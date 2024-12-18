@@ -10,9 +10,9 @@
 
 Fabric CICD is a Python library designed for use with [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) workspaces. This library is intended to support code first CICD integrations to seamlessly integrate Source Controlled workspaces into a deployment framework.  The goal of this library is to support the CICD developers that don't want to dig into the weeds of interacting directly with the Microsoft Fabric APIs.  
 
-If you encounter any issues, please [raise a bug](https://github.com/microsoft/semantic-link-labs/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=).
+If you encounter any issues, please [raise a bug](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=).
 
-If you have ideas for new features/functions, please [request a feature](https://github.com/microsoft/semantic-link-labs/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=).
+If you have ideas for new features/functions, please [request a feature](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=).
 
 ## Featured Scenarios
 - Deploying Items hosted in a repository
