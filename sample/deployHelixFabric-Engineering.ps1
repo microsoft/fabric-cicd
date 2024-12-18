@@ -25,22 +25,18 @@ $env:PYTHONPATH = ".;$PSScriptRoot"
 
 # Execute a Python script for deployment tasks
 Python -c @"
-import deployfabric.install_requirements
-from deployfabric.FabricWorkspace import FabricWorkspace
-from helixCustom.helixCustomFunctions import preprocess_all_items
+pip install fabric-cicd
+
+from fabric-cicd.FabricWorkspace import FabricWorkspace
 
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
-    workspace_id='$workspace_id',
-    environment='$environment',
-    repository_directory=r'$repository_directory',
-    item_type_in_scope=$item_type_in_scope,
-    base_api_url='https://msitapi.fabric.microsoft.com/',
+    workspace_id='',
+    environment='',
+    repository_directory=r'',
+    item_type_in_scope=[],
     debug_output=$False
 )
-
-# Preprocess items before publishing/unpublishing
-preprocess_all_items(target_workspace)
 
 # Publish all items defined in scope
 target_workspace.publish_all_items()
