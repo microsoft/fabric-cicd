@@ -21,15 +21,11 @@ jobs:
         pip install flake8 black requests
 
     - name: Run flake8
+      continue-on-error: true
       run: |
-        flake8 . > flake8_output.txt || true
+        flake8 .
 
     - name: Run black
+      continue-on-error: true
       run: |
-        black --check . > black_output.txt || true
-
-    - name: Comment on PR
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        PR_NUMBER: ${{ github.event.pull_request.number }}
-      run: python .github/workflows/comment_linter_issues.py
+        black --check .
