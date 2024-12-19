@@ -18,10 +18,18 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black
+        pip install flake8 black requests
 
     - name: Run flake8
-      run: flake8 .
+      run: |
+        flake8 . > flake8_output.txt || true
 
     - name: Run black
-      run: black --check .
+      run: |
+        black --check . > black_output.txt || true
+
+    - name: Comment on PR
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: python comment_linter_issues.py
