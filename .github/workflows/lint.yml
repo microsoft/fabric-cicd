@@ -1,16 +1,27 @@
-name: Lint
+name: Lint Python Code
+
 on: [pull_request]
 
 jobs:
-  flake8-lint:
+  lint:
     runs-on: ubuntu-latest
-    name: Lint
+
     steps:
-      - name: Check out source repository
-        uses: actions/checkout@v3
-      - name: Set up Python environment
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - name: flake8 Lint
-        uses: py-actions/flake8@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black
+
+    - name: Run flake8
+      run: flake8 .
+
+    - name: Run black
+      run: black --check .
