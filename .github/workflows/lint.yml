@@ -16,3 +16,4 @@ jobs:
         uses: py-actions/flake8@v2
         with:
           path: "src"
+          plugins: "flake8-bugbear==22.1.11 flake8-black"
