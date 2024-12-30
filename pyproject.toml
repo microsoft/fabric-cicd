@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fabric-cicd"
+authors = [
+    { name = "Microsoft Corporation" },
+]
+version = "0.1.1"
+description = "Microsoft Fabric CI/CD"
+readme="README.md"
+requires-python = ">=3.10,<3.12"
+keywords = ["microsoft fabric", "fabric", "cicd"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3"
+]
+license = { text = "MIT License" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+install_requires = [
+    "requests>=2.32.3",
+    "pyyaml>=6.0.2",
+    "azure-identity>=1.19.0"
+]
+
+[project.urls]
+Repository = "https://github.com/microsoft/fabric-cicd.git"

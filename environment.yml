@@ -1,11 +1,7 @@
 name: fabric-cicd
 dependencies:
-- flake8
-- mypy
-- pytest
-- pytest-cov
-- pytest-mock
+- python>=3.10
 - pip:
-  - azure-identity
-  - pyyaml
-  - requests
+  - requests>=2.32.3
+  - pyyaml>=6.0.2
+  - azure-identity>=1.19.0
