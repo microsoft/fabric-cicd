@@ -30,12 +30,16 @@ If you have ideas for new features/functions, please [request a feature](https:/
     - Connections are not changed during the deployment
   - Environments
     - Custom and Public Libraries are not included in the deployment
+  - Folders
+    - Sub folders are not included in the deployment
     
 ## How to Use
-```python
+```shell
 pip install fabric-cicd
+```
 
-from fabric-cicd.FabricWorkspace import FabricWorkspace
+```python
+from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
@@ -47,7 +51,11 @@ target_workspace = FabricWorkspace(
 )
 
 # Publish all items defined in scope
-target_workspace.publish_all_items()
+publish_all_items(target_workspace)
+
+# Unpublish all items defined in scope not found in repository
+# Except those starting with DEBUG_
+unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r'^DEBUG.*')
 ```
 
 ## Contributing
