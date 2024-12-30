@@ -1,14 +1,62 @@
-# Project
+# Fabric CICD
+[![PyPI version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd)
+[![Read The Docs](https://readthedocs.org/projects/fabric-cicd/badge/?version=0.1&style=flat)](https://readthedocs.org/projects/fabric-cicd/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Downloads](https://static.pepy.tech/badge/fabric-cicd)](https://pepy.tech/project/fabric-cicd)
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+---
+[Read the documentation on ReadTheDocs!](https://fabric-cicd.readthedocs.io/en/stable/)
+---
 
-As the maintainer of this project, please make a few updates:
+Fabric CICD is a Python library designed for use with [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) workspaces. This library is intended to support code first CICD integrations to seamlessly integrate Source Controlled workspaces into a deployment framework.  The goal of this library is to support the CICD developers that don't want to dig into the weeds of interacting directly with the Microsoft Fabric APIs.  
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+If you encounter any issues, please [raise a bug](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=).
+
+If you have ideas for new features/functions, please [request a feature](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=).
+
+## Featured Scenarios
+- Deploying Items hosted in a repository
+
+### In Scope Item Types
+  - Notebooks
+  - Data Pipelines
+  - Environments
+  
+### Limitations
+  - Notebooks Limitations
+    - Attached lakehouses are not changed during the deployment
+    - Attached resources are not included in the deployment
+  - Data Pipelines
+    - Connections are not changed during the deployment
+  - Environments
+    - Custom and Public Libraries are not included in the deployment
+  - Folders
+    - Sub folders are not included in the deployment
+    
+## How to Use
+```shell
+pip install fabric-cicd
+```
+
+```python
+from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+# Initialize the FabricWorkspace object with the required parameters
+target_workspace = FabricWorkspace(
+    workspace_id='',
+    environment='',
+    repository_directory=r'',
+    item_type_in_scope=[],
+    debug_output=False
+)
+
+# Publish all items defined in scope
+publish_all_items(target_workspace)
+
+# Unpublish all items defined in scope not found in repository
+# Except those starting with DEBUG_
+unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r'^DEBUG.*')
+```
 
 ## Contributing
 
