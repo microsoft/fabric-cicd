@@ -1,14 +1,14 @@
 
-from fabric_cicd.items_._datapipeline import (
+from fabric_cicd._items._datapipeline import (
     _publish_datapipelines,
     _sort_datapipelines,
 )
 
-from fabric_cicd.items_._environment import (
+from fabric_cicd._items._environment import (
     _publish_environments
 )
 
-from fabric_cicd.items_._notebook import (
+from fabric_cicd._items._notebook import (
     _publish_notebooks
 )
 
