@@ -1,4 +1,4 @@
-from deployfabric.CustomPrint import CustomPrint
+from fabric_cicd._CustomPrint import _CustomPrint
 import json, time, requests, base64, datetime
 from azure.identity import DefaultAzureCredential
 
@@ -56,7 +56,7 @@ class FabricEndpoint:
                     long_running = True
                 else:
                     retry_after = float(response.headers.get('Retry-After', 0.5))
-                    CustomPrint.sub_line(f"Operation in progress. Checking again in {retry_after} seconds.")
+                    print_sub_line(f"Operation in progress. Checking again in {retry_after} seconds.")
                     time.sleep(retry_after)
 
             # Handle successful responses
@@ -66,18 +66,18 @@ class FabricEndpoint:
             # Handle API throttling
             elif response.status_code == 429:
                 retry_after = float(response.headers.get('Retry-After', 5)) + 5
-                CustomPrint.sub_line(f"API Overloaded: Retrying in {retry_after} seconds")
+                print_sub_line(f"API Overloaded: Retrying in {retry_after} seconds")
                 time.sleep(retry_after)
 
             # Handle expired authentication token
             elif response.status_code == 401 and response.headers.get('x-ms-public-api-error-code') == "TokenExpired":
-                CustomPrint.sub_line("AAD token expired. Refreshing token.")
+                print_sub_line("AAD token expired. Refreshing token.")
                 self.refresh_token()
 
             # Handle item name conflicts
             elif response.status_code == 400 and response.headers.get('x-ms-public-api-error-code') == "ItemDisplayNameAlreadyInUse":
                 if iteration_count <= 6:
-                    CustomPrint.sub_line("Item name is reserved. Retrying in 60 seconds.")
+                    print_sub_line("Item name is reserved. Retrying in 60 seconds.")
                     time.sleep(60)
                 else:
                     self.raise_invoke_exception(f"Item name still in use after 6 attempts. Description: {response.reason}",response, method, url, body)
@@ -132,17 +132,17 @@ class FabricEndpoint:
         :param body: Body of the request.
         """
         debug_color = "gray"
-        CustomPrint.header("DEBUG OUTPUT", debug_color)
-        CustomPrint.line(f"URL: {url}", debug_color)
-        CustomPrint.line(f"Method: {method}", debug_color)
-        CustomPrint.line(f"Request Body: {body}", debug_color)
+        print_header("DEBUG OUTPUT", debug_color)
+        print_line(f"URL: {url}", debug_color)
+        print_line(f"Method: {method}", debug_color)
+        print_line(f"Request Body: {body}", debug_color)
         if response is not None:
-            CustomPrint.line(f"Response Status: {response.status_code}", debug_color)
-            CustomPrint.line("Response Header:", debug_color)
-            CustomPrint.line(response.headers, debug_color)
-            CustomPrint.line("Response Body:", debug_color)
-            CustomPrint.line(response.text, debug_color)
-            CustomPrint.line("")
+            print_line(f"Response Status: {response.status_code}", debug_color)
+            print_line("Response Header:", debug_color)
+            print_line(response.headers, debug_color)
+            print_line("Response Body:", debug_color)
+            print_line(response.text, debug_color)
+            print_line("")
 
     def raise_invoke_exception(self, message, response, method, url, body):
         """
