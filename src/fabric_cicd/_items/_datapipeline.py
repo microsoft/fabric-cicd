@@ -7,7 +7,7 @@ Functions to process and deploy DataPipeline item.
 """
 
 
-def _publish_datapipelines(fabric_workspace_obj):
+def publish_datapipelines(fabric_workspace_obj):
     """
     Publishes all data pipeline items from the repository in the correct order based on their dependencies.
     """
@@ -31,7 +31,7 @@ def _publish_datapipelines(fabric_workspace_obj):
 
         unsorted_pipeline_dict[item_name] = item_content_dict
 
-    publish_order = _sort_datapipelines(
+    publish_order = sort_datapipelines(
         fabric_workspace_obj, unsorted_pipeline_dict, "Repository"
     )
 
@@ -40,7 +40,7 @@ def _publish_datapipelines(fabric_workspace_obj):
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
 
 
-def _sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type):
+def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type):
     """
     Output a sorted list that datapipelines should be published or unpublished with based on item dependencies.
 

@@ -1,35 +1,47 @@
 from fabric_cicd._common._custom_print import print_header
+from fabric_cicd._common._validate_input import (
+    validate_fabric_workspace_obj,
+)
+from fabric_cicd.fabric_workspace import FabricWorkspace
 import fabric_cicd._items as items
 import json
 import base64
 import re
+
 
 """
 Functions to deploy Fabric workspace items.
 """
 
 
-def publish_all_items(fabric_workspace_obj):
+def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all items defined in item_type_in_scope list.
     """
+    fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Environments")
-        items._publish_environments(fabric_workspace_obj)
+        items.publish_environments(fabric_workspace_obj)
     if "Notebook" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Notebooks")
-        items._publish_notebooks(fabric_workspace_obj)
+        items.publish_notebooks(fabric_workspace_obj)
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing DataPipelines")
-        items._publish_datapipelines(fabric_workspace_obj)
+        items.publish_datapipelines(fabric_workspace_obj)
 
 
-def unpublish_all_orphan_items(fabric_workspace_obj, item_name_exclude_regex):
+def unpublish_all_orphan_items(
+    fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str
+) -> None:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
 
     :param item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished.
     """
+
+    fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
     regex_pattern = re.compile(item_name_exclude_regex)
 
     fabric_workspace_obj._refresh_deployed_items()
@@ -79,7 +91,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj, item_name_exclude_regex):
                         unsorted_pipeline_dict[item_name] = json.loads(decoded_string)
 
             # Determine order to delete w/o dependencies
-            to_delete_list = items._sort_datapipelines(
+            to_delete_list = items.sort_datapipelines(
                 fabric_workspace_obj, unsorted_pipeline_dict, "Deployed"
             )
 

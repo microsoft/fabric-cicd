@@ -16,6 +16,8 @@ If you have ideas for new features/functions, please [request a feature](https:/
 
 ## Featured Scenarios
 - Deploying Items hosted in a repository
+- 100% deployment, does not consider diffs
+- Deploys into the tenant of the executing identity
 
 ### In Scope Item Types
   - Notebooks
