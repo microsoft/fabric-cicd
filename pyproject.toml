@@ -7,7 +7,7 @@ name = "fabric-cicd"
 authors = [
     { name = "Microsoft Corporation" }
 ]
-version = "0.1.4"
+version = "0.1.5"
 description = "Microsoft Fabric CI/CD"
 readme = "README.md"
 requires-python = ">=3.9"
