@@ -42,10 +42,10 @@ class FabricWorkspace:
         self.base_api_url = f"{base_api_url}/v1/workspaces/{workspace_id}"
         self.debug_output = debug_output
 
-        self.refresh_deployed_items()
-        self.refresh_repository_items()
+        self._refresh_deployed_items()
+        self._refresh_repository_items()
 
-    def refresh_repository_items(self):
+    def _refresh_repository_items(self):
         """
         Refreshes the repository_items dictionary by scanning the repository directory.
         """
@@ -115,7 +115,7 @@ class FabricWorkspace:
             with open(parameter_file_path, "r") as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
-    def refresh_deployed_items(self):
+    def _refresh_deployed_items(self):
         """
         Refreshes the deployed_items dictionary by querying the Fabric workspace items API.
         """
@@ -141,7 +141,7 @@ class FabricWorkspace:
                 "guid": item_guid,
             }
 
-    def replace_logical_ids(self, raw_file):
+    def _replace_logical_ids(self, raw_file):
         """
         Replaces logical IDs with deployed GUIDs in the raw file content.
 
@@ -163,7 +163,7 @@ class FabricWorkspace:
 
         return raw_file
 
-    def replace_parameters(self, raw_file):
+    def _replace_parameters(self, raw_file):
         """
         Replaces values found in parameter file with the chosen environment value.
 
@@ -183,7 +183,7 @@ class FabricWorkspace:
 
         return raw_file
 
-    def replace_activity_workspace_ids(self, raw_file, lookup_type):
+    def _replace_activity_workspace_ids(self, raw_file, lookup_type):
         """
         Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
         in the raw file content.
@@ -194,7 +194,7 @@ class FabricWorkspace:
         # Create a dictionary from the raw_file
         item_content_dict = json.loads(raw_file)
 
-        def find_and_replace_activity_workspace_ids(input_object):
+        def _find_and_replace_activity_workspace_ids(input_object):
             """
             Recursively scans through JSON to find and replace feature branch workspace IDs in nested and
             non-nested activities where workspaceId
@@ -213,7 +213,7 @@ class FabricWorkspace:
                         # Convert the notebook ID to its name
                         item_type = "Notebook"
                         referenced_id = input_object["typeProperties"]["notebookId"]
-                        referenced_name = self.convert_id_to_name(
+                        referenced_name = self._convert_id_to_name(
                             item_type=item_type,
                             generic_id=referenced_id,
                             lookup_type=lookup_type,
@@ -226,23 +226,23 @@ class FabricWorkspace:
 
                     # Recursively search in the value
                     else:
-                        find_and_replace_activity_workspace_ids(value)
+                        _find_and_replace_activity_workspace_ids(value)
 
             # Check if the current object is a list
             elif isinstance(input_object, list):
                 # Recursively search in each item
                 for item in input_object:
-                    find_and_replace_activity_workspace_ids(item)
+                    _find_and_replace_activity_workspace_ids(item)
 
         # Start the recursive search and replace from the root of the JSON data
-        find_and_replace_activity_workspace_ids(item_content_dict)
+        _find_and_replace_activity_workspace_ids(item_content_dict)
 
         # Convert the updated dict back to a JSON string
         raw_file = json.dumps(item_content_dict, indent=2)
 
         return raw_file
 
-    def convert_id_to_name(self, item_type, generic_id, lookup_type):
+    def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
         For a given item_type and id, returns the item name.  Special handling for both deployed and repository items
 
@@ -264,7 +264,7 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def publish_item(
+    def _publish_item(
         self, item_name, item_type, excluded_files={".platform"}, full_publish=True
     ):
         """
@@ -299,7 +299,7 @@ class FabricWorkspace:
 
                         # Replace feature branch workspace IDs with target workspace IDs in data pipeline activities.
                         if item_type == "DataPipeline":
-                            raw_file = self.replace_activity_workspace_ids(
+                            raw_file = self._replace_activity_workspace_ids(
                                 raw_file, "Repository"
                             )
 
@@ -317,8 +317,8 @@ class FabricWorkspace:
                             )
 
                         # Replace logical IDs with deployed GUIDs.
-                        replaced_raw_file = self.replace_logical_ids(raw_file)
-                        replaced_raw_file = self.replace_parameters(replaced_raw_file)
+                        replaced_raw_file = self._replace_logical_ids(raw_file)
+                        replaced_raw_file = self._replace_parameters(replaced_raw_file)
 
                         byte_file = replaced_raw_file.encode("utf-8")
                         payload = base64.b64encode(byte_file).decode("utf-8")
@@ -369,7 +369,7 @@ class FabricWorkspace:
 
         print_sub_line("Published")
 
-    def unpublish_item(self, item_name, item_type):
+    def _unpublish_item(self, item_name, item_type):
         """
         Unpublishes an item from the Fabric workspace.
 
