@@ -145,7 +145,7 @@ def _find_referenced_datapipelines(
 
                 # Add found pipeline reference to list
                 if referenced_id is not None:
-                    referenced_name = fabric_workspace_obj.convert_id_to_name(
+                    referenced_name = fabric_workspace_obj._convert_id_to_name(
                         item_type=item_type,
                         generic_id=referenced_id,
                         lookup_type=lookup_type,
