@@ -32,7 +32,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
 
 
 def unpublish_all_orphan_items(
-    fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str
+    fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$"
 ) -> None:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
@@ -42,7 +42,10 @@ def unpublish_all_orphan_items(
 
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    regex_pattern = re.compile(item_name_exclude_regex)
+    try:
+        regex_pattern = re.compile(item_name_exclude_regex)
+    except Exception as e:
+        print(f"An error occurred with the regex provided: {e}")
 
     fabric_workspace_obj._refresh_deployed_items()
     print_header("Unpublishing Orphaned Items")

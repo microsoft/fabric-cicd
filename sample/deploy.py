@@ -61,5 +61,8 @@ target_workspace = FabricWorkspace(
 publish_all_items(target_workspace)
 
 # Unpublish all items defined in item_type_in_scope not found in repository
-# Excluding items with starting with the name DEBUG in the workspace
-unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r"^DEBUG.*")
+unpublish_all_orphan_items(
+    target_workspace,
+    # Optional to exclude item names matching the regex pattern
+    # item_name_exclude_regex=r"^DEBUG.*"
+)
