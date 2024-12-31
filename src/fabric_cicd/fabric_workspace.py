@@ -66,7 +66,9 @@ class FabricWorkspace:
         self.environment_parameter = {}
 
         if os.path.isfile(parameter_file_path):
-            print(f"Found parameter file '{parameter_file_path}'")
+            print_line(
+                f"Info: Found parameter file '{parameter_file_path}'", color="yellow"
+            )
             with open(parameter_file_path, "r") as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
