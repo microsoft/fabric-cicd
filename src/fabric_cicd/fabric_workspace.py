@@ -43,9 +43,9 @@ class FabricWorkspace:
         self.debug_output = debug_output
 
         self.refresh_deployed_items()
-        self.refresh_repository_items()
+        self._refresh_repository_items()
 
-    def refresh_repository_items(self):
+    def _refresh_repository_items(self):
         """
         Refreshes the repository_items dictionary by scanning the repository directory.
         """
