@@ -37,7 +37,7 @@ def _publish_datapipelines(fabric_workspace_obj):
 
     # Publish
     for item_name in publish_order:
-        fabric_workspace_obj.publish_item(item_name=item_name, item_type=item_type)
+        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
 
 
 def _sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type):

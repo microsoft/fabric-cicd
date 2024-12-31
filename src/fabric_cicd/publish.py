@@ -32,7 +32,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj, item_name_exclude_regex):
     """
     regex_pattern = re.compile(item_name_exclude_regex)
 
-    fabric_workspace_obj.refresh_deployed_items()
+    fabric_workspace_obj._refresh_deployed_items()
     print_header("Unpublishing Orphaned Items")
 
     # Order of unpublishing to handle dependencies cleanly
@@ -84,6 +84,6 @@ def unpublish_all_orphan_items(fabric_workspace_obj, item_name_exclude_regex):
             )
 
         for item_name in to_delete_list:
-            fabric_workspace_obj.unpublish_item(
+            fabric_workspace_obj._unpublish_item(
                 item_name=item_name, item_type=item_type
             )
