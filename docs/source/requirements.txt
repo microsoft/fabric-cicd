@@ -1,0 +1,4 @@
+sphinx_rtd_theme
+requests>=2.32.3
+pyyaml>=6.0.2
+azure-identity>=1.19.0
