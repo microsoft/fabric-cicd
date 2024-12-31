@@ -16,6 +16,8 @@ If you have ideas for new features/functions, please [request a feature](https:/
 
 ## Featured Scenarios
 - Deploying Items hosted in a repository
+- 100% deployment, does not consider diffs
+- Deploys into the tenant of the executing identity
 
 ### In Scope Item Types
   - Notebooks
@@ -46,16 +48,14 @@ target_workspace = FabricWorkspace(
     workspace_id='',
     environment='',
     repository_directory=r'',
-    item_type_in_scope=[],
-    debug_output=False
+    item_type_in_scope=[]
 )
 
-# Publish all items defined in scope
+# Publish all items defined in item_type_in_scope
 publish_all_items(target_workspace)
 
-# Unpublish all items defined in scope not found in repository
-# Except those starting with DEBUG_
-unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r'^DEBUG.*')
+# Unpublish all items defined in item_type_in_scope not found in repository
+unpublish_all_orphan_items(target_workspace)
 ```
 
 ## Contributing

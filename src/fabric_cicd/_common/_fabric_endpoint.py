@@ -21,7 +21,7 @@ class FabricEndpoint:
         self.aad_token = None
         self.aad_token_expiration = None
         self.debug_output = debug_output
-        self.refresh_token()
+        self._refresh_token()
 
     def invoke(self, method, url, body="{}"):
         """
@@ -48,7 +48,7 @@ class FabricEndpoint:
             iteration_count += 1
 
             if self.debug_output:
-                self.write_debug_output(response, method, url, body)
+                self._write_debug_output(response, method, url, body)
 
             # Handle long-running operations
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
@@ -90,7 +90,7 @@ class FabricEndpoint:
                 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired"
             ):
                 print_sub_line("AAD token expired. Refreshing token.")
-                self.refresh_token()
+                self._refresh_token()
 
             # Handle item name conflicts
             elif (
@@ -102,7 +102,7 @@ class FabricEndpoint:
                     print_sub_line("Item name is reserved. Retrying in 60 seconds.")
                     time.sleep(60)
                 else:
-                    self.raise_invoke_exception(
+                    self._raise_invoke_exception(
                         f"Item name still in use after 6 attempts. Description: {response.reason}",
                         response,
                         method,
@@ -114,7 +114,7 @@ class FabricEndpoint:
             elif (
                 response.status_code == 403 and response.reason == "FeatureNotAvailable"
             ):
-                self.raise_invoke_exception(
+                self._raise_invoke_exception(
                     f"Item type not supported. Description: {response.reason}",
                     response,
                     method,
@@ -124,7 +124,7 @@ class FabricEndpoint:
 
             # Handle unexpected errors
             else:
-                self.raise_invoke_exception(
+                self._raise_invoke_exception(
                     f"Unhandled error occurred. Description: {response.reason}",
                     response,
                     method,
@@ -142,7 +142,7 @@ class FabricEndpoint:
             "status_code": response.status_code,
         }
 
-    def refresh_token(self):
+    def _refresh_token(self):
         """
         Refreshes the AAD token if empty or expiration has passed
         """
@@ -174,7 +174,7 @@ class FabricEndpoint:
             except Exception as e:
                 print(f"An error occurred: {e}")
 
-    def write_debug_output(self, response, method, url, body):
+    def _write_debug_output(self, response, method, url, body):
         """
         Outputs debug information if debug mode is enabled.
 
@@ -196,7 +196,7 @@ class FabricEndpoint:
             print_line(response.text, debug_color)
             print_line("")
 
-    def raise_invoke_exception(self, message, response, method, url, body):
+    def _raise_invoke_exception(self, message, response, method, url, body):
         """
         Raises an exception with a message and optionally outputs debug information.
 
@@ -207,5 +207,5 @@ class FabricEndpoint:
         :param body: Body of the request.
         """
         if self.debug_output:
-            self.write_debug_output(response, method, url, body)
+            self._write_debug_output(response, method, url, body)
         raise Exception(message)

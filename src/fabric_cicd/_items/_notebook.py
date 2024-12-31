@@ -3,7 +3,7 @@ Functions to process and deploy Notebook item.
 """
 
 
-def _publish_notebooks(fabric_workspace_obj):
+def publish_notebooks(fabric_workspace_obj):
     """
     Publishes all notebook items from the repository.
     """

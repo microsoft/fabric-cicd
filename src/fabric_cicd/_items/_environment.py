@@ -7,7 +7,7 @@ Functions to process and deploy Environment item.
 """
 
 
-def _publish_environments(fabric_workspace_obj):
+def publish_environments(fabric_workspace_obj):
     """
     Publishes all environment items from the repository.
 

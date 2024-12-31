@@ -17,13 +17,13 @@ class FabricWorkspace:
 
     def __init__(
         self,
-        workspace_id,
-        environment,
-        repository_directory,
-        item_type_in_scope,
-        base_api_url="https://api.fabric.microsoft.com/",
-        debug_output=False,
-    ):
+        workspace_id: str,
+        repository_directory: str,
+        item_type_in_scope: list[str],
+        base_api_url: str = "https://api.fabric.microsoft.com/",
+        environment: str = "N/A",
+        debug_output: bool = False,
+    ) -> None:
         """
         Initializes the FabricWorkspace instance.
 
@@ -34,16 +34,41 @@ class FabricWorkspace:
         :param base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
         :param debug_output: If True, enables debug output for API requests.
         """
-        self.endpoint = FabricEndpoint(debug_output=debug_output)
-        self.workspace_id = workspace_id
-        self.environment = environment
-        self.repository_directory = repository_directory
-        self.item_type_in_scope = item_type_in_scope
-        self.base_api_url = f"{base_api_url}/v1/workspaces/{workspace_id}"
-        self.debug_output = debug_output
+        from fabric_cicd._common._validate_input import (
+            validate_workspace_id,
+            validate_repository_directory,
+            validate_item_type_in_scope,
+            validate_base_api_url,
+            validate_environment,
+            validate_debug_output,
+        )
 
+        # validate and record
+        self.workspace_id = validate_workspace_id(workspace_id)
+        self.repository_directory = validate_repository_directory(repository_directory)
+        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
+        self.base_api_url = (
+            f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
+        )
+
+        self.environment = validate_environment(environment)
+        self.debug_output = validate_debug_output(debug_output)
+
+        # do work
+        self.endpoint = FabricEndpoint(debug_output=self.debug_output)
+        self._refresh_parameter_file()
         self._refresh_deployed_items()
         self._refresh_repository_items()
+
+    def _refresh_parameter_file(self):
+        # load parameters if file is present
+        parameter_file_path = os.path.join(self.repository_directory, "parameter.yml")
+        self.environment_parameter = {}
+
+        if os.path.isfile(parameter_file_path):
+            print(f"Found parameter file '{parameter_file_path}'")
+            with open(parameter_file_path, "r") as yaml_file:
+                self.environment_parameter = yaml.safe_load(yaml_file)
 
     def _refresh_repository_items(self):
         """
@@ -105,15 +130,6 @@ class FabricWorkspace:
                     "guid": item_guid,
                     "logical_id": item_logical_id,
                 }
-
-        # load parameters if file is present
-        parameter_file_path = os.path.join(self.repository_directory, "parameter.yml")
-        self.environment_parameter = {}
-
-        if os.path.isfile(parameter_file_path):
-            print(parameter_file_path)
-            with open(parameter_file_path, "r") as yaml_file:
-                self.environment_parameter = yaml.safe_load(yaml_file)
 
     def _refresh_deployed_items(self):
         """
