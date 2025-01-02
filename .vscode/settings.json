@@ -1,0 +1,34 @@
+{
+    "editor": {
+        "tabSize": 4,
+        "trimAutoWhitespace": false
+    },
+    "diffEditor":{
+        "ignoreTrimWhitespace": false
+    },
+    "files": {
+        "trimTrailingWhitespace": false,
+        "trimTrailingWhitespaceInRegexAndStrings": false,
+        "insertFinalNewline": true,
+        "autoSave": "off"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
+    "python": {
+        "createEnvironment.trigger": "off",
+    },
+    "[json]": {
+        "editor.formatOnSave": true
+    },
+    "git": {
+        "branchPrefix": "users/",
+        "enableSmartCommit": true,
+        "confirmSync": false,
+        "autofetch": true
+    },
+    "terminal":{
+        "integrated.defaultProfile.windows": "Git Bash"
+    }
+}
