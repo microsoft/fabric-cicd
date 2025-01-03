@@ -19,7 +19,7 @@ class FabricEndpoint:
 
     def __init__(self, token_credential=None):
         """
-        Initializes the FabricEndpoint instance, sets up the authentication token, and sets debug mode.
+        Initializes the FabricEndpoint instance, sets up the authentication token.
 
         """
         self.aad_token = None
