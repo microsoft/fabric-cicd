@@ -16,7 +16,7 @@ from fabric_cicd import (
 # enable_debug_log()
 
 # The defined environment values should match the names found in the parameter.yml file
-workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
+workspace_id = "fd844302-8fdd-42c1-b1ff-e35bc8e294e4"
 environment = "dev"
 
 # In this example, our workspace content sits within the root/sample/workspace directory
