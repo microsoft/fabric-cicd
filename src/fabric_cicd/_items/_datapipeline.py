@@ -1,6 +1,7 @@
 import os
 import json
 from collections import defaultdict, deque
+from fabric_cicd._common._exceptions import ParsingError
 
 """
 Functions to process and deploy DataPipeline item.
@@ -97,7 +98,7 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
                 zero_in_degree_queue.append(neighbor)
 
     if len(sorted_items) != len(in_degree):
-        raise ValueError(
+        raise ParsingError(
             "There is a cycle in the graph. Cannot determine a valid publish order."
         )
 

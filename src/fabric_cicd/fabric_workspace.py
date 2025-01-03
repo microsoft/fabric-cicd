@@ -1,19 +1,27 @@
 from fabric_cicd._common._custom_print import (
-    print_line,
     print_timestamp,
     print_sub_line,
 )
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._exceptions import ParsingError
 import os
 import json
 import base64
 import yaml
+from azure.identity import DefaultAzureCredential
+from azure.core.credentials import TokenCredential
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FabricWorkspace:
     """
     A class to manage and publish workspace items to the Fabric API.
     """
+
+    # Define which Item Types
+    _non_upn_item_types = ["Notebook", "Environment"]
 
     def __init__(
         self,
@@ -22,17 +30,17 @@ class FabricWorkspace:
         item_type_in_scope: list[str],
         base_api_url: str = "https://api.fabric.microsoft.com/",
         environment: str = "N/A",
-        debug_output: bool = False,
+        token_credential: TokenCredential = None,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
 
         :param workspace_id: The ID of the workspace to interact with.
-        :param environment: The environment to be used for parameterization.
         :param repository_directory: Directory path where repository items are located.
         :param item_type_in_scope: Item types that should be deployed for given workspace.
         :param base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
-        :param debug_output: If True, enables debug output for API requests.
+        :param environment: The environment to be used for parameterization.
+        :param token_credential: The token credential to use for API requests.
         """
         from fabric_cicd._common._validate_input import (
             validate_workspace_id,
@@ -40,35 +48,44 @@ class FabricWorkspace:
             validate_item_type_in_scope,
             validate_base_api_url,
             validate_environment,
-            validate_debug_output,
+            validate_token_credential,
         )
 
-        # validate and record
+        # Initialize endpoint
+        self.endpoint = FabricEndpoint(
+            # if credential is defined, use DefaultAzureCredential
+            token_credential=(
+                DefaultAzureCredential()
+                if token_credential is None
+                else validate_token_credential(token_credential)
+            )
+        )
+
+        # Validate and set class variables
         self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory = validate_repository_directory(repository_directory)
-        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
+        self.item_type_in_scope = validate_item_type_in_scope(
+            item_type_in_scope, upn_auth=self.endpoint.upn_auth
+        )
         self.base_api_url = (
             f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
         )
-
         self.environment = validate_environment(environment)
-        self.debug_output = validate_debug_output(debug_output)
 
-        # do work
-        self.endpoint = FabricEndpoint(debug_output=self.debug_output)
+        # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
         self._refresh_deployed_items()
         self._refresh_repository_items()
 
     def _refresh_parameter_file(self):
-        # load parameters if file is present
+        """
+        Load parameters if file is present
+        """
         parameter_file_path = os.path.join(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
         if os.path.isfile(parameter_file_path):
-            print_line(
-                f"Info: Found parameter file '{parameter_file_path}'", color="yellow"
-            )
+            logger.info(f"Found parameter file '{parameter_file_path}'")
             with open(parameter_file_path, "r") as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
@@ -85,28 +102,26 @@ class FabricWorkspace:
 
                 # Print a warning and skip directory if empty
                 if not os.listdir(directory.path):
-                    print_line(
-                        f"Warning: directory {directory.name} is empty.", color="yellow"
-                    )
+                    logger.warning(f"Directory {directory.name} is empty.")
                     continue
 
                 # Attempt to read metadata file
                 try:
                     with open(item_metadata_path, "r") as file:
                         item_metadata = json.load(file)
-                except FileNotFoundError:
-                    raise ValueError(
-                        f"{item_metadata_path} path does not exist in the specified repository."
+                except FileNotFoundError as e:
+                    ParsingError(
+                        f"{item_metadata_path} path does not exist in the specified repository. {e}"
                     )
-                except json.JSONDecodeError:
-                    raise ValueError(f"Error decoding JSON in {item_metadata_path}.")
+                except json.JSONDecodeError as e:
+                    ParsingError(f"Error decoding JSON in {item_metadata_path}. {e}")
 
                 # Ensure required metadata fields are present
                 if (
                     "type" not in item_metadata["metadata"]
                     or "displayName" not in item_metadata["metadata"]
                 ):
-                    raise ValueError(
+                    raise ParsingError(
                         f"displayName & type are required in {item_metadata_path}"
                     )
 
@@ -173,8 +188,8 @@ class FabricWorkspace:
 
                 if logical_id in raw_file:
                     if item_guid == "":
-                        raise Exception(
-                            "Cannot replace logical ID as referenced item is not yet deployed."
+                        raise ParsingError(
+                            f"Cannot replace logical ID '{logical_id}' as referenced item is not yet deployed."
                         )
                     else:
                         raw_file = raw_file.replace(logical_id, item_guid)

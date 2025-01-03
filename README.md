@@ -20,20 +20,29 @@ If you have ideas for new features/functions, please [request a feature](https:/
 - Deploys into the tenant of the executing identity
 
 ### In Scope Item Types
-  - Notebooks
-  - Data Pipelines
-  - Environments
+- Notebooks
+- Data Pipelines
+- Environments
   
 ### Limitations
-  - Notebooks Limitations
-    - Attached lakehouses are not changed during the deployment
-    - Attached resources are not included in the deployment
-  - Data Pipelines
-    - Connections are not changed during the deployment
-  - Environments
-    - Custom and Public Libraries are not included in the deployment
-  - Folders
-    - Sub folders are not included in the deployment
+- **Notebooks**:
+  - Attached lakehouses are not changed during deployment
+  - Attached resources are not included in deployment
+- **Data Pipelines**:
+  - Connections are not changed during deployment
+- **Environments**:
+  - Custom and public libraries are not included in deployment
+- **Folders**:
+  - Sub folders are not included in deployment
+    
+### Authentication
+- Optionally provide your own credential object aligned with the [TokenCredential class](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential) in the `token_credential` parameter.
+- If the `token_credential` parameter is omitted, the library uses the Azure SDK `DefaultAzureCredential` for authentication.
+  - Refer to the [Azure SDK documentation](https://learn.microsoft.com/en-us/azure/developer/python/sdk/authentication/credential-chains?tabs=dac#defaultazurecredential-overview) for the order in which credential types are attempted.
+  - For local development with a UPN, install either the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows) or [Az.Accounts](https://www.powershellgallery.com/packages/Az.Accounts/2.2.3).
+  - Note: When no credential is provided, the `DefaultAzureCredential` may choose an unexpected identity. For instance, if you log in to the Azure CLI with an SPN but log in to Az.Account with a UPN, the `DefaultAzureCredential` will choose the CLI authentication first.
+
+ 
     
 ## How to Use
 ```shell
