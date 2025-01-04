@@ -78,20 +78,21 @@ def exception_handler(exception_type, exception, traceback):
         original_logger = exception.logger
 
         # Write only the exception message to the console
-        additional_info = getattr(exception, "additional_info", None)
-        additional_info = (
-            "\n\nAdditional Info: \n" + additional_info
-            if additional_info is not None
-            else ""
-        )
         logging.getLogger("console_only").error(
-            f"{str(exception)}{additional_info}\n\nSee {os.path.abspath('fabric_cicd.error.log')} for full details."
+            f"{str(exception)}\n\nSee {os.path.abspath('fabric_cicd.error.log')} for full details."
         )
 
         # Write exception and full stack trace to logs but not terminal
         package_logger = logging.getLogger("fabric_cicd")
 
         # Clear any existing handlers to prevent writing to console
+        additional_info = getattr(exception, "additional_info", None)
+        additional_info = (
+            "\n\nAdditional Info: \n" + additional_info
+            if additional_info is not None
+            else ""
+        )
+
         package_logger.handlers = []
         original_logger.exception(
             f"%s{additional_info}",

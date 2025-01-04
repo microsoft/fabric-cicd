@@ -39,118 +39,121 @@ class FabricEndpoint:
         exit_loop = False
         iteration_count = 0
         long_running = False
+        unhandled = False
 
         while not exit_loop:
-            headers = {
-                "Authorization": f"Bearer {self.aad_token}",
-                "Content-Type": "application/json; charset=utf-8",
-            }
+            try:
+                headers = {
+                    "Authorization": f"Bearer {self.aad_token}",
+                    "Content-Type": "application/json; charset=utf-8",
+                }
 
-            response = requests.request(
-                method=method, url=url, headers=headers, json=body
-            )
-            iteration_count += 1
+                response = requests.request(
+                    method=method, url=url, headers=headers, json=body
+                )
+                iteration_count += 1
 
-            invoke_log_message = format_invoke_log(response, method, url, body)
+                invoke_log_message = _format_invoke_log(response, method, url, body)
 
-            # Handle long-running operations
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
-            if (
-                response.status_code == 200 and long_running
-            ) or response.status_code == 202:
-                url = response.headers.get("Location")
-                method = "GET"
-                body = "{}"
-                if long_running and response.json().get("status") in [
-                    "Succeeded",
-                    "Failed",
-                    "Undefined",
-                ]:
-                    long_running = False
-                elif not long_running:
-                    time.sleep(1)
-                    long_running = True
-                else:
-                    retry_after = float(response.headers.get("Retry-After", 0.5))
-                    logger.info(
-                        f"Operation in progress. Checking again in {retry_after} seconds."
-                    )
+                # Handle long-running operations
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
+                if (
+                    response.status_code == 200 and long_running
+                ) or response.status_code == 202:
+                    url = response.headers.get("Location")
+                    method = "GET"
+                    body = "{}"
+                    if long_running and response.json().get("status") in [
+                        "Succeeded",
+                        "Failed",
+                        "Undefined",
+                    ]:
+                        long_running = False
+                    elif not long_running:
+                        time.sleep(1)
+                        long_running = True
+                    else:
+                        retry_after = float(response.headers.get("Retry-After", 0.5))
+                        logger.info(
+                            f"Operation in progress. Checking again in {retry_after} seconds."
+                        )
+                        time.sleep(retry_after)
+
+                # Handle successful responses
+                elif response.status_code in {200, 201}:
+                    exit_loop = True
+
+                # Handle API throttling
+                elif response.status_code == 429:
+                    retry_after = float(response.headers.get("Retry-After", 5)) + 5
+                    logger.info(f"API Overloaded: Retrying in {retry_after} seconds")
                     time.sleep(retry_after)
 
-            # Handle successful responses
-            elif response.status_code in {200, 201}:
-                exit_loop = True
+                # Handle expired authentication token
+                elif (
+                    response.status_code == 401
+                    and response.headers.get("x-ms-public-api-error-code")
+                    == "TokenExpired"
+                ):
+                    logger.info("AAD token expired. Refreshing token.")
+                    self._refresh_token()
 
-            # Handle API throttling
-            elif response.status_code == 429:
-                retry_after = float(response.headers.get("Retry-After", 5)) + 5
-                logger.info(f"API Overloaded: Retrying in {retry_after} seconds")
-                time.sleep(retry_after)
-
-            # Handle expired authentication token
-            elif (
-                response.status_code == 401
-                and response.headers.get("x-ms-public-api-error-code") == "TokenExpired"
-            ):
-                logger.info("AAD token expired. Refreshing token.")
-                self._refresh_token()
-
-            # Handle unauthorized access
-            elif (
-                response.status_code == 401
-                and response.headers.get("x-ms-public-api-error-code") == "Unauthorized"
-            ):
-                raise InvokeError(
-                    f"The executing identity is not authorized to call {method} on '{url}'.",
-                    logger,
-                )
-
-            # Handle item name conflicts
-            elif (
-                response.status_code == 400
-                and response.headers.get("x-ms-public-api-error-code")
-                == "ItemDisplayNameAlreadyInUse"
-            ):
-                if iteration_count <= 6:
-                    logger.info("Item name is reserved. Retrying in 60 seconds.")
-                    time.sleep(60)
-                else:
-                    raise InvokeError(
-                        f"Item name still in use after 6 attempts. Description: {response.reason}",
-                        logger,
+                # Handle unauthorized access
+                elif (
+                    response.status_code == 401
+                    and response.headers.get("x-ms-public-api-error-code")
+                    == "Unauthorized"
+                ):
+                    raise Exception(
+                        f"The executing identity is not authorized to call {method} on '{url}'."
                     )
 
-            # Handle unsupported principal type
-            elif (
-                response.status_code == 400
-                and response.headers.get("x-ms-public-api-error-code")
-                == "PrincipalTypeNotSupported"
-            ):
-                raise InvokeError(
-                    f"The executing principal type is not supported to call {method} on '{url}'",
-                    logger,
-                )
+                # Handle item name conflicts
+                elif (
+                    response.status_code == 400
+                    and response.headers.get("x-ms-public-api-error-code")
+                    == "ItemDisplayNameAlreadyInUse"
+                ):
+                    if iteration_count <= 6:
+                        logger.info("Item name is reserved. Retrying in 60 seconds.")
+                        time.sleep(60)
+                    else:
+                        raise Exception(
+                            f"Item name still in use after 6 attempts. Description: {response.reason}"
+                        )
 
-            # Handle unsupported item types
-            elif (
-                response.status_code == 403 and response.reason == "FeatureNotAvailable"
-            ):
-                raise InvokeError(
-                    f"Item type not supported. Description: {response.reason}",
-                    logger,
-                )
+                # Handle unsupported principal type
+                # elif (
+                #     response.status_code == 400
+                #     and response.headers.get("x-ms-public-api-error-code")
+                #     == "PrincipalTypeNotSupported"
+                # ):
+                #     raise Exception(
+                #         f"The executing principal type is not supported to call {method} on '{url}'"
+                #     )
 
-            # Handle unexpected errors
-            else:
-                raise InvokeError(
-                    f"Unhandled error occurred. Description: {response.reason}.",
-                    logger,
-                    invoke_log_message,
-                )
+                # Handle unsupported item types
+                elif (
+                    response.status_code == 403
+                    and response.reason == "FeatureNotAvailable"
+                ):
+                    raise Exception(
+                        f"Item type not supported. Description: {response.reason}"
+                    )
 
-            # Log if reached to end of loop iteration
-            if logger.isEnabledFor(logging.DEBUG):
+                # Handle unexpected errors
+                else:
+                    raise Exception(
+                        f"Unhandled error occurred calling {method} on '{url}'."
+                    )
+
+                # Log if reached to end of loop iteration
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(invoke_log_message)
+
+            except Exception as e:
                 logger.debug(invoke_log_message)
+                raise InvokeError(e, logger, invoke_log_message)
 
         return {
             "header": dict(response.headers),
@@ -176,19 +179,12 @@ class FabricEndpoint:
             try:
                 self.aad_token = self.token_credential.get_token(resource_url).token
             except ClientAuthenticationError as e:
-                try:
-                    raise TokenError(f"Failed to aquire AAD token. {e}")
-                except TokenError as e:
-                    logger.exception(e)
-                    raise
+                raise TokenError(f"Failed to aquire AAD token. {e}", logger)
             except Exception as e:
-                try:
-                    raise TokenError(
-                        f"An unexpected error occurred when generating the AAD token. {e}"
-                    )
-                except TokenError as e:
-                    logger.exception(e)
-                    raise
+                raise TokenError(
+                    f"An unexpected error occurred when generating the AAD token. {e}",
+                    logger,
+                )
 
             try:
                 decoded_token = _decode_jwt(self.aad_token)
@@ -202,11 +198,7 @@ class FabricEndpoint:
                         expiration
                     )
                 else:
-                    try:
-                        raise TokenError("Token does not contain expiration claim.")
-                    except TokenError as e:
-                        logger.exception(e)
-                        raise
+                    raise TokenError("Token does not contain expiration claim.", logger)
 
                 if upn:
                     logger.info(f"Executing as User '{upn}'")
@@ -219,13 +211,10 @@ class FabricEndpoint:
                         logger.info(f"Executing as Object Id '{oid}'")
 
             except Exception as e:
-                try:
-                    raise TokenError(
-                        f"An unexpected error occurred while decoding the credential token. {e}"
-                    )
-                except TokenError as e:
-                    logger.exception(e)
-                    raise
+                raise TokenError(
+                    f"An unexpected error occurred while decoding the credential token. {e}",
+                    logger,
+                )
 
 
 def _decode_jwt(token):
@@ -246,13 +235,13 @@ def _decode_jwt(token):
         decoded_str = decoded_bytes.decode("utf-8")
         return json.loads(decoded_str)
     except Exception as e:
-        logger.exception(e)
         raise TokenError(
-            f"An unexpected error occurred while decoding the credential token. {e}"
+            f"An unexpected error occurred while decoding the credential token. {e}",
+            logger,
         )
 
 
-def format_invoke_log(response, method, url, body, error=False):
+def _format_invoke_log(response, method, url, body, error=False):
     message = [
         f"\nURL: {url}",
         f"Method: {method}",
