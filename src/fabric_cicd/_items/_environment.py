@@ -1,10 +1,12 @@
-from fabric_cicd._common._custom_print import print_sub_line
 import os
 import yaml
+import logging
 
 """
 Functions to process and deploy Environment item.
 """
+
+logger = logging.getLogger(__name__)
 
 
 def publish_environments(fabric_workspace_obj):
@@ -66,7 +68,7 @@ def _publish_environment_compute(fabric_workspace_obj, item_name):
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
             body=yaml_body,
         )
-        print_sub_line("Updating Spark Settings")
+        logger.info("Updating Spark Settings")
 
         # Publish updated settings
         # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
@@ -74,7 +76,7 @@ def _publish_environment_compute(fabric_workspace_obj, item_name):
             method="POST",
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish",
         )
-        print_sub_line("Published Spark Settings")
+        logger.info("Published Spark Settings")
 
 
 def _convert_environment_compute_to_camel(fabric_workspace_obj, input_dict):

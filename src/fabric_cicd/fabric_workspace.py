@@ -1,7 +1,3 @@
-from fabric_cicd._common._custom_print import (
-    print_timestamp,
-    print_sub_line,
-)
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._exceptions import ParsingError
 import os
@@ -122,7 +118,8 @@ class FabricWorkspace:
                     or "displayName" not in item_metadata["metadata"]
                 ):
                     raise ParsingError(
-                        f"displayName & type are required in {item_metadata_path}"
+                        f"displayName & type are required in {item_metadata_path}",
+                        logger,
                     )
 
                 item_type = item_metadata["metadata"]["type"]
@@ -189,7 +186,8 @@ class FabricWorkspace:
                 if logical_id in raw_file:
                     if item_guid == "":
                         raise ParsingError(
-                            f"Cannot replace logical ID '{logical_id}' as referenced item is not yet deployed."
+                            f"Cannot replace logical ID '{logical_id}' as referenced item is not yet deployed.",
+                            logger,
                         )
                     else:
                         raw_file = raw_file.replace(logical_id, item_guid)
@@ -369,7 +367,7 @@ class FabricWorkspace:
         else:
             combined_body = metadata_body
 
-        print_timestamp(f"Publishing {item_type} '{item_name}'")
+        logger.info(f"Publishing {item_type} '{item_name}'")
 
         if not item_guid:
             # Create a new item if it does not exist
@@ -400,7 +398,7 @@ class FabricWorkspace:
                 body=metadata_body,
             )
 
-        print_sub_line("Published")
+        logger.info("Published")
 
     def _unpublish_item(self, item_name, item_type):
         """
@@ -411,11 +409,12 @@ class FabricWorkspace:
         """
         item_guid = self.deployed_items[item_type][item_name]["guid"]
 
-        print_timestamp(f"Unpublishing {item_type} '{item_name}'")
+        logger.info(f"Unpublishing {item_type} '{item_name}'")
 
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         self.endpoint.invoke(
             method="DELETE", url=f"{self.base_api_url}/items/{item_guid}"
         )
-        print_sub_line("Unpublished")
+
+        logger.info("Unpublished")

@@ -1,4 +1,3 @@
-from fabric_cicd._common._custom_print import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
@@ -7,11 +6,37 @@ import fabric_cicd._items as items
 import json
 import base64
 import re
-
+import logging
 
 """
 Functions to deploy Fabric workspace items.
 """
+
+logger = logging.getLogger(__name__)
+
+
+def _print_header(message, color="green"):
+    """
+    Prints a header message with a decorative line above and below it.
+
+    :param message: The header message to print.
+    :param color: The color to use for the header and lines (default is 'green').
+    """
+
+    def print_with_color(message):
+        print(f"\033[32m{message}\033[0m")
+
+    line_separator = "#" * 100
+    formatted_message = f"########## {message}"
+    formatted_message = (
+        f"{formatted_message} {line_separator[len(formatted_message)+1:]}"
+    )
+
+    print("")  # Print a blank line before the header
+    print_with_color(line_separator)
+    print_with_color(formatted_message)
+    print_with_color(line_separator)
+    print("")  # Print a blank line after the header
 
 
 def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
@@ -21,13 +46,13 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Environments")
+        _print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
     if "Notebook" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Notebooks")
+        _print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing DataPipelines")
+        _print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
 
 

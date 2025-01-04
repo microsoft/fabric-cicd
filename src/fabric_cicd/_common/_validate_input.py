@@ -2,7 +2,6 @@ import os
 import re
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd._common._exceptions import InputError
-
 from azure.core.credentials import TokenCredential
 import logging
 
@@ -33,9 +32,9 @@ def validate_data_type(expected_type, variable_name, input):
         input
     ):
 
-        error_message = f"The provided {variable_name} is not of type {expected_type}."
-        logger.exception(error_message)
-        raise InputError(error_message)
+        raise InputError(
+            f"The provided {variable_name} is not of type {expected_type}.", logger
+        )
 
     return input
 
@@ -53,16 +52,13 @@ def validate_item_type_in_scope(input, upn_auth):
     for item_type in input:
         if item_type not in accepted_item_types:
 
-            try:
-                raise InputError(
-                    f"Invalid or unsupported item type: '{item_type}'. "
-                    f"For User Identity Authentication, must be one of {', '.join(accepted_item_types_upn)}. "
-                    f"For Service Principal or Managed Identity Authentication, "
-                    f"must be one of {', '.join(accepted_item_types_non_upn)}."
-                )
-            except InputError as e:
-                logger.exception(e)
-                raise
+            raise InputError(
+                f"Invalid or unsupported item type: '{item_type}'. "
+                f"For User Identity Authentication, must be one of {', '.join(accepted_item_types_upn)}. "
+                f"For Service Principal or Managed Identity Authentication, "
+                f"must be one of {', '.join(accepted_item_types_non_upn)}.",
+                logger,
+            )
 
     return input
 
@@ -71,13 +67,9 @@ def validate_repository_directory(input):
     validate_data_type("string", "repository_directory", input)
 
     if not os.path.isdir(input):
-        try:
-            raise InputError(
-                f"The provided repository_directory '{input}' does not exist."
-            )
-        except InputError as e:
-            logger.exception(e)
-            raise
+        raise InputError(
+            f"The provided repository_directory '{input}' does not exist.", logger
+        )
 
     return input
 
@@ -86,15 +78,13 @@ def validate_base_api_url(input):
     validate_data_type("string", "base_api_url", input)
 
     if not re.match(r"^https:\/\/([a-zA-Z0-9]+)\.fabric\.microsoft\.com\/$", input):
-        try:
-            raise InputError(
-                "The provided base_api_url does not follow the 'https://<word>.fabric.microsoft.com/' syntax. "
-                "Ensure the URL has a single word in between 'https://' and '.fabric.microsoft.com/', "
-                "and only contains alphanumeric characters."
-            )
-        except InputError as e:
-            logger.exception(e)
-            raise
+
+        raise InputError(
+            "The provided base_api_url does not follow the 'https://<word>.fabric.microsoft.com/' syntax. "
+            "Ensure the URL has a single word in between 'https://' and '.fabric.microsoft.com/', "
+            "and only contains alphanumeric characters.",
+            logger,
+        )
 
     return input
 
@@ -107,11 +97,7 @@ def validate_workspace_id(input):
         input,
     ):
 
-        try:
-            raise InputError("The provided workspace_id is not a valid guid.")
-        except InputError as e:
-            logger.exception(e)
-            raise
+        raise InputError("The provided workspace_id is not a valid guid.", logger)
 
     return input
 

@@ -1,4 +1,4 @@
-from fabric_cicd._common._exceptions import InvokeError, TokenError, log_invoke_payload
+from fabric_cicd._common._exceptions import InvokeError, TokenError
 import json
 import time
 import requests
@@ -51,6 +51,8 @@ class FabricEndpoint:
             )
             iteration_count += 1
 
+            invoke_log_message = format_invoke_log(response, method, url, body)
+
             # Handle long-running operations
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
             if (
@@ -98,17 +100,10 @@ class FabricEndpoint:
                 response.status_code == 401
                 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized"
             ):
-                try:
-                    raise InvokeError(
-                        f"The executing identity is not authorized to call {method} on '{url}'",
-                        response,
-                        method,
-                        url,
-                        body,
-                    )
-                except InvokeError as e:
-                    logger.exception(e)
-                    raise
+                raise InvokeError(
+                    f"The executing identity is not authorized to call {method} on '{url}'.",
+                    logger,
+                )
 
             # Handle item name conflicts
             elif (
@@ -120,17 +115,10 @@ class FabricEndpoint:
                     logger.info("Item name is reserved. Retrying in 60 seconds.")
                     time.sleep(60)
                 else:
-                    try:
-                        raise InvokeError(
-                            f"Item name still in use after 6 attempts. Description: {response.reason}",
-                            response,
-                            method,
-                            url,
-                            body,
-                        )
-                    except InvokeError as e:
-                        logger.exception(e)
-                        raise
+                    raise InvokeError(
+                        f"Item name still in use after 6 attempts. Description: {response.reason}",
+                        logger,
+                    )
 
             # Handle unsupported principal type
             elif (
@@ -138,57 +126,31 @@ class FabricEndpoint:
                 and response.headers.get("x-ms-public-api-error-code")
                 == "PrincipalTypeNotSupported"
             ):
-                try:
-                    raise InvokeError(
-                        f"The executing principal type is not supported to call {method} on '{url}'",
-                        response,
-                        method,
-                        url,
-                        body,
-                        logger,
-                    )
-                except InvokeError as e:
-                    logger.exception(e)
-                    raise
+                raise InvokeError(
+                    f"The executing principal type is not supported to call {method} on '{url}'",
+                    logger,
+                )
 
             # Handle unsupported item types
             elif (
                 response.status_code == 403 and response.reason == "FeatureNotAvailable"
             ):
-                try:
-                    raise InvokeError(
-                        f"Item type not supported. Description: {response.reason}",
-                        response,
-                        method,
-                        url,
-                        body,
-                    )
-                except InvokeError as e:
-                    logger.exception(e)
-                    raise
+                raise InvokeError(
+                    f"Item type not supported. Description: {response.reason}",
+                    logger,
+                )
 
             # Handle unexpected errors
             else:
-                try:
-                    raise InvokeError(
-                        f"Unhandled error occurred. Description: {response.reason}. \n"
-                        f"Url: {url} \n"
-                        f"Method: {method} \n"
-                        f"Response Status: {response.status_code} \n"
-                        f"Response Header: {response.headers} \n"
-                        f"Response Body: {response.text}",
-                        response,
-                        method,
-                        url,
-                        body,
-                    )
-                except InvokeError as e:
-                    logger.exception(e)
-                    raise
+                raise InvokeError(
+                    f"Unhandled error occurred. Description: {response.reason}.",
+                    logger,
+                    invoke_log_message,
+                )
 
             # Log if reached to end of loop iteration
             if logger.isEnabledFor(logging.DEBUG):
-                log_invoke_payload(logger, response, method, url, body)
+                logger.debug(invoke_log_message)
 
         return {
             "header": dict(response.headers),
@@ -288,3 +250,32 @@ def _decode_jwt(token):
         raise TokenError(
             f"An unexpected error occurred while decoding the credential token. {e}"
         )
+
+
+def format_invoke_log(response, method, url, body, error=False):
+    message = [
+        f"\nURL: {url}",
+        f"Method: {method}",
+        (
+            f"Request Body:\n{json.dumps(body, indent=4)}"
+            if body
+            else "Request Body: None"
+        ),
+    ]
+    if response is not None:
+        message.extend(
+            [
+                f"Response Status: {response.status_code}",
+                "Response Headers:",
+                json.dumps(dict(response.headers), indent=4),
+                "Response Body:",
+                (
+                    json.dumps(response.json(), indent=4)
+                    if response.headers.get("Content-Type") == "application/json"
+                    else response.text
+                ),
+                "",
+            ]
+        )
+
+    return "\n".join(message)
