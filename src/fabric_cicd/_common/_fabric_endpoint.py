@@ -122,14 +122,14 @@ class FabricEndpoint:
                         )
 
                 # Handle unsupported principal type
-                # elif (
-                #     response.status_code == 400
-                #     and response.headers.get("x-ms-public-api-error-code")
-                #     == "PrincipalTypeNotSupported"
-                # ):
-                #     raise Exception(
-                #         f"The executing principal type is not supported to call {method} on '{url}'"
-                #     )
+                elif (
+                    response.status_code == 400
+                    and response.headers.get("x-ms-public-api-error-code")
+                    == "PrincipalTypeNotSupported"
+                ):
+                    raise Exception(
+                        f"The executing principal type is not supported to call {method} on '{url}'"
+                    )
 
                 # Handle unsupported item types
                 elif (

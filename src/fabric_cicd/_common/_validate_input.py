@@ -41,7 +41,7 @@ def validate_data_type(expected_type, variable_name, input):
 
 def validate_item_type_in_scope(input, upn_auth):
     accepted_item_types_upn = ["Notebook", "DataPipeline", "Environment"]
-    accepted_item_types_non_upn = ["Notebook", "Environment", "DataPipeline"]
+    accepted_item_types_non_upn = ["Notebook", "Environment"]
 
     accepted_item_types = (
         accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
