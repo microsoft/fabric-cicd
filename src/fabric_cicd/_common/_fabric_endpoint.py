@@ -39,7 +39,6 @@ class FabricEndpoint:
         exit_loop = False
         iteration_count = 0
         long_running = False
-        unhandled = False
 
         while not exit_loop:
             try:
