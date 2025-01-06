@@ -96,7 +96,7 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
                 zero_in_degree_queue.append(neighbor)
 
     if len(sorted_items) != len(in_degree):
-        raise ParsingError("There is a cycle in the graph. Cannot determine a valid publish order.")
+        raise ParsingError("There is a cycle in the graph. Cannot determine a valid publish order.", logger)
 
     # Remove items not present in unpublish list and invert order for deployed sort
     if lookup_type == "Deployed":

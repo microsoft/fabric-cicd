@@ -13,7 +13,7 @@ base_api_url = "https://msitapi.fabric.microsoft.com/"
 token_credential = TokenCredential
 
 # Optional: Print all API calls to log file
-change_log_level()
+change_log_level("DEBUG")
 
 # Initialize the FabricWorkspace object with the required and optional parameters
 target_workspace = FabricWorkspace(

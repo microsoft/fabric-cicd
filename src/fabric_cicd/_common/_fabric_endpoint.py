@@ -19,7 +19,7 @@ class FabricEndpoint:
     Handles interactions with the Fabric API, including authentication and request management.
     """
 
-    def __init__(self, token_credential=None):
+    def __init__(self, token_credential):
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
 
