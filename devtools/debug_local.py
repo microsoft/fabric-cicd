@@ -16,7 +16,7 @@ workspace_id = "fd844302-8fdd-42c1-b1ff-e35bc8e294e4"
 environment = "dev"
 
 # In this example, our workspace content sits within the root/sample/workspace directory
-repository_directory = str(root_directory / "devtools" / "workspace")
+repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
 item_type_in_scope = ["DataPipeline", "Notebook", "Environment"]
