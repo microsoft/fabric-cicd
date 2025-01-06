@@ -1,8 +1,8 @@
 {
-	"recommendations": [
+    "recommendations": [
         "ms-python.python",
-        "ms-python.flake8",
-	"ms-python.black-formatter",
-        "github.vscode-github-actions",
-	]
+        "esbenp.prettier-vscode",
+        "ms-vscode.powershell",
+        "charliermarsh.ruff"
+    ]
 }

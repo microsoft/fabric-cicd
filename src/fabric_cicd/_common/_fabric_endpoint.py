@@ -1,10 +1,12 @@
-from fabric_cicd._common._custom_print import print_line, print_sub_line, print_header
-import json
-import time
-import requests
 import base64
 import datetime
+import json
+import time
+
+import requests
 from azure.identity import DefaultAzureCredential
+
+from fabric_cicd._common._custom_print import print_header, print_line, print_sub_line
 
 
 class FabricEndpoint:
@@ -42,9 +44,7 @@ class FabricEndpoint:
                 "Content-Type": "application/json; charset=utf-8",
             }
 
-            response = requests.request(
-                method=method, url=url, headers=headers, json=body
-            )
+            response = requests.request(method=method, url=url, headers=headers, json=body)
             iteration_count += 1
 
             if self.debug_output:
@@ -52,9 +52,7 @@ class FabricEndpoint:
 
             # Handle long-running operations
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
-            if (
-                response.status_code == 200 and long_running
-            ) or response.status_code == 202:
+            if (response.status_code == 200 and long_running) or response.status_code == 202:
                 url = response.headers.get("Location")
                 method = "GET"
                 body = "{}"
@@ -69,9 +67,7 @@ class FabricEndpoint:
                     long_running = True
                 else:
                     retry_after = float(response.headers.get("Retry-After", 0.5))
-                    print_sub_line(
-                        f"Operation in progress. Checking again in {retry_after} seconds."
-                    )
+                    print_sub_line(f"Operation in progress. Checking again in {retry_after} seconds.")
                     time.sleep(retry_after)
 
             # Handle successful responses
@@ -85,18 +81,14 @@ class FabricEndpoint:
                 time.sleep(retry_after)
 
             # Handle expired authentication token
-            elif (
-                response.status_code == 401
-                and response.headers.get("x-ms-public-api-error-code") == "TokenExpired"
-            ):
+            elif response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
                 print_sub_line("AAD token expired. Refreshing token.")
                 self._refresh_token()
 
             # Handle item name conflicts
             elif (
                 response.status_code == 400
-                and response.headers.get("x-ms-public-api-error-code")
-                == "ItemDisplayNameAlreadyInUse"
+                and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
             ):
                 if iteration_count <= 6:
                     print_sub_line("Item name is reserved. Retrying in 60 seconds.")
@@ -111,9 +103,7 @@ class FabricEndpoint:
                     )
 
             # Handle unsupported item types
-            elif (
-                response.status_code == 403 and response.reason == "FeatureNotAvailable"
-            ):
+            elif response.status_code == 403 and response.reason == "FeatureNotAvailable":
                 self._raise_invoke_exception(
                     f"Item type not supported. Description: {response.reason}",
                     response,
@@ -134,11 +124,7 @@ class FabricEndpoint:
 
         return {
             "header": dict(response.headers),
-            "body": (
-                response.json()
-                if "application/json" in response.headers.get("Content-Type")
-                else {}
-            ),
+            "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
             "status_code": response.status_code,
         }
 
@@ -165,9 +151,7 @@ class FabricEndpoint:
                 expiration = json.loads(decoded).get("exp")
 
                 if expiration:
-                    self.aad_token_expiration = datetime.datetime.fromtimestamp(
-                        expiration
-                    )
+                    self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration)
                 else:
                     print("Token does not contain expiration claim.")
 

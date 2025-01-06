@@ -1,10 +1,9 @@
 ---
-name: 'Issue: Question / Advice needed'
+name: "Issue: Question / Advice needed"
 about: Ask a question about this project
-title: ''
+title: ""
 labels: question
-assignees: ''
-
+assignees: ""
 ---
 
 **What are you trying to achieve?**

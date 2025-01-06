@@ -29,3 +29,14 @@ where = ["src"]
 
 [project.urls]
 Repository = "https://github.com/microsoft/fabric-cicd.git"
+
+[tool.ruff]
+line-length = 120
+exclude = ["debug", "sample"]
+
+[tool.ruff.lint]
+preview=true
+select = ["I"]
+
+[tool.ruff.format]
+preview=true

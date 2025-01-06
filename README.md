@@ -1,41 +1,46 @@
 # Fabric CICD
+
 [![PyPI version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd)
 [![Read The Docs](https://readthedocs.org/projects/fabric-cicd/badge/?version=latest&style=flat)](https://readthedocs.org/projects/fabric-cicd/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/charliermarsh/ruff)
 [![Downloads](https://static.pepy.tech/badge/fabric-cicd)](https://pepy.tech/project/fabric-cicd)
 
 ---
-[Read the documentation on ReadTheDocs!](https://fabric-cicd.readthedocs.io/en/stable/)
----
 
-Fabric CICD is a Python library designed for use with [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) workspaces. This library is intended to support code first CICD integrations to seamlessly integrate Source Controlled workspaces into a deployment framework.  The goal of this library is to support the CICD developers that don't want to dig into the weeds of interacting directly with the Microsoft Fabric APIs.  
+## [Read the documentation on ReadTheDocs!](https://fabric-cicd.readthedocs.io/en/stable/)
+
+Fabric CICD is a Python library designed for use with [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) workspaces. This library is intended to support code first CICD integrations to seamlessly integrate Source Controlled workspaces into a deployment framework. The goal of this library is to support the CICD developers that don't want to dig into the weeds of interacting directly with the Microsoft Fabric APIs.
 
 If you encounter any issues, please [raise a bug](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=).
 
 If you have ideas for new features/functions, please [request a feature](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=).
 
 ## Featured Scenarios
+
 - Deploying Items hosted in a repository
 - 100% deployment, does not consider diffs
 - Deploys into the tenant of the executing identity
 
 ### In Scope Item Types
-  - Notebooks
-  - Data Pipelines
-  - Environments
-  
+
+- Notebooks
+- Data Pipelines
+- Environments
+
 ### Limitations
-  - Notebooks Limitations
-    - Attached lakehouses are not changed during the deployment
-    - Attached resources are not included in the deployment
-  - Data Pipelines
-    - Connections are not changed during the deployment
-  - Environments
-    - Custom and Public Libraries are not included in the deployment
-  - Folders
-    - Sub folders are not included in the deployment
-    
+
+- Notebooks Limitations
+  - Attached lakehouses are not changed during the deployment
+  - Attached resources are not included in the deployment
+- Data Pipelines
+  - Connections are not changed during the deployment
+- Environments
+  - Custom and Public Libraries are not included in the deployment
+- Folders
+  - Sub folders are not included in the deployment
+
 ## How to Use
+
 ```shell
 pip install fabric-cicd
 ```
@@ -60,7 +65,7 @@ unpublish_all_orphan_items(target_workspace)
 
 ## Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
 
@@ -74,8 +79,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## Trademarks
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.

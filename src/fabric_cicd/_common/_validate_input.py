@@ -1,5 +1,6 @@
 import os
 import re
+
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 """
@@ -16,18 +17,13 @@ def validate_data_type(expected_type, variable_name, input):
         "string": lambda x: isinstance(x, str),
         "bool": lambda x: isinstance(x, bool),
         "list": lambda x: isinstance(x, list),
-        "list[string]": lambda x: isinstance(x, list)
-        and all(isinstance(item, str) for item in x),
+        "list[string]": lambda x: isinstance(x, list) and all(isinstance(item, str) for item in x),
         "FabricWorkspace": lambda x: isinstance(x, FabricWorkspace),
     }
 
     # Check if the expected type is valid and if the input matches the expected type
-    if expected_type not in type_validators or not type_validators[expected_type](
-        input
-    ):
-        raise ValueError(
-            f"The provided {variable_name} is not of type {expected_type}."
-        )
+    if expected_type not in type_validators or not type_validators[expected_type](input):
+        raise ValueError(f"The provided {variable_name} is not of type {expected_type}.")
 
     return input
 
@@ -39,9 +35,7 @@ def validate_item_type_in_scope(input):
 
     for item_type in input:
         if item_type not in accepted_item_types:
-            raise ValueError(
-                f"Invalid item type: '{item_type}'. Must be one of {', '.join(accepted_item_types)}."
-            )
+            raise ValueError(f"Invalid item type: '{item_type}'. Must be one of {', '.join(accepted_item_types)}.")
 
     return input
 

@@ -5,12 +5,12 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '20 14 * * 1'
+    - cron: "20 14 * * 1"
 
 permissions:
   actions: read
   contents: read
-  security-events: write   # To upload sarif files
+  security-events: write # To upload sarif files
 
 jobs:
   analyze:
@@ -27,5 +27,3 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-
- 
