@@ -31,8 +31,9 @@ def change_log_level(level: str = "DEBUG") -> None:
     """
     if level.upper() == "DEBUG":
         configure_logger(logging.DEBUG)
+        logger.info(f"Changed log level to DEBUG")
     else:
-        logger.warning(f"Log level {level} not supported.  Only DEBUG is supported at this time. No changes made.")
+        logger.warning(f"Log level '{level}' not supported.  Only DEBUG is supported at this time. No changes made.")
 
 
 configure_logger()
