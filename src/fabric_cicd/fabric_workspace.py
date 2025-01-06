@@ -309,6 +309,7 @@ class FabricWorkspace:
             publishes metadata (for items like Environments).
         """
         item_path = self.repository_items[item_type][item_name]["path"]
+        item_guid = self.repository_items[item_type][item_name]["guid"]
         item_description = self.repository_items[item_type][item_name]["description"]
 
         metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
