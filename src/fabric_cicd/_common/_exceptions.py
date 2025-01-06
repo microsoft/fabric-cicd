@@ -1,21 +1,21 @@
-class BaseCustomException(Exception):
+class BaseCustomError(Exception):
     def __init__(self, message, logger, additional_info=None):
         super().__init__(message)
         self.logger = logger
         self.additional_info = additional_info
 
 
-class ParsingError(BaseCustomException):
+class ParsingError(BaseCustomError):
     pass
 
 
-class InputError(BaseCustomException):
+class InputError(BaseCustomError):
     pass
 
 
-class TokenError(BaseCustomException):
+class TokenError(BaseCustomError):
     pass
 
 
-class InvokeError(BaseCustomException):
+class InvokeError(BaseCustomError):
     pass

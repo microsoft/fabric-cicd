@@ -1,3 +1,5 @@
+"""Module for publishing and unpublishing Fabric workspace items."""
+
 import base64
 import json
 import logging
@@ -127,7 +129,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
 
-def _print_header(message, color="green"):
+def _print_header(message):
     """
     Prints a header message with a decorative line above and below it.
 
@@ -142,8 +144,8 @@ def _print_header(message, color="green"):
     formatted_message = f"########## {message}"
     formatted_message = f"{formatted_message} {line_separator[len(formatted_message) + 1 :]}"
 
-    print("")  # Print a blank line before the header
+    print()  # Print a blank line before the header
     print_with_color(line_separator)
     print_with_color(formatted_message)
     print_with_color(line_separator)
-    print("")  # Print a blank line after the header
+    print()  # Print a blank line after the header

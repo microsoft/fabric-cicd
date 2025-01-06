@@ -198,7 +198,7 @@ def _decode_jwt(token):
         raise TokenError(f"An unexpected error occurred while decoding the credential token. {e}", logger)
 
 
-def _format_invoke_log(response, method, url, body, error=False):
+def _format_invoke_log(response, method, url, body):
     message = [
         f"\nURL: {url}",
         f"Method: {method}",

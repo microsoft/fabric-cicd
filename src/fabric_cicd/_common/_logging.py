@@ -5,7 +5,7 @@ import sys
 
 import colorlog
 
-import fabric_cicd._common._exceptions as _exceptions
+from fabric_cicd._common import _exceptions
 
 
 def configure_logger(level: int = logging.INFO) -> None:
