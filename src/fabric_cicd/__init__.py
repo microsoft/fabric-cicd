@@ -7,6 +7,7 @@ from fabric_cicd.publish import publish_all_items, unpublish_all_orphan_items
 
 logger = logging.getLogger(__name__)
 
+
 def change_log_level(level: str = "DEBUG") -> None:
     """
     Sets the log level for all loggers within the fabric_cicd package.  Currently only supports DEBUG.

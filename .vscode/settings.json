@@ -18,10 +18,12 @@
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.codeActionsOnSave": {
             "source.fixAll":  "explicit"
-        }
+        },
+        "editor.formatOnSave": true
     },
     "[powershell]": {
-        "editor.defaultFormatter": "ms-vscode.powershell"
+        "editor.defaultFormatter": "ms-vscode.powershell",
+        "editor.formatOnSave": true
     },
     "git": {
         "branchPrefix": "users/",
@@ -31,7 +33,6 @@
     },
     "ruff" :{
         "organizeImports": true,
-        "fixAll": true,
-        "editor.formatOnSave": true
+        "fixAll": true
     }
 }
