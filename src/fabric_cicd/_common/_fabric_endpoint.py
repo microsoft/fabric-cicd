@@ -130,7 +130,6 @@ class FabricEndpoint:
         return {
             "header": dict(response.headers),
             "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
-            "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
             "status_code": response.status_code,
         }
 
