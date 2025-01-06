@@ -1,0 +1,4 @@
+requests>=2.32.3
+pyyaml>=6.0.2
+azure-identity>=1.19.0
+colorlog>=6.9.0

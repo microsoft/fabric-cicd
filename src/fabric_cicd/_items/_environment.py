@@ -1,4 +1,6 @@
+import logging
 import os
+
 
 import yaml
 
@@ -7,6 +9,8 @@ from fabric_cicd._common._custom_print import print_sub_line
 """
 Functions to process and deploy Environment item.
 """
+
+logger = logging.getLogger(__name__)
 
 
 def publish_environments(fabric_workspace_obj):
@@ -18,6 +22,7 @@ def publish_environments(fabric_workspace_obj):
     item_type = "Environment"
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         # Only deploy the shell for environments
+        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, full_publish=False)
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, full_publish=False)
         _publish_environment_compute(fabric_workspace_obj, item_name=item_name)
 
@@ -38,6 +43,7 @@ def _publish_environment_compute(fabric_workspace_obj, item_name):
 
     # Read compute settings from YAML file
     with open(os.path.join(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
+    with open(os.path.join(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
         yaml_body = yaml.safe_load(f)
 
         # Update instance pool settings if present
@@ -46,11 +52,13 @@ def _publish_environment_compute(fabric_workspace_obj, item_name):
 
             if "spark_pool" in fabric_workspace_obj.environment_parameter:
                 parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
+                parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
                 if pool_id in parameter_dict:
                     # replace any found references with specified environment value
                     yaml_body["instancePool"] = parameter_dict[pool_id]
                     del yaml_body["instance_pool_id"]
 
+        yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
         yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
 
         # Update compute settings
@@ -60,15 +68,14 @@ def _publish_environment_compute(fabric_workspace_obj, item_name):
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
             body=yaml_body,
         )
-        print_sub_line("Updating Spark Settings")
+        logger.info("Updating Spark Settings")
 
         # Publish updated settings
         # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
         fabric_workspace_obj.endpoint.invoke(
-            method="POST",
-            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish",
+            method="POST", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish"
         )
-        print_sub_line("Published Spark Settings")
+        logger.info("Published Spark Settings")
 
 
 def _convert_environment_compute_to_camel(fabric_workspace_obj, input_dict):

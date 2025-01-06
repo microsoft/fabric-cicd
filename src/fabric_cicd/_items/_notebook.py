@@ -1,6 +1,10 @@
+import logging
+
 """
 Functions to process and deploy Notebook item.
 """
+
+logger = logging.getLogger(__name__)
 
 
 def publish_notebooks(fabric_workspace_obj):
