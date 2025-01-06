@@ -2,7 +2,7 @@
 Example of optional parameters for FabricWorkspace and publish functions.
 """
 
-from fabric_cicd import FabricWorkspace, enable_debug_log, publish_all_items, unpublish_all_orphan_items
+from fabric_cicd import FabricWorkspace, change_log_level, publish_all_items, unpublish_all_orphan_items
 
 # Sample values for FabricWorkspace parameters
 workspace_id = "your-workspace-id"
@@ -13,7 +13,7 @@ base_api_url = "https://msitapi.fabric.microsoft.com/"
 token_credential = TokenCredential
 
 # Optional: Print all API calls to log file
-enable_debug_log()
+change_log_level()
 
 # Initialize the FabricWorkspace object with the required and optional parameters
 target_workspace = FabricWorkspace(

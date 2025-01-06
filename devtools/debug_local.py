@@ -7,9 +7,9 @@ from azure.identity import ClientSecretCredential
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
-from fabric_cicd import FabricWorkspace, enable_debug_log, publish_all_items, unpublish_all_orphan_items
+from fabric_cicd import FabricWorkspace, change_log_level, publish_all_items, unpublish_all_orphan_items
 
-# enable_debug_log()
+# change_log_level()
 
 # The defined environment values should match the names found in the parameter.yml file
 workspace_id = "fd844302-8fdd-42c1-b1ff-e35bc8e294e4"

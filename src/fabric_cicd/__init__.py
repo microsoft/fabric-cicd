@@ -6,17 +6,20 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import publish_all_items, unpublish_all_orphan_items
 
 
-def enable_debug_log() -> None:
+def change_log_level(level: str = "DEBUG") -> None:
     """
-    Sets the log level for all loggers within the fabric_cicd package to DEBUG.
+    Sets the log level for all loggers within the fabric_cicd package.  Currently only supports DEBUG.
 
     This function configures the logging level for all loggers in the fabric_cicd package to DEBUG,
     which is useful for development and debugging purposes.
+    
+    :param level: The logging level to set (e.g., DEBUG).
+    :type level: int
 
     Examples:
         Basic usage:
-            >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, set_log_level_to_debug
-            >>> set_log_level_to_debug()
+            >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, change_log_level
+            >>> change_log_level("DEBUG")
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/path/to/repo",
@@ -25,7 +28,11 @@ def enable_debug_log() -> None:
             >>> publish_all_items(workspace)
             >>> unpublish_orphaned_items(workspace)
     """
-    configure_logger(logging.DEBUG)
+    if level.upper() == "DEBUG":
+        configure_logger(logging.DEBUG)
+    else:
+        print(f"Log level {level} not supported.  Only DEBUG is supported at this time. No changes made.")
+        pass
 
 
 configure_logger()
@@ -35,5 +42,5 @@ __all__ = [
     "FabricWorkspace",
     "publish_all_items",
     "unpublish_all_orphan_items",
-    "enable_debug_log",
+    "change_log_level",
 ]
