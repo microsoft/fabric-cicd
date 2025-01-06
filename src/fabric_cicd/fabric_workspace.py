@@ -152,7 +152,6 @@ class FabricWorkspace:
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, {}).get("guid", "")
-                item_guid = self.deployed_items.get(item_type, {}).get(item_name, {}).get("guid", "")
 
                 if item_type not in self.repository_items:
                     self.repository_items[item_type] = {}

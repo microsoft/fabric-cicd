@@ -20,7 +20,6 @@ def publish_environments(fabric_workspace_obj):
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         # Only deploy the shell for environments
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, full_publish=False)
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, full_publish=False)
         _publish_environment_compute(fabric_workspace_obj, item_name=item_name)
 
 

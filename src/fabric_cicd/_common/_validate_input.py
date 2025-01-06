@@ -24,7 +24,6 @@ def validate_data_type(expected_type, variable_name, input):
         "bool": lambda x: isinstance(x, bool),
         "list": lambda x: isinstance(x, list),
         "list[string]": lambda x: isinstance(x, list) and all(isinstance(item, str) for item in x),
-        "list[string]": lambda x: isinstance(x, list) and all(isinstance(item, str) for item in x),
         "FabricWorkspace": lambda x: isinstance(x, FabricWorkspace),
         "TokenCredential": lambda x: isinstance(x, TokenCredential),
     }
