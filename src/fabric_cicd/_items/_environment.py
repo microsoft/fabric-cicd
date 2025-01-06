@@ -35,6 +35,7 @@ def _publish_environment_compute(fabric_workspace_obj, item_name):
     """
     item_type = "Environment"
     item_path = fabric_workspace_obj.repository_items[item_type][item_name]["path"]
+    item_guid = fabric_workspace_obj.repository_items[item_type][item_name]["guid"]
 
     # Read compute settings from YAML file
     with open(os.path.join(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
