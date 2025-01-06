@@ -13,7 +13,7 @@ from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 logger = logging.getLogger(__name__)
 
 
-class FabricWorkskspace:
+class FabricWorkspace:
     """
     A class to manage and publish workspace items to the Fabric API.
     """
