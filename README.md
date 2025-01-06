@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd)
 [![Read The Docs](https://readthedocs.org/projects/fabric-cicd/badge/?version=latest&style=flat)](https://readthedocs.org/projects/fabric-cicd/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/charliermarsh/ruff)
 [![Downloads](https://static.pepy.tech/badge/fabric-cicd)](https://pepy.tech/project/fabric-cicd)
 
 ---
