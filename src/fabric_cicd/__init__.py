@@ -32,7 +32,6 @@ def change_log_level(level: str = "DEBUG") -> None:
         configure_logger(logging.DEBUG)
     else:
         print(f"Log level {level} not supported.  Only DEBUG is supported at this time. No changes made.")
-        pass
 
 
 configure_logger()
