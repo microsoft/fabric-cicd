@@ -7,7 +7,8 @@ name = "fabric-cicd"
 authors = [
     { name = "Microsoft Corporation" }
 ]
-version = "0.1.5"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
 description = "Microsoft Fabric CI/CD"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,12 +18,10 @@ classifiers = [
 ]
 license = { text = "MIT License" }
 
-# Define dependencies here
-dependencies = [
-    "requests>=2.32.3",
-    "pyyaml>=6.0.2",
-    "azure-identity>=1.19.0"
-]
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+dependencies = {file = "requirements.txt"}
+optional-dependencies.dev = {file = "requirements-dev.txt"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
