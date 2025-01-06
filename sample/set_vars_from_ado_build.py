@@ -3,9 +3,10 @@ Example to set variables based on the target environment.
 Environment is determined based on the branch that produced the build.
 """
 
-from pathlib import Path
-from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 import os
+from pathlib import Path
+
+from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 branch = os.getenv("BUILD_SOURCEBRANCHNAME")
 

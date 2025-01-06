@@ -4,8 +4,10 @@ Environment is determined based on the current branch name.
 """
 
 from pathlib import Path
-from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
 import git  # Depends on pip install gitpython
+
+from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 # In this example, this file is being ran in the root/sample directory
 root_directory = Path(__file__).resolve().parent.parent
