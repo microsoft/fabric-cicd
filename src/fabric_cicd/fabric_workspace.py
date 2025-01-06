@@ -338,6 +338,7 @@ class FabricWorkspace:
 
                         # Replace logical IDs with deployed GUIDs.
                         replaced_raw_file = self._replace_logical_ids(raw_file)
+                        replaced_raw_file = self._replace_parameters(replaced_raw_file)
 
                         byte_file = replaced_raw_file.encode("utf-8")
                         payload = base64.b64encode(byte_file).decode("utf-8")
