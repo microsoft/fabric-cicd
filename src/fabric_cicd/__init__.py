@@ -12,7 +12,7 @@ def change_log_level(level: str = "DEBUG") -> None:
 
     This function configures the logging level for all loggers in the fabric_cicd package to DEBUG,
     which is useful for development and debugging purposes.
-    
+
     :param level: The logging level to set (e.g., DEBUG).
     :type level: int
 
