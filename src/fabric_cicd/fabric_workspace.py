@@ -1,13 +1,15 @@
+import base64
+import json
+import os
+
+import yaml
+
 from fabric_cicd._common._custom_print import (
     print_line,
-    print_timestamp,
     print_sub_line,
+    print_timestamp,
 )
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
-import os
-import json
-import base64
-import yaml
 
 
 class FabricWorkspace:
@@ -35,21 +37,19 @@ class FabricWorkspace:
         :param debug_output: If True, enables debug output for API requests.
         """
         from fabric_cicd._common._validate_input import (
-            validate_workspace_id,
-            validate_repository_directory,
-            validate_item_type_in_scope,
             validate_base_api_url,
-            validate_environment,
             validate_debug_output,
+            validate_environment,
+            validate_item_type_in_scope,
+            validate_repository_directory,
+            validate_workspace_id,
         )
 
         # validate and record
         self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
-        self.base_api_url = (
-            f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
-        )
+        self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
 
         self.environment = validate_environment(environment)
         self.debug_output = validate_debug_output(debug_output)
@@ -66,9 +66,7 @@ class FabricWorkspace:
         self.environment_parameter = {}
 
         if os.path.isfile(parameter_file_path):
-            print_line(
-                f"Info: Found parameter file '{parameter_file_path}'", color="yellow"
-            )
+            print_line(f"Info: Found parameter file '{parameter_file_path}'", color="yellow")
             with open(parameter_file_path, "r") as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
@@ -85,9 +83,7 @@ class FabricWorkspace:
 
                 # Print a warning and skip directory if empty
                 if not os.listdir(directory.path):
-                    print_line(
-                        f"Warning: directory {directory.name} is empty.", color="yellow"
-                    )
+                    print_line(f"Warning: directory {directory.name} is empty.", color="yellow")
                     continue
 
                 # Attempt to read metadata file
@@ -95,20 +91,13 @@ class FabricWorkspace:
                     with open(item_metadata_path, "r") as file:
                         item_metadata = json.load(file)
                 except FileNotFoundError:
-                    raise ValueError(
-                        f"{item_metadata_path} path does not exist in the specified repository."
-                    )
+                    raise ValueError(f"{item_metadata_path} path does not exist in the specified repository.")
                 except json.JSONDecodeError:
                     raise ValueError(f"Error decoding JSON in {item_metadata_path}.")
 
                 # Ensure required metadata fields are present
-                if (
-                    "type" not in item_metadata["metadata"]
-                    or "displayName" not in item_metadata["metadata"]
-                ):
-                    raise ValueError(
-                        f"displayName & type are required in {item_metadata_path}"
-                    )
+                if "type" not in item_metadata["metadata"] or "displayName" not in item_metadata["metadata"]:
+                    raise ValueError(f"displayName & type are required in {item_metadata_path}")
 
                 item_type = item_metadata["metadata"]["type"]
                 item_description = item_metadata["metadata"].get("description", "")
@@ -116,11 +105,7 @@ class FabricWorkspace:
                 item_logical_id = item_metadata["config"]["logicalId"]
 
                 # Get the GUID if the item is already deployed
-                item_guid = (
-                    self.deployed_items.get(item_type, {})
-                    .get(item_name, {})
-                    .get("guid", "")
-                )
+                item_guid = self.deployed_items.get(item_type, {}).get(item_name, {}).get("guid", "")
 
                 if item_type not in self.repository_items:
                     self.repository_items[item_type] = {}
@@ -173,9 +158,7 @@ class FabricWorkspace:
 
                 if logical_id in raw_file:
                     if item_guid == "":
-                        raise Exception(
-                            "Cannot replace logical ID as referenced item is not yet deployed."
-                        )
+                        raise Exception("Cannot replace logical ID as referenced item is not yet deployed.")
                     else:
                         raw_file = raw_file.replace(logical_id, item_guid)
 
@@ -188,16 +171,12 @@ class FabricWorkspace:
         :param raw_file: The raw file content where parameter values need to be replaced.
         """
         if "find_replace" in self.environment_parameter:
-            for key, parameter_dict in self.environment_parameter[
-                "find_replace"
-            ].items():
+            for key, parameter_dict in self.environment_parameter["find_replace"].items():
                 if key in raw_file:
                     # if environment not found in dict
                     if self.environment in parameter_dict:
                         # replace any found references with specified environment value
-                        raw_file = raw_file.replace(
-                            key, parameter_dict[self.environment]
-                        )
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
 
         return raw_file
 
@@ -238,9 +217,7 @@ class FabricWorkspace:
                         )
                         # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
                         if referenced_name:
-                            input_object["typeProperties"][
-                                "workspaceId"
-                            ] = target_workspace_id
+                            input_object["typeProperties"]["workspaceId"] = target_workspace_id
 
                     # Recursively search in the value
                     else:
@@ -269,11 +246,7 @@ class FabricWorkspace:
         :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository)
         """
 
-        lookup_dict = (
-            self.repository_items
-            if lookup_type == "Repository"
-            else self.deployed_items
-        )
+        lookup_dict = self.repository_items if lookup_type == "Repository" else self.deployed_items
         lookup_key = "logical_id" if lookup_type == "Repository" else "guid"
 
         for item_name, item_details in lookup_dict[item_type].items():
@@ -282,9 +255,7 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(
-        self, item_name, item_type, excluded_files={".platform"}, full_publish=True
-    ):
+    def _publish_item(self, item_name, item_type, excluded_files={".platform"}, full_publish=True):
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -317,22 +288,14 @@ class FabricWorkspace:
 
                         # Replace feature branch workspace IDs with target workspace IDs in data pipeline activities.
                         if item_type == "DataPipeline":
-                            raw_file = self._replace_activity_workspace_ids(
-                                raw_file, "Repository"
-                            )
+                            raw_file = self._replace_activity_workspace_ids(raw_file, "Repository")
 
                         # Replace default workspace id with target workspace id
                         # TODO Remove this once bug is resolved in API
                         if item_type == "Notebook":
-                            default_workspace_string = (
-                                '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-                            )
-                            target_workspace_string = (
-                                f'"workspaceId": "{self.workspace_id}"'
-                            )
-                            raw_file = raw_file.replace(
-                                default_workspace_string, target_workspace_string
-                            )
+                            default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
+                            target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
+                            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
 
                         # Replace logical IDs with deployed GUIDs.
                         replaced_raw_file = self._replace_logical_ids(raw_file)
@@ -341,13 +304,11 @@ class FabricWorkspace:
                         byte_file = replaced_raw_file.encode("utf-8")
                         payload = base64.b64encode(byte_file).decode("utf-8")
 
-                        item_payload.append(
-                            {
-                                "path": relative_path,
-                                "payload": payload,
-                                "payloadType": "InlineBase64",
-                            }
-                        )
+                        item_payload.append({
+                            "path": relative_path,
+                            "payload": payload,
+                            "payloadType": "InlineBase64",
+                        })
 
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
@@ -400,7 +361,5 @@ class FabricWorkspace:
 
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
-        self.endpoint.invoke(
-            method="DELETE", url=f"{self.base_api_url}/items/{item_guid}"
-        )
+        self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
         print_sub_line("Unpublished")

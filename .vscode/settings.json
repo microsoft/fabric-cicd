@@ -1,9 +1,11 @@
 {
     "editor": {
         "tabSize": 4,
-        "trimAutoWhitespace": false
+        "trimAutoWhitespace": false,
+        "defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
     },
-    "diffEditor":{
+    "diffEditor": {
         "ignoreTrimWhitespace": false
     },
     "files": {
@@ -13,14 +15,13 @@
         "autoSave": "off"
     },
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter",
-        "editor.formatOnSave": true
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll":  "explicit"
+        }
     },
-    "python": {
-        "createEnvironment.trigger": "off",
-    },
-    "[json]": {
-        "editor.formatOnSave": true
+    "[powershell]": {
+        "editor.defaultFormatter": "ms-vscode.powershell"
     },
     "git": {
         "branchPrefix": "users/",
@@ -28,7 +29,9 @@
         "confirmSync": false,
         "autofetch": true
     },
-    "terminal":{
-        "integrated.defaultProfile.windows": "Git Bash"
+    "ruff" :{
+        "organizeImports": true,
+        "fixAll": true,
+        "editor.formatOnSave": true
     }
 }

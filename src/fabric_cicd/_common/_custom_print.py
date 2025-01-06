@@ -26,9 +26,7 @@ def _get_ansi_color(color_name):
         "light_cyan": "\033[96m",
         "light_white": "\033[97m",
     }
-    return color_dict.get(
-        color_name.lower(), "\033[37m"
-    )  # Default to white if color not found
+    return color_dict.get(color_name.lower(), "\033[37m")  # Default to white if color not found
 
 
 def print_line(message, color="white"):
@@ -71,7 +69,7 @@ def print_header(message, color="green"):
     """
     line_separator = "#" * 100
     formatted_message = f"########## {message}"
-    formatted_message = f"{formatted_message} {line_separator[len(formatted_message):]}"
+    formatted_message = f"{formatted_message} {line_separator[len(formatted_message) :]}"
 
     print_line("")  # Print a blank line before the header
     print_line(line_separator, color)

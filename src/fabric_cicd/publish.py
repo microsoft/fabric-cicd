@@ -1,13 +1,13 @@
+import base64
+import json
+import re
+
+import fabric_cicd._items as items
 from fabric_cicd._common._custom_print import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
 from fabric_cicd.fabric_workspace import FabricWorkspace
-import fabric_cicd._items as items
-import json
-import base64
-import re
-
 
 """
 Functions to deploy Fabric workspace items.
@@ -31,9 +31,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
         items.publish_datapipelines(fabric_workspace_obj)
 
 
-def unpublish_all_orphan_items(
-    fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$"
-) -> None:
+def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
 
@@ -53,23 +51,15 @@ def unpublish_all_orphan_items(
     # Order of unpublishing to handle dependencies cleanly
     # TODO need to expand this to be more dynamic
     unpublish_order = [
-        x
-        for x in ["DataPipeline", "Notebook", "Environment"]
-        if x in fabric_workspace_obj.item_type_in_scope
+        x for x in ["DataPipeline", "Notebook", "Environment"] if x in fabric_workspace_obj.item_type_in_scope
     ]
 
     for item_type in unpublish_order:
-        deployed_names = set(
-            fabric_workspace_obj.deployed_items.get(item_type, {}).keys()
-        )
-        repository_names = set(
-            fabric_workspace_obj.repository_items.get(item_type, {}).keys()
-        )
+        deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
+        repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
         to_delete_set = deployed_names - repository_names
-        to_delete_list = [
-            name for name in to_delete_set if not regex_pattern.match(name)
-        ]
+        to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
         if item_type == "DataPipeline":
             # need to first define order of delete
@@ -78,9 +68,7 @@ def unpublish_all_orphan_items(
             for item_name in to_delete_list:
                 # Get deployed item definition
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item-definition
-                item_guid = fabric_workspace_obj.deployed_items[item_type][item_name][
-                    "guid"
-                ]
+                item_guid = fabric_workspace_obj.deployed_items[item_type][item_name]["guid"]
                 response = fabric_workspace_obj.endpoint.invoke(
                     method="POST",
                     url=f"{fabric_workspace_obj.base_api_url}/items/{item_guid}/getDefinition",
@@ -94,11 +82,7 @@ def unpublish_all_orphan_items(
                         unsorted_pipeline_dict[item_name] = json.loads(decoded_string)
 
             # Determine order to delete w/o dependencies
-            to_delete_list = items.sort_datapipelines(
-                fabric_workspace_obj, unsorted_pipeline_dict, "Deployed"
-            )
+            to_delete_list = items.sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, "Deployed")
 
         for item_name in to_delete_list:
-            fabric_workspace_obj._unpublish_item(
-                item_name=item_name, item_type=item_type
-            )
+            fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
