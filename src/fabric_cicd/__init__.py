@@ -5,6 +5,7 @@ from fabric_cicd._common._logging import configure_logger, exception_handler
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import publish_all_items, unpublish_all_orphan_items
 
+logger = logging.getLogger(__name__)
 
 def change_log_level(level: str = "DEBUG") -> None:
     """
@@ -31,7 +32,7 @@ def change_log_level(level: str = "DEBUG") -> None:
     if level.upper() == "DEBUG":
         configure_logger(logging.DEBUG)
     else:
-        print(f"Log level {level} not supported.  Only DEBUG is supported at this time. No changes made.")
+        logger.warning(f"Log level {level} not supported.  Only DEBUG is supported at this time. No changes made.")
 
 
 configure_logger()
