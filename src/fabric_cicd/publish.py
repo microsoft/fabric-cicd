@@ -97,8 +97,6 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     for item_type in unpublish_order:
         deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
         repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
-        deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
-        repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
         to_delete_set = deployed_names - repository_names
         to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]

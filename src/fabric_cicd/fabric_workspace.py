@@ -334,9 +334,6 @@ class FabricWorkspace:
                             default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
                             target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
                             raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
-                            default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-                            target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
-                            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
 
                         # Replace logical IDs with deployed GUIDs.
                         replaced_raw_file = self._replace_logical_ids(raw_file)
