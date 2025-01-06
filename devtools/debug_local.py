@@ -39,7 +39,7 @@ target_workspace = FabricWorkspace(
 )
 
 # Publish all items defined in item_type_in_scope
-publish_all_items(target_workspace)
+# publish_all_items(target_workspace)
 
 # Unpublish all items defined in scope not found in repository
 # Excluding items with starting with DEBUG
