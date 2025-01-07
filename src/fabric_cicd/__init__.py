@@ -18,7 +18,7 @@ def change_log_level(level: str = "DEBUG") -> None:
     which is useful for development and debugging purposes.
 
     :param level: The logging level to set (e.g., DEBUG).
-    :type level: int
+    :type level: str
 
     Examples:
         Basic usage:
