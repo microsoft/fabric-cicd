@@ -31,6 +31,7 @@ def change_log_level(level: str = "DEBUG") -> None:
             ... )
             >>> publish_all_items(workspace)
             >>> unpublish_orphaned_items(workspace)
+
     """
     if level.upper() == "DEBUG":
         configure_logger(logging.DEBUG)
@@ -44,7 +45,7 @@ sys.excepthook = exception_handler
 
 __all__ = [
     "FabricWorkspace",
+    "change_log_level",
     "publish_all_items",
     "unpublish_all_orphan_items",
-    "change_log_level",
 ]

@@ -1,7 +1,7 @@
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath("../../src/"))
+sys.path.insert(0, Path("../../src/").resolve())
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath("../../src/"))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "fabric-cicd"
-copyright = "Microsoft Corporation"
+copyright = "Microsoft Corporation"  # noqa A001
 author = "Microsoft Corporation"
 release = "0.1.3"
 

@@ -15,15 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class FabricEndpoint:
-    """
-    Handles interactions with the Fabric API, including authentication and request management.
-    """
+    """Handles interactions with the Fabric API, including authentication and request management."""
 
     def __init__(self, token_credential):
-        """
-        Initializes the FabricEndpoint instance, sets up the authentication token.
-
-        """
+        """Initializes the FabricEndpoint instance, sets up the authentication token."""
         self.aad_token = None
         self.aad_token_expiration = None
         self.token_credential = token_credential
@@ -91,7 +86,8 @@ class FabricEndpoint:
                 elif (
                     response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized"
                 ):
-                    raise Exception(f"The executing identity is not authorized to call {method} on '{url}'.")
+                    msg = f"The executing identity is not authorized to call {method} on '{url}'."
+                    raise Exception(msg)
 
                 # Handle item name conflicts
                 elif (
@@ -102,22 +98,26 @@ class FabricEndpoint:
                         logger.info("Item name is reserved. Retrying in 60 seconds.")
                         time.sleep(60)
                     else:
-                        raise Exception(f"Item name still in use after 6 attempts. Description: {response.reason}")
+                        msg = f"Item name still in use after 6 attempts. Description: {response.reason}"
+                        raise Exception(msg)
 
                 # Handle unsupported principal type
                 elif (
                     response.status_code == 400
                     and response.headers.get("x-ms-public-api-error-code") == "PrincipalTypeNotSupported"
                 ):
-                    raise Exception(f"The executing principal type is not supported to call {method} on '{url}'")
+                    msg = f"The executing principal type is not supported to call {method} on '{url}'"
+                    raise Exception(msg)
 
                 # Handle unsupported item types
                 elif response.status_code == 403 and response.reason == "FeatureNotAvailable":
-                    raise Exception(f"Item type not supported. Description: {response.reason}")
+                    msg = f"Item type not supported. Description: {response.reason}"
+                    raise Exception(msg)
 
                 # Handle unexpected errors
                 else:
-                    raise Exception(f"Unhandled error occurred calling {method} on '{url}'.")
+                    msg = f"Unhandled error occurred calling {method} on '{url}'."
+                    raise Exception(msg)
 
                 # Log if reached to end of loop iteration
                 if logger.isEnabledFor(logging.DEBUG):
@@ -125,7 +125,7 @@ class FabricEndpoint:
 
             except Exception as e:
                 logger.debug(invoke_log_message)
-                raise InvokeError(e, logger, invoke_log_message)
+                raise InvokeError(e, logger, invoke_log_message) from e
 
         return {
             "header": dict(response.headers),
@@ -134,9 +134,7 @@ class FabricEndpoint:
         }
 
     def _refresh_token(self):
-        """
-        Refreshes the AAD token if empty or expiration has passed
-        """
+        """Refreshes the AAD token if empty or expiration has passed"""
         if (
             self.aad_token is None
             or self.aad_token_expiration is None
@@ -147,9 +145,11 @@ class FabricEndpoint:
             try:
                 self.aad_token = self.token_credential.get_token(resource_url).token
             except ClientAuthenticationError as e:
-                raise TokenError(f"Failed to aquire AAD token. {e}", logger)
+                msg = f"Failed to aquire AAD token. {e}"
+                raise TokenError(msg, logger) from e
             except Exception as e:
-                raise TokenError(f"An unexpected error occurred when generating the AAD token. {e}", logger)
+                msg = f"An unexpected error occurred when generating the AAD token. {e}"
+                raise TokenError(msg, logger) from e
 
             try:
                 decoded_token = _decode_jwt(self.aad_token)
@@ -161,7 +161,8 @@ class FabricEndpoint:
                 if expiration:
                     self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration)
                 else:
-                    raise TokenError("Token does not contain expiration claim.", logger)
+                    msg = "Token does not contain expiration claim."
+                    raise TokenError(msg, logger)
 
                 if upn:
                     logger.info(f"Executing as User '{upn}'")
@@ -174,18 +175,18 @@ class FabricEndpoint:
                         logger.info(f"Executing as Object Id '{oid}'")
 
             except Exception as e:
-                raise TokenError(f"An unexpected error occurred while decoding the credential token. {e}", logger)
+                msg = f"An unexpected error occurred while decoding the credential token. {e}"
+                raise TokenError(msg, logger) from e
 
 
 def _decode_jwt(token):
-    """
-    Decodes a JWT token and returns the payload as a dictionary.
-    """
+    """Decodes a JWT token and returns the payload as a dictionary."""
     try:
         # Split the token into its parts
         parts = token.split(".")
         if len(parts) != 3:
-            raise TokenError("The token has an invalid JWT format")
+            msg = "The token has an invalid JWT format"
+            raise TokenError(msg, logger)
 
         # Decode the payload (second part of the token)
         payload = parts[1]
@@ -195,7 +196,8 @@ def _decode_jwt(token):
         decoded_str = decoded_bytes.decode("utf-8")
         return json.loads(decoded_str)
     except Exception as e:
-        raise TokenError(f"An unexpected error occurred while decoding the credential token. {e}", logger)
+        msg = f"An unexpected error occurred while decoding the credential token. {e}"
+        raise TokenError(msg, logger) from e
 
 
 def _format_invoke_log(response, method, url, body):

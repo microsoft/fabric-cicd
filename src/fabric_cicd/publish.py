@@ -34,6 +34,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
             ... )
             >>> publish_all_items(workspace)
+
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -78,8 +79,8 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
             >>> publish_all_items(workspace)
             >>> exclude_regex = ".*_do_not_delete"
             >>> unpublish_orphaned_items(workspace, exclude_regex)
-    """
 
+    """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
     try:

@@ -8,9 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def publish_notebooks(fabric_workspace_obj):
-    """
-    Publishes all notebook items from the repository.
-    """
+    """Publishes all notebook items from the repository."""
     item_type = "Notebook"
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
