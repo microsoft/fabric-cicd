@@ -5,8 +5,6 @@ from pathlib import Path
 
 from fabric_cicd._common._exceptions import ParsingError
 
-from fabric_cicd._common._exceptions import ParsingError
-
 """
 Functions to process and deploy DataPipeline item.
 """
