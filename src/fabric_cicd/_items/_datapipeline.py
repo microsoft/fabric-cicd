@@ -1,10 +1,15 @@
 import json
+import logging
 import os
 from collections import defaultdict, deque
+
+from fabric_cicd._common._exceptions import ParsingError
 
 """
 Functions to process and deploy DataPipeline item.
 """
+
+logger = logging.getLogger(__name__)
 
 
 def publish_datapipelines(fabric_workspace_obj):
@@ -58,9 +63,7 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
             unpublish_items.append(item_name)
 
         referenced_pipelines = _find_referenced_datapipelines(
-            fabric_workspace_obj,
-            item_content_dict=item_content_dict,
-            lookup_type=lookup_type,
+            fabric_workspace_obj, item_content_dict=item_content_dict, lookup_type=lookup_type
         )
 
         for referenced_name in referenced_pipelines:
@@ -93,7 +96,7 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
                 zero_in_degree_queue.append(neighbor)
 
     if len(sorted_items) != len(in_degree):
-        raise ValueError("There is a cycle in the graph. Cannot determine a valid publish order.")
+        raise ParsingError("There is a cycle in the graph. Cannot determine a valid publish order.", logger)
 
     # Remove items not present in unpublish list and invert order for deployed sort
     if lookup_type == "Deployed":
@@ -134,9 +137,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
                 # Add found pipeline reference to list
                 if referenced_id is not None:
                     referenced_name = fabric_workspace_obj._convert_id_to_name(
-                        item_type=item_type,
-                        generic_id=referenced_id,
-                        lookup_type=lookup_type,
+                        item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                     )
                     if referenced_name:
                         reference_list.append(referenced_name)

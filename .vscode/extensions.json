@@ -1,8 +1,8 @@
 {
-    "recommendations": [
-        "ms-python.python",
-        "esbenp.prettier-vscode",
-        "ms-vscode.powershell",
-        "charliermarsh.ruff"
-    ]
+  "recommendations": [
+    "ms-python.python",
+    "esbenp.prettier-vscode",
+    "ms-vscode.powershell",
+    "charliermarsh.ruff"
+  ]
 }

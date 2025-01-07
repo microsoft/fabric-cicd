@@ -1,12 +1,17 @@
 import base64
 import datetime
 import json
+import logging
 import time
 
 import requests
-from azure.identity import DefaultAzureCredential
+from azure.core.exceptions import (
+    ClientAuthenticationError,
+)
 
-from fabric_cicd._common._custom_print import print_header, print_line, print_sub_line
+from fabric_cicd._common._exceptions import InvokeError, TokenError
+
+logger = logging.getLogger(__name__)
 
 
 class FabricEndpoint:
@@ -14,15 +19,14 @@ class FabricEndpoint:
     Handles interactions with the Fabric API, including authentication and request management.
     """
 
-    def __init__(self, debug_output=False):
+    def __init__(self, token_credential):
         """
-        Initializes the FabricEndpoint instance, sets up the authentication token, and sets debug mode.
+        Initializes the FabricEndpoint instance, sets up the authentication token.
 
-        :param debug_output: If True, enables debug output for API requests.
         """
         self.aad_token = None
         self.aad_token_expiration = None
-        self.debug_output = debug_output
+        self.token_credential = token_credential
         self._refresh_token()
 
     def invoke(self, method, url, body="{}"):
@@ -39,88 +43,89 @@ class FabricEndpoint:
         long_running = False
 
         while not exit_loop:
-            headers = {
-                "Authorization": f"Bearer {self.aad_token}",
-                "Content-Type": "application/json; charset=utf-8",
-            }
+            try:
+                headers = {
+                    "Authorization": f"Bearer {self.aad_token}",
+                    "Content-Type": "application/json; charset=utf-8",
+                }
 
-            response = requests.request(method=method, url=url, headers=headers, json=body)
-            iteration_count += 1
+                response = requests.request(method=method, url=url, headers=headers, json=body)
+                iteration_count += 1
 
-            if self.debug_output:
-                self._write_debug_output(response, method, url, body)
+                invoke_log_message = _format_invoke_log(response, method, url, body)
 
-            # Handle long-running operations
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
-            if (response.status_code == 200 and long_running) or response.status_code == 202:
-                url = response.headers.get("Location")
-                method = "GET"
-                body = "{}"
-                if long_running and response.json().get("status") in [
-                    "Succeeded",
-                    "Failed",
-                    "Undefined",
-                ]:
-                    long_running = False
-                elif not long_running:
-                    time.sleep(1)
-                    long_running = True
-                else:
-                    retry_after = float(response.headers.get("Retry-After", 0.5))
-                    print_sub_line(f"Operation in progress. Checking again in {retry_after} seconds.")
+                # Handle long-running operations
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
+                if (response.status_code == 200 and long_running) or response.status_code == 202:
+                    url = response.headers.get("Location")
+                    method = "GET"
+                    body = "{}"
+                    if long_running and response.json().get("status") in ["Succeeded", "Failed", "Undefined"]:
+                        long_running = False
+                    elif not long_running:
+                        time.sleep(1)
+                        long_running = True
+                    else:
+                        retry_after = float(response.headers.get("Retry-After", 0.5))
+                        logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
+                        time.sleep(retry_after)
+
+                # Handle successful responses
+                elif response.status_code in {200, 201}:
+                    exit_loop = True
+
+                # Handle API throttling
+                elif response.status_code == 429:
+                    retry_after = float(response.headers.get("Retry-After", 5)) + 5
+                    logger.info(f"API Overloaded: Retrying in {retry_after} seconds")
                     time.sleep(retry_after)
 
-            # Handle successful responses
-            elif response.status_code in {200, 201}:
-                exit_loop = True
+                # Handle expired authentication token
+                elif (
+                    response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired"
+                ):
+                    logger.info("AAD token expired. Refreshing token.")
+                    self._refresh_token()
 
-            # Handle API throttling
-            elif response.status_code == 429:
-                retry_after = float(response.headers.get("Retry-After", 5)) + 5
-                print_sub_line(f"API Overloaded: Retrying in {retry_after} seconds")
-                time.sleep(retry_after)
+                # Handle unauthorized access
+                elif (
+                    response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized"
+                ):
+                    raise Exception(f"The executing identity is not authorized to call {method} on '{url}'.")
 
-            # Handle expired authentication token
-            elif response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
-                print_sub_line("AAD token expired. Refreshing token.")
-                self._refresh_token()
+                # Handle item name conflicts
+                elif (
+                    response.status_code == 400
+                    and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
+                ):
+                    if iteration_count <= 6:
+                        logger.info("Item name is reserved. Retrying in 60 seconds.")
+                        time.sleep(60)
+                    else:
+                        raise Exception(f"Item name still in use after 6 attempts. Description: {response.reason}")
 
-            # Handle item name conflicts
-            elif (
-                response.status_code == 400
-                and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
-            ):
-                if iteration_count <= 6:
-                    print_sub_line("Item name is reserved. Retrying in 60 seconds.")
-                    time.sleep(60)
+                # Handle unsupported principal type
+                elif (
+                    response.status_code == 400
+                    and response.headers.get("x-ms-public-api-error-code") == "PrincipalTypeNotSupported"
+                ):
+                    raise Exception(f"The executing principal type is not supported to call {method} on '{url}'")
+
+                # Handle unsupported item types
+                elif response.status_code == 403 and response.reason == "FeatureNotAvailable":
+                    raise Exception(f"Item type not supported. Description: {response.reason}")
+
+                # Handle unexpected errors
                 else:
-                    self._raise_invoke_exception(
-                        f"Item name still in use after 6 attempts. Description: {response.reason}",
-                        response,
-                        method,
-                        url,
-                        body,
-                    )
+                    raise Exception(f"Unhandled error occurred calling {method} on '{url}'.")
 
-            # Handle unsupported item types
-            elif response.status_code == 403 and response.reason == "FeatureNotAvailable":
-                self._raise_invoke_exception(
-                    f"Item type not supported. Description: {response.reason}",
-                    response,
-                    method,
-                    url,
-                    body,
-                )
+                # Log if reached to end of loop iteration
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(invoke_log_message)
 
-            # Handle unexpected errors
-            else:
-                self._raise_invoke_exception(
-                    f"Unhandled error occurred. Description: {response.reason}",
-                    response,
-                    method,
-                    url,
-                    body,
-                )
+            except Exception as e:
+                logger.debug(invoke_log_message)
+                raise InvokeError(e, logger, invoke_log_message)
 
         return {
             "header": dict(response.headers),
@@ -137,59 +142,80 @@ class FabricEndpoint:
             or self.aad_token_expiration is None
             or self.aad_token_expiration < datetime.datetime.utcnow()
         ):
-            credential = DefaultAzureCredential()
-            resource_url = "https://api.fabric.microsoft.com"
-
-            self.aad_token = credential.get_token(resource_url).token
+            resource_url = "https://api.fabric.microsoft.com/.default"
 
             try:
-                parts = self.aad_token.split(".")
-                payload = parts[1]
-                padding = "=" * (4 - len(payload) % 4)
-                payload += padding
-                decoded = base64.urlsafe_b64decode(payload.encode("utf-8"))
-                expiration = json.loads(decoded).get("exp")
+                self.aad_token = self.token_credential.get_token(resource_url).token
+            except ClientAuthenticationError as e:
+                raise TokenError(f"Failed to aquire AAD token. {e}", logger)
+            except Exception as e:
+                raise TokenError(f"An unexpected error occurred when generating the AAD token. {e}", logger)
+
+            try:
+                decoded_token = _decode_jwt(self.aad_token)
+                expiration = decoded_token.get("exp")
+                upn = decoded_token.get("upn")
+                appid = decoded_token.get("appid")
+                oid = decoded_token.get("oid")
 
                 if expiration:
                     self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration)
                 else:
-                    print("Token does not contain expiration claim.")
+                    raise TokenError("Token does not contain expiration claim.", logger)
+
+                if upn:
+                    logger.info(f"Executing as User '{upn}'")
+                    self.upn_auth = True
+                else:
+                    self.upn_auth = False
+                    if appid:
+                        logger.info(f"Executing as Application Id '{appid}'")
+                    elif oid:
+                        logger.info(f"Executing as Object Id '{oid}'")
 
             except Exception as e:
-                print(f"An error occurred: {e}")
+                raise TokenError(f"An unexpected error occurred while decoding the credential token. {e}", logger)
 
-    def _write_debug_output(self, response, method, url, body):
-        """
-        Outputs debug information if debug mode is enabled.
 
-        :param response: The HTTP response object to log.
-        :param method: HTTP method used for the request.
-        :param url: URL used for the request.
-        :param body: Body of the request.
-        """
-        debug_color = "gray"
-        print_header("DEBUG OUTPUT", debug_color)
-        print_line(f"URL: {url}", debug_color)
-        print_line(f"Method: {method}", debug_color)
-        print_line(f"Request Body: {body}", debug_color)
-        if response is not None:
-            print_line(f"Response Status: {response.status_code}", debug_color)
-            print_line("Response Header:", debug_color)
-            print_line(response.headers, debug_color)
-            print_line("Response Body:", debug_color)
-            print_line(response.text, debug_color)
-            print_line("")
+def _decode_jwt(token):
+    """
+    Decodes a JWT token and returns the payload as a dictionary.
+    """
+    try:
+        # Split the token into its parts
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise TokenError("The token has an invalid JWT format")
 
-    def _raise_invoke_exception(self, message, response, method, url, body):
-        """
-        Raises an exception with a message and optionally outputs debug information.
+        # Decode the payload (second part of the token)
+        payload = parts[1]
+        padding = "=" * (4 - len(payload) % 4)
+        payload += padding
+        decoded_bytes = base64.urlsafe_b64decode(payload.encode("utf-8"))
+        decoded_str = decoded_bytes.decode("utf-8")
+        return json.loads(decoded_str)
+    except Exception as e:
+        raise TokenError(f"An unexpected error occurred while decoding the credential token. {e}", logger)
 
-        :param message: The error message to include in the exception.
-        :param response: The HTTP response object to log.
-        :param method: HTTP method used for the request.
-        :param url: URL used for the request.
-        :param body: Body of the request.
-        """
-        if self.debug_output:
-            self._write_debug_output(response, method, url, body)
-        raise Exception(message)
+
+def _format_invoke_log(response, method, url, body):
+    message = [
+        f"\nURL: {url}",
+        f"Method: {method}",
+        (f"Request Body:\n{json.dumps(body, indent=4)}" if body else "Request Body: None"),
+    ]
+    if response is not None:
+        message.extend([
+            f"Response Status: {response.status_code}",
+            "Response Headers:",
+            json.dumps(dict(response.headers), indent=4),
+            "Response Body:",
+            (
+                json.dumps(response.json(), indent=4)
+                if response.headers.get("Content-Type") == "application/json"
+                else response.text
+            ),
+            "",
+        ])
+
+    return "\n".join(message)

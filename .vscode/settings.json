@@ -1,37 +1,38 @@
 {
-    "editor": {
-        "tabSize": 4,
-        "trimAutoWhitespace": false,
-        "defaultFormatter": "esbenp.prettier-vscode",
-        "editor.formatOnSave": true
+  "editor": {
+    "tabSize": 4,
+    "trimAutoWhitespace": false,
+    "defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "diffEditor": {
+    "ignoreTrimWhitespace": false
+  },
+  "files": {
+    "trimTrailingWhitespace": false,
+    "trimTrailingWhitespaceInRegexAndStrings": false,
+    "insertFinalNewline": true,
+    "autoSave": "off"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
     },
-    "diffEditor": {
-        "ignoreTrimWhitespace": false
-    },
-    "files": {
-        "trimTrailingWhitespace": false,
-        "trimTrailingWhitespaceInRegexAndStrings": false,
-        "insertFinalNewline": true,
-        "autoSave": "off"
-    },
-    "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff",
-        "editor.codeActionsOnSave": {
-            "source.fixAll":  "explicit"
-        }
-    },
-    "[powershell]": {
-        "editor.defaultFormatter": "ms-vscode.powershell"
-    },
-    "git": {
-        "branchPrefix": "users/",
-        "enableSmartCommit": true,
-        "confirmSync": false,
-        "autofetch": true
-    },
-    "ruff" :{
-        "organizeImports": true,
-        "fixAll": true,
-        "editor.formatOnSave": true
-    }
+    "editor.formatOnSave": true
+  },
+  "[powershell]": {
+    "editor.defaultFormatter": "ms-vscode.powershell",
+    "editor.formatOnSave": true
+  },
+  "git": {
+    "branchPrefix": "users/",
+    "enableSmartCommit": true,
+    "confirmSync": false,
+    "autofetch": true
+  },
+  "ruff": {
+    "organizeImports": true,
+    "fixAll": true
+  }
 }
