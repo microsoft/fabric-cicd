@@ -65,7 +65,7 @@ ignore = [
 "{devtools,docs}/*" = [
     "D100", # Missing docstring in public module
     "D104", # Missing docstring in public package
-    "INP001" # Use of input() function
+    "INP001" # Missing __init__ in package
 ]
 [tool.ruff.format]
 preview=true
