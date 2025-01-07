@@ -1,7 +1,10 @@
+"""Module provides the FabricWorkspace class to manage and publish workspace items to the Fabric API."""
+
 import base64
 import json
 import logging
 import os
+from pathlib import Path
 
 import yaml
 from azure.core.credentials import TokenCredential
@@ -14,9 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class FabricWorkspace:
-    """
-    A class to manage and publish workspace items to the Fabric API.
-    """
+    """A class to manage and publish workspace items to the Fabric API."""
 
     def __init__(
         self,
@@ -74,6 +75,7 @@ class FabricWorkspace:
                 ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
                 ...     token_credential=token_credential
                 ... )
+
         """
         from fabric_cicd._common._validate_input import (
             validate_base_api_url,
@@ -105,27 +107,22 @@ class FabricWorkspace:
         self._refresh_repository_items()
 
     def _refresh_parameter_file(self):
-        """
-        Load parameters if file is present
-        """
-        parameter_file_path = os.path.join(self.repository_directory, "parameter.yml")
+        """Load parameters if file is present"""
+        parameter_file_path = Path(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
-        if os.path.isfile(parameter_file_path):
+        if Path(parameter_file_path).is_file():
             logger.info(f"Found parameter file '{parameter_file_path}'")
-            with open(parameter_file_path, "r") as yaml_file:
+            with Path.open(parameter_file_path) as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
     def _refresh_repository_items(self):
-        """
-        Refreshes the repository_items dictionary by scanning the repository directory.
-        """
-
+        """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
 
         for directory in os.scandir(self.repository_directory):
             if directory.is_dir():
-                item_metadata_path = os.path.join(directory.path, ".platform")
+                item_metadata_path = Path(directory.path, ".platform")
 
                 # Print a warning and skip directory if empty
                 if not os.listdir(directory.path):
@@ -134,7 +131,7 @@ class FabricWorkspace:
 
                 # Attempt to read metadata file
                 try:
-                    with open(item_metadata_path, "r") as file:
+                    with Path.open(item_metadata_path) as file:
                         item_metadata = json.load(file)
                 except FileNotFoundError as e:
                     ParsingError(f"{item_metadata_path} path does not exist in the specified repository. {e}", logger)
@@ -143,7 +140,8 @@ class FabricWorkspace:
 
                 # Ensure required metadata fields are present
                 if "type" not in item_metadata["metadata"] or "displayName" not in item_metadata["metadata"]:
-                    raise ParsingError(f"displayName & type are required in {item_metadata_path}", logger)
+                    msg = f"displayName & type are required in {item_metadata_path}"
+                    raise ParsingError(msg, logger)
 
                 item_type = item_metadata["metadata"]["type"]
                 item_description = item_metadata["metadata"].get("description", "")
@@ -165,9 +163,7 @@ class FabricWorkspace:
                 }
 
     def _refresh_deployed_items(self):
-        """
-        Refreshes the deployed_items dictionary by querying the Fabric workspace items API.
-        """
+        """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
         # Get all items in workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item
         response = self.endpoint.invoke(method="GET", url=f"{self.base_api_url}/items")
@@ -201,11 +197,9 @@ class FabricWorkspace:
 
                 if logical_id in raw_file:
                     if item_guid == "":
-                        raise ParsingError(
-                            f"Cannot replace logical ID '{logical_id}' as referenced item is not yet deployed.", logger
-                        )
-                    else:
-                        raw_file = raw_file.replace(logical_id, item_guid)
+                        msg = f"Cannot replace logical ID '{logical_id}' as referenced item is not yet deployed."
+                        raise ParsingError(msg, logger)
+                    raw_file = raw_file.replace(logical_id, item_guid)
 
         return raw_file
 
@@ -217,11 +211,9 @@ class FabricWorkspace:
         """
         if "find_replace" in self.environment_parameter:
             for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                if key in raw_file:
-                    # if environment not found in dict
-                    if self.environment in parameter_dict:
-                        # replace any found references with specified environment value
-                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                if key in raw_file and self.environment in parameter_dict:
+                    # replace any found references with specified environment value
+                    raw_file = raw_file.replace(key, parameter_dict[self.environment])
 
         return raw_file
 
@@ -276,9 +268,7 @@ class FabricWorkspace:
         _find_and_replace_activity_workspace_ids(item_content_dict)
 
         # Convert the updated dict back to a JSON string
-        raw_file = json.dumps(item_content_dict, indent=2)
-
-        return raw_file
+        return json.dumps(item_content_dict, indent=2)
 
     def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
@@ -288,7 +278,6 @@ class FabricWorkspace:
         :param generic_id: Logical id or item guid of the item based on lookup_type.
         :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository)
         """
-
         lookup_dict = self.repository_items if lookup_type == "Repository" else self.deployed_items
         lookup_key = "logical_id" if lookup_type == "Repository" else "guid"
 
@@ -298,7 +287,7 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, excluded_files={".platform"}, full_publish=True):
+    def _publish_item(self, item_name, item_type, excluded_files=None, full_publish=True):
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -312,17 +301,19 @@ class FabricWorkspace:
         item_guid = self.repository_items[item_type][item_name]["guid"]
         item_description = self.repository_items[item_type][item_name]["description"]
 
+        excluded_files = excluded_files or {".platform"}
+
         metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
 
         if full_publish:
             item_payload = []
             for root, _, files in os.walk(item_path):
                 for file in files:
-                    full_path = os.path.join(root, file)
-                    relative_path = os.path.relpath(full_path, item_path)
+                    full_path = Path(root, file)
+                    relative_path = str(full_path.relative_to(item_path))
 
                     if file not in excluded_files:
-                        with open(full_path, "r", encoding="utf-8") as f:
+                        with Path.open(full_path, encoding="utf-8") as f:
                             raw_file = f.read()
 
                         # Replace feature branch workspace IDs with target workspace IDs in data pipeline activities.

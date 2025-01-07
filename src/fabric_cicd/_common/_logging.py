@@ -1,7 +1,7 @@
 import inspect
 import logging
-import os
 import sys
+from pathlib import Path
 
 import colorlog
 
@@ -14,7 +14,6 @@ def configure_logger(level: int = logging.INFO) -> None:
 
     :param level: The log level to set. Must be one of the standard logging levels.
     """
-
     # Configure default logging
     logging.basicConfig(
         level=(
@@ -69,7 +68,7 @@ def exception_handler(exception_type, exception, traceback):
 
         # Write only the exception message to the console
         logging.getLogger("console_only").error(
-            f"{str(exception)}\n\nSee {os.path.abspath('fabric_cicd.error.log')} for full details."
+            f"{exception!s}\n\nSee {Path('fabric_cicd.error.log').resolve()} for full details."
         )
 
         # Write exception and full stack trace to logs but not terminal

@@ -7,7 +7,7 @@ from azure.identity import ClientSecretCredential
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
-from fabric_cicd import FabricWorkspace, change_log_level, publish_all_items, unpublish_all_orphan_items
+from fabric_cicd import FabricWorkspace, change_log_level, publish_all_items, unpublish_all_orphan_items  # noqa F401
 
 # change_log_level()
 

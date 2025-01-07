@@ -7,7 +7,7 @@ from fabric_cicd._items._notebook import publish_notebooks
 
 __all__ = [
     "publish_datapipelines",
-    "sort_datapipelines",
     "publish_environments",
     "publish_notebooks",
+    "sort_datapipelines",
 ]

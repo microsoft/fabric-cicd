@@ -1,7 +1,7 @@
 import json
 import logging
-import os
 from collections import defaultdict, deque
+from pathlib import Path
 
 from fabric_cicd._common._exceptions import ParsingError
 
@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def publish_datapipelines(fabric_workspace_obj):
-    """
-    Publishes all data pipeline items from the repository in the correct order based on their dependencies.
-    """
+    """Publishes all data pipeline items from the repository in the correct order based on their dependencies."""
     item_type = "DataPipeline"
 
     # Get all data pipelines from the repository
@@ -26,9 +24,8 @@ def publish_datapipelines(fabric_workspace_obj):
     # Construct unsorted_pipeline_dict with dict of pipeline
     unsorted_pipeline_dict = {}
     for item_name, item_details in pipelines.items():
-        with open(
-            os.path.join(item_details["path"], "pipeline-content.json"),
-            "r",
+        with Path.open(
+            Path(item_details["path"], "pipeline-content.json"),
             encoding="utf-8",
         ) as f:
             raw_file = f.read()
@@ -50,7 +47,6 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
     :param item_content_dict: Dict representation of the pipeline-content file.
     :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository)
     """
-
     # Step 1: Create a graph to manage dependencies
     graph = defaultdict(list)
     in_degree = defaultdict(int)
@@ -96,7 +92,8 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
                 zero_in_degree_queue.append(neighbor)
 
     if len(sorted_items) != len(in_degree):
-        raise ParsingError("There is a cycle in the graph. Cannot determine a valid publish order.", logger)
+        msg = "There is a cycle in the graph. Cannot determine a valid publish order."
+        raise ParsingError(msg, logger)
 
     # Remove items not present in unpublish list and invert order for deployed sort
     if lookup_type == "Deployed":
