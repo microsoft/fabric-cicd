@@ -3,6 +3,7 @@
 
 import json
 import logging
+import re
 from collections import defaultdict, deque
 from pathlib import Path
 
@@ -106,7 +107,7 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
     return sorted_items
 
 
-def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, lookup_type):
+def _find_referenced_datapipelines_Orig(fabric_workspace_obj, item_content_dict, lookup_type):
     """
     Scan through item path and find pipeline references (including nested pipeline activities).
 
@@ -156,3 +157,48 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
     find_execute_pipeline_activities(item_content_dict)
 
     return reference_list
+
+def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, lookup_type):
+    """
+    Scan through item path and find pipeline references (including nested pipeline activities).
+
+    :param item_content_dict: Dict representation of the pipeline-content file.
+    :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
+    :return: a list of referenced pipeline names.
+    """
+    item_type = "DataPipeline"
+    reference_list = []
+    guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+
+    def find_pipeline(input_object):
+        """
+        Recursively scans through JSON to find all pipeline references.
+
+        :param input_object: Object can be a dict or list present in the input JSON.
+        """
+        # Check if the current object is a dict
+        if isinstance(input_object, dict):
+            for key, value in input_object.items():
+                if isinstance(value, str) and guid_pattern.match(value):
+                    referenced_id = match.group(0) # ensure valid guid
+                    referenced_name = fabric_workspace_obj._convert_id_to_name(
+                        item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
+                    )
+                    if referenced_name:
+                        reference_list.append(referenced_name)
+                
+                # Recursively search in the value
+                else:
+                    find_pipeline(value)
+                
+        # Check if the current object is a list
+        elif isinstance(input_object, list):
+            # Recursively search in each item
+            for item in input_object:
+                find_pipeline(item)
+
+    # Start the recursive search from the root of the JSON data
+    find_pipeline(item_content_dict)
+    print("REFERENCE LIST: ", reference_list)
+    return reference_list
+    
