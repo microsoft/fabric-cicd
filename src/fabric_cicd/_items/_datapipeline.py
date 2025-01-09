@@ -127,7 +127,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
         """
         # Check if the current object is a dict
         if isinstance(input_object, dict):
-            for key, value in input_object.items():
+            for _key, value in input_object.items():
                 if isinstance(value, str):
                     match = guid_pattern.search(value)
                     if match:
