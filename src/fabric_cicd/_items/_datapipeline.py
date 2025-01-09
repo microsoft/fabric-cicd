@@ -187,6 +187,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
                         referenced_name = fabric_workspace_obj._convert_id_to_name(
                             item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                         )
+                        print("REFERENCED NAME:", referenced_name)
                         if referenced_name:
                             reference_list.append(referenced_name)
                 
