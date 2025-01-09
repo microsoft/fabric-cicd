@@ -179,13 +179,15 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
         # Check if the current object is a dict
         if isinstance(input_object, dict):
             for key, value in input_object.items():
-                if isinstance(value, str) and guid_pattern.match(value):
-                    referenced_id = match.group(0) # ensure valid guid
-                    referenced_name = fabric_workspace_obj._convert_id_to_name(
-                        item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
-                    )
-                    if referenced_name:
-                        reference_list.append(referenced_name)
+                if isinstance(value, str):
+                    match = guid_pattern.search(value)
+                    if match:
+                        referenced_id = match.group(0) # ensure valid guid
+                        referenced_name = fabric_workspace_obj._convert_id_to_name(
+                            item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
+                        )
+                        if referenced_name:
+                            reference_list.append(referenced_name)
                 
                 # Recursively search in the value
                 else:
