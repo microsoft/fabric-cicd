@@ -183,6 +183,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
                     match = guid_pattern.search(value)
                     if match:
                         referenced_id = match.group(0) # ensure valid guid
+                        print("VALID GUID:", referenced_id)
                         referenced_name = fabric_workspace_obj._convert_id_to_name(
                             item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                         )
