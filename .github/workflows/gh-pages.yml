@@ -1,28 +1,42 @@
+# Workflow inspiration and adaptation came from Andruino-Cli
+# https://github.com/arduino/arduino-cli/blob/master/.github/workflows/deploy-cobra-mkdocs-versioned-poetry.yml
+
 name: Github Pages
 on:
   push:
     branches:
       - users/JacobKnightley/documentation
-permissions:
-  contents: write
+
+  create:
+
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Configure Git Credentials
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install Requirements
         run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-docs.txt
+
+      - name: Deploy
+        run: |
+          # Publishing implies creating a git commit on the production branch, 
+          # We will need to create a user for this at some point
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
-      - uses: actions/cache@v4
-        with:
-          key: mkdocs-material-${{ env.cache_id }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
-      - run: pip install -r requirements-doc.txt
-      - run: mike deploy --push 0.0.1 latest --update-aliases
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/production:refs/remotes/origin/production
+          mike deploy \
+            --update-aliases \
+            --branch gh-pages \
+            --push \
+            0.0.1 \
+            latest
