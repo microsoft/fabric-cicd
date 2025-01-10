@@ -26,4 +26,5 @@ jobs:
             mkdocs-material-
       - run: pip install -r requirements.txt
       - run: pip install -r requirements-dev.txt
-      - run: mkdocs gh-deploy --force
+      - run: mike delete --all
+      - run: mike deploy 0.0.1 latest --update-aliases
