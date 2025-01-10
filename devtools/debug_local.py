@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 # The following is intended for developers of fabric-cicd to debug locally against the github repo
 
 import sys

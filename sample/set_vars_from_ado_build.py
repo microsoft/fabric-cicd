@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 """
 Example to set variables based on the target environment.
 Environment is determined based on the branch that produced the build.
