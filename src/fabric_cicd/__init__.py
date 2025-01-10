@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 """Provides tools for managing and publishing items in a Fabric workspace."""
 
 import logging

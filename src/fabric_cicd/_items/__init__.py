@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 from fabric_cicd._items._datapipeline import (
     publish_datapipelines,
     sort_datapipelines,

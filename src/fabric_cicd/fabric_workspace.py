@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 """Module provides the FabricWorkspace class to manage and publish workspace items to the Fabric API."""
 
 import base64

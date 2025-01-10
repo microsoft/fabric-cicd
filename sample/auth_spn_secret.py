@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 """
 Example of authenticating with SPN + Secret
 Can be expanded to retrieve values from Key Vault or other sources

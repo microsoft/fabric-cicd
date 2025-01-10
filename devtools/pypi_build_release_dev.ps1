@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 Remove-Item -Recurse -Force dist/*
 
 python -m build

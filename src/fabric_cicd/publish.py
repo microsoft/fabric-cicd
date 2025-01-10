@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 """Module for publishing and unpublishing Fabric workspace items."""
 
 import base64
