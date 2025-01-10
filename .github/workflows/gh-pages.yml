@@ -24,6 +24,5 @@ jobs:
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install -r requirements.txt
-      - run: pip install -r requirements-dev.txt
-      - run: mike deploy 0.0.1 latest --update-aliases
+      - run: pip install -r requirements-doc.txt
+      - run: mike deploy --push 0.0.1 latest --update-aliases
