@@ -132,17 +132,17 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
                     match = guid_pattern.search(value)
                     if match:
                         # If a valid GUID is found, convert it to its name. If it's not None, it's a pipeline and will be added to the reference list
-                        referenced_id = match.group(0) 
+                        referenced_id = match.group(0)
                         referenced_name = fabric_workspace_obj._convert_id_to_name(
                             item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                         )
                         if referenced_name:
                             reference_list.append(referenced_name)
-                
+
                 # Recursively search in the value
                 else:
                     find_pipeline(value)
-                
+
         # Check if the current object is a list
         elif isinstance(input_object, list):
             # Recursively search in each item
@@ -151,5 +151,5 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
 
     # Start the recursive search from the root of the JSON data
     find_pipeline(item_content_dict)
-    
+
     return reference_list
