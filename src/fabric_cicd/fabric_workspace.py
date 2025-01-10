@@ -34,50 +34,56 @@ class FabricWorkspace:
         """
         Initializes the FabricWorkspace instance.
 
-        :param workspace_id: The ID of the workspace to interact with.
-        :type workspace_id: str
-        :param repository_directory: Directory path where repository items are located.
-        :type repository_directory: str
-        :param item_type_in_scope: Item types that should be deployed for given workspace.
-        :type item_type_in_scope: list
-        :param base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
-        :type base_api_url: str, optional
-        :param environment: The environment to be used for parameterization.
-        :type environment: str, optional
-        :param token_credential: The token credential to use for API requests.
-        :type token_credential: str, optional
+        Parameters
+        ----------
+        workspace_id : str
+            The ID of the workspace to interact with.
+        repository_directory : str
+            Directory path where repository items are located.
+        item_type_in_scope : list
+            Item types that should be deployed for given workspace.
+        base_api_url : str, optional
+            Base URL for the Fabric API. Defaults to the Fabric API endpoint.
+        environment : str, optional
+            The environment to be used for parameterization.
+        token_credential : str, optional
+            The token credential to use for API requests.
 
-        Examples:
-            Basic usage:
-                >>> workspace = FabricWorkspace(
-                ...     workspace_id="your-workspace-id",
-                ...     repository_directory="/path/to/repo",
-                ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-                ... )
+        Examples
+        --------
+        Basic usage
+        >>> from fabric_cicd import FabricWorkspace
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
 
-            With optional parameters:
-                >>> workspace = FabricWorkspace(
-                ...     workspace_id="your-workspace-id",
-                ...     repository_directory="/your/path/to/repo",
-                ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-                ...     base_api_url="https://orgapi.fabric.microsoft.com",
-                ...     environment="your-target-environment"
-                ... )
+        With optional parameters
+        >>> from fabric_cicd import FabricWorkspace
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/your/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     base_api_url="https://orgapi.fabric.microsoft.com",
+        ...     environment="your-target-environment"
+        ... )
 
-            With token credential:
-                >>> from azure.identity import ClientSecretCredential
-                >>> client_id = "your-client-id"
-                >>> client_secret = "your-client-secret"
-                >>> tenant_id = "your-tenant-id"
-                >>> token_credential = ClientSecretCredential(
-                ...     client_id=client_id, client_secret=client_secret, tenant_id=tenant_id
-                ... )
-                >>> workspace = FabricWorkspace(
-                ...     workspace_id="your-workspace-id",
-                ...     repository_directory="/your/path/to/repo",
-                ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-                ...     token_credential=token_credential
-                ... )
+        With token credential
+        >>> from fabric_cicd import FabricWorkspace
+        >>> from azure.identity import ClientSecretCredential
+        >>> client_id = "your-client-id"
+        >>> client_secret = "your-client-secret"
+        >>> tenant_id = "your-tenant-id"
+        >>> token_credential = ClientSecretCredential(
+        ...     client_id=client_id, client_secret=client_secret, tenant_id=tenant_id
+        ... )
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/your/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=token_credential
+        ... )
 
         """
         from fabric_cicd._common._validate_input import (

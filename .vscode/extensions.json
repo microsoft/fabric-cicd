@@ -3,6 +3,7 @@
     "ms-python.python",
     "esbenp.prettier-vscode",
     "ms-vscode.powershell",
-    "charliermarsh.ruff"
+    "charliermarsh.ruff",
+    "tamasfe.even-better-toml"
   ]
 }

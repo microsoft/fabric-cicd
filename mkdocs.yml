@@ -1,0 +1,98 @@
+site_name: fabric_cicd
+
+repo_name: microsoft/fabric-cicd
+repo_url: https://github.com/microsoft/fabric-cicd
+
+nav:
+    - Getting Started: index.md
+    - Code Reference: code_reference.md
+    - Examples: example.md
+    - Contribution: contribution.md
+    - Changelog: changelog.md
+    - Help: help.md
+
+theme:
+    name: material
+    custom_dir: docs/overrides
+    icon:
+        logo: fontawesome/solid/code
+    font:
+        text: Roboto
+        code: Roboto Mono
+
+    features:
+        - content.code.copy
+        - content.tooltips
+        - navigation.expand
+        - navigation.indexes
+        - navigation.sections
+        - navigation.tabs
+        - navigation.tabs.sticky
+        - navigation.top
+        - search.highlight
+        - search.suggest
+        - toc.follow
+        - toc.integrate
+    language: en
+    palette:
+        scheme: fabric
+
+extra_css:
+    - stylesheets/extra.css
+
+plugins:
+    - search:
+          separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+    - minify:
+          minify_html: true
+    - include-markdown
+    - mkdocstrings:
+          handlers:
+              python:
+                  paths: ["src"]
+                  options:
+                      docstring_style: numpy
+                      docstring_options:
+                          ignore_init_summary: true
+                      summary:
+                          modules: false
+                          functions: true
+                          classes: true
+                      show_source: false
+                      show_root_full_path: false
+                      separate_signature: true
+                      show_signature_annotations: true
+                      signature_crossrefs: true
+                      filters: ["!^_", "^__init__$"]
+                      merge_init_into_class: true
+                      show_symbol_type_heading: true
+                      show_symbol_type_toc: true
+
+extra:
+    social:
+        - icon: fontawesome/brands/github
+          link: https://github.com/microsoft/fabric-cicd
+    generator: false
+    analytics:
+        feedback:
+        title: Was this page helpful?
+        ratings:
+            - icon: material/thumb-up-outline
+              name: This page was helpful
+              data: 1
+              note: Thanks for your feedback!
+            - icon: material/thumb-down-outline
+              name: This page could be improved
+              data: 0
+              note: >-
+                  Thanks for your feedback! Help us improve this page by using our 
+                  <a href="https://github.com/microsoft/fabric-cicd/issues/new?template=bug_report.md&documentation-location={url}" target="_blank" rel="noopener">feedback form</a>.
+
+markdown_extensions:
+    - abbr
+    - md_in_html
+    - toc:
+          permalink: true
+    - admonition
+
+copyright: Copyright © Microsoft Corporation

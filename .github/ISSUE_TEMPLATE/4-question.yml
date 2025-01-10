@@ -1,0 +1,40 @@
+name: Question
+description: Ask a question
+title: "[Question]: "
+labels: ["question"]
+body:
+    - type: markdown
+      attributes:
+          value: Thanks for asking a question!
+
+    - type: textarea
+      id: trying-to-achieve
+      attributes:
+          label: What are you trying to achieve?
+          description: Provide a brief background description of the problem you're trying to solve. Include information about the item type, and the type of deployment you're trying to achieve.
+      validations:
+          required: true
+
+    - type: textarea
+      id: tried-so-far
+      attributes:
+          label: What have you tried so far?
+          description: If applicable, describe the steps you have tried so far. For scripting-related questions, show the code that you have written.
+      validations:
+          required: true
+
+    - type: textarea
+      id: specific-question
+      attributes:
+          label: What specific question do you have?
+          description: Clearly state the question you need help with.
+      validations:
+          required: true
+
+    - type: textarea
+      id: additional-context
+      attributes:
+          label: Additional context
+          description: Add any other context or screenshots here.
+      validations:
+          required: false

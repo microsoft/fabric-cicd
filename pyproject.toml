@@ -4,9 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fabric-cicd"
-authors = [
-    { name = "Microsoft Corporation" }
-]
+authors = [{ name = "Microsoft Corporation" }]
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 description = "Microsoft Fabric CI/CD"
@@ -14,14 +12,14 @@ readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Programming Language :: Python :: 3"
+    "Programming Language :: Python :: 3",
 ]
 license = { text = "MIT License" }
 
 [tool.setuptools.dynamic]
-version = {file = "VERSION"}
-dependencies = {file = "requirements.txt"}
-optional-dependencies.dev = {file = "requirements-dev.txt"}
+version = { file = "VERSION" }
+dependencies = { file = "requirements.txt" }
+optional-dependencies.dev = { file = "requirements-dev.txt" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -36,21 +34,21 @@ exclude = ["sample/*"]
 [tool.ruff.lint]
 # https://docs.astral.sh/ruff/rules/
 select = [
-    "A", # flake8-builtins
+    "A",   # flake8-builtins
     "ARG", # flake8-unused-arguments
-    "B", # flake8-bugbear
-    "D", # pydocstyle
-    "EM", # flake8-errmsg
-    "F", # Pyflakes
-    "I", # isort
+    "B",   # flake8-bugbear
+    "D",   # pydocstyle
+    "EM",  # flake8-errmsg
+    "F",   # Pyflakes
+    "I",   # isort
     "INP", # flake8-no-pep420
-    "N", # pep8-naming
-    "PT", # flake8-pytest-style
+    "N",   # pep8-naming
+    "PT",  # flake8-pytest-style
     "PTH", # flake8-use-pathlib
     "RET", # flake8-return
     "RUF", # Ruff-specific rules
     "SIM", # flake8-simplify
-    "UP", # pyupgrade
+    "UP",  # pyupgrade
 ]
 ignore = [
     "D203", # No blank lines between a section header and its content
@@ -62,10 +60,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"{devtools,docs}/*" = [
-    "D100", # Missing docstring in public module
-    "D104", # Missing docstring in public package
-    "INP001" # Missing __init__ in package
+"{devtools,.readthedocs}/*" = [
+    "D100",   # Missing docstring in public module
+    "D104",   # Missing docstring in public package
+    "INP001", # Missing __init__ in package
 ]
 [tool.ruff.format]
-preview=true
+preview = true
+docstring-code-format = false
+docstring-code-line-length = "dynamic"

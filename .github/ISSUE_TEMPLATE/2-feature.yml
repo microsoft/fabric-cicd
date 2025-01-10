@@ -1,0 +1,41 @@
+name: Feature Request
+description: Request a feature
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+    - type: markdown
+      attributes:
+          value: Thanks for suggesting a feature!
+
+    - type: textarea
+      id: problem-description
+      attributes:
+          label: What is the problem?
+          description: Describe what the gap is.
+          placeholder: "I'm always frustrated when [...]"
+      validations:
+          required: true
+
+    - type: textarea
+      id: solution-description
+      attributes:
+          label: What is the solution?
+          description: Describe the solution you'd like
+      validations:
+          required: true
+
+    - type: textarea
+      id: alternatives-considered
+      attributes:
+          label: What alternatives have you considered?
+          description: Describe alternatives you've considered
+      validations:
+          required: false
+
+    - type: textarea
+      id: additional-context
+      attributes:
+          label: Additional context
+          description: Add any other context or screenshots here.
+      validations:
+          required: false

@@ -2,3 +2,8 @@ ruff
 gitpython
 build
 twine
+mkdocs-material
+mkdocstring-python
+include-markdown
+mkdocs-minify-plugin
+mike

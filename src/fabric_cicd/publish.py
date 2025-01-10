@@ -25,18 +25,21 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
-    :param fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    :type fabric_workspace_obj: FabricWorkspace
+    Parameters
+    ----------
+    fabric_workspace_obj : FabricWorkspace
+        The FabricWorkspace object containing the items to be published.
 
-    Examples:
-        Basic usage:
-            >>> from fabric_cicd import FabricWorkspace, publish_all_items
-            >>> workspace = FabricWorkspace(
-            ...     workspace_id="your-workspace-id",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-            ... )
-            >>> publish_all_items(workspace)
+    Examples
+    --------
+    Basic usage
+    >>> from fabric_cicd import FabricWorkspace, publish_all_items
+    >>> workspace = FabricWorkspace(
+    ...     workspace_id="your-workspace-id",
+    ...     repository_directory="/path/to/repo",
+    ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+    ... )
+    >>> publish_all_items(workspace)
 
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
@@ -56,32 +59,35 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
 
-    :param fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    :type fabric_workspace_obj: FabricWorkspace
-    :param item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished.
-    :type item_name_exclude_regex: str
+    Parameters
+    ----------
+    fabric_workspace_obj : FabricWorkspace
+        The FabricWorkspace object containing the items to be published.
+    item_name_exclude_regex : str
+        Regex pattern to exclude specific items from being unpublished. Default is '^$' which will exclude nothing.
 
-    Examples:
-        Basic usage:
-            >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
-            >>> workspace = FabricWorkspace(
-            ...     workspace_id="your-workspace-id",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-            ... )
-            >>> publish_all_items(workspace)
-            >>> unpublish_orphaned_items(workspace)
+    Examples
+    --------
+    Basic usage
+    >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+    >>> workspace = FabricWorkspace(
+    ...     workspace_id="your-workspace-id",
+    ...     repository_directory="/path/to/repo",
+    ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+    ... )
+    >>> publish_all_items(workspace)
+    >>> unpublish_orphaned_items(workspace)
 
-        With regex name exclusion:
-            >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
-            >>> workspace = FabricWorkspace(
-            ...     workspace_id="your-workspace-id",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-            ... )
-            >>> publish_all_items(workspace)
-            >>> exclude_regex = ".*_do_not_delete"
-            >>> unpublish_orphaned_items(workspace, exclude_regex)
+    With regex name exclusion
+    >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+    >>> workspace = FabricWorkspace(
+    ...     workspace_id="your-workspace-id",
+    ...     repository_directory="/path/to/repo",
+    ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+    ... )
+    >>> publish_all_items(workspace)
+    >>> exclude_regex = ".*_do_not_delete"
+    >>> unpublish_orphaned_items(workspace, exclude_regex)
 
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)

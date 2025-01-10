@@ -1,38 +1,56 @@
 {
-  "editor": {
-    "tabSize": 4,
-    "trimAutoWhitespace": false,
-    "defaultFormatter": "esbenp.prettier-vscode",
-    "editor.formatOnSave": true
-  },
-  "diffEditor": {
-    "ignoreTrimWhitespace": false
-  },
-  "files": {
-    "trimTrailingWhitespace": false,
-    "trimTrailingWhitespaceInRegexAndStrings": false,
-    "insertFinalNewline": true,
-    "autoSave": "off"
-  },
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit"
+    "editor": {
+        "tabSize": 4,
+        "trimAutoWhitespace": false
     },
-    "editor.formatOnSave": true
-  },
-  "[powershell]": {
-    "editor.defaultFormatter": "ms-vscode.powershell",
-    "editor.formatOnSave": true
-  },
-  "git": {
-    "branchPrefix": "users/",
-    "enableSmartCommit": true,
-    "confirmSync": false,
-    "autofetch": true
-  },
-  "ruff": {
-    "organizeImports": true,
-    "fixAll": true
-  }
+    "diffEditor": {
+        "ignoreTrimWhitespace": false
+    },
+    "files": {
+        "trimTrailingWhitespace": false,
+        "trimTrailingWhitespaceInRegexAndStrings": false,
+        "insertFinalNewline": true,
+        "autoSave": "off"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit"
+        },
+        "editor.formatOnSave": true
+    },
+    "[powershell]": {
+        "editor.defaultFormatter": "ms-vscode.powershell",
+        "editor.formatOnSave": true
+    },
+    "[toml]": {
+        "editor.defaultFormatter": "tamasfe.even-better-toml",
+        "editor.formatOnSave": true
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[markdown]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "git": {
+        "branchPrefix": "users/",
+        "enableSmartCommit": true,
+        "confirmSync": false,
+        "autofetch": true
+    },
+    "ruff": {
+        "organizeImports": true,
+        "fixAll": true
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "useTabs": false
+    }
 }

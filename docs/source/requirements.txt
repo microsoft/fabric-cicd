@@ -1,4 +1,0 @@
-sphinx_rtd_theme
-requests
-pyyaml
-azure-identity
