@@ -1,6 +1,5 @@
 # Workflow inspiration and adaptation came from Andruino-Cli
-# https://github.com/arduino/arduino-cli/blob/master/.github/workflows/deploy-cobra-mkdocs-versioned-poetry.yml
-
+# https://github.com/squidfunk/mkdocs-material/discussions/6546
 name: Github Pages
 on:
   push:
@@ -25,7 +24,7 @@ jobs:
       - name: Install Requirements
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements-docs.txt
+          python -m pip install -r requirements-doc.txt
 
       - name: Deploy
         run: |
