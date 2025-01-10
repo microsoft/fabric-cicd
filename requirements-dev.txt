@@ -3,7 +3,7 @@ gitpython
 build
 twine
 mkdocs-material
-mkdocstring-python
+mkdocstrings-python
 include-markdown
 mkdocs-minify-plugin
 mike
