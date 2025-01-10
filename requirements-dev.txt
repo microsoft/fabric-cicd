@@ -4,6 +4,6 @@ build
 twine
 mkdocs-material
 mkdocstrings-python
-markdown-include
+mkdocs-include-markdown-plugin
 mkdocs-minify-plugin
 mike
