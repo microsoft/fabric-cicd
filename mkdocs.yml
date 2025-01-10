@@ -2,6 +2,9 @@ site_name: fabric_cicd
 
 repo_name: microsoft/fabric-cicd
 repo_url: https://github.com/microsoft/fabric-cicd
+site_url: https://microsoft.github.io/fabric-cicd/
+remote_branch: gh-pages
+remote_name: origin
 
 nav:
     - Getting Started: index.md
@@ -69,6 +72,10 @@ plugins:
                       show_symbol_type_toc: true
 
 extra:
+    version:
+        provider: mike
+        default: latest
+        alias: true
     social:
         - icon: fontawesome/brands/github
           link: https://github.com/microsoft/fabric-cicd
