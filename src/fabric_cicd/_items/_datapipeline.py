@@ -153,4 +153,3 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
     find_pipeline(item_content_dict)
     
     return reference_list
-    
