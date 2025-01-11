@@ -6,8 +6,10 @@ on:
     branches:
       - users/JacobKnightley/documentation
 
-  create:
-
+permissions:
+  contents: write
+  actions: write
+      
 jobs:
   publish:
     runs-on: ubuntu-latest
