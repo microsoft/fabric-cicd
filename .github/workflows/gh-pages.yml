@@ -35,10 +35,10 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
           git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
-          mike set-default latest
           mike deploy \
             --update-aliases \
             --branch gh-pages \
             --push \
             0.0.1 \
             latest
+          mike set-default latest
