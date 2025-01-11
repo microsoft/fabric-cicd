@@ -41,4 +41,4 @@ jobs:
             --push \
             0.0.1 \
             latest
-          mike set-default latest
+          mike set-default --push latest
