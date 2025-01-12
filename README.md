@@ -13,6 +13,8 @@ Fabric CICD is a Python library designed for use with [Microsoft Fabric](https:/
 
 If you encounter any issues, please [raise a bug](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=).
 
+testing how this works
+
 If you have ideas for new features/functions, please [request a feature](https://github.com/microsoft/fabric-cicd/issues/new?assignees=&labels=&projects=&template=feature_request.md&title=).
 
 ## Featured Scenarios
