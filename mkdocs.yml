@@ -101,5 +101,6 @@ markdown_extensions:
     - toc:
           permalink: true
     - admonition
+    - pymdownx.highlight
 
 copyright: Copyright © Microsoft Corporation
