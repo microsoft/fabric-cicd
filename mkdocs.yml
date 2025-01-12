@@ -37,6 +37,7 @@ theme:
         - search.suggest
         - toc.follow
         - toc.integrate
+        - announce.dismiss
     language: en
     palette:
         scheme: fabric
