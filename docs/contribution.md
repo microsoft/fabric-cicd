@@ -21,20 +21,29 @@ Before you begin, ensure you have the following installed:
 
 ## Initial Configuration
 
-1. Clone the repository:
+1. **Fork the Repository on GitHub**:
+
+    - Go to the repository (fabric-cicd)[https://github.com/microsoft/fabric-cicd] on GitHub.
+    - In the top right corner, click on the **Fork** button.
+    - This will create a copy of the repository in your own GitHub account.
+
+2. **Clone Your Forked Repository**:
+
+    - Once the fork is complete, go to your GitHub account and open the forked repository.
+    - Click on the **Code** button, then copy the URL (HTTPS or SSH).
+    - Open your terminal and run the following command to clone your forked repository:
 
     ```sh
-    git clone https://github.com/microsoft/fabric-cicd.git /your/target/directory
-    cd /your/target/directory
+    git clone <URL-of-your-forked-repository>
     ```
 
-1. Create a virtual environment:
+3. **Create a Virtual Environment**:
 
     ```sh
     python -m venv venv
     ```
 
-1. Activate the virtual environment:
+4. **Activate the Virtual Environment**:
 
     - On Windows:
 
@@ -48,18 +57,18 @@ Before you begin, ensure you have the following installed:
         source venv/bin/activate
         ```
 
-1. Install the dependencies:
+5. **Install the Dependencies**:
 
     ```sh
     pip install -r requirements.txt
     ```
 
-1. Open the project in VS Code and ensure the virtual environment is selected:
+6. **Open the Project in VS Code and Ensure the Virtual Environment is Selected**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`.
-    - Choose the interpreter from the venv directory.
+    - Choose the interpreter from the `venv` directory.
 
-1. Ensure all VS Code extensions are installed:
+7. **Ensure All VS Code Extensions Are Installed**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Extensions: Show Recommended Extensions`.
-    - Install all extensions recommended for the workspace
+    - Install all extensions recommended for the workspace.
