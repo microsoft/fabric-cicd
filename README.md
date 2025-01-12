@@ -23,7 +23,9 @@ All documentation is hosted on our [fabric-cicd](https://microsoft.github.io/fab
 -   [Code Reference](https://microsoft.github.io/fabric-cicd/code_reference/)
 -   [Contribution](https://microsoft.github.io/fabric-cicd/contribution/)
 -   [Changelog](https://microsoft.github.io/fabric-cicd/changelog/)
--   [Help](https://microsoft.github.io/fabric-cicd/help)
+-   [Support](https://microsoft.github.io/fabric-cicd/help/#support)
+-   [Security](https://microsoft.github.io/fabric-cicd/help/#security)
+-   [License](https://microsoft.github.io/fabric-cicd/help/#license)
 
 ## Installation
 
