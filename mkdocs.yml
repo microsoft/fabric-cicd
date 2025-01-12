@@ -16,10 +16,10 @@ nav:
 
 theme:
     name: material
-    custom_dir: docs/.config/overrides
+    custom_dir: docs/config/overrides
     icon:
         logo: fontawesome/solid/code
-    favicon: docs/.config/assets/favicon.ico
+    favicon: config/assets/favicon.ico
     font:
         text: Roboto
         code: Roboto Mono
@@ -42,7 +42,7 @@ theme:
         scheme: fabric
 
 extra_css:
-    - .config/stylesheets/extra.css
+    - config/stylesheets/extra.css
 
 plugins:
     - search:
