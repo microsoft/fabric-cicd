@@ -23,7 +23,7 @@ Before you begin, ensure you have the following installed:
 
 1. **Fork the Repository on GitHub**:
 
-    - Go to the repository (fabric-cicd)[https://github.com/microsoft/fabric-cicd] on GitHub.
+    - Go to the repository [fabric-cicd](https://github.com/microsoft/fabric-cicd) on GitHub.
     - In the top right corner, click on the **Fork** button.
     - This will create a copy of the repository in your own GitHub account.
 
