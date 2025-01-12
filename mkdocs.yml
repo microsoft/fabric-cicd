@@ -19,7 +19,7 @@ theme:
     custom_dir: docs/.config/overrides
     icon:
         logo: fontawesome/solid/code
-    favicon: .config/assets/favicon.ico
+    favicon: docs/.config/assets/favicon.ico
     font:
         text: Roboto
         code: Roboto Mono
