@@ -11,7 +11,7 @@ The following contains all major, minor, and patch version release notes. Additi
 -   Support for Workspace Folders
 -   Enhancements for existing item types
     -   Notebook - Support for attached resources
-    -   Data Pipeline - Support for all connections w/in activities
+    -   Data Pipeline - Support for all connections within activities
     -   Environment - Support for attached public libraries - Support for attached custom libraries
 
 ## Version 0.1.0
