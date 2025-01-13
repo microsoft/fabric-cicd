@@ -109,7 +109,7 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
 
 def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, lookup_type):
     """
-    Scan through item path and find pipeline references (including nested pipeline activities).
+    Scan through item path and find pipeline references (including nested pipelines).
 
     :param item_content_dict: Dict representation of the pipeline-content file.
     :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
@@ -119,7 +119,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
     reference_list = []
     guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
-    def find_pipeline(input_object):
+    def find_datapipeline(input_object):
         """
         Recursively scans through JSON to find all pipeline references.
 
@@ -131,7 +131,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
                 if isinstance(value, str):
                     match = guid_pattern.search(value)
                     if match:
-                        # If a valid GUID is found, convert it to its name. If it's not None, it's a pipeline and will be added to the reference list
+                        # If a valid GUID is found, convert it to name. If name is not None, it's a pipeline and will be added to the reference list
                         referenced_id = match.group(0)
                         referenced_name = fabric_workspace_obj._convert_id_to_name(
                             item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
@@ -141,15 +141,15 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
 
                 # Recursively search in the value
                 else:
-                    find_pipeline(value)
+                    find_datapipeline(value)
 
         # Check if the current object is a list
         elif isinstance(input_object, list):
             # Recursively search in each item
             for item in input_object:
-                find_pipeline(item)
+                find_datapipeline(item)
 
     # Start the recursive search from the root of the JSON data
-    find_pipeline(item_content_dict)
+    find_datapipeline(item_content_dict)
 
     return reference_list
