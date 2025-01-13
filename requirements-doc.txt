@@ -3,3 +3,4 @@ mkdocstrings-python
 mkdocs-include-markdown-plugin
 mkdocs-minify-plugin
 mike
+ruff
