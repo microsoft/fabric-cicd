@@ -1,4 +1,4 @@
-site_name: fabric_cicd
+site_name: fabric-cicd
 
 repo_name: microsoft/fabric-cicd
 repo_url: https://github.com/microsoft/fabric-cicd
