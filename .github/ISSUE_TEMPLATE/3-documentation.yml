@@ -1,0 +1,40 @@
+name: Documentation Feedback
+description: Provide documentation feedback
+title: "[Documentation]: "
+labels: ["documentation"]
+body:
+    - type: markdown
+      attributes:
+          value: Thanks for providing documentation feedback!
+
+    - type: input
+      id: documentation-location
+      attributes:
+          label: Location
+          description: What part of the documentation does this feedback pertain to?  Provide a URL where applicable.
+      validations:
+          required: true
+
+    - type: textarea
+      id: feedback
+      attributes:
+          label: Feedback
+          description: What is your feedback?
+      validations:
+          required: true
+
+    - type: textarea
+      id: improvements
+      attributes:
+          label: Suggested Improvements
+          description: What improvements would you suggest?
+      validations:
+          required: true
+
+    - type: textarea
+      id: additional-context
+      attributes:
+          label: Additional context
+          description: Add any other context or screenshots here.
+      validations:
+          required: false
