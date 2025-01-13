@@ -30,6 +30,7 @@
 
 ## Parameter.yml File
 
-```yaml
-{ % include "../sample/workspace/parameter.yml" % }
+<!--prettier-ignore-->
+```yml
+{% include "../sample/workspace/parameter.yml" %}
 ```
