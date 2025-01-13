@@ -56,7 +56,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find` value as the key and the `replace` value for each environment. See the [Example](example.md) page for a complete yaml file.
 
-Note: A common use case for this function is to replace connection strings. I.e. find connection guid db52be81-c2b2-4261-84fa-840c67f4bbd0 and replace with 81bbb339-8d0b-46e8-bfa6-289a159c0733.
+Note: A common use case for this function is to replace connection strings. I.e. find and replaced a connection guid referenced in data pipeline.
 
 ```yaml
 find_replace:

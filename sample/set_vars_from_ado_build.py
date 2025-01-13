@@ -14,15 +14,12 @@ from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan
 branch = os.getenv("BUILD_SOURCEBRANCHNAME")
 
 # The defined environment values should match the names found in the parameter.yml file
-if branch == "Develop":
+if branch == "ppe":
     workspace_id = "a2745610-0253-4cf3-9e47-0b5cf8aa00f0"
-    environment = "dev"
-elif branch == "Test":
-    workspace_id = "b33ecfe9-a9ad-4aca-ad9c-72c0a728f2c0"
-    environment = "test"
-elif branch == "Main":
+    environment = "PPE"
+elif branch == "main":
     workspace_id = "9010397b-7c0f-4d93-8620-90e51816e9e9"
-    environment = "main"
+    environment = "PROD"
 else:
     raise ValueError("Invalid branch to deploy from")
 

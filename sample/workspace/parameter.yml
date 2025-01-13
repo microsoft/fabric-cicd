@@ -1,12 +1,15 @@
 find_replace:
     # SQL Connection Guid
     db52be81-c2b2-4261-84fa-840c67f4bbd0:
-        dev: 81bbb339-8d0b-46e8-bfa6-289a159c0733
-        test: b1eb660d-541c-4f39-b085-f9842600a579
-        prod: 5d6a1b16-447f-464a-b959-45d0fed35ca0
+        PPE: 81bbb339-8d0b-46e8-bfa6-289a159c0733
+        PROD: 5d6a1b16-447f-464a-b959-45d0fed35ca0
 
 spark_pool:
-    # CapacityPool_Large_Static
+    # CapacityPool_Large
     72c68dbc-0775-4d59-909d-a47896f4573b:
         type: "Capacity"
-        name: "CapacityPool_Large_Static"
+        name: "CapacityPool_Large"
+    # CapacityPool_Medium
+    e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d:
+        type: "Workspace"
+        name: "WorkspacePool_Medium"
