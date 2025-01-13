@@ -8,6 +8,12 @@ To install fabric-cicd, run:
 pip install fabric-cicd
 ```
 
+While in private preview, to install fabric-cicd, run:
+
+```bash
+pip install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fabric-cicd
+```
+
 ## Authentication
 
 -   You can optionally provide your own credential object that aligns with the `TokenCredential` class. For more details, see the [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential) documentation.

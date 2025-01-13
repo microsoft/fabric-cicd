@@ -61,6 +61,7 @@ Before you begin, ensure you have the following installed:
 
     ```sh
     pip install -r requirements.txt
+    pip install -r requirements.dev.txt
     ```
 
 6. **Open the Project in VS Code and Ensure the Virtual Environment is Selected**:
