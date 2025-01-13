@@ -10,7 +10,7 @@ on:
 permissions:
   actions: read
   contents: read
-  security-events: write # To upload sarif files
+  security-events: write
 
 jobs:
   analyze:
