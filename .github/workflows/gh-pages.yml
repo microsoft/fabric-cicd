@@ -1,0 +1,53 @@
+# Workflow inspiration and adaptation came from Andruino-Cli
+# https://github.com/squidfunk/mkdocs-material/discussions/6546
+name: Github Pages
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+      
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install Requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-doc.txt
+          
+      - name: Read version from file
+        id: get_version
+        run: |
+          VERSION=$(cat VERSION)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
+          mike deploy \
+            --update-aliases \
+            --branch gh-pages \
+            --push \
+            ${{ env.VERSION }} \
+            latest
+          mike set-default --push latest
