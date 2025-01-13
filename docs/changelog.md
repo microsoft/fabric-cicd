@@ -16,7 +16,7 @@ The following contains all major, minor, and patch version release notes. Additi
 
 ## Version 0.1.0
 
-<span class="md-h2-subheader">Release Date: 2025-01-15</span>
+<span class="md-h2-subheader">Release Date: TBD</span>
 
 -   Initial public preview release
 -   Supports Notebook, Pipeline, and Environment deployments
