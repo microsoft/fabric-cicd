@@ -39,14 +39,14 @@ This library deploys from a directory containing files and directories committed
 
 ```
 /<your-directory>
-    /<item-name>.<item-type>/
+    /<item-name>.<item-type>
         ...
-    /<item-name>.<item-type>/
+    /<item-name>.<item-type>
         ...
-    /<workspace-subfolder>/
-        /<item-name>.<item-type>/
+    /<workspace-subfolder>
+        /<item-name>.<item-type>
             ...
-        /<item-name>.<item-type>/
+        /<item-name>.<item-type>
             ...
     /parameter.yml
 ```
