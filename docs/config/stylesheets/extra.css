@@ -92,3 +92,9 @@ p:has(.md-h2-subheader) {
 .md-nav--lifted .md-nav__item {
     font-size: .7rem;
 }
+
+/* Markdown image resizing */
+.md-typeset img {
+    max-width: 40rem;
+    height: auto; /* Maintain aspect ratio */
+}
