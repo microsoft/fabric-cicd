@@ -7,9 +7,12 @@ remote_branch: gh-pages
 remote_name: origin
 
 nav:
-    - Getting Started: index.md
+    - Home: index.md
     - Code Reference: code_reference.md
-    - Examples: example.md
+    - How To:
+          - Getting Started: how_to/getting_started.md
+          - Parameterization: how_to/parameterization.md
+          - Examples: how_to/example.md
     - Contribution: contribution.md
     - Changelog: changelog.md
     - Help: help.md
