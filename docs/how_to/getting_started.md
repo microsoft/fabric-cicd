@@ -48,4 +48,4 @@ The flow pictured below is the hero scenario for this library and is the recomme
 
 ![GIT Flow](../config/assets/git_flow.png)
 
-<img src="../config/assets/git_flow.png" alt="GIT Flow" width="600"/>
+<img src="../config/assets/git_flow.png" alt="GIT Flow" width="40rem"/>
