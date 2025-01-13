@@ -38,11 +38,12 @@ This library deploys from a directory containing files and directories committed
 
 ## GIT Flow
 
-The flow pictured below is the hero scenario for this library and is the recommendation if you're just starting out. This library is also only designed to support a full deployment (not a partial diff deployment) to ensure that the _Deployed_ or _Non-Feature_ workspaces contain the expected code. Full deployments guarantee consistency and are key to achieving full CICD.
+The flow pictured below is the hero scenario for this library and is the recommendation if you're just starting out.
 
 -   _Deployed_ or _Non-Feature_ branches are not connected to workspaces via [GIT Sync](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/git-get-started?tabs=azure-devops%2CAzure%2Ccommit-to-git#connect-a-workspace-to-a-git-repo)
 -   _Feature_ or _User_ branches are connected to workspaces via [GIT Sync](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/git-get-started?tabs=azure-devops%2CAzure%2Ccommit-to-git#connect-a-workspace-to-a-git-repo)
 -   _Deployed_ or _Non-Feature_ workspaces are only updated through script-based deployments, such as through the fabric-cicd library
 -   Feature branches are created from the default branch, merged back into the default branch, and cherry picked into the upper branches
+-   Each deployment is a full deployment and does not consider commit diffs
 
-    ![GIT Flow](../config/assets/git_flow.png)
+![GIT Flow](../config/assets/git_flow.png)
