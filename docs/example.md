@@ -27,3 +27,9 @@
 ```python
 {% include "../sample/optional_parameters.py" %}
 ```
+
+## Parameter.yml File
+
+```yaml
+{ % include "../sample/workspace/parameter.yml" % }
+```
