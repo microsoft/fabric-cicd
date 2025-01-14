@@ -11,7 +11,7 @@
 
 ## Project Overview
 
-Fabric CICD is a Python library designed for use with [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) workspaces. This library is intended to support code first CICD integrations to seamlessly integrate Source Controlled workspaces into a deployment framework. The goal of this library is to support the CICD developers that don't want to dig into the weeds of interacting directly with the Microsoft Fabric APIs.
+fabric-cicd is a Python library designed for use with [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) workspaces. This library supports code-first Continuous Integration / Continuous Deployment (CI/CD) automations to seamlessly integrate Source Controlled workspaces into a deployment framework. The goal is to assist CI/CD developers who prefer not to interact directly with the Microsoft Fabric APIs.
 
 ## Documentation
 
