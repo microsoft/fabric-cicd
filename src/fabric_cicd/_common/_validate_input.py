@@ -40,8 +40,8 @@ def validate_data_type(expected_type, variable_name, input_value):
 
 
 def validate_item_type_in_scope(input_value, upn_auth):
-    accepted_item_types_upn = ["Notebook", "DataPipeline", "Environment"]
-    accepted_item_types_non_upn = ["Notebook", "Environment"]
+    accepted_item_types_upn = FabricWorkspace.ACCEPTED_ITEM_TYPES_UPN
+    accepted_item_types_non_upn = FabricWorkspace.ACCEPTED_ITEM_TYPES_NON_UPN
 
     accepted_item_types = accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
 

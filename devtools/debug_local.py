@@ -15,14 +15,14 @@ from fabric_cicd import FabricWorkspace, change_log_level, publish_all_items, un
 # change_log_level()
 
 # The defined environment values should match the names found in the parameter.yml file
-workspace_id = "fd844302-8fdd-42c1-b1ff-e35bc8e294e4"
+workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
 environment = "dev"
 
 # In this example, our workspace content sits within the root/sample/workspace directory
 repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
-item_type_in_scope = ["DataPipeline", "Notebook", "Environment"]
+item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel"]
 
 
 client_id = "your-client-id"
@@ -38,7 +38,7 @@ target_workspace = FabricWorkspace(
     item_type_in_scope=item_type_in_scope,
     # Override base url in rare cases where it's different
     base_api_url="https://msitapi.fabric.microsoft.com/",
-    token_credential=token_credential,
+    # token_credential=token_credential,
 )
 
 # Publish all items defined in item_type_in_scope

@@ -58,15 +58,26 @@ class FabricEndpoint:
                     url = response.headers.get("Location")
                     method = "GET"
                     body = "{}"
-                    if long_running and response.json().get("status") in ["Succeeded", "Failed", "Undefined"]:
-                        long_running = False
-                    elif not long_running:
+                    response_json = response.json()
+
+                    if long_running:
+                        status = response_json.get("status")
+                        if status == "Succeeded":
+                            long_running = False
+                            exit_loop = True
+                        elif status == "Failed":
+                            msg = f"Operation failed. Error Code: {response_json['error']['errorCode']}. Error Message: {response_json['error']['message']}"
+                            raise Exception(msg)
+                        elif status == "Undefined":
+                            msg = f"Operation is in an undefined state. Full Body: {response_json}"
+                            raise Exception(msg)
+                        else:
+                            retry_after = float(response.headers.get("Retry-After", 0.5))
+                            logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
+                            time.sleep(retry_after)
+                    else:
                         time.sleep(1)
                         long_running = True
-                    else:
-                        retry_after = float(response.headers.get("Retry-After", 0.5))
-                        logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
-                        time.sleep(retry_after)
 
                 # Handle successful responses
                 elif response.status_code in {200, 201}:
@@ -119,7 +130,12 @@ class FabricEndpoint:
 
                 # Handle unexpected errors
                 else:
-                    msg = f"Unhandled error occurred calling {method} on '{url}'."
+                    err_msg = (
+                        f" Message: {response.json()['message']}"
+                        if "application/json" in response.headers.get("Content-Type")
+                        else ""
+                    )
+                    msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
                     raise Exception(msg)
 
                 # Log if reached to end of loop iteration

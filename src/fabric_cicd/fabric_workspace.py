@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
+    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "SemanticModel")
+    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "SemanticModel")
+
     def __init__(
         self,
         workspace_id: str,
@@ -296,7 +299,7 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, excluded_files=None, full_publish=True):
+    def _publish_item(self, item_name, item_type, excluded_files=None, excluded_directories=None, full_publish=True):
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -311,15 +314,19 @@ class FabricWorkspace:
         item_description = self.repository_items[item_type][item_name]["description"]
 
         excluded_files = excluded_files or {".platform"}
+        excluded_directories = excluded_directories or None
 
         metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
 
         if full_publish:
             item_payload = []
-            for root, _, files in os.walk(item_path):
+            for root, dirs, files in os.walk(item_path):
+                # modify dirs in place
+                dirs[:] = [d for d in dirs if d not in excluded_directories]
+
                 for file in files:
                     full_path = Path(root, file)
-                    relative_path = str(full_path.relative_to(item_path))
+                    relative_path = str(full_path.relative_to(item_path).as_posix())
 
                     if file not in excluded_files:
                         with Path.open(full_path, encoding="utf-8") as f:
@@ -330,7 +337,6 @@ class FabricWorkspace:
                             raw_file = self._replace_activity_workspace_ids(raw_file, "Repository")
 
                         # Replace default workspace id with target workspace id
-                        # TODO Remove this once bug is resolved in API
                         if item_type == "Notebook":
                             default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
                             target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
