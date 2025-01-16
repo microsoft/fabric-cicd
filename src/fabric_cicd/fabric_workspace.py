@@ -13,7 +13,7 @@ import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd._common._exceptions import ItemDependencyError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
+
+    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel")
+    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel")
 
     def __init__(
         self,
@@ -296,7 +299,20 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, excluded_files=None, full_publish=True):
+    def _convert_path_to_id(self, item_type, path):
+        """
+        For a given path and item type, returns the logical id.
+
+        :param item_type: Type of the item (e.g., Notebook, Environment).
+        :param path: Full path of the desired item.
+        """
+        for item_details in self.repository_items[item_type].values():
+            if item_details.get("path") == path:
+                return item_details["logical_id"]
+        # if not found
+        return None
+
+    def _publish_item(self, item_name, item_type, excluded_files=None, excluded_directories=None, full_publish=True):
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -311,15 +327,19 @@ class FabricWorkspace:
         item_description = self.repository_items[item_type][item_name]["description"]
 
         excluded_files = excluded_files or {".platform"}
+        excluded_directories = excluded_directories or None
 
         metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
 
         if full_publish:
             item_payload = []
-            for root, _, files in os.walk(item_path):
+            for root, dirs, files in os.walk(item_path):
+                # modify dirs in place
+                dirs[:] = [d for d in dirs if d not in excluded_directories]
+
                 for file in files:
                     full_path = Path(root, file)
-                    relative_path = str(full_path.relative_to(item_path))
+                    relative_path = str(full_path.relative_to(item_path).as_posix())
 
                     if file not in excluded_files:
                         with Path.open(full_path, encoding="utf-8") as f:
@@ -330,11 +350,38 @@ class FabricWorkspace:
                             raw_file = self._replace_activity_workspace_ids(raw_file, "Repository")
 
                         # Replace default workspace id with target workspace id
-                        # TODO Remove this once bug is resolved in API
                         if item_type == "Notebook":
                             default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
                             target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
                             raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+
+                        # Replace connections in report
+                        if item_type == "Report" and Path(file).name == "definition.pbir":
+                            definition_body = json.loads(raw_file)
+                            if (
+                                "datasetReference" in definition_body
+                                and "byPath" in definition_body["datasetReference"]
+                            ):
+                                model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
+                                model_path = str((Path(item_path) / model_rel_path).resolve())
+                                model_id = self._convert_path_to_id("SemanticModel", model_path)
+
+                                if not model_id:
+                                    msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
+                                    raise ItemDependencyError(msg, logger)
+
+                                definition_body["datasetReference"] = {
+                                    "byConnection": {
+                                        "connectionString": None,
+                                        "pbiServiceModelId": None,
+                                        "pbiModelVirtualServerName": "sobe_wowvirtualserver",
+                                        "pbiModelDatabaseName": f"{model_id}",
+                                        "name": "EntityDataSource",
+                                        "connectionType": "pbiServiceXmlaStyleLive",
+                                    }
+                                }
+
+                                raw_file = json.dumps(definition_body, indent=4)
 
                         # Replace logical IDs with deployed GUIDs.
                         replaced_raw_file = self._replace_logical_ids(raw_file)

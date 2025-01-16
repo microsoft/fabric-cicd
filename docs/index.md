@@ -12,6 +12,8 @@ The following item types are supported by the library:
 -   Notebooks
 -   Data Pipelines
 -   Environments
+-   Semantic Models
+-   Reports
 
 ## Installation
 

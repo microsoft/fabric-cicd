@@ -58,15 +58,27 @@ class FabricEndpoint:
                     url = response.headers.get("Location")
                     method = "GET"
                     body = "{}"
-                    if long_running and response.json().get("status") in ["Succeeded", "Failed", "Undefined"]:
-                        long_running = False
-                    elif not long_running:
+                    response_json = response.json()
+
+                    if long_running:
+                        status = response_json.get("status")
+                        if status == "Succeeded":
+                            long_running = False
+                            exit_loop = True
+                        elif status == "Failed":
+                            response_error = response_json["error"]
+                            msg = f"Operation failed. Error Code: {response_error['errorCode']}. Error Message: {response_error['message']}"
+                            raise Exception(msg)
+                        elif status == "Undefined":
+                            msg = f"Operation is in an undefined state. Full Body: {response_json}"
+                            raise Exception(msg)
+                        else:
+                            retry_after = float(response.headers.get("Retry-After", 0.5))
+                            logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
+                            time.sleep(retry_after)
+                    else:
                         time.sleep(1)
                         long_running = True
-                    else:
-                        retry_after = float(response.headers.get("Retry-After", 0.5))
-                        logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
-                        time.sleep(retry_after)
 
                 # Handle successful responses
                 elif response.status_code in {200, 201}:
@@ -119,7 +131,8 @@ class FabricEndpoint:
 
                 # Handle unexpected errors
                 else:
-                    msg = f"Unhandled error occurred calling {method} on '{url}'."
+                    err_msg = _parse_json_body(response, f" Message: {response.json()['message']}", "")
+                    msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
                     raise Exception(msg)
 
                 # Log if reached to end of loop iteration
@@ -132,7 +145,7 @@ class FabricEndpoint:
 
         return {
             "header": dict(response.headers),
-            "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
+            "body": (_parse_json_body(response, response.json(), {})),
             "status_code": response.status_code,
         }
 
@@ -215,12 +228,13 @@ def _format_invoke_log(response, method, url, body):
             "Response Headers:",
             json.dumps(dict(response.headers), indent=4),
             "Response Body:",
-            (
-                json.dumps(response.json(), indent=4)
-                if response.headers.get("Content-Type") == "application/json"
-                else response.text
-            ),
+            _parse_json_body(response, json.dumps(response.json(), indent=4), response.text),
             "",
         ])
 
     return "\n".join(message)
+
+
+def _parse_json_body(response, default_return, alt_return):
+    """Parses the response body if the body is of json type"""
+    return default_return if response.headers.get("Content-Type") == "application/json" else alt_return

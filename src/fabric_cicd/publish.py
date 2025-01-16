@@ -50,6 +50,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
     if "Notebook" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
+    if "SemanticModel" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing SemanticModels")
+        items.publish_semanticmodels(fabric_workspace_obj)
+    if "Report" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing Reports")
+        items.publish_reports(fabric_workspace_obj)
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
@@ -103,7 +109,9 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     # Order of unpublishing to handle dependencies cleanly
     # TODO need to expand this to be more dynamic
     unpublish_order = [
-        x for x in ["DataPipeline", "Notebook", "Environment"] if x in fabric_workspace_obj.item_type_in_scope
+        x
+        for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment"]
+        if x in fabric_workspace_obj.item_type_in_scope
     ]
 
     for item_type in unpublish_order:
