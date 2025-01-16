@@ -66,7 +66,8 @@ class FabricEndpoint:
                             long_running = False
                             exit_loop = True
                         elif status == "Failed":
-                            msg = f"Operation failed. Error Code: {response_json['error']['errorCode']}. Error Message: {response_json['error']['message']}"
+                            response_error = response_json["error"]
+                            msg = f"Operation failed. Error Code: {response_error['errorCode']}. Error Message: {response_error['message']}"
                             raise Exception(msg)
                         elif status == "Undefined":
                             msg = f"Operation is in an undefined state. Full Body: {response_json}"
