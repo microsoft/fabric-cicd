@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def publish_reports(fabric_workspace_obj):
-    """Publishes all semantic model items from the repository."""
+    """Publishes all report items from the repository."""
     item_type = "Report"
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
