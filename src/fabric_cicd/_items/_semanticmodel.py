@@ -4,7 +4,7 @@
 import logging
 
 """
-Functions to process and deploy Smemantic Model item.
+Functions to process and deploy Semantic Model item.
 """
 
 logger = logging.getLogger(__name__)
