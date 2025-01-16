@@ -279,6 +279,73 @@ class FabricWorkspace:
         # Convert the updated dict back to a JSON string
         return json.dumps(item_content_dict, indent=2)
 
+    def _replace_activity_workspace_ids(self, raw_file, lookup_type):
+        """
+        Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
+        in the raw file content.
+
+        :param raw_file: The raw file content where workspace IDs need to be replaced.
+        :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
+        """
+        # Create a dictionary from the raw_file
+        item_content_dict = json.loads(raw_file)
+        # supported_activities = ["TridentNotebook"]
+
+        supported_activities = {
+            "InvokePipeline": "Data Pipeline",
+            "RefreshDataflow": "Dataflow Gen2",
+            "TridentNotebook": "Notebook",
+        }
+
+        def _find_and_replace_activity_workspace_ids(input_object):
+            """
+            Recursively scans through JSON to find and replace feature branch workspace IDs in nested and
+            non-nested activities where workspaceId
+            property exists (e.g. Trident Notebook). Note: the function can be modified to process other pipeline
+            activities where workspaceId exists.
+
+            :param input_object: Object can be a dictionary or list present in the input JSON.
+            """
+            # Check if the current object is a dictionary
+            if isinstance(input_object, dict):
+                target_workspace_id = self.workspace_id
+                default_featurebranch_workspace_id = "00000000-0000-0000-0000-000000000000"
+
+                # Iterate through the activities and search for supported activities (e.g. TridentNotebook)
+                for key, value in input_object.items():
+                    if key == "type" and value in supported_activities:
+                        workspace_id = input_object["typeProperties"]["workspaceId"]
+                        # Replace the feature branch workspace ID with target workspace ID
+                        if workspace_id == default_featurebranch_workspace_id:
+                            input_object["typeProperties"]["workspaceId"] = target_workspace_id
+
+                        elif workspace_id != default_featurebranch_workspace_id:
+                            # Convert the notebook ID to its name
+                            item_type = supported_activities[value]
+                            referenced_id = input_object["typeProperties"].get(f"{item_type.lower()}Id")
+                            referenced_name = self._convert_id_to_name(
+                                item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
+                            )
+                            # Replace workspace ID with target workspace ID if the referenced item exists in the repo
+                            if referenced_name:
+                                input_object["typeProperties"]["workspaceId"] = target_workspace_id
+
+                    # Recursively search in the value
+                    else:
+                        _find_and_replace_activity_workspace_ids(value)
+
+            # Check if the current object is a list
+            elif isinstance(input_object, list):
+                # Recursively search in each item
+                for item in input_object:
+                    _find_and_replace_activity_workspace_ids(item)
+
+        # Start the recursive search and replace from the root of the JSON data
+        _find_and_replace_activity_workspace_ids(item_content_dict)
+
+        # Convert the updated dict back to a JSON string
+        return json.dumps(item_content_dict, indent=2)
+
     def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
         For a given item_type and id, returns the item name.  Special handling for both deployed and repository items
