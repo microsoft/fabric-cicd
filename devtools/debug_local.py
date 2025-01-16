@@ -22,8 +22,7 @@ environment = "dev"
 repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
-item_type_in_scope = ["SemanticModel", "Report"]
-
+item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel", "Report"]
 
 client_id = "your-client-id"
 client_secret = "your-client-secret"
@@ -42,7 +41,7 @@ target_workspace = FabricWorkspace(
 )
 
 # Publish all items defined in item_type_in_scope
-publish_all_items(target_workspace)
+# publish_all_items(target_workspace)
 
 # Unpublish all items defined in scope not found in repository
 # Excluding items with starting with DEBUG
