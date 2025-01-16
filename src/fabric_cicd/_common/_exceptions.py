@@ -23,3 +23,7 @@ class TokenError(BaseCustomError):
 
 class InvokeError(BaseCustomError):
     pass
+
+
+class ItemDependencyError(BaseCustomError):
+    pass

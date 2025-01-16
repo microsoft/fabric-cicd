@@ -53,6 +53,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
     if "SemanticModel" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing SemanticModels")
         items.publish_semanticmodels(fabric_workspace_obj)
+    if "Report" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing Reports")
+        items.publish_reports(fabric_workspace_obj)
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
@@ -107,7 +110,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     # TODO need to expand this to be more dynamic
     unpublish_order = [
         x
-        for x in ["DataPipeline", "SemanticModel", "Notebook", "Environment"]
+        for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment"]
         if x in fabric_workspace_obj.item_type_in_scope
     ]
 

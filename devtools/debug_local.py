@@ -22,7 +22,7 @@ environment = "dev"
 repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
-item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel"]
+item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel", "Report"]
 
 
 client_id = "your-client-id"

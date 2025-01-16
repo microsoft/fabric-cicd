@@ -13,6 +13,7 @@ The following item types are supported by the library:
 -   Data Pipelines
 -   Environments
 -   Semantic Models
+-   Reports
 
 ## Installation
 
