@@ -1,13 +1,13 @@
 name: Bug Report
 description: Report a bug
-title: "[Bug]: "
+title: ""
 labels: ["bug"]
 body:
     - type: markdown
       attributes:
           value: Thanks for reporting a bug!
 
-    - type: input
+    - type: textarea
       id: steps-to-reproduce
       attributes:
           label: Steps to Reproduce

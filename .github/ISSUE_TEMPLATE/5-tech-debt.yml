@@ -1,11 +1,11 @@
-name: Feature Request
-description: Request a feature
+name: Technical Debt
+description: Raises technical debt
 title: ""
-labels: ["enhancement"]
+labels: ["tech debt"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for suggesting a feature!
+          value: Used internally to raise improvements in code quality, maintainability, and technical debt.
 
     - type: textarea
       id: problem-description
@@ -22,14 +22,6 @@ body:
           description: Describe the solution you'd like
       validations:
           required: true
-
-    - type: textarea
-      id: alternatives-considered
-      attributes:
-          label: What alternatives have you considered?
-          description: Describe alternatives you've considered
-      validations:
-          required: false
 
     - type: textarea
       id: additional-context
