@@ -27,13 +27,14 @@ class FabricEndpoint:
         self.token_credential = token_credential
         self._refresh_token()
 
-    def invoke(self, method, url, body="{}"):
+    def invoke(self, method, url, body="{}", files=None):
         """
         Sends an HTTP request to the specified URL with the given method and body.
 
         :param method: HTTP method to use for the request (e.g., 'GET', 'POST', 'PATCH', 'DELETE').
         :param url: URL to send the request to.
         :param body: The JSON body to include in the request. Defaults to an empty JSON object.
+        :param files: The file path to be included in the request. Defaults to None.
         :return: A dictionary containing the response headers, body, and status code.
         """
         exit_loop = False
@@ -42,12 +43,17 @@ class FabricEndpoint:
 
         while not exit_loop:
             try:
-                headers = {
-                    "Authorization": f"Bearer {self.aad_token}",
-                    "Content-Type": "application/json; charset=utf-8",
-                }
+                if files is None:
+                    headers = {
+                        "Authorization": f"Bearer {self.aad_token}",
+                        "Content-Type": "application/json; charset=utf-8",
+                    }
+                    response = requests.request(method=method, url=url, headers=headers, json=body)
 
-                response = requests.request(method=method, url=url, headers=headers, json=body)
+                else:
+                    headers = {"Authorization": f"Bearer {self.aad_token}"}
+                    response = requests.request(method=method, url=url, headers=headers, files=files)
+
                 iteration_count += 1
 
                 invoke_log_message = _format_invoke_log(response, method, url, body)
@@ -58,15 +64,27 @@ class FabricEndpoint:
                     url = response.headers.get("Location")
                     method = "GET"
                     body = "{}"
-                    if long_running and response.json().get("status") in ["Succeeded", "Failed", "Undefined"]:
-                        long_running = False
-                    elif not long_running:
+                    response_json = response.json()
+
+                    if long_running:
+                        status = response_json.get("status")
+                        if status == "Succeeded":
+                            long_running = False
+                            exit_loop = True
+                        elif status == "Failed":
+                            response_error = response_json["error"]
+                            msg = f"Operation failed. Error Code: {response_error['errorCode']}. Error Message: {response_error['message']}"
+                            raise Exception(msg)
+                        elif status == "Undefined":
+                            msg = f"Operation is in an undefined state. Full Body: {response_json}"
+                            raise Exception(msg)
+                        else:
+                            retry_after = float(response.headers.get("Retry-After", 0.5))
+                            logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
+                            time.sleep(retry_after)
+                    else:
                         time.sleep(1)
                         long_running = True
-                    else:
-                        retry_after = float(response.headers.get("Retry-After", 0.5))
-                        logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
-                        time.sleep(retry_after)
 
                 # Handle successful responses
                 elif response.status_code in {200, 201}:
@@ -104,6 +122,21 @@ class FabricEndpoint:
                         msg = f"Item name still in use after 6 attempts. Description: {response.reason}"
                         raise Exception(msg)
 
+                # Handle scenario where library removed from environment before being removed from repo
+                elif response.status_code == 400 and "is not present in the environment." in response.json().get(
+                    "message", "No message provided"
+                ):
+                    msg = f"Deployment attempted to remove a library that is not present in the environment. Description: {response.json().get('message')}"
+                    raise Exception(msg)
+
+                # Handle no environment libraries on GET request
+                elif (
+                    response.status_code == 404
+                    and response.headers.get("x-ms-public-api-error-code") == "EnvironmentLibrariesNotFound"
+                ):
+                    logger.info("Live environment doesnt have any libraries, continuing")
+                    exit_loop = True
+
                 # Handle unsupported principal type
                 elif (
                     response.status_code == 400
@@ -119,7 +152,8 @@ class FabricEndpoint:
 
                 # Handle unexpected errors
                 else:
-                    msg = f"Unhandled error occurred calling {method} on '{url}'."
+                    err_msg = _parse_json_body(response, f" Message: {response.json()['message']}", "")
+                    msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
                     raise Exception(msg)
 
                 # Log if reached to end of loop iteration
@@ -132,7 +166,7 @@ class FabricEndpoint:
 
         return {
             "header": dict(response.headers),
-            "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
+            "body": (_parse_json_body(response, response.json(), {})),
             "status_code": response.status_code,
         }
 
@@ -215,12 +249,13 @@ def _format_invoke_log(response, method, url, body):
             "Response Headers:",
             json.dumps(dict(response.headers), indent=4),
             "Response Body:",
-            (
-                json.dumps(response.json(), indent=4)
-                if response.headers.get("Content-Type") == "application/json"
-                else response.text
-            ),
+            _parse_json_body(response, json.dumps(response.json(), indent=4), response.text),
             "",
         ])
 
     return "\n".join(message)
+
+
+def _parse_json_body(response, default_return, alt_return):
+    """Parses the response body if the body is of json type"""
+    return default_return if "application/json" in (response.headers.get("Content-Type") or "") else alt_return

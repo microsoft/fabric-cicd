@@ -6,11 +6,9 @@ The following contains all major, minor, and patch version release notes. Additi
 
 -   Support for additional item types
     -   Dataflow G2
-    -   Semantic Model
-    -   Report
+    -   Lakehouse
 -   Support for Workspace Folders
 -   Enhancements for existing item types
-    -   Notebook - Support for attached resources
     -   Data Pipeline - Support for all connections within activities
     -   Environment - Support for attached public libraries - Support for attached custom libraries
 
@@ -19,7 +17,7 @@ The following contains all major, minor, and patch version release notes. Additi
 <span class="md-h2-subheader">Release Date: TBD</span>
 
 -   Initial public preview release
--   Supports Notebook, Pipeline, and Environment deployments
+-   Supports Notebook, Pipeline, Semantic Model, Report, and Environment deployments
 -   Supports User and System Identity authentication
 -   Released to PyPi
--   Onboarded to ReadTheDocs
+-   Onboarded to Github Pages

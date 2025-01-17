@@ -1,0 +1,6 @@
+relationship AutoDetected_981379f6-d1c0-48e8-a4d4-cf3718d1fc57
+	crossFilteringBehavior: bothDirections
+	fromCardinality: one
+	fromColumn: Table.Column2
+	toColumn: Table_2.Column1
+
