@@ -27,7 +27,7 @@ class FabricEndpoint:
         self.token_credential = token_credential
         self._refresh_token()
 
-    def invoke(self, method, url, body="{}"):
+    def invoke(self, method, url, body="{}", files=None):
         """
         Sends an HTTP request to the specified URL with the given method and body.
 
@@ -42,10 +42,18 @@ class FabricEndpoint:
 
         while not exit_loop:
             try:
-                headers = {
-                    "Authorization": f"Bearer {self.aad_token}",
-                    "Content-Type": "application/json; charset=utf-8",
-                }
+                if files is None:
+                    headers = {
+                        "Authorization": f"Bearer {self.aad_token}",
+                        "Content-Type": "application/json; charset=utf-8",
+                    }
+                    response = requests.request(method=method, url=url, headers=headers, json = body)
+                    
+                else:
+                    headers = {
+                        "Authorization": f"Bearer {self.aad_token}"
+                    }
+                    response = requests.request(method=method, url=url, headers=headers, files = files)
 
                 response = requests.request(method=method, url=url, headers=headers, json=body)
                 iteration_count += 1
@@ -115,7 +123,21 @@ class FabricEndpoint:
                     else:
                         msg = f"Item name still in use after 6 attempts. Description: {response.reason}"
                         raise Exception(msg)
-
+                    
+                # Handle scenario where library removed from environment before being removed from repo
+                elif (
+                    response.status_code == 400 and "is not present in the environment." in response.json().get("message", "No message provided")
+                ):
+                    msg = f"Deployment attempted to remove a library that is not present in the environment. Description: {response.json().get('message')}"
+                    raise Exception(msg)    
+                
+                # Handle no environment libraries on GET request
+                elif (
+                    response.status_code == 404 and response.headers.get("x-ms-public-api-error-code") == "EnvironmentLibrariesNotFound"
+                ):
+                    logger.info("Live environment doesnt have any libraries, continuing")
+                    exit_loop = True
+                    
                 # Handle unsupported principal type
                 elif (
                     response.status_code == 400

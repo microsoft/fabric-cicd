@@ -3,7 +3,7 @@
 
 import logging
 from pathlib import Path
-
+import time
 import yaml
 
 """
@@ -31,17 +31,35 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
     Publishes compute settings and libraries for a given environment item.
 
     This process involves two steps:
+    1. Check for ongoing publish.
     1. Updating the compute settings.
-    2. Uploading/overwriting libraries to the environment.
-    3. Deleting libraries in the environment that are not present in repository.
-    4. Publishing the updated settings.
+    2. Uploading/overwrite libraries to the environment.
+    3. Delete libraries in the environment that are not present in repository.
+    4. Publish the updated settings.
 
     :param item_name: Name of the environment item whose compute settings are to be published.
     """
     item_type = "Environment"
     item_path = fabric_workspace_obj.repository_items[item_type][item_name]["path"]
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name]["guid"]
-
+    
+    
+    # Check for ongoing publish
+    publish_state = False
+    while not publish_state:
+        response_state = fabric_workspace_obj.endpoint.invoke(
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/"
+        )
+        logger.info(f"Checking environment publish status")
+        spark_libraries_state = response_state['body'].get("properties", {}).get("publishDetails", {}).get("componentPublishInfo", {}).get("sparkLibraries", {}).get("state", "No state provided")
+        spark_settings_state = response_state['body'].get("properties", {}).get("publishDetails", {}).get("componentPublishInfo", {}).get("sparkSettings", {}).get("state", "No state provided")
+        if spark_libraries_state == "success" and spark_settings_state == "success":
+            logger.info(f"No active publish, continue")
+            publish_state = True
+        else:
+            logger.info(f"Publish currently in progress, waiting 60 seconds")
+            time.sleep(60)
+    
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
         yaml_body = yaml.safe_load(f)
@@ -57,6 +75,7 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
                     del yaml_body["instance_pool_id"]
 
         yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
+        logger.info("Updating spark settings")
         # Update compute settings
         # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-compute/update-staging-settings
         fabric_workspace_obj.endpoint.invoke(
@@ -64,7 +83,7 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
             body=yaml_body,
         )
-        logger.info("Updating spark settings")
+        logger.info("spark settings updated")
 
     # Add libraries to environment, overwriting anything with the same name
     for library in ["CustomLibraries", "PublicLibraries"]:
@@ -73,6 +92,7 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
             for file_path in repo_library_path.iterdir():
                 with file_path.open("rb") as f:
                     files = {"file": (file_path.name, file_path.open("rb"))}
+                    logger.info(f"Uploading {file_path.name} to {library}")
                     # Upload libraries From Repo
                     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/upload-staging-library
                     fabric_workspace_obj.endpoint.invoke(
@@ -80,14 +100,14 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
                         url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries",
                         files=files,
                     )
-                    logger.info(f"Uploading {file_path.name} to {library}")
-
+                    logger.info(f"Uploaded")
+                    
+    logger.info("Getting environment libraries")
     # Get published libraries
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/get-published-libraries
     response_environment = fabric_workspace_obj.endpoint.invoke(
         method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/libraries"
     )
-    logger.info("Getting environment libraries")
     library_files = set()
     response_public_libraries = response_environment['body'].get('environmentYml', '')
     response_custom_libraries = response_environment['body'].get('customLibraries', {})
