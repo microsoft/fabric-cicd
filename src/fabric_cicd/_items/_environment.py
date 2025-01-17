@@ -32,10 +32,10 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
 
     This process involves two steps:
     1. Check for ongoing publish.
-    1. Updating the compute settings.
-    2. Uploading/overwrite libraries to the environment.
-    3. Delete libraries in the environment that are not present in repository.
-    4. Publish the updated settings.
+    2. Updating the compute settings.
+    3. Uploading/overwrite libraries to the environment.
+    4. Delete libraries in the environment that are not present in repository.
+    5. Publish the updated settings.
 
     :param item_name: Name of the environment item whose compute settings are to be published.
     """
