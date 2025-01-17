@@ -34,6 +34,7 @@ class FabricEndpoint:
         :param method: HTTP method to use for the request (e.g., 'GET', 'POST', 'PATCH', 'DELETE').
         :param url: URL to send the request to.
         :param body: The JSON body to include in the request. Defaults to an empty JSON object.
+        :param files: The file path to be included in the request. Defaults to None.
         :return: A dictionary containing the response headers, body, and status code.
         """
         exit_loop = False
@@ -53,7 +54,6 @@ class FabricEndpoint:
                     headers = {"Authorization": f"Bearer {self.aad_token}"}
                     response = requests.request(method=method, url=url, headers=headers, files=files)
 
-                response = requests.request(method=method, url=url, headers=headers, json=body)
                 iteration_count += 1
 
                 invoke_log_message = _format_invoke_log(response, method, url, body)
