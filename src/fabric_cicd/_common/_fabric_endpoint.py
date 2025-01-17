@@ -237,4 +237,4 @@ def _format_invoke_log(response, method, url, body):
 
 def _parse_json_body(response, default_return, alt_return):
     """Parses the response body if the body is of json type"""
-    return default_return if response.headers.get("Content-Type") == "application/json" else alt_return
+    return default_return if "application/json" in (response.headers.get("Content-Type") or "") else alt_return
