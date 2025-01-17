@@ -2,8 +2,9 @@
 # Licensed under the MIT License.
 
 import logging
-from pathlib import Path
 import time
+from pathlib import Path
+
 import yaml
 
 """
@@ -42,24 +43,37 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
     item_type = "Environment"
     item_path = fabric_workspace_obj.repository_items[item_type][item_name]["path"]
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name]["guid"]
-    
-    
+
     # Check for ongoing publish
     publish_state = False
     while not publish_state:
         response_state = fabric_workspace_obj.endpoint.invoke(
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/"
         )
-        logger.info(f"Checking environment publish status")
-        spark_libraries_state = response_state['body'].get("properties", {}).get("publishDetails", {}).get("componentPublishInfo", {}).get("sparkLibraries", {}).get("state", "No state provided")
-        spark_settings_state = response_state['body'].get("properties", {}).get("publishDetails", {}).get("componentPublishInfo", {}).get("sparkSettings", {}).get("state", "No state provided")
+        logger.info("Checking environment publish status")
+        spark_libraries_state = (
+            response_state["body"]
+            .get("properties", {})
+            .get("publishDetails", {})
+            .get("componentPublishInfo", {})
+            .get("sparkLibraries", {})
+            .get("state", "No state provided")
+        )
+        spark_settings_state = (
+            response_state["body"]
+            .get("properties", {})
+            .get("publishDetails", {})
+            .get("componentPublishInfo", {})
+            .get("sparkSettings", {})
+            .get("state", "No state provided")
+        )
         if spark_libraries_state == "success" and spark_settings_state == "success":
-            logger.info(f"No active publish, continue")
+            logger.info("No active publish, continue")
             publish_state = True
         else:
-            logger.info(f"Publish currently in progress, waiting 60 seconds")
+            logger.info("Publish currently in progress, waiting 60 seconds")
             time.sleep(60)
-    
+
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
         yaml_body = yaml.safe_load(f)
@@ -100,8 +114,8 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
                         url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries",
                         files=files,
                     )
-                    logger.info(f"Uploaded")
-                    
+                    logger.info("Uploaded")
+
     logger.info("Getting environment libraries")
     # Get published libraries
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/get-published-libraries
@@ -109,9 +123,9 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
         method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/libraries"
     )
     library_files = set()
-    response_public_libraries = response_environment['body'].get('environmentYml', '')
-    response_custom_libraries = response_environment['body'].get('customLibraries', {})
-    if response_public_libraries != '':
+    response_public_libraries = response_environment["body"].get("environmentYml", "")
+    response_custom_libraries = response_environment["body"].get("customLibraries", {})
+    if response_public_libraries != "":
         library_files.add("environment.yml")
     for files in response_custom_libraries.values():
         for file in files:
@@ -131,7 +145,7 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
             fabric_workspace_obj.endpoint.invoke(
                 method="DELETE",
                 url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?libraryToDelete={file}",
-                body={}
+                body={},
             )
             logger.info(f"Deleted {file} from live environment")
 
