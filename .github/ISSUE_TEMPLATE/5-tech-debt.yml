@@ -1,6 +1,6 @@
 name: Technical Debt
 description: Raises technical debt
-title: ""
+title: "Technical Debt"
 labels: ["tech debt"]
 body:
     - type: markdown
