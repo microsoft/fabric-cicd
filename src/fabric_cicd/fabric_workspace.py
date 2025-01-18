@@ -3,7 +3,6 @@
 
 """Module provides the FabricWorkspace class to manage and publish workspace items to the Fabric API."""
 
-import base64
 import json
 import logging
 import os
@@ -13,8 +12,9 @@ import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._exceptions import ItemDependencyError, ParsingError
+from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._item_file import ItemFile
 
 logger = logging.getLogger(__name__)
 
@@ -195,92 +195,40 @@ class FabricWorkspace:
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = {"description": item_description, "guid": item_guid}
 
-    def _replace_logical_ids(self, raw_file):
+    def _replace_logical_ids(self, item_file_obj):
         """
-        Replaces logical IDs with deployed GUIDs in the raw file content.
+        Replaces logical IDs with deployed GUIDs in the file content.
 
-        :param raw_file: The raw file content where logical IDs need to be replaced.
-        :return: The raw file content with logical IDs replaced by GUIDs.
+        :param item_file_obj: An ItemFile object containing the file content where logical IDs need to be replaced.
+        :return: The ItemFile object with logical IDs replaced by GUIDs.
         """
         for items in self.repository_items.values():
             for item_dict in items.values():
                 logical_id = item_dict["logical_id"]
                 item_guid = item_dict["guid"]
 
-                if logical_id in raw_file:
+                if logical_id in item_file_obj.contents:
                     if item_guid == "":
                         msg = f"Cannot replace logical ID '{logical_id}' as referenced item is not yet deployed."
                         raise ParsingError(msg, logger)
-                    raw_file = raw_file.replace(logical_id, item_guid)
+                    item_file_obj.contents = item_file_obj.contents.replace(logical_id, item_guid)
 
-        return raw_file
+        return item_file_obj
 
-    def _replace_parameters(self, raw_file):
+    def _replace_parameters(self, item_file_obj):
         """
         Replaces values found in parameter file with the chosen environment value.
 
-        :param raw_file: The raw file content where parameter values need to be replaced.
+        :param item_file_obj: An ItemFile object containing the file content where parameters need to be replaced.
+        :return: The ItemFile object with parameters replaced.
         """
         if "find_replace" in self.environment_parameter:
             for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                if key in raw_file and self.environment in parameter_dict:
+                if key in item_file_obj.contents and self.environment in parameter_dict:
                     # replace any found references with specified environment value
-                    raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                    item_file_obj.contents = item_file_obj.contents.replace(key, parameter_dict[self.environment])
 
-        return raw_file
-
-    def _replace_activity_workspace_ids(self, raw_file, lookup_type):
-        """
-        Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
-        in the raw file content.
-
-        :param raw_file: The raw file content where workspace IDs need to be replaced.
-        :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
-        """
-        # Create a dictionary from the raw_file
-        item_content_dict = json.loads(raw_file)
-
-        def _find_and_replace_activity_workspace_ids(input_object):
-            """
-            Recursively scans through JSON to find and replace feature branch workspace IDs in nested and
-            non-nested activities where workspaceId
-            property exists (e.g. Trident Notebook). Note: the function can be modified to process other pipeline
-            activities where workspaceId exists.
-
-            :param input_object: Object can be a dictionary or list present in the input JSON.
-            """
-            # Check if the current object is a dictionary
-            if isinstance(input_object, dict):
-                target_workspace_id = self.workspace_id
-
-                # Iterate through the activities and search for TridentNotebook activities
-                for key, value in input_object.items():
-                    if key == "type" and value == "TridentNotebook":
-                        # Convert the notebook ID to its name
-                        item_type = "Notebook"
-                        referenced_id = input_object["typeProperties"]["notebookId"]
-                        referenced_name = self._convert_id_to_name(
-                            item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
-                        )
-                        # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
-                        if referenced_name:
-                            input_object["typeProperties"]["workspaceId"] = target_workspace_id
-
-                    # Recursively search in the value
-                    else:
-                        _find_and_replace_activity_workspace_ids(value)
-
-            # Check if the current object is a list
-            elif isinstance(input_object, list):
-                # Recursively search in each item
-                for item in input_object:
-                    _find_and_replace_activity_workspace_ids(item)
-
-        # Start the recursive search and replace from the root of the JSON data
-        _find_and_replace_activity_workspace_ids(item_content_dict)
-
-        # Convert the updated dict back to a JSON string
-        return json.dumps(item_content_dict, indent=2)
+        return item_file_obj
 
     def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
@@ -312,7 +260,15 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, excluded_files=None, excluded_directories=None, full_publish=True):
+    def _publish_item(
+        self,
+        item_name,
+        item_type,
+        excluded_files=None,
+        excluded_directories=None,
+        full_publish=True,
+        func_process_file=None,
+    ):
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -334,63 +290,26 @@ class FabricWorkspace:
         if full_publish:
             item_payload = []
             for root, dirs, files in os.walk(item_path):
-                # modify dirs in place
+                # remove excluded directories
                 dirs[:] = [d for d in dirs if d not in excluded_directories]
 
-                for file in files:
-                    full_path = Path(root, file)
-                    relative_path = str(full_path.relative_to(item_path).as_posix())
+                # remove excluded files
+                files[:] = [file_name for file_name in files if file_name not in excluded_files]
 
-                    if file not in excluded_files:
-                        with Path.open(full_path, encoding="utf-8") as f:
-                            raw_file = f.read()
+                for file_name in files:
+                    item_file_obj = ItemFile(item_path=item_path, file_path=Path(root, file_name))
 
-                        # Replace feature branch workspace IDs with target workspace IDs in data pipeline activities.
-                        if item_type == "DataPipeline":
-                            raw_file = self._replace_activity_workspace_ids(raw_file, "Repository")
+                    # Replace values within file
+                    if func_process_file:
+                        item_file_obj = func_process_file(self, item_file_obj)
+                    item_file_obj = self._replace_logical_ids(item_file_obj)
+                    item_file_obj = self._replace_parameters(item_file_obj)
 
-                        # Replace default workspace id with target workspace id
-                        if item_type == "Notebook":
-                            default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-                            target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
-                            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
-
-                        # Replace connections in report
-                        if item_type == "Report" and Path(file).name == "definition.pbir":
-                            definition_body = json.loads(raw_file)
-                            if (
-                                "datasetReference" in definition_body
-                                and "byPath" in definition_body["datasetReference"]
-                            ):
-                                model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
-                                model_path = str((Path(item_path) / model_rel_path).resolve())
-                                model_id = self._convert_path_to_id("SemanticModel", model_path)
-
-                                if not model_id:
-                                    msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
-                                    raise ItemDependencyError(msg, logger)
-
-                                definition_body["datasetReference"] = {
-                                    "byConnection": {
-                                        "connectionString": None,
-                                        "pbiServiceModelId": None,
-                                        "pbiModelVirtualServerName": "sobe_wowvirtualserver",
-                                        "pbiModelDatabaseName": f"{model_id}",
-                                        "name": "EntityDataSource",
-                                        "connectionType": "pbiServiceXmlaStyleLive",
-                                    }
-                                }
-
-                                raw_file = json.dumps(definition_body, indent=4)
-
-                        # Replace logical IDs with deployed GUIDs.
-                        replaced_raw_file = self._replace_logical_ids(raw_file)
-                        replaced_raw_file = self._replace_parameters(replaced_raw_file)
-
-                        byte_file = replaced_raw_file.encode("utf-8")
-                        payload = base64.b64encode(byte_file).decode("utf-8")
-
-                        item_payload.append({"path": relative_path, "payload": payload, "payloadType": "InlineBase64"})
+                    item_payload.append({
+                        "path": item_file_obj.get_relative_path(),
+                        "payload": item_file_obj.get_payload(),
+                        "payloadType": "InlineBase64",
+                    })
 
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}

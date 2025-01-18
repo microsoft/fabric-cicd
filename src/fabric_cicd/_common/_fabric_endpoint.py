@@ -152,7 +152,11 @@ class FabricEndpoint:
 
                 # Handle unexpected errors
                 else:
-                    err_msg = _parse_json_body(response, f" Message: {response.json()['message']}", "")
+                    err_msg = (
+                        f" Message: {response.json()['message']}"
+                        if "application/json" in (response.headers.get("Content-Type") or "")
+                        else ""
+                    )
                     msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
                     raise Exception(msg)
 
@@ -166,7 +170,7 @@ class FabricEndpoint:
 
         return {
             "header": dict(response.headers),
-            "body": (_parse_json_body(response, response.json(), {})),
+            "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
             "status_code": response.status_code,
         }
 
@@ -249,13 +253,12 @@ def _format_invoke_log(response, method, url, body):
             "Response Headers:",
             json.dumps(dict(response.headers), indent=4),
             "Response Body:",
-            _parse_json_body(response, json.dumps(response.json(), indent=4), response.text),
+            (
+                json.dumps(response.json(), indent=4)
+                if response.headers.get("Content-Type") == "application/json"
+                else response.text
+            ),
             "",
         ])
 
     return "\n".join(message)
-
-
-def _parse_json_body(response, default_return, alt_return):
-    """Parses the response body if the body is of json type"""
-    return default_return if "application/json" in (response.headers.get("Content-Type") or "") else alt_return

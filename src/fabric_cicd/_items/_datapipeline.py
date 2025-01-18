@@ -41,7 +41,13 @@ def publish_datapipelines(fabric_workspace_obj):
 
     # Publish
     for item_name in publish_order:
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
+        fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=item_type, func_process_file=_process_datapipeline_file_contents
+        )
+
+
+def _process_datapipeline_file_contents(fabric_workspace_obj, item_file_obj):
+    return _replace_activity_workspace_ids(fabric_workspace_obj, item_file_obj)
 
 
 def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type):
@@ -153,3 +159,59 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
     find_datapipeline(item_content_dict)
 
     return reference_list
+
+
+def _replace_activity_workspace_ids(fabric_workspace_obj, item_file_obj):
+    """
+    Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
+    in the raw file content.
+
+    :param raw_file: The raw file content where workspace IDs need to be replaced.
+    :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
+    """
+    # Create a dictionary from the raw_file
+    item_content_dict = json.loads(item_file_obj.contents)
+
+    def _find_and_replace_activity_workspace_ids(input_object):
+        """
+        Recursively scans through JSON to find and replace feature branch workspace IDs in nested and
+        non-nested activities where workspaceId
+        property exists (e.g. Trident Notebook). Note: the function can be modified to process other pipeline
+        activities where workspaceId exists.
+
+        :param input_object: Object can be a dictionary or list present in the input JSON.
+        """
+        # Check if the current object is a dictionary
+        if isinstance(input_object, dict):
+            target_workspace_id = fabric_workspace_obj.workspace_id
+
+            # Iterate through the activities and search for TridentNotebook activities
+            for key, value in input_object.items():
+                if key == "type" and value == "TridentNotebook":
+                    # Convert the notebook ID to its name
+                    item_type = "Notebook"
+                    referenced_id = input_object["typeProperties"]["notebookId"]
+                    referenced_name = fabric_workspace_obj._convert_id_to_name(
+                        item_type=item_type, generic_id=referenced_id, lookup_type="Repository"
+                    )
+                    # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
+                    if referenced_name:
+                        input_object["typeProperties"]["workspaceId"] = target_workspace_id
+
+                # Recursively search in the value
+                else:
+                    _find_and_replace_activity_workspace_ids(value)
+
+        # Check if the current object is a list
+        elif isinstance(input_object, list):
+            # Recursively search in each item
+            for item in input_object:
+                _find_and_replace_activity_workspace_ids(item)
+
+    # Start the recursive search and replace from the root of the JSON data
+    _find_and_replace_activity_workspace_ids(item_content_dict)
+
+    # Convert the updated dict back to a JSON string
+    item_file_obj.contents = json.dumps(item_content_dict, indent=2)
+
+    return item_file_obj
