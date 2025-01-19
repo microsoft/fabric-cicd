@@ -60,10 +60,11 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"{devtools, tests}/*" = [
+"{devtools,tests}/*" = [
     "D",   # pydocstyle
     "INP", # flake8-no-pep420
 ]
+
 [tool.ruff.format]
 preview = true
 docstring-code-format = false
