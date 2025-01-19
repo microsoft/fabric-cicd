@@ -71,6 +71,6 @@ docstring-code-format = false
 docstring-code-line-length = "dynamic"
 
 [tool.pytest.ini_options]
-addopts = "-v"
+addopts = "-v --tb=short --disable-warnings"
 testpaths = ["tests"]
 python_files = "test_*.py"
