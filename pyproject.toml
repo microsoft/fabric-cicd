@@ -60,12 +60,16 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"{devtools,.readthedocs}/*" = [
-    "D100",   # Missing docstring in public module
-    "D104",   # Missing docstring in public package
-    "INP001", # Missing __init__ in package
+"{devtools, tests}/*" = [
+    "D",   # pydocstyle
+    "INP", # flake8-no-pep420
 ]
 [tool.ruff.format]
 preview = true
 docstring-code-format = false
 docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+addopts = "-v"
+testpaths = ["tests"]
+python_files = "test_*.py"
