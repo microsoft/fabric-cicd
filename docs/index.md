@@ -27,3 +27,6 @@ While in private preview, to install fabric-cicd, run:
 ```bash
 pip install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fabric-cicd
 ```
+
+## Basic Example
+
