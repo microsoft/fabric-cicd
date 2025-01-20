@@ -15,7 +15,7 @@ nav:
     - Code Reference: code_reference.md
     - Contribution: contribution.md
     - Changelog: changelog.md
-    - Help: help.md
+    - About: about.md
 
 theme:
     name: material
