@@ -18,14 +18,11 @@ fabric-cicd is a Python library designed for use with [Microsoft Fabric](https:/
 All documentation is hosted on our [fabric-cicd](https://microsoft.github.io/fabric-cicd/) GitHub Pages
 
 Useful Sections:
--   [Getting Started](https://microsoft.github.io/fabric-cicd/latest/how_to/getting_started/)
--   [Examples](https://microsoft.github.io/fabric-cicd/latest/how_to/example/)
--   [Code Reference](https://microsoft.github.io/fabric-cicd/latest/code_reference/)
+-   [Home](https://microsoft.github.io/fabric-cicd/latest/)
+-   [How To](https://microsoft.github.io/fabric-cicd/latest/how_to/)
 -   [Contribution](https://microsoft.github.io/fabric-cicd/latest/contribution/)
 -   [Changelog](https://microsoft.github.io/fabric-cicd/latest/changelog/)
--   [Support](https://microsoft.github.io/fabric-cicd/latest/help/#support)
--   [Security](https://microsoft.github.io/fabric-cicd/latest/help/#security)
--   [License](https://microsoft.github.io/fabric-cicd/latest/help/#license)
+-   [Support & Security](https://microsoft.github.io/fabric-cicd/latest/help/)
 
 ## Installation
 
