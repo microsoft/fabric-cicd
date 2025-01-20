@@ -29,9 +29,10 @@ pip install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-ur
 ```
 
 ## Basic Example
-from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 ```python
+from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
     workspace_id = "your-workspace-id",
