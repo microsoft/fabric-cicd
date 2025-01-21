@@ -3,7 +3,7 @@ name = "fabric-cicd"
 authors = [{ name = "Microsoft Corporation" }]
 description = "Microsoft Fabric CI/CD"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.13"
 license = { file = "LICENSE" }
 dynamic = ["version"]
 urls.Repository = "https://github.com/microsoft/fabric-cicd.git"
@@ -24,6 +24,7 @@ dev = [
     "mkdocs-minify-plugin>=0.8.0",
     "mkdocstrings-python>=1.13.0",
 ]
+
 
 [build-system]
 requires = ["setuptools>=61.0"]
