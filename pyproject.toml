@@ -5,67 +5,38 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fabric-cicd"
 authors = [{ name = "Microsoft Corporation" }]
-dynamic = ["version", "dependencies", "optional-dependencies"]
-
 description = "Microsoft Fabric CI/CD"
 readme = "README.md"
 requires-python = ">=3.9"
+license = { file = "LICENSE" }
+dynamic = ["version"]
+urls.Repository = "https://github.com/microsoft/fabric-cicd.git"
+
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
 ]
-license = { text = "MIT License" }
 
-[tool.setuptools.dynamic]
-version = { file = "VERSION" }
-dependencies = { file = "requirements.txt" }
-optional-dependencies.dev = { file = "requirements-dev.txt" }
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[project.urls]
-Repository = "https://github.com/microsoft/fabric-cicd.git"
-
-[tool.ruff]
-line-length = 120
-exclude = ["sample/*"]
-
-[tool.ruff.lint]
-# https://docs.astral.sh/ruff/rules/
-select = [
-    "A",   # flake8-builtins
-    "ARG", # flake8-unused-arguments
-    "B",   # flake8-bugbear
-    "D",   # pydocstyle
-    "EM",  # flake8-errmsg
-    "F",   # Pyflakes
-    "I",   # isort
-    "INP", # flake8-no-pep420
-    "N",   # pep8-naming
-    "PT",  # flake8-pytest-style
-    "PTH", # flake8-use-pathlib
-    "RET", # flake8-return
-    "RUF", # Ruff-specific rules
-    "SIM", # flake8-simplify
-    "UP",  # pyupgrade
-]
-ignore = [
-    "D203", # No blank lines between a section header and its content
-    "D205", # 1 blank line required between summary line and description
-    "D212", # Multi-line docstring summary should start at the first line
-    "D400", # First line should end with a period
-    "D401", # First line should be in imperative mood
-    "D415", # First line should end with a period, question mark, or exclamation point
+dependencies = [
+    "azure-identity>=1.19.0",
+    "colorlog>=6.9.0",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"{devtools,.readthedocs}/*" = [
-    "D100",   # Missing docstring in public module
-    "D104",   # Missing docstring in public package
-    "INP001", # Missing __init__ in package
+[tool.setuptools]
+dynamic.version = { file = "VERSION" }
+packages.find.where = ["src"]
+
+[dependency-groups]
+dev = [
+    "gitpython>=3.1.44",
+    "mike>=2.1.3",
+    "mkdocs-include-markdown-plugin>=7.1.2",
+    "mkdocs-minify-plugin>=0.8.0",
+    "mkdocstrings-python>=1.13.0",
 ]
-[tool.ruff.format]
-preview = true
-docstring-code-format = false
-docstring-code-line-length = "dynamic"
+
+[tool.uv]
+package = true
+python-preference = "only-managed"

@@ -1,4 +1,0 @@
-ruff
-gitpython
-build
-twine

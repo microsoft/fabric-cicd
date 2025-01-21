@@ -37,13 +37,16 @@ Before you begin, ensure you have the following installed:
     git clone <URL-of-your-forked-repository>
     ```
 
-3. **Create a Virtual Environment**:
+3. pip install uv
+4. uv tool install ruff
+
+5. **Create a Virtual Environment**:
 
     ```sh
     python -m venv venv
     ```
 
-4. **Activate the Virtual Environment**:
+6. **Activate the Virtual Environment**:
 
     - On Windows:
 
@@ -57,19 +60,19 @@ Before you begin, ensure you have the following installed:
         source venv/bin/activate
         ```
 
-5. **Install the Dependencies**:
+7. **Install the Dependencies**:
 
     ```sh
     pip install -r requirements.txt
     pip install -r requirements.dev.txt
     ```
 
-6. **Open the Project in VS Code and Ensure the Virtual Environment is Selected**:
+8. **Open the Project in VS Code and Ensure the Virtual Environment is Selected**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`.
     - Choose the interpreter from the `venv` directory.
 
-7. **Ensure All VS Code Extensions Are Installed**:
+9. **Ensure All VS Code Extensions Are Installed**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Extensions: Show Recommended Extensions`.
     - Install all extensions recommended for the workspace.
