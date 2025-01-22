@@ -45,6 +45,9 @@ version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Update Version: v{old_version} -> v{new_version}"
 commit = true  # creates a new commit for the version update with the above defined message
 #push = true  # pushes the commit automatically to github
+tag_message = "{new_version}"
+tag_scope = "default"
+tag = true
 
 [tool.bumpver.file_patterns]
 "VERSION" = ["{version}"]
