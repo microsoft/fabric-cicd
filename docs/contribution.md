@@ -68,7 +68,7 @@ Before you begin, ensure you have the following installed:
 
 ### Code Formatting & Linting
 
--   The python code within this project is mainted by ruff.
+-   The python code within this project is maintained by ruff.
 -   If you install the recommended extensions, ruff will auto format on save of any file.
 -   Before being able to merge a PR, ruff is ran in a Github Action to ensure the files are properly formatted and maintained.
 -   To force linting, run the following.
