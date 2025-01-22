@@ -39,7 +39,7 @@ package = true
 python-preference = "only-managed"
 
 [tool.bumpver]
-current_version = "0.0.1"             # ignore, version is determined by VERSION file
+current_version = "0.0.2"             # ignore, version is determined by VERSION file
 version_pattern = "MAJOR.MINOR.PATCH"
 # below fields are optional, default value is false
 commit_message = "Update Version: v{old_version} -> v{new_version}"
