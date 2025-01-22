@@ -1,9 +1,10 @@
 function global:env.activate() {
-    uv sync
+    uv sync  --python 3.11
     $venvPath = ".venv\Scripts\activate.ps1"
 
     if (Test-Path $venvPath) {
         & $venvPath
+        Write-Host "venv activated"
     }
     else {
         Write-Host "venv not found"
@@ -13,7 +14,7 @@ function global:env.activate() {
 function global:env.deactivate() {
     if (Get-Command -Name deactivate -CommandType Function -ErrorAction SilentlyContinue) {
         deactivate
-        Write-Host "Virtual environment deactivated."
+        Write-Host "venv deactivated"
     }
     else {
         Write-Host "venv not activated"
@@ -38,5 +39,7 @@ else {
 # Activate the environment
 env.activate
 
-Write-Host "To activate the environment, run env.activate. To deactivate the environment, run env.deactivate."
-Write-Host "venv environment activated."
+Write-Host "To activate the environment, run " -NoNewline
+Write-Host "env.activate" -ForegroundColor Green
+Write-Host "To deactivate the environment, run " -NoNewline
+Write-Host "env.deactivate" -ForegroundColor Green
