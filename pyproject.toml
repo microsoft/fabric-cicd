@@ -37,3 +37,14 @@ packages.find.where = ["src"]
 [tool.uv]
 package = true
 python-preference = "only-managed"
+
+[tool.bumpver]
+current_version = "0.0.1"             # ignore, version is determined by VERSION file
+version_pattern = "MAJOR.MINOR.PATCH"
+# below fields are optional, default value is false
+commit_message = "update version: v{old_version} -> v{new_version}"
+#commit = true  # creates a new commit for the version update with the above defined message
+#push = true  # pushes the commit automatically to github
+
+[tool.bumpver.file_patterns]
+"VERSION" = ["{version}"]
