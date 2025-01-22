@@ -27,49 +27,52 @@ Before you begin, ensure you have the following installed:
     - In the top right corner, click on the **Fork** button.
     - This will create a copy of the repository in your own GitHub account.
 
-2. **Clone Your Forked Repository**:
+1. **Clone Your Forked Repository**:
 
     - Once the fork is complete, go to your GitHub account and open the forked repository.
-    - Click on the **Code** button, then copy the URL (HTTPS or SSH).
-    - Open your terminal and run the following command to clone your forked repository:
+    - Click on the **Code** button, and clone to VS Code.
 
-    ```sh
-    git clone <URL-of-your-forked-repository>
+1. **Run activate.ps1**:
+
+-   Open the Project in VS Code
+-   Open PowerShell terminal
+-   Run activate.ps1 which will install uv, and ruff if not already found. And set up the default environment leveraging uv sync.
+    ```powershell
+    .\activate.ps1
     ```
+    _Note that this is technically optional and is designed to work with PowerShell. You can execute these steps manually as well, this is merely a helper_
 
-3. **Create a Virtual Environment**:
-
-    ```sh
-    python -m venv venv
-    ```
-
-4. **Activate the Virtual Environment**:
-
-    - On Windows:
-
-        ```sh
-        .\venv\Scripts\activate
-        ```
-
-    - On macOS and Linux:
-
-        ```sh
-        source venv/bin/activate
-        ```
-
-5. **Install the Dependencies**:
-
-    ```sh
-    pip install -r requirements.txt
-    pip install -r requirements.dev.txt
-    ```
-
-6. **Open the Project in VS Code and Ensure the Virtual Environment is Selected**:
+1. **Select Python Interpreter**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`.
     - Choose the interpreter from the `venv` directory.
 
-7. **Ensure All VS Code Extensions Are Installed**:
+1. **Ensure All VS Code Extensions Are Installed**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Extensions: Show Recommended Extensions`.
     - Install all extensions recommended for the workspace.
+
+## Development
+
+### Managing Dependencies
+
+-   All dependencies in this project are managed by uv which will resolve all dependencies and lock the versions to speed up virtual environment creation.
+-   For additions, run:
+    ```sh
+    uv add <package-name>
+    ```
+-   For removals, run:
+    ```sh
+    uv remove <package-name>
+    ```
+
+### Code Formatting & Linting
+
+-   The python code within this project is mainted by ruff.
+-   If you install the recommended extensions, ruff will auto format on save of any file.
+-   Before being able to merge a PR, ruff is ran in a Github Action to ensure the files are properly formatted and maintained.
+-   To force linting, run the following.
+    ```sh
+    ruff format
+    ruff check
+    ```

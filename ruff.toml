@@ -1,0 +1,41 @@
+line-length = 120
+exclude = ["sample/*"]
+
+[lint]
+# https://docs.astral.sh/ruff/rules/
+select = [
+    "A",   # flake8-builtins
+    "ARG", # flake8-unused-arguments
+    "B",   # flake8-bugbear
+    "D",   # pydocstyle
+    "EM",  # flake8-errmsg
+    "F",   # Pyflakes
+    "I",   # isort
+    "INP", # flake8-no-pep420
+    "N",   # pep8-naming
+    "PT",  # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "RET", # flake8-return
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
+]
+ignore = [
+    "D203", # No blank lines between a section header and its content
+    "D205", # 1 blank line required between summary line and description
+    "D212", # Multi-line docstring summary should start at the first line
+    "D400", # First line should end with a period
+    "D401", # First line should be in imperative mood
+    "D415", # First line should end with a period, question mark, or exclamation point
+]
+
+[lint.per-file-ignores]
+"{devtools,.readthedocs}/*" = [
+    "D100",   # Missing docstring in public module
+    "D104",   # Missing docstring in public package
+    "INP001", # Missing __init__ in package
+]
+[format]
+preview = true
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
