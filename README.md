@@ -4,8 +4,7 @@
 [![TestPyPI version](https://img.shields.io/badge/TestPyPI-fabric--cicd-blue)](https://test.pypi.org/project/fabric-cicd/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/charliermarsh/ruff)
 
-<!-- [![PyPI Version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd) -->
-<!--[![Python Versions](https://img.shields.io/pypi/pyversions/fabric-cicd.svg)](https://pypi.org/project/fabric-cicd/) -->
+<!-- [![PyPI version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd) -->
 <!-- [![Downloads](https://static.pepy.tech/badge/fabric-cicd)](https://pepy.tech/project/fabric-cicd) -->
 
 ---
