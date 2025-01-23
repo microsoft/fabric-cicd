@@ -30,10 +30,9 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"{devtools,.readthedocs}/*" = [
-    "D100",   # Missing docstring in public module
-    "D104",   # Missing docstring in public package
-    "INP001", # Missing __init__ in package
+"{devtools}/*" = [
+    "D",   # pydocstyle
+    "INP", # flake8-no-pep420
 ]
 [format]
 preview = true
