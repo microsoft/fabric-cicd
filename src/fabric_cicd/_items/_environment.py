@@ -67,12 +67,12 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
             .get("sparkSettings", {})
             .get("state", "No state provided")
         )
-        if spark_libraries_state == "success" and spark_settings_state == "success":
+        if spark_libraries_state.lower() == "success" and spark_settings_state.lower() == "success":
             logger.info("No active publish, continue")
             publish_state = True
         else:
-            logger.info("Publish currently in progress, waiting 60 seconds")
-            time.sleep(60)
+            logger.info("Publish currently in progress, waiting 20 seconds")
+            time.sleep(20)
 
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
@@ -97,7 +97,7 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
             body=yaml_body,
         )
-        logger.info("spark settings updated")
+        logger.info("Spark settings updated")
 
     # Add libraries to environment, overwriting anything with the same name
     for library in ["CustomLibraries", "PublicLibraries"]:
