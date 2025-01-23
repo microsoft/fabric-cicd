@@ -1,7 +1,6 @@
 # Fabric CICD
 
 [![Language](https://img.shields.io/badge/language-Python-blue.svg)](https://www.python.org/)
-[![PyPI Version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd)
 [![PyPi version](https://badgen.net/pypi/v/fabric-cicd/)](https://pypi.org/project/fabric-cicd)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/charliermarsh/ruff)
 
