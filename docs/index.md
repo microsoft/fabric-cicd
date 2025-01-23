@@ -22,3 +22,27 @@ To install fabric-cicd, run:
 ```bash
 pip install fabric-cicd
 ```
+While in private preview, to install fabric-cicd, run:
+
+```bash
+pip install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fabric-cicd
+```
+
+## Basic Example
+
+```python
+from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+# Initialize the FabricWorkspace object with the required parameters
+target_workspace = FabricWorkspace(
+    workspace_id = "your-workspace-id",
+    repository_directory = "your-repository-directory",
+    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"],
+)
+
+# Publish all items defined in item_type_in_scope
+publish_all_items(target_workspace)
+
+# Unpublish all items defined in item_type_in_scope not found in repository
+unpublish_all_orphan_items(target_workspace)
+```
