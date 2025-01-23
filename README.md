@@ -2,7 +2,6 @@
 
 [![Language](https://img.shields.io/badge/language-Python-blue.svg)](https://www.python.org/)
 [![PyPI Version](https://badge.fury.io/py/fabric-cicd.svg)](https://badge.fury.io/py/fabric-cicd)
-[![Python Versions](https://img.shields.io/pypi/pyversions/fabric-cicd.svg)](https://pypi.org/project/fabric-cicd/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/charliermarsh/ruff)
 
 ---
@@ -16,6 +15,7 @@ fabric-cicd is a Python library designed for use with [Microsoft Fabric](https:/
 All documentation is hosted on our [fabric-cicd](https://microsoft.github.io/fabric-cicd/) GitHub Pages
 
 Section Overview:
+
 -   [Home](https://microsoft.github.io/fabric-cicd/latest/)
 -   [How To](https://microsoft.github.io/fabric-cicd/latest/how_to/)
 -   [Contribution](https://microsoft.github.io/fabric-cicd/latest/contribution/)
