@@ -7,6 +7,7 @@ import base64
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -239,6 +240,14 @@ class FabricWorkspace:
         """
         # Create a dictionary from the raw_file
         item_content_dict = json.loads(raw_file)
+        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+
+        # Mapping of supported data pipeline activities
+        mapped_activities = {
+            "InvokePipeline": ["Data Pipeline", "pipelineId"],
+            "RefreshDataflow": ["Dataflow", "dataflowId"],
+            "TridentNotebook": ["Notebook", "notebookId"],
+        }
 
         def _find_and_replace_activity_workspace_ids(input_object):
             """
@@ -255,16 +264,23 @@ class FabricWorkspace:
 
                 # Iterate through the activities and search for TridentNotebook activities
                 for key, value in input_object.items():
-                    if key == "type" and value == "TridentNotebook":
-                        # Convert the notebook ID to its name
-                        item_type = "Notebook"
-                        referenced_id = input_object["typeProperties"]["notebookId"]
-                        referenced_name = self._convert_id_to_name(
-                            item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
-                        )
-                        # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
-                        if referenced_name:
+                    if key == "type" and value in mapped_activities:
+                        if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
+                            print("Found feature branch workspace Id is all zeros")
                             input_object["typeProperties"]["workspaceId"] = target_workspace_id
+                        elif guid_pattern.match(input_object["typeProperties"]["workspaceId"]):
+                            print("Found feature branch workspace Id that is NOT all zeros")
+                            item_type = mapped_activities[value][0]
+                            print("ITEM Type", item_type)
+                            referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
+                            print("REFERENCED ID", referenced_id)
+                            referenced_name = self._convert_id_to_name(
+                                item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
+                            )
+                            print("REFERENCED NAME", referenced_name)
+                            # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
+                            if referenced_name:
+                                input_object["typeProperties"]["workspaceId"] = target_workspace_id
 
                     # Recursively search in the value
                     else:
