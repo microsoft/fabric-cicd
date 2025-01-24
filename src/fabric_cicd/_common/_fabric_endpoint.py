@@ -81,13 +81,9 @@ class FabricEndpoint:
                             msg = f"Operation is in an undefined state. Full Body: {response_json}"
                             raise Exception(msg)
                         else:
-                            # Handle retry for long-running operations
-                            if "Retry-After" in response.headers:
-                                self._handle_retry(response, invoke_log_message, attempt=iteration_count - 1)
-                            else:
-                                retry_after = 0.5
-                                logger.info(f"Operation in progress. Checking again in {retry_after} seconds.")
-                                time.sleep(retry_after)
+                            self._handle_retry(
+                                response, invoke_log_message, attempt=iteration_count - 1, base_delay=0.5
+                            )
                     else:
                         time.sleep(1)
                         long_running = True
@@ -98,15 +94,7 @@ class FabricEndpoint:
 
                 # Handle API throttling
                 elif response.status_code == 429:
-                    if "Retry-After" in response.headers:
-                        self._handle_retry(response, invoke_log_message, attempt=iteration_count - 1)
-                    else:
-                        retry_after = 5 + 5  # Default delay if Retry-After is not provided
-                        logger.info(f"API Overloaded: Retrying in {retry_after} seconds")
-                        time.sleep(retry_after)
-                        if iteration_count >= 5:
-                            msg = "Maximum retry attempts exceeded due to API throttling."
-                            raise InvokeError(msg, logger, invoke_log_message)
+                    self._handle_retry(response, invoke_log_message, attempt=iteration_count - 1, base_delay=10)
 
                 # Handle expired authentication token
                 elif (
@@ -189,15 +177,15 @@ class FabricEndpoint:
             "status_code": response.status_code,
         }
 
-    def _handle_retry(self, response, invoke_log_message, attempt, max_retries=5, base_delay=0.5):
+    def _handle_retry(self, response, invoke_log_message, attempt, base_delay, max_retries=5):
         """
         Handles retry logic with exponential backoff based on the response.
 
         :param response: The HTTP response object.
         :param invoke_log_message: Log message for the current invocation.
         :param attempt: The current attempt number.
-        :param max_retries: Maximum number of retry attempts.
         :param base_delay: Base delay in seconds for backoff.
+        :param max_retries: Maximum number of retry attempts.
         :raises InvokeError: If maximum retries are exceeded.
         """
         if attempt < max_retries:
