@@ -70,7 +70,6 @@ class FabricEndpoint:
                         status = response_json.get("status")
                         if status == "Succeeded":
                             long_running = False
-                            exit_loop = True
                         elif status == "Failed":
                             response_error = response_json["error"]
                             msg = (
