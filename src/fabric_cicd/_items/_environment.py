@@ -147,8 +147,7 @@ def _get_repo_libraries(item_path):
     if repo_library_path.exists():
         for root, _dirs, files in os.walk(repo_library_path):
             for file_name in files:
-                file_path = Path(root, file_name)
-                repo_library_files[file_name] = file_path
+                repo_library_files[file_name] = Path(root, file_name)
 
     return repo_library_files
 
