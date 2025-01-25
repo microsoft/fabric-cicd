@@ -231,7 +231,7 @@ class FabricEndpoint:
                 raise TokenError(msg, logger) from e
 
 
-def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prepend_message=None):
+def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prepend_message=""):
     """
     Handles retry logic with exponential backoff based on the response.
 
