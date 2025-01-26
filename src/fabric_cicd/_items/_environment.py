@@ -56,7 +56,7 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
 
     repo_library_files = _get_repo_libraries(item_path)
 
-    # Add libraries to environment, overwriting anything with the same name adn return the list of libraries
+    # Add libraries to environment, overwriting anything with the same name and return the list of libraries
     _add_libraries(fabric_workspace_obj, item_guid, repo_library_files)
 
     # Remove libraries from live environment that are not in the repository
