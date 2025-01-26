@@ -11,17 +11,17 @@ body:
       id: problem-description
       attributes:
           label: What is the problem?
-          description: Describe what the gap is.
+          description: Describe what the gap is and how to reproduce it.
       validations:
           required: true
 
     - type: textarea
       id: solution-description
       attributes:
-          label: What is the solution?
-          description: Describe the solution you'd like
+          label: Is there an ideal solution?
+          description: Describe the ideal solution if there is one.
       validations:
-          required: true
+          required: false
 
     - type: textarea
       id: additional-context
