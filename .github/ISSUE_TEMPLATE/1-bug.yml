@@ -7,24 +7,19 @@ body:
       attributes:
           value: Thanks for reporting a bug!
 
-    - type: textarea
-      id: steps-to-reproduce
+    - type: checkboxes
+      id: reproducible
       attributes:
-          label: Steps to Reproduce
-          description: What are the steps to reproduce this bug?
-          placeholder: |
-              1. In this environment...
-              1. With this config...
-              1. Run '...'
-              1. See error...
-      validations:
-          required: true
+          label: Please confirm the following
+          options:
+              - label: The bug is consistently reproducible
+              - label: Debug logs were captured with `change_log_level()`
 
     - type: textarea
       id: what-happens
       attributes:
           label: What happens?
-          description: Describe what happens when you follow the steps.
+          description: What are the steps to reproduce this bug? Describe what happens when you follow the steps.
       validations:
           required: true
 
@@ -36,19 +31,14 @@ body:
       validations:
           required: true
 
-    - type: textarea
-      id: logs
-      attributes:
-          label: Any logs, error output, etc?
-          description: If it is long, please paste to https://gist.github.com/ and insert the link here.  Ensure to strip any non public information.
-      validations:
-          required: false
-
-    - type: input
+    - type: dropdown
       id: operating-system
       attributes:
           label: Operating System
           description: What operating system are you using?
+          options:
+              - Windows
+              - Mac/Linux
       validations:
           required: true
 
@@ -60,18 +50,22 @@ body:
       validations:
           required: true
 
-    - type: input
+    - type: dropdown
       id: authentication-type
       attributes:
           label: Authentication Type
           description: What authentication type were you using?
+          options:
+              - User Identity
+              - System Identity (SPN, MI, Etc)
+              - Other
       validations:
           required: true
 
     - type: textarea
       id: additional-context
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Additional context, screenshots, logs, error output, etc
+          description: Add any other relevant details. If it is long, please paste to https://gist.github.com/ and insert the link here.  Ensure to strip any non public information.
       validations:
           required: false
