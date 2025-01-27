@@ -233,7 +233,8 @@ class FabricWorkspace:
     def _replace_activity_workspace_ids(self, raw_file, lookup_type):
         """
         Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
-        in the raw file content. Handles the replacement of both default feature branch workspace ID (i.e. 00000000-0000-0000-0000-000000000000) and non-default values.
+        in the raw file content. Handles the replacement of both default feature branch workspace ID (i.e. 00000000-0000-0000-0000-000000000000)
+        and non-default values.
 
         :param raw_file: The raw file content where workspace IDs need to be replaced.
         :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
@@ -250,14 +251,14 @@ class FabricWorkspace:
         # Create a dictionary from the updated raw file
         item_content_dict = json.loads(raw_file)
 
-        # Mapping of supported data pipeline activities that may reference non-default feature branch workspace IDs
+        # Mapping of supported data pipeline activities that may reference non-default feature branch workspace ID values
+        # Dictionary structure: {activity_name: [item_type, item_id_name]}
         mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
 
         def _find_and_replace_activity_workspace_ids(input_object):
             """
             Recursively scans through JSON to find and replace non-default feature branch workspace IDs in nested and
-            non-nested activities that are supported. Note: the function can be modified to process other pipeline
-            activities where workspaceId is referenced.
+            non-nested activities that are supported (mapping can be updated).
 
             :param input_object: Object can be a dictionary or list present in the input JSON.
             """
@@ -266,6 +267,7 @@ class FabricWorkspace:
                 # Iterate through the activities
                 for key, value in input_object.items():
                     if key == "type" and value in mapped_activities:
+                        # Check if workspace ID is a valid GUID and not the target workspace ID
                         if (
                             guid_pattern.match(input_object["typeProperties"]["workspaceId"])
                             and input_object["typeProperties"]["workspaceId"] != target_workspace_id
