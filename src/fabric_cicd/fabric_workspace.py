@@ -277,7 +277,6 @@ class FabricWorkspace:
                             referenced_name = self._convert_id_to_name(
                                 item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                             )
-                            print(referenced_name)
                             # Replace workspace ID with target workspace ID if the referenced item exists in the repo
                             if referenced_name:
                                 input_object["typeProperties"]["workspaceId"] = target_workspace_id
