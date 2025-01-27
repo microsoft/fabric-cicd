@@ -278,7 +278,7 @@ class FabricWorkspace:
                         #    logging.warning("Warning: connection aren't supported during deployment.")
                         # if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
                         #    input_object["typeProperties"]["workspaceId"] = target_workspace_id
-                        if guid_pattern.match(input_object["typeProperties"]["workspaceId"]):
+                        if guid_pattern.match(input_object["typeProperties"]["workspaceId"]) != target_workspace_id:
                             item_type = mapped_activities[value][0]
                             print("ITEM TYPE:", item_type)
                             referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
