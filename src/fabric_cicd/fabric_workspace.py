@@ -252,7 +252,7 @@ class FabricWorkspace:
 
         # Mapping of supported data pipeline activities (that may reference non-zero feature branch workspace IDs)
         mapped_activities = {
-            "InvokePipeline": ["DataPipeline", "pipelineId"],
+            "InvokePipeline": ["DataPipeline", "pipelineId"]
             # "RefreshDataflow": ["Dataflow", "dataflowId"],
             # "TridentNotebook": ["Notebook", "notebookId"],
         }
@@ -279,6 +279,7 @@ class FabricWorkspace:
                         # if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
                         #    input_object["typeProperties"]["workspaceId"] = target_workspace_id
                         if guid_pattern.match(input_object["typeProperties"]["workspaceId"]) != target_workspace_id:
+                            print(input_object["typeProperties"]["workspaceId"])
                             item_type = mapped_activities[value][0]
                             print("ITEM TYPE:", item_type)
                             referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
