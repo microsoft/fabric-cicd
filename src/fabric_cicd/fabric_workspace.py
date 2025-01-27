@@ -339,6 +339,8 @@ class FabricWorkspace:
                     # Get the item type from mapped_activities dictionary using activity type
                     item_type = mapped_activities[activity_type][0]
                     print("ITEM TYPE", item_type)
+                    print("ID KEY", id_key)
+                    print("ITEM ID", item_id)
                     if item_type:
                         # Convert item ID to name using _convert_id_to_name method
                         referenced_name = self._convert_id_to_name(
