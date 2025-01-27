@@ -261,7 +261,7 @@ class FabricWorkspace:
             # Check if the current object is a dictionary
             if isinstance(input_object, dict):
                 target_workspace_id = self.workspace_id
-                current_workspace_id = input_object["typeProperties"]["workspaceId"]
+                # current_workspace_id = input_object["typeProperties"]["workspaceId"]
 
                 # Iterate through the activities
                 for key, value in input_object.items():
@@ -269,9 +269,9 @@ class FabricWorkspace:
                     if key == "type" and value in mapped_activities:
                         if "connection" in input_object["externalReferences"]:
                             logging.warning("Warning: connection aren't supported during deployment.")
-                        if current_workspace_id == "00000000-0000-0000-0000-000000000000":
+                        if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
                             input_object["typeProperties"]["workspaceId"] = target_workspace_id
-                        elif guid_pattern.match(current_workspace_id):
+                        elif guid_pattern.match(input_object["typeProperties"]["workspaceId"]):
                             item_type = mapped_activities[value][0]
                             referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
                             referenced_name = self._convert_id_to_name(
