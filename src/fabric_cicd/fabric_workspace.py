@@ -233,65 +233,50 @@ class FabricWorkspace:
     def _replace_activity_workspace_ids(self, raw_file, lookup_type):
         """
         Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
-        in the raw file content.
+        in the raw file content. Handles the replacement of both default feature branch workspace ID (i.e. 00000000-0000-0000-0000-000000000000) and non-default values.
 
         :param raw_file: The raw file content where workspace IDs need to be replaced.
         :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
         """
-        # Initial replace of feature branch workspace IDs in the raw file
-        # Define the default and target workspace ID strings
-        default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-        target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
-
-        # Replace the default workspace ID with the target workspace ID
-        raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
-
-        # Create a dictionary from the raw_file
-        item_content_dict = json.loads(raw_file)
+        target_workspace_id = self.workspace_id
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
-        # Mapping of supported data pipeline activities (that may reference non-zero feature branch workspace IDs)
-        mapped_activities = {
-            "InvokePipeline": ["DataPipeline", "pipelineId"]
-            # "RefreshDataflow": ["Dataflow", "dataflowId"],
-            # "TridentNotebook": ["Notebook", "notebookId"],
-        }
+        # Replace all instances of the default feature branch workspace ID with the target workspace ID in the raw file
+        default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
+        target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
+
+        raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+
+        # Create a dictionary from the updated raw file
+        item_content_dict = json.loads(raw_file)
+
+        # Mapping of supported data pipeline activities that may reference non-default feature branch workspace IDs
+        mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
 
         def _find_and_replace_activity_workspace_ids(input_object):
             """
-            Recursively scans through JSON to find and replace feature branch workspace IDs in nested and
-            non-nested activities where workspaceId
-            property exists (e.g. Trident Notebook). Note: the function can be modified to process other pipeline
-            activities where workspaceId exists.
+            Recursively scans through JSON to find and replace non-default feature branch workspace IDs in nested and
+            non-nested activities that are supported. Note: the function can be modified to process other pipeline
+            activities where workspaceId is referenced.
 
             :param input_object: Object can be a dictionary or list present in the input JSON.
             """
             # Check if the current object is a dictionary
             if isinstance(input_object, dict):
-                target_workspace_id = self.workspace_id
-
                 # Iterate through the activities
                 for key, value in input_object.items():
-                    # Replace workspace ID with target workspace ID for supported activities
                     if key == "type" and value in mapped_activities:
-                        # if "externalReferences" in input_object and "connection" in input_object["externalReferences"]:
-                        #    logging.warning("Warning: connection aren't supported during deployment.")
-                        # if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
-                        #    input_object["typeProperties"]["workspaceId"] = target_workspace_id
                         if (
                             guid_pattern.match(input_object["typeProperties"]["workspaceId"])
                             and input_object["typeProperties"]["workspaceId"] != target_workspace_id
                         ):
-                            print(input_object["typeProperties"]["workspaceId"])
                             item_type = mapped_activities[value][0]
-                            print("ITEM TYPE:", item_type)
                             referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
-                            print("REFERENCED ID:", referenced_id)
                             referenced_name = self._convert_id_to_name(
                                 item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                             )
-                            print("REFERENCED NAME:", referenced_name)
-                            # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
+                            print(referenced_name)
+                            # Replace workspace ID with target workspace ID if the referenced item exists in the repo
                             if referenced_name:
                                 input_object["typeProperties"]["workspaceId"] = target_workspace_id
 
