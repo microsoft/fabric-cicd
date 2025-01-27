@@ -331,7 +331,7 @@ class FabricWorkspace:
                 )
                 print("ACTIVITY PATTERN", activity_pattern)
                 activity_match = activity_pattern.search(raw_file)
-                print("ACTIVITY MATCH", activity_match)
+                print("ACTIVITY MATCH", str(activity_match))
 
                 if activity_match:
                     # Extract the activity type and item ID from the matched pattern
