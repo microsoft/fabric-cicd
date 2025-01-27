@@ -267,7 +267,7 @@ class FabricWorkspace:
                 for key, value in input_object.items():
                     # Replace workspace ID with target workspace ID for supported activities
                     if key == "type" and value in mapped_activities:
-                        if input_object["externalReferences"]["connection"]:
+                        if "externalReferences" in input_object and "connection" in input_object["externalReferences"]:
                             logging.warning("Warning: connection aren't supported during deployment.")
                         if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
                             input_object["typeProperties"]["workspaceId"] = target_workspace_id
