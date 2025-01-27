@@ -34,13 +34,13 @@ Before you begin, ensure you have the following installed:
 
 1. **Run activate.ps1**:
 
--   Open the Project in VS Code
--   Open PowerShell terminal
--   Run activate.ps1 which will install uv, and ruff if not already found. And set up the default environment leveraging uv sync.
-    ```powershell
-    .\activate.ps1
-    ```
-    _Note that this is technically optional and is designed to work with PowerShell. You can execute these steps manually as well, this is merely a helper_
+    - Open the Project in VS Code
+    - Open PowerShell terminal
+    - Run activate.ps1 which will install uv, and ruff if not already found. And set up the default environment leveraging uv sync.
+        ```powershell
+        .\activate.ps1
+        ```
+        _Note that this is technically optional and is designed to work with PowerShell. You can execute these steps manually as well, this is merely a helper_
 
 1. **Select Python Interpreter**:
 
