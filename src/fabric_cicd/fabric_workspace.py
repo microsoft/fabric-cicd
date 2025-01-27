@@ -307,12 +307,14 @@ class FabricWorkspace:
         :param path: Full path of the desired item.
         """
         for item_details in self.repository_items[item_type].values():
-            if item_details.get("path") == path:
+            if Path(item_details.get("path")) == Path(path):
                 return item_details["logical_id"]
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, excluded_files=None, excluded_directories=None, full_publish=True):
+    def _publish_item(
+        self, item_name, item_type, excluded_files=None, excluded_directories=None, full_publish=True, **kwargs
+    ):
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -325,6 +327,8 @@ class FabricWorkspace:
         item_path = self.repository_items[item_type][item_name]["path"]
         item_guid = self.repository_items[item_type][item_name]["guid"]
         item_description = self.repository_items[item_type][item_name]["description"]
+
+        max_retries = 10 if item_type == "SemanticModel" else 5
 
         excluded_files = excluded_files or {".platform"}
         excluded_directories = excluded_directories or None
@@ -403,7 +407,7 @@ class FabricWorkspace:
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body
+                method="POST", url=f"{self.base_api_url}/items", body=combined_body, max_retries=max_retries
             )
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name]["guid"] = item_guid
@@ -412,7 +416,10 @@ class FabricWorkspace:
                 # Update the item's definition if full publish is required
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
                 self.endpoint.invoke(
-                    method="POST", url=f"{self.base_api_url}/items/{item_guid}/updateDefinition", body=definition_body
+                    method="POST",
+                    url=f"{self.base_api_url}/items/{item_guid}/updateDefinition",
+                    body=definition_body,
+                    max_retries=max_retries,
                 )
 
             # Remove the 'type' key as it's not supported in the update-item API
@@ -420,9 +427,16 @@ class FabricWorkspace:
 
             # Update the item's metadata
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(method="PATCH", url=f"{self.base_api_url}/items/{item_guid}", body=metadata_body)
+            self.endpoint.invoke(
+                method="PATCH",
+                url=f"{self.base_api_url}/items/{item_guid}",
+                body=metadata_body,
+                max_retries=max_retries,
+            )
 
-        logger.info("Published")
+        # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
+        if not kwargs.get("skip_publish_logging", False):
+            logger.info("Published")
 
     def _unpublish_item(self, item_name, item_type):
         """
