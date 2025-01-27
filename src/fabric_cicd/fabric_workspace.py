@@ -261,23 +261,22 @@ class FabricWorkspace:
             # Check if the current object is a dictionary
             if isinstance(input_object, dict):
                 target_workspace_id = self.workspace_id
+                current_workspace_id = input_object["typeProperties"]["workspaceId"]
 
-                # Iterate through the activities and search for TridentNotebook activities
+                # Iterate through the activities
                 for key, value in input_object.items():
+                    # Replace workspace ID with target workspace ID for supported activities
                     if key == "type" and value in mapped_activities:
-                        if input_object["typeProperties"]["workspaceId"] == "00000000-0000-0000-0000-000000000000":
-                            print("Found feature branch workspace Id is all zeros")
+                        if "connection" in input_object["externalReferences"]:
+                            logging.warning("Warning: connection aren't supported during deployment.")
+                        if current_workspace_id == "00000000-0000-0000-0000-000000000000":
                             input_object["typeProperties"]["workspaceId"] = target_workspace_id
-                        elif guid_pattern.match(input_object["typeProperties"]["workspaceId"]):
-                            print("Found feature branch workspace Id that is NOT all zeros")
+                        elif guid_pattern.match(current_workspace_id):
                             item_type = mapped_activities[value][0]
-                            print("ITEM Type", item_type)
                             referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
-                            print("REFERENCED ID", referenced_id)
                             referenced_name = self._convert_id_to_name(
                                 item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                             )
-                            print("REFERENCED NAME", referenced_name)
                             # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
                             if referenced_name:
                                 input_object["typeProperties"]["workspaceId"] = target_workspace_id
