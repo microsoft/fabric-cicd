@@ -244,7 +244,7 @@ class FabricWorkspace:
 
         # Mapping of supported data pipeline activities
         mapped_activities = {
-            "InvokePipeline": ["Data Pipeline", "pipelineId"],
+            "InvokePipeline": ["DataPipeline", "pipelineId"],
             "RefreshDataflow": ["Dataflow", "dataflowId"],
             "TridentNotebook": ["Notebook", "notebookId"],
         }
