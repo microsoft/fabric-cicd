@@ -335,7 +335,7 @@ class FabricWorkspace:
 
                 if activity_match:
                     # Extract the activity type and item ID from the matched pattern
-                    activity_type, item_id = activity_match.groups()
+                    activity_type, id_key, item_id = activity_match.groups()
                     # Get the item type from mapped_activities dictionary using activity type
                     item_type = mapped_activities.get(activity_type, [None])
                     print("ITEM TYPE", item_type)
