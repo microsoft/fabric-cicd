@@ -37,3 +37,8 @@ packages.find.where = ["src"]
 [tool.uv]
 package = true
 python-preference = "only-managed"
+
+[tool.pytest.ini_options]
+addopts = "-v --tb=short --disable-warnings"
+testpaths = ["tests"]
+python_files = "test_*.py"
