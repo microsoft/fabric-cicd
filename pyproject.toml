@@ -21,8 +21,12 @@ dev = [
     "gitpython>=3.1.44",
     "mike>=2.1.3",
     "mkdocs-include-markdown-plugin>=7.1.2",
+    "mkdocs-material>=9.5.50",
     "mkdocs-minify-plugin>=0.8.0",
     "mkdocstrings-python>=1.13.0",
+    "pytest>=8.3.4",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.9.3",
 ]
 
 
@@ -41,4 +45,4 @@ python-preference = "only-managed"
 [tool.pytest.ini_options]
 addopts = "-v --tb=short --disable-warnings"
 testpaths = ["tests"]
-python_files = "test_*.py"
+pythonpath = ["src"]
