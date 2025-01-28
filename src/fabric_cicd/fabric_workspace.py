@@ -42,7 +42,7 @@ class FabricWorkspace:
         workspace_id : str
             The ID of the workspace to interact with.
         repository_directory : str
-            Directory path where repository items are located.
+            Local directory path of the repository where items are to be deployed from.
         item_type_in_scope : list
             Item types that should be deployed for given workspace.
         base_api_url : str, optional
