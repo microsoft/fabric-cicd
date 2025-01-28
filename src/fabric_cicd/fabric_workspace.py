@@ -334,6 +334,8 @@ class FabricWorkspace:
 
             for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
                 if value in mapped_activities:
+                    print("PATH", path)
+                    print("VALUE", value)
                     if isinstance(path, str):
                         path = path.split("/")
                     type_properties_path = (*path[:-1], "typeProperties")
