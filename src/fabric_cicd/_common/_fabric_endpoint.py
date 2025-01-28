@@ -70,6 +70,9 @@ class FabricEndpoint:
                         status = response_json.get("status")
                         if status == "Succeeded":
                             long_running = False
+                            # If location not included in operation success call, no body is expected to be returned
+                            exit_loop = url is None
+
                         elif status == "Failed":
                             response_error = response_json["error"]
                             msg = (
@@ -103,9 +106,9 @@ class FabricEndpoint:
                 # Handle API throttling
                 elif response.status_code == 429:
                     handle_retry(
-                        response,
                         attempt=iteration_count,
                         base_delay=10,
+                        max_retries=5,
                         response_retry_after=retry_after,
                         prepend_message="API is throttled.",
                     )
@@ -130,7 +133,6 @@ class FabricEndpoint:
                     and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
                 ):
                     handle_retry(
-                        response,
                         attempt=iteration_count,
                         base_delay=2.5,
                         max_retries=5,
