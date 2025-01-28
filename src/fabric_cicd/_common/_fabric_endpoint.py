@@ -244,6 +244,7 @@ def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prep
     """
     if attempt < max_retries:
         retry_after = float(response_retry_after)
+        base_delay = float(base_delay)
         delay = min(retry_after, base_delay * (2**attempt))
 
         # modify output for proper plurality and formatting
