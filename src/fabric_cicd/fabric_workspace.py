@@ -301,8 +301,8 @@ class FabricWorkspace:
             return json.dumps(item_content_dict, indent=2)
 
         # For other item types, return the updated raw file
-        return raw_file
-        """
+        return raw_file   
+    """
 
     def _replace_workspace_ids(self, raw_file, item_type):
         """
@@ -332,28 +332,34 @@ class FabricWorkspace:
                 "RefreshDataflow": ["Dataflow", "dataflowId"],
             }
 
+            # Iterate over all 'type' keys in the dictionary, yielding their paths and values
             for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
                 if value in mapped_activities:
-                    print("PATH", path)
-                    print("VALUE", value)
-                    if isinstance(path, str):
-                        path = path.split("/")
-                    type_properties_path = (*path[:-1], "typeProperties")
-                    print("TYPE PROPERTIES PATH", type_properties_path)
-                    workspace_id_path = (*type_properties_path, "workspaceId")
-                    print("WORKSPACE ID PATH", workspace_id_path)
+                    # Split the path into components
+                    path = path.split("/")
+                    print("Path: ", path)
+                    # Create a path to 'workspaceId'
+                    workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
+                    # Get the workspace ID at the specified path
                     workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
-                    print("WORKSPACE ID", workspace_id)
+                    print("Workspace ID Path: ", workspace_id_path)
+                    print("Workspace ID: ", workspace_id)
+                    # Check if the workspace ID is a valid GUID and is not the target workspace ID
                     if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                        item_type = mapped_activities[value][0]
-                        referenced_id = dpath.util.get(
-                            item_content_dict, (*type_properties_path, mapped_activities[value][1])
-                        )
-                        lookup_type = "Repository"
+                        item_type, item_id_name = mapped_activities[value]
+                        print("Item Type: ", item_type)
+                        print("Item ID Name: ", item_id_name)
+                        # Get the referenced ID from the specified path
+                        referenced_id_path = (*path[:-1], "typeProperties", item_id_name)
+                        referenced_id = dpath.util.get(item_content_dict, referenced_id_path)
+                        print("referenced_id_path:", referenced_id_path)
+                        print("referenced_id:", referenced_id)
+                        # Convert the referenced ID to a name
                         referenced_name = self._convert_id_to_name(
-                            item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
+                            item_type=item_type, generic_id=referenced_id, lookup_type="Repository"
                         )
-                        print("REFERENCED NAME", referenced_name)
+                        print("Referenced Name: ", referenced_name)
+                        # Update the workspace ID if a referenced name is found
                         if referenced_name:
                             dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
 
