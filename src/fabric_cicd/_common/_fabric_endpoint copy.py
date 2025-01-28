@@ -1,18 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-import base64
-import datetime
 import json
 import logging
 import time
 
-import requests
-from azure.core.exceptions import (
-    ClientAuthenticationError,
-)
-
-from fabric_cicd._common._exceptions import InvokeError, TokenError
+from fabric_cicd._common._exceptions import InvokeError
+from fabric_cicd._common._fabric_request import FabricRequest
 
 logger = logging.getLogger(__name__)
 
@@ -20,68 +14,80 @@ logger = logging.getLogger(__name__)
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
 
-    def __init__(self, token_credential):
-        """Initializes the FabricEndpoint instance, sets up the authentication token."""
-        self.aad_token = None
-        self.aad_token_expiration = None
-        self.token_credential = token_credential
-        self._refresh_token()
-
-    def invoke(self, method, url, body="{}", files=None, **kwargs):
-        """
-        Sends an HTTP request to the specified URL with the given method and body.
-
-        :param method: HTTP method to use for the request (e.g., 'GET', 'POST', 'PATCH', 'DELETE').
-        :param url: URL to send the request to.
-        :param body: The JSON body to include in the request. Defaults to an empty JSON object.
-        :param files: The file path to be included in the request. Defaults to None.
-        :return: A dictionary containing the response headers, body, and status code.
-        """
+    def invoke(self, method, url, body=None, files=None, **kwargs):
         exit_loop = False
         iteration_count = 0
         long_running = False
 
         while not exit_loop:
             try:
-                if files is None:
-                    headers = {
-                        "Authorization": f"Bearer {self.aad_token}",
-                        "Content-Type": "application/json; charset=utf-8",
-                    }
-                    response = requests.request(method=method, url=url, headers=headers, json=body)
-                else:
-                    headers = {"Authorization": f"Bearer {self.aad_token}"}
-                    response = requests.request(method=method, url=url, headers=headers, files=files)
-
                 iteration_count += 1
+                request_obj = FabricRequest(
+                    method=method,
+                    url=url,
+                    bearer_token=self.aad_token,
+                    body=body,
+                    files=files,
+                )
+                request_obj.submit()
 
-                retry_after = response.headers.get("Retry-After", 60)
-                invoke_log_message = _format_invoke_log(response, method, url, body)
+                if not long_running and request_obj.response.status_code in {202}:
+                    time.sleep(1)
+                elif (
+                    request_obj.response.status_code == 200 and long_running
+                ) or request_obj.response.status_code == 202:
+                    max_retries = kwargs.get("max_longrunning_retries", 5)
+                    exit_loop, new_url = handle_longrunning(request_obj, iteration_count, max_retries)
 
-        return {
-            "header": dict(response.headers),
-            "body": (response.json() if "application/json" in response.headers.get("Content-Type") else {}),
-            "status_code": response.status_code,
-        }
-    
-    def _handle_response(self, response, method, url, body, **kwargs):
-    def _handle_response(self, method, url, body="{}", files=None, **kwargs):
-        """
-        Sends an HTTP request to the specified URL with the given method and body.
+                # handle response
 
-        :param method: HTTP method to use for the request (e.g., 'GET', 'POST', 'PATCH', 'DELETE').
-        :param url: URL to send the request to.
-        :param body: The JSON body to include in the request. Defaults to an empty JSON object.
-        :param files: The file path to be included in the request. Defaults to None.
-        :return: A dictionary containing the response headers, body, and status code.
-        """
+                if long_running:
+                    request_obj = FabricRequest(
+                        method="GET",
+                        url=new_url,
+                        bearer_token=None,
+                        body="{}",
+                    )
+
+            except Exception as e:
+                logger.debug(request_obj.log_message)
+                raise InvokeError(e, logger, request_obj.log_message) from e
+
+
+def handle_longrunning(request_obj, iteration_count, max_retries):
+    # Handle long-running operations
+    # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
+
+    response_json = request_obj.response.json()
+    status = response_json.get("status")
+    location_url = request_obj.response_location
+
+    if status == "Succeeded":
+        return location_url is None, location_url
+
+    if status == "Failed":
+        response_error = response_json.get("error", {})
+        msg = (
+            f"Operation failed. Error Code: {response_error.get('errorCode')}. "
+            f"Error Message: {response_error.get('message')}"
+        )
+        raise Exception(msg)
+
+    if status == "Undefined":
+        msg = f"Operation is in an undefined state. Full Body: {response_json}"
+        raise Exception(msg)
+
+    handle_retry(
+        attempt=iteration_count - 1,
+        base_delay=0.5,
+        response_retry_after=request_obj.retry_after,
+        max_retries=max_retries,
+        prepend_message="Operation in progress.",
+    )
+    return False, location_url
+
+    def handle_response(self, response, method, url, body, iteration_count, long_running):
         exit_loop = False
-        iteration_count = 0
-        long_running = False
-
-
-        iteration_count += 1
-
         retry_after = response.headers.get("Retry-After", 60)
         invoke_log_message = _format_invoke_log(response, method, url, body)
 
@@ -141,16 +147,12 @@ class FabricEndpoint:
             )
 
         # Handle expired authentication token
-        elif (
-            response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired"
-        ):
+        elif response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
             logger.info("AAD token expired. Refreshing token.")
             self._refresh_token()
 
         # Handle unauthorized access
-        elif (
-            response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized"
-        ):
+        elif response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized":
             msg = f"The executing identity is not authorized to call {method} on '{url}'."
             raise Exception(msg)
 
@@ -203,55 +205,6 @@ class FabricEndpoint:
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(invoke_log_message)
 
-    except Exception as e:
-        logger.debug(invoke_log_message)
-        raise InvokeError(e, logger, invoke_log_message) from e
-
-    def _refresh_token(self):
-        """Refreshes the AAD token if empty or expiration has passed"""
-        if (
-            self.aad_token is None
-            or self.aad_token_expiration is None
-            or self.aad_token_expiration < datetime.datetime.utcnow()
-        ):
-            resource_url = "https://api.fabric.microsoft.com/.default"
-
-            try:
-                self.aad_token = self.token_credential.get_token(resource_url).token
-            except ClientAuthenticationError as e:
-                msg = f"Failed to aquire AAD token. {e}"
-                raise TokenError(msg, logger) from e
-            except Exception as e:
-                msg = f"An unexpected error occurred when generating the AAD token. {e}"
-                raise TokenError(msg, logger) from e
-
-            try:
-                decoded_token = _decode_jwt(self.aad_token)
-                expiration = decoded_token.get("exp")
-                upn = decoded_token.get("upn")
-                appid = decoded_token.get("appid")
-                oid = decoded_token.get("oid")
-
-                if expiration:
-                    self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration)
-                else:
-                    msg = "Token does not contain expiration claim."
-                    raise TokenError(msg, logger)
-
-                if upn:
-                    logger.info(f"Executing as User '{upn}'")
-                    self.upn_auth = True
-                else:
-                    self.upn_auth = False
-                    if appid:
-                        logger.info(f"Executing as Application Id '{appid}'")
-                    elif oid:
-                        logger.info(f"Executing as Object Id '{oid}'")
-
-            except Exception as e:
-                msg = f"An unexpected error occurred while decoding the credential token. {e}"
-                raise TokenError(msg, logger) from e
-
 
 def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prepend_message=""):
     """
@@ -277,27 +230,6 @@ def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prep
     else:
         msg = f"Maximum retry attempts ({max_retries}) exceeded."
         raise Exception(msg)
-
-
-def _decode_jwt(token):
-    """Decodes a JWT token and returns the payload as a dictionary."""
-    try:
-        # Split the token into its parts
-        parts = token.split(".")
-        if len(parts) != 3:
-            msg = "The token has an invalid JWT format"
-            raise TokenError(msg, logger)
-
-        # Decode the payload (second part of the token)
-        payload = parts[1]
-        padding = "=" * (4 - len(payload) % 4)
-        payload += padding
-        decoded_bytes = base64.urlsafe_b64decode(payload.encode("utf-8"))
-        decoded_str = decoded_bytes.decode("utf-8")
-        return json.loads(decoded_str)
-    except Exception as e:
-        msg = f"An unexpected error occurred while decoding the credential token. {e}"
-        raise TokenError(msg, logger) from e
 
 
 def _format_invoke_log(response, method, url, body):
