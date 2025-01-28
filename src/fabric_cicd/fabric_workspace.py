@@ -230,35 +230,26 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_activity_workspace_ids(self, raw_file, lookup_type):
+    def _replace_workspace_ids(self, raw_file, item_type):
         """
-        Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
-        in the raw file content. Handles the replacement of both default feature branch workspace ID (i.e. 00000000-0000-0000-0000-000000000000)
-        and non-default values.
+        Replaces feature branch workspace ID with target workspace ID referenced in the raw file content.
+        Handles the replacement of default feature branch workspace ID (i.e. 00000000-0000-0000-0000-000000000000)
+        and non-default values (can be present in data pipeline activities).
 
         :param raw_file: The raw file content where workspace IDs need to be replaced.
+        :param item_type: Type of the item where the replacement occurs (e.g., Notebook, DataPipeline).
         :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
         """
-        target_workspace_id = self.workspace_id
-        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
-
         # Replace all instances of the default feature branch workspace ID with the target workspace ID in the raw file
+        target_workspace_id = self.workspace_id
         default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
         target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
-
         raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
 
-        # Create a dictionary from the updated raw file
-        item_content_dict = json.loads(raw_file)
-
-        # Mapping of supported data pipeline activities that may reference non-default feature branch workspace ID values
-        # Dictionary structure: {activity_name: [item_type, item_id_name]}
-        mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-
-        def _find_and_replace_activity_workspace_ids(input_object):
+        def _find_and_replace_pl_activity_workspace_ids(input_object):
             """
             Recursively scans through JSON to find and replace non-default feature branch workspace IDs in nested and
-            non-nested activities that are supported (mapping can be updated).
+            non-nested data pipeline activities that are supported (mapping can be updated).
 
             :param input_object: Object can be a dictionary or list present in the input JSON.
             """
@@ -274,6 +265,7 @@ class FabricWorkspace:
                         ):
                             item_type = mapped_activities[value][0]
                             referenced_id = input_object["typeProperties"][mapped_activities[value][1]]
+                            lookup_type = "Repository"
                             referenced_name = self._convert_id_to_name(
                                 item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                             )
@@ -283,19 +275,31 @@ class FabricWorkspace:
 
                     # Recursively search in the value
                     else:
-                        _find_and_replace_activity_workspace_ids(value)
+                        _find_and_replace_pl_activity_workspace_ids(value)
 
             # Check if the current object is a list
             elif isinstance(input_object, list):
                 # Recursively search in each item
                 for item in input_object:
-                    _find_and_replace_activity_workspace_ids(item)
+                    _find_and_replace_pl_activity_workspace_ids(item)
 
-        # Start the recursive search and replace from the root of the JSON data
-        _find_and_replace_activity_workspace_ids(item_content_dict)
+        if item_type == "DataPipeline":
+            # Create a dictionary from the updated raw file
+            item_content_dict = json.loads(raw_file)
+            guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
-        # Convert the updated dict back to a JSON string
-        return json.dumps(item_content_dict, indent=2)
+            # Mapping of supported data pipeline activities that may reference non-default feature branch workspace ID values
+            # Dictionary structure: {activity_name: [item_type, item_id_name]}
+            mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+
+            # Start the recursive search and replace from the root of the JSON data
+            _find_and_replace_pl_activity_workspace_ids(item_content_dict)
+
+            # Convert the updated dict back to a JSON string
+            return json.dumps(item_content_dict, indent=2)
+
+        # For other item types, return the updated raw file
+        return raw_file
 
     def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
@@ -360,15 +364,9 @@ class FabricWorkspace:
                         with Path.open(full_path, encoding="utf-8") as f:
                             raw_file = f.read()
 
-                        # Replace feature branch workspace IDs with target workspace IDs in data pipeline activities.
-                        if item_type == "DataPipeline":
-                            raw_file = self._replace_activity_workspace_ids(raw_file, "Repository")
-
-                        # Replace default workspace id with target workspace id
-                        if item_type == "Notebook":
-                            default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-                            target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
-                            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+                        # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
+                        if item_type in ["DataPipeline", "Notebook"]:
+                            raw_file = self._replace_workspace_ids(raw_file, item_type)
 
                         # Replace connections in report
                         if item_type == "Report" and Path(file).name == "definition.pbir":
