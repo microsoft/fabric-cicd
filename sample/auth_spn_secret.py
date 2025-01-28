@@ -19,7 +19,7 @@ token_credential = ClientSecretCredential(client_id=client_id, client_secret=cli
 workspace_id = "your-workspace-id"
 environment = "your-environment"
 repository_directory = "your-repository-directory"
-item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+item_type_in_scope = ["Notebook", "Environment"]
 
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
