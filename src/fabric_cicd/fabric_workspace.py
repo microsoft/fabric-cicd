@@ -240,7 +240,6 @@ class FabricWorkspace:
         :param item_type: Type of the item where the replacement occurs (e.g., Notebook, DataPipeline).
         :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
         """
-        print("Item Type: ", item_type)
         # Replace all instances of the default feature branch workspace ID with the target workspace ID in the raw file
         target_workspace_id = self.workspace_id
         default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
@@ -285,7 +284,6 @@ class FabricWorkspace:
                     _find_and_replace_pl_activity_workspace_ids(item)
 
         if item_type == "DataPipeline":
-            print("Data Pipeline requires additional processing")
             # Create a dictionary from the updated raw file
             item_content_dict = json.loads(raw_file)
             guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
@@ -299,7 +297,7 @@ class FabricWorkspace:
 
             # Convert the updated dict back to a JSON string
             return json.dumps(item_content_dict, indent=2)
-        print("Returning updated raw file")
+
         # For other item types, return the updated raw file
         return raw_file
 
