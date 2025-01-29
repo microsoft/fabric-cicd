@@ -13,208 +13,64 @@ def mock_requests(mocker):
     return mocker.patch("requests.request")
 
 
-def test_200():
-    """Initial call to an item api that returns a long running redirect"""
+@pytest.mark.parametrize( 
+    ("status_code", "raise_exception", "request_method", "long_running", "expected_long_running", "expected_exit_loop", "response_json"),  
+    [
+        (200, False, "POST", False, False,  True, {}),
+        (202, False, "POST", False,  True, False, {}),
+        (200, False,  "GET",  True,  True, False, {"status": "Running"}),
+        (200, False,  "GET",  True, False,  True, {"status": "Succeeded"}),
+        (200, False,  "GET",  True, False, False, {"status": "Succeeded"}),
+        (200,  True,  "GET",  True, False,  True, {"status": "Failed","error": {"errorCode": "SampleErrorCode", "message": "Sample failure message"}}),
+    ],
+    ids=[
+        "success",
+        "long_running_redirect",
+        "long_running_running",
+        "long_running__success",
+        "long_running__success_with_result",
+        "long_running__failed",
+    ])  # fmt: skip
+def test_handle_response(
+    status_code,
+    raise_exception,
+    request_method,
+    long_running,
+    expected_long_running,
+    expected_exit_loop,
+    response_json,
+):
+    """Long running scenarios expected to pass"""
+    response = Mock(status_code=status_code, headers={}, json=Mock(return_value=response_json))
 
-    response = Mock()
-    response.status_code = 200
-    response.headers = {"Content-Type": "application/json"}
-    response.json.return_value = {"status": "Succeeded"}
+    request_url = "old"
 
-    orig_method = "POST"
-    orig_url = "http://example.com"
-    orig_body = "{}"
-    orig_long_running = False
-    orig_retry_after = 60
-    orig_iteration_count = 1
+    if long_running and not expected_exit_loop:
+        response.headers["Retry-After"] = 20
+        response.headers["Location"] = request_url
+    elif not long_running and expected_long_running:
+        response.headers["Retry-After"] = 20
+        response.headers["Location"] = "new"
 
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method=orig_method,
-        url=orig_url,
-        body=orig_body,
-        long_running=orig_long_running,
-        retry_after=orig_retry_after,
-        iteration_count=orig_iteration_count,
-    )
-
-    assert exit_loop is True
-    assert method == orig_method
-    assert url == orig_url
-    assert body == orig_body
-    assert long_running == orig_long_running
-
-
-def test_202_long_running_redirect():
-    """Initial call to an item api that returns a long running redirect"""
-    request_method = "POST"
-    request_url = "https://example.com/"
-    request_body = '{"displayName": "Example"}'
-    old_long_running = False
-    old_iteration_count = 1
-
-    response = Mock()
-    response.status_code = 202
-    response.headers = {
-        "Content-Type": "application/json",
-        "Location": "https://example.com/operations/0000",
-        "x-ms-operation-id": "0acd697c-1550-43cd-b998-91bfbfbd47c6",
-        "Retry-After": 30,
-    }
-    response.json.return_value = {}
-
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method=request_method,
-        url=request_url,
-        body=request_body,
-        long_running=old_long_running,
-        iteration_count=old_iteration_count,
-    )
-
-    assert exit_loop is False
-    assert method == "GET"
-    assert url == response.headers.get("Location")
-    assert body == "{}"
-    assert long_running != old_long_running
-
-
-def test_200_long_running_inprogess():
-    """The first get call to long running with in progess state"""
-    request_method = "GET"
-    request_url = "https://example.com/operations/0000"
-    request_body = "{}"
-    old_long_running = True
-    old_iteration_count = 2
-
-    response = Mock()
-    response.status_code = 200
-    response.headers = {
-        "Content-Type": "application/json",
-        "Location": "https://example.com/operations/0000",
-        "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-        "Retry-After": 20,
-    }
-    response.json.return_value = {
-        "status": "Running",
-        "createdTimeUtc": "2023-09-13T14:56:18.477Z",
-        "lastUpdatedTimeUtc": "2023-09-13T15:01:10.532Z",
-        "percentComplete": 25,
-    }
-
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method=request_method,
-        url=request_url,
-        body=request_body,
-        long_running=old_long_running,
-        iteration_count=old_iteration_count,
-    )
-
-    assert exit_loop is False
-    assert method == "GET"
-    assert url == response.headers.get("Location")
-    assert body == "{}"
-    assert long_running == old_long_running
-
-
-def test_200_long_running_success():
-    """The first get call to long running with in progess state"""
-    request_method = "GET"
-    request_url = "https://example.com/operations/0000"
-    request_body = "{}"
-    old_long_running = True
-    old_iteration_count = 2
-
-    response = Mock()
-    response.status_code = 200
-    response.headers = {
-        "Content-Type": "application/json",
-        "Location": "https://example.com/operations/0000/result",
-        "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-    }
-    response.json.return_value = {
-        "status": "Succeeded",
-        "createdTimeUtc": "2023-09-13T14:56:18.477Z",
-        "lastUpdatedTimeUtc": "2023-09-13T15:01:10.532Z",
-        "percentComplete": 100,
-    }
-
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method=request_method,
-        url=request_url,
-        body=request_body,
-        long_running=old_long_running,
-        iteration_count=old_iteration_count,
-    )
-
-    assert exit_loop is False
-    assert method == "GET"
-    assert url == response.headers.get("Location")
-    assert body == "{}"
-    assert long_running == False
-
-
-def test_200_long_running_success_withoutlocation():
-    """The first get call to long running with in progess state"""
-    request_method = "GET"
-    request_url = "https://example.com/operations/0000"
-    request_body = "{}"
-    old_long_running = True
-    old_iteration_count = 2
-
-    response = Mock()
-    response.status_code = 200
-    response.headers = {
-        "Content-Type": "application/json",
-        "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-    }
-    response.json.return_value = {
-        "status": "Succeeded",
-        "createdTimeUtc": "2023-09-13T14:56:18.477Z",
-        "lastUpdatedTimeUtc": "2023-09-13T15:01:10.532Z",
-        "percentComplete": 100,
-    }
-
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method=request_method,
-        url=request_url,
-        body=request_body,
-        long_running=old_long_running,
-        iteration_count=old_iteration_count,
-    )
-
-    assert exit_loop is True
-    assert long_running == False
-
-
-def test_200_long_running_fail():
-    """The first get call to long running with in progess state"""
-    request_method = "GET"
-    request_url = "https://example.com/operations/0000"
-    request_body = "{}"
-    old_long_running = True
-    old_iteration_count = 2
-
-    response = Mock()
-    response.status_code = 200
-    response.headers = {
-        "Content-Type": "application/json",
-        "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-    }
-    response.json.return_value = {
-        "status": "Failed",
-        "error": {"errorCode": "SampleErrorCode", "message": "Sample failure message"},
-    }
-
-    with pytest.raises(Exception, match="[Operation failed].*"):
-        _handle_response(
+    if not raise_exception:
+        exit_loop, _method, url, _body, long_running = _handle_response(
             response=response,
             method=request_method,
             url=request_url,
-            body=request_body,
-            long_running=old_long_running,
-            iteration_count=old_iteration_count,
+            body="{}",
+            long_running=long_running,
+            iteration_count=2,
         )
+        assert exit_loop == expected_exit_loop
+        assert long_running == expected_long_running
+    else:
+        exception_match = "[Operation failed].*" if status_code == 200 else ""
+        with pytest.raises(Exception, match=exception_match):
+            _handle_response(
+                response=response,
+                method=request_method,
+                url=request_url,
+                body="{}",
+                long_running=long_running,
+                iteration_count=2,
+            )
