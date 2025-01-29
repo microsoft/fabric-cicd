@@ -43,15 +43,10 @@ class FabricEndpoint:
 
         while not exit_loop:
             try:
+                headers = {"Authorization": f"Bearer {self.aad_token}"}
                 if files is None:
-                    headers = {
-                        "Authorization": f"Bearer {self.aad_token}",
-                        "Content-Type": "application/json; charset=utf-8",
-                    }
-                    response = requests.request(method=method, url=url, headers=headers, json=body)
-                else:
-                    headers = {"Authorization": f"Bearer {self.aad_token}"}
-                    response = requests.request(method=method, url=url, headers=headers, files=files)
+                    headers["Content-Type"] = "application/json; charset=utf-8"
+                response = requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
 
