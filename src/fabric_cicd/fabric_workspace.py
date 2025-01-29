@@ -264,7 +264,6 @@ class FabricWorkspace:
             mapped_activities = (
                 mapped_activities if mapped_activities else {"RefreshDataflow": ["Dataflow", "dataflowId"]}
             )
-            print("MAPPED ACTIVITIES:", mapped_activities)
             # Use the dpath.util library to find and replace feature branch workspace IDs in all activities (including nested ones) in the dictionary
             for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
                 if value in mapped_activities:
@@ -279,12 +278,10 @@ class FabricWorkspace:
                         # Create a path to the item's logical ID and get the logical ID value
                         logical_id_path = (*path[:-1], "typeProperties", item_id_name)
                         logical_id = dpath.util.get(item_content_dict, logical_id_path)
-                        print("LOGICAL_ID:", logical_id)
                         # Convert the logical ID to a name to check if it exists in the repository
                         item_name = self._convert_id_to_name(
                             item_type=item_type, generic_id=logical_id, lookup_type="Repository"
                         )
-                        print("ITEM_NAME:", item_name)
                         # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
                         if item_name:
                             dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
