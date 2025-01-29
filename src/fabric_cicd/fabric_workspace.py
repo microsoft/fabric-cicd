@@ -274,6 +274,7 @@ class FabricWorkspace:
             # }
             print("MAPPED_ACTIVITIES:", mapped_activities)
             if mapped_activities:
+                print("Need to search for non-default feature branch workspace IDs")
                 # Use the dpath.util library to find and replace feature branch workspace IDs in all activities (including nested ones) in the dictionary
                 for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
                     if value in mapped_activities:
