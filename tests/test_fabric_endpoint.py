@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 from unittest.mock import Mock
 
 import pytest
@@ -10,7 +13,9 @@ def mock_requests(mocker):
     return mocker.patch("requests.request")
 
 
-def test__handle_response_200():
+def test_200():
+    """Initial call to an item api that returns a long running redirect"""
+
     response = Mock()
     response.status_code = 200
     response.headers = {"Content-Type": "application/json"}
@@ -40,7 +45,7 @@ def test__handle_response_200():
     assert long_running == orig_long_running
 
 
-def test_handle_response_202_long_running_redirect():
+def test_202_long_running_redirect():
     """Initial call to an item api that returns a long running redirect"""
     request_method = "POST"
     request_url = "https://example.com/"
@@ -74,7 +79,7 @@ def test_handle_response_202_long_running_redirect():
     assert long_running != old_long_running
 
 
-def test_handle_response_200_long_running_inprogess():
+def test_200_long_running_inprogess():
     """The first get call to long running with in progess state"""
     request_method = "GET"
     request_url = "https://example.com/operations/0000"
@@ -113,7 +118,7 @@ def test_handle_response_200_long_running_inprogess():
     assert long_running == old_long_running
 
 
-def test_handle_response_200_long_running_success():
+def test_200_long_running_success():
     """The first get call to long running with in progess state"""
     request_method = "GET"
     request_url = "https://example.com/operations/0000"
@@ -152,7 +157,7 @@ def test_handle_response_200_long_running_success():
     assert long_running == False
 
 
-def test_handle_response_200_long_running_success_withoutlocation():
+def test_200_long_running_success_withoutlocation():
     """The first get call to long running with in progess state"""
     request_method = "GET"
     request_url = "https://example.com/operations/0000"
@@ -187,7 +192,7 @@ def test_handle_response_200_long_running_success_withoutlocation():
     assert long_running == False
 
 
-def test_handle_response_200_long_running_fail():
+def test_200_long_running_fail():
     """The first get call to long running with in progess state"""
     request_method = "GET"
     request_url = "https://example.com/operations/0000"
@@ -204,25 +209,15 @@ def test_handle_response_200_long_running_fail():
     }
     response.json.return_value = {
         "status": "Failed",
-        "error": {"errorCode": "OperationFailed", "message": "Operation failed"},
+        "error": {"errorCode": "SampleErrorCode", "message": "Sample failure message"},
     }
 
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method=request_method,
-        url=request_url,
-        body=request_body,
-        long_running=old_long_running,
-        iteration_count=old_iteration_count,
-    )
-
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="[Operation failed].*"):
         _handle_response(
             response=response,
-            method="GET",
-            url="http://example.com",
-            body="{}",
-            long_running=True,
-            retry_after=60,
-            iteration_count=1,
+            method=request_method,
+            url=request_url,
+            body=request_body,
+            long_running=old_long_running,
+            iteration_count=old_iteration_count,
         )
