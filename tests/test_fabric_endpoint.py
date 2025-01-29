@@ -132,7 +132,6 @@ def test_200_long_running_success():
         "Content-Type": "application/json",
         "Location": "https://example.com/operations/0000/result",
         "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-        "Retry-After": 20,
     }
     response.json.return_value = {
         "status": "Succeeded",
@@ -170,7 +169,6 @@ def test_200_long_running_success_withoutlocation():
     response.headers = {
         "Content-Type": "application/json",
         "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-        "Retry-After": 20,
     }
     response.json.return_value = {
         "status": "Succeeded",
@@ -205,7 +203,6 @@ def test_200_long_running_fail():
     response.headers = {
         "Content-Type": "application/json",
         "x-ms-operation-id": "cfafbeb1-8037-4d0c-896e-a46fb27ff227",
-        "Retry-After": 20,
     }
     response.json.return_value = {
         "status": "Failed",
