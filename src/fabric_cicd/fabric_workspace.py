@@ -233,9 +233,8 @@ class FabricWorkspace:
 
     def _replace_workspace_ids(self, raw_file, item_type):
         """
-        Replaces feature branch workspace ID with target workspace ID found in the raw file content.
-        Handles the replacement of default feature branch workspace ID (i.e. 00000000-0000-0000-0000-000000000000)
-        and non-default values (actual guid of feature branch workspace which can be found in data pipeline activities).
+        Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
+        (actual workspace ID guid) values, with target workspace ID in the raw file content.
 
         :param raw_file: The raw file content where workspace IDs need to be replaced.
         :param item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
@@ -245,52 +244,58 @@ class FabricWorkspace:
         target_workspace_id = self.workspace_id
         default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
         target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
-        raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+
+        if default_workspace_string in raw_file:
+            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
 
         # For DataPipeline item, additional replacements may be required
         if item_type == "DataPipeline":
-            # Create a dictionary from the updated raw file
-            item_content_dict = json.loads(raw_file)
-            guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+            raw_file = self._replace_activity_workspace_ids(raw_file, target_workspace_id)
 
-            # Mapping of supported data pipeline activities that may reference non-default feature branch workspace ID
-            # Dictionary structure: {activity_name: [item_type, item_id_name]}
-            # Load supported activities from environment parameters and convert to the required structure
-            supported_activities = self.environment_parameter.get("supported_activities", {}).get("activities", [])
-            mapped_activities = {
-                activity["name"]: [activity["item_type"], activity["item_id_name"]] for activity in supported_activities
-            }
-            # If no activities are found in the parameter file, use default mapping
-            mapped_activities = (
-                mapped_activities if mapped_activities else {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-            )
-            # Use the dpath.util library to find and replace feature branch workspace IDs in all activities (including nested ones) in the dictionary
-            for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
-                if value in mapped_activities:
-                    # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
-                    path = path.split("/")
-                    workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
-                    workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
-
-                    # Check if the workspace ID is a valid GUID and is not the target workspace ID
-                    if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                        item_type, item_id_name = mapped_activities[value]
-                        # Create a path to the item's logical ID and get the logical ID value
-                        logical_id_path = (*path[:-1], "typeProperties", item_id_name)
-                        logical_id = dpath.util.get(item_content_dict, logical_id_path)
-                        # Convert the logical ID to a name to check if it exists in the repository
-                        item_name = self._convert_id_to_name(
-                            item_type=item_type, generic_id=logical_id, lookup_type="Repository"
-                        )
-                        # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
-                        if item_name:
-                            dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
-
-            # Convert the updated dict back to a JSON string
-            return json.dumps(item_content_dict, indent=2)
-
-        # For other item types, return the updated raw file
         return raw_file
+
+    def _replace_activity_workspace_ids(self, raw_file, target_workspace_id):
+        """
+        Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
+        with target workspace ID found in DataPipeline activities.
+        """
+        item_content_dict = json.loads(raw_file)
+        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+
+        # Load supported data pipeline activities from environment parameters
+        supported_activities = (
+            self.environment_parameter.get("datapipeline", {}).get("supported_activities", {}).get("activities", [])
+        )
+        mapped_activities = {
+            activity["name"]: [activity["item_type"], activity["item_id_name"]] for activity in supported_activities
+        }
+        # Set a default dictionary if no activities are passed in from the parameter file
+        mapped_activities = mapped_activities if mapped_activities else {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+
+        # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
+        for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
+            if value in mapped_activities:
+                # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
+                path = path.split("/")
+                workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
+                workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
+
+                # Check if the workspace ID is a valid GUID and is not the target workspace ID
+                if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
+                    item_type, item_id_name = mapped_activities[value]
+                    # Create a path to the item's logical ID and get the logical ID value
+                    logical_id_path = (*path[:-1], "typeProperties", item_id_name)
+                    logical_id = dpath.util.get(item_content_dict, logical_id_path)
+                    # Convert the logical ID to a name to check if it exists in the repository
+                    item_name = self._convert_id_to_name(
+                        item_type=item_type, generic_id=logical_id, lookup_type="Repository"
+                    )
+                    # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
+                    if item_name:
+                        dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
+
+        # Convert the updated dict back to a JSON string
+        return json.dumps(item_content_dict, indent=2)
 
     def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
