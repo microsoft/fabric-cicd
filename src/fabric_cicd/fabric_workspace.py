@@ -255,8 +255,17 @@ class FabricWorkspace:
 
             # Mapping of supported data pipeline activities that may reference non-default feature branch workspace ID
             # Dictionary structure: {activity_name: [item_type, item_id_name]}
-            mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+            # mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
 
+            # Load supported activities from environment parameters
+            supported_activities = self.environment_parameter.get("supported_activities", {})
+            print("SUPPORTED_ACTIVITIES:", supported_activities)
+            # Convert supported_activities to the required format
+            mapped_activities = {
+                activity: [details["item_type"], details["item_id_name"]]
+                for activity, details in supported_activities.items()
+            }
+            print("MAPPED_ACTIVITIES:", mapped_activities)
             # Use the dpath.util library to find and replace feature branch workspace IDs in all activities (including nested ones) in the dictionary
             for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
                 if value in mapped_activities:
