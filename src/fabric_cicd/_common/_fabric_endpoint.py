@@ -143,7 +143,6 @@ def _handle_response(response, method, url, body, long_running, iteration_count,
     ::param url: The URL used in the request.
     ::param body: The JSON body used in the request.
     ::param long_running: A boolean indicating if the operation is long-running.
-    ::param retry_after: The value of the Retry-After header from the response.
     ::param invoke_log_message: The formatted log message for the request.
     ::param iteration_count: The current iteration count of the loop.
     ::param kwargs: Additional keyword arguments to pass to the method.
