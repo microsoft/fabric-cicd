@@ -308,10 +308,11 @@ class FabricWorkspace:
                     activities_mapping = default_activities_mapping
                     break
                 
-                if not validate_item_type_in_scope(list(item_type), upn_auth=self.endpoint.upn_auth):
-                    logger.warning(f"Invalid item type: {item_type}")
-                    activities_mapping = default_activities_mapping
-                    break
+                validate_item_type_in_scope(list(item_type), upn_auth=self.endpoint.upn_auth)
+                #if not validate_item_type_in_scope(list(item_type), upn_auth=self.endpoint.upn_auth):
+                    #logger.warning(f"Invalid item type: {item_type}")
+                    #activities_mapping = default_activities_mapping
+                    #break
                 
                 activities_mapping[name] = [item_type, item_id_name]
                 
