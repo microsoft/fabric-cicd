@@ -283,8 +283,17 @@ class FabricWorkspace:
         
         default_activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
         
+        
+        # Check if all expected keys are present
+        if not all(key in self.environment_parameter for key in ["datapipeline", "activities", "activity_properties"]):
+            logger.warning("Missing required keys in the parameter file.")
+            activities_mapping = default_activities_mapping
+        else:
+            # Load data pipeline activities and their properties from environment parameters
+            activities = self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
+
         # Load data pipeline activities and their properties from environment parameters
-        activities = self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
+        #activities = self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
         print("activities:", activities)
         # Validate the input
         if not activities:
