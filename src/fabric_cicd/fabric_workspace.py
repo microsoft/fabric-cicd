@@ -291,31 +291,35 @@ class FabricWorkspace:
         else:
             # Load data pipeline activities and their properties from environment parameters
             activities = self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
+            print("activities:", activities)
+            # Validate the input
+            if not activities:
+                logger.warning("No data pipeline activities found in the parameter file.")
+                activities_mapping = default_activities_mapping
+            else:
+                activities_mapping = {}
+                for activity in activities:
+                    if not isinstance(activity, dict):
+                        logger.warning("Invalid activity format in the parameter file.")
+                        activities_mapping = default_activities_mapping
+                        break
+                    name = activity.get("name")
+                    item_type = activity.get("item_type")
+                    item_id_name = activity.get("item_id_name")
+                    print("name:", name)
+                    print("item_type:", item_type)
+                    print("item_id_name:", item_id_name)
+                    if not name or not item_type or not item_id_name:
+                        logger.warning("Missing required keys in activity properties.")
+                        activities_mapping = default_activities_mapping
+                        break
+                
+                    activities_mapping[name] = [item_type, item_id_name]
 
         # Load data pipeline activities and their properties from environment parameters
         #activities = self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
-        print("activities:", activities)
-        # Validate the input
-        if not activities:
-            logger.warning("No data pipeline activities found in the parameter file.")
-            activities_mapping = default_activities_mapping
-        else:
-            activities_mapping = {}
-            for activity in activities:
-                if not isinstance(activity, dict):
-                    logger.warning("Invalid activity format in the parameter file.")
-                    activities_mapping = default_activities_mapping
-                    break
-                name = activity.get("name")
-                item_type = activity.get("item_type")
-                item_id_name = activity.get("item_id_name")
-                print("name:", name)
-                print("item_type:", item_type)
-                print("item_id_name:", item_id_name)
-                if not name or not item_type or not item_id_name:
-                    logger.warning("Missing required keys in activity properties.")
-                    activities_mapping = default_activities_mapping
-                    break
+        
+        
                 
                 #validate_item_type_in_scope(list(item_type), upn_auth=self.endpoint.upn_auth)
                 #if not validate_item_type_in_scope(list(item_type), upn_auth=self.endpoint.upn_auth):
@@ -323,7 +327,7 @@ class FabricWorkspace:
                     #activities_mapping = default_activities_mapping
                     #break
                 
-                activities_mapping[name] = [item_type, item_id_name]
+                
                 
         print(activities_mapping)
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
