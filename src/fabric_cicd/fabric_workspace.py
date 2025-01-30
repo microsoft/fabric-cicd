@@ -266,17 +266,23 @@ class FabricWorkspace:
         activities = (
             self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
         )
-        print("activities:", activities)
-        mapped_activities = {
+        # Construct an activities mapping dictionary with format: {activity_name: [item_type, item_id_name]}
+        activities_mapping = {
             activity["name"]: [activity["item_type"], activity["item_id_name"]] for activity in activities
         } 
-        # Use the default dictionary if no parameters are passed in
-        default_mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-        mapped_activities = mapped_activities if mapped_activities else default_mapped_activities
-        print("mapped_activities:", mapped_activities)
+        # Use a dictionary with default values if no parameters were successfully passed in
+        default_activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+        #activities_mapping = activities_mapping if activities_mapping else default_activities_mapping
+        if activities_mapping:
+            activities_mapping = activities_mapping
+        else:
+            logger.warning("No parameters were passed in or parameters were incorrectly passed in. Using default activities mapping.")
+            activities_mapping = default_activities_mapping
+            
+        print("mapped_activities:", activities_mapping)
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
-            if value in mapped_activities:
+            if value in activities_mapping:
                 # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
                 path = path.split("/")
                 workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
@@ -284,7 +290,7 @@ class FabricWorkspace:
 
                 # Check if the workspace ID is a valid GUID and is not the target workspace ID
                 if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                    item_type, item_id_name = mapped_activities[value]
+                    item_type, item_id_name = activities_mapping[value]
                     # Create a path to the item's logical ID and get the logical ID value
                     logical_id_path = (*path[:-1], "typeProperties", item_id_name)
                     logical_id = dpath.util.get(item_content_dict, logical_id_path)
