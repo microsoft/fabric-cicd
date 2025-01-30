@@ -268,8 +268,7 @@ class FabricWorkspace:
         )
         print("activities:", activities)
         mapped_activities = {
-            for activity in activities:
-                mapped_activities[activity["name"]] = [activity["item_type"], activity["item_id_name"]]
+            activity["name"]: [activity["item_type"], activity["item_id_name"]] for activity in activities
         } 
         # Use the default dictionary if no parameters are passed in
         default_mapped_activities = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
