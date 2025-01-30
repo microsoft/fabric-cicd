@@ -6,6 +6,7 @@
 import logging
 import sys
 
+from fabric_cicd._common._check_version import check_version
 from fabric_cicd._common._logging import configure_logger, exception_handler
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import publish_all_items, unpublish_all_orphan_items
@@ -45,6 +46,8 @@ def change_log_level(level: str = "DEBUG") -> None:
 
 configure_logger()
 sys.excepthook = exception_handler
+
+check_version()
 
 __all__ = [
     "FabricWorkspace",
