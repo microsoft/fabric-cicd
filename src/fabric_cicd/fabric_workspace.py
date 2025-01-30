@@ -292,7 +292,7 @@ class FabricWorkspace:
                     item_name = self._convert_id_to_name(
                         item_type=item_type, generic_id=logical_id, lookup_type="Repository"
                     )
-                    prit("item_name:", item_name)
+                    print("item_name:", item_name)
                     # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
                     if item_name:
                         dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
