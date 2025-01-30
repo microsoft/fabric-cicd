@@ -27,3 +27,31 @@ class InvokeError(BaseCustomError):
 
 class ItemDependencyError(BaseCustomError):
     pass
+
+
+class UnhandledInvokeError(BaseCustomError):
+    pass
+
+
+class UnsupportedPrincipalTypeError(BaseCustomError):
+    pass
+
+
+class EnvironmentLibrariesNotFoundError(BaseCustomError):
+    pass
+
+
+class UnsupportedItemTypeError(BaseCustomError):
+    pass
+
+
+class LongRunningOperationError(BaseCustomError):
+    pass
+
+
+class EnvironmentValidationError(BaseCustomError):
+    pass
+
+
+class ExceededMaxRetryError(BaseCustomError):
+    pass
