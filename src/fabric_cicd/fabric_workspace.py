@@ -263,23 +263,59 @@ class FabricWorkspace:
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
         
         # Load data pipeline activities and their properties from environment parameters
-        activities = (
-            self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
-        )
+        #activities = (
+        #    self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
+        #)
         # Construct an activities mapping dictionary with format: {activity_name: [item_type, item_id_name]}
-        activities_mapping = {
-            activity["name"]: [activity["item_type"], activity["item_id_name"]] for activity in activities
-        } 
+        #activities_mapping = {
+        #    activity["name"]: [activity["item_type"], activity["item_id_name"]] for activity in activities
+        #} 
         # Use a dictionary with default values if no parameters were successfully passed in
-        default_activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+        #default_activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
         #activities_mapping = activities_mapping if activities_mapping else default_activities_mapping
-        if activities_mapping:
-            activities_mapping = activities_mapping
-        else:
-            logger.warning("No parameters were passed in or parameters were incorrectly passed in. Using default activities mapping.")
-            activities_mapping = default_activities_mapping
+        #if activities_mapping:
+        #    activities_mapping = activities_mapping
+        #else:
+        #    logger.warning("No parameters were passed in or parameters were incorrectly passed in. Using default activities mapping.")
+        #    activities_mapping = default_activities_mapping
             
-        print("mapped_activities:", activities_mapping)
+        #print("mapped_activities:", activities_mapping)
+        
+        default_activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+        
+        # Load data pipeline activities and their properties from environment parameters
+        activities = self.environment_parameter.get("datapipeline", {}).get("activities", {}).get("activity_properties", [])
+        print("activities:", activities)
+        # Validate the input
+        if not activities:
+            logger.warning("No data pipeline activities found in the parameter file.")
+            activities_mapping = default_activities_mapping
+        else:
+            activities_mapping = {}
+            for activity in activities:
+                if not isinstance(activity, dict):
+                    logger.warning("Invalid activity format in the parameter file.")
+                    activities_mapping = default_activities_mapping
+                    break
+                name = activity.get("name")
+                item_type = activity.get("item_type")
+                item_id_name = activity.get("item_id_name")
+                print("name:", name)
+                print("item_type:", item_type)
+                print("item_id_name:", item_id_name)
+                if not name or not item_type or not item_id_name:
+                    logger.warning("Missing required keys in activity properties.")
+                    activities_mapping = default_activities_mapping
+                    break
+                
+                if not self._validate_item_in_scope(item_type, upn_auth=self.endpoint.upn_auth):
+                    logger.warning(f"Invalid item type: {item_type}")
+                    activities_mapping = default_activities_mapping
+                    break
+                
+                activities_mapping[name] = [item_type, item_id_name]
+                
+        print(activities_mapping)
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
             if value in activities_mapping:
