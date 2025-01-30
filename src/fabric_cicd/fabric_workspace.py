@@ -313,10 +313,10 @@ class FabricWorkspace:
                         activities_mapping = default_activities_mapping
                         break
 
-                    if not self._validate_item_in_scope(item_type):
-                        logger.warning(f"Invalid item type: {item_type}")
-                        activities_mapping = default_activities_mapping
-                        break
+                    #if not self._validate_item_in_scope(item_type):
+                    #    logger.warning(f"Invalid item type: {item_type}")
+                    #    activities_mapping = default_activities_mapping
+                    #    break
 
                     activities_mapping[name] = [item_type, item_id_name]
                
