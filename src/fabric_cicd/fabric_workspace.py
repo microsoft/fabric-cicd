@@ -246,6 +246,7 @@ class FabricWorkspace:
         target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
 
         if default_workspace_string in raw_file:
+            print("true")
             raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
 
         # For DataPipeline item, additional replacements may be required
