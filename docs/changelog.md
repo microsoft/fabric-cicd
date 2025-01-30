@@ -8,7 +8,7 @@ The following contains all major, minor, and patch version release notes.
 
 -   Onboard PyTest framework
 -   Update documentation & examples
--   Add PyPI check version to encourage version bumps
+-   Resolves [#75](https://github.com/microsoft/fabric-cicd/issues/75) - Add PyPI check version to encourage version bumps
 -   Fixes [#61](https://github.com/microsoft/fabric-cicd/issues/61) - Semantic model initial publish results in None Url error
 -   Fixes [#63](https://github.com/microsoft/fabric-cicd/issues/63) - Integer parsed as float faliing in handle_retry for <3.12 python
 
