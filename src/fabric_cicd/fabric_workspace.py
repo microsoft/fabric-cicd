@@ -271,7 +271,7 @@ class FabricWorkspace:
         }
         # Set a default dictionary if no activities are passed in from the parameter file
         mapped_activities = mapped_activities if mapped_activities else {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-
+        print("Mapping dict:", mapped_activities)
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
             if value in mapped_activities:
@@ -290,6 +290,7 @@ class FabricWorkspace:
                     item_name = self._convert_id_to_name(
                         item_type=item_type, generic_id=logical_id, lookup_type="Repository"
                     )
+                    print("Item name:", item_name)
                     # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
                     if item_name:
                         dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
