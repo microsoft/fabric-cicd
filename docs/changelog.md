@@ -11,7 +11,7 @@ The following contains all major, minor, and patch version release notes.
 -   Fixes [#77](https://github.com/microsoft/fabric-cicd/issues/77) - Items in subfolders are skipped
 -   Fixes [#76](https://github.com/microsoft/fabric-cicd/issues/76) - Default item types fail to unpublish
 -   Fixes [#61](https://github.com/microsoft/fabric-cicd/issues/61) - Semantic model initial publish results in None Url error
--   Fixes [#63](https://github.com/microsoft/fabric-cicd/issues/63) - Integer parsed as float faliing in handle_retry for <3.12 python
+-   Fixes [#63](https://github.com/microsoft/fabric-cicd/issues/63) - Integer parsed as float failing in handle_retry for <3.12 python
 
 ## Version 0.1.2
 
