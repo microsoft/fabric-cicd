@@ -132,12 +132,14 @@ class FabricWorkspace:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
 
-        for directory in os.scandir(self.repository_directory):
-            if directory.is_dir():
-                item_metadata_path = Path(directory.path, ".platform")
+        for root, _dirs, files in os.walk(self.repository_directory):
+            directory = Path(root)
+            # valid item directory with .platform file within
+            if ".platform" in files:
+                item_metadata_path = Path(directory, ".platform")
 
                 # Print a warning and skip directory if empty
-                if not os.listdir(directory.path):
+                if not os.listdir(directory):
                     logger.warning(f"Directory {directory.name} is empty.")
                     continue
 
@@ -169,7 +171,7 @@ class FabricWorkspace:
                 # Add the item to the repository_items dictionary
                 self.repository_items[item_type][item_name] = {
                     "description": item_description,
-                    "path": directory.path,
+                    "path": str(directory),
                     "guid": item_guid,
                     "logical_id": item_logical_id,
                 }
