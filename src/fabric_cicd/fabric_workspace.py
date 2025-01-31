@@ -451,6 +451,8 @@ class FabricWorkspace:
 
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
-        self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
-
-        logger.info("Unpublished")
+        try:
+            self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
+            logger.info("Unpublished")
+        except Exception as e:
+            logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
