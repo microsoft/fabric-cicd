@@ -250,6 +250,7 @@ source = { editable = "." }
 dependencies = [
     { name = "azure-identity" },
     { name = "colorlog" },
+    { name = "packaging" },
     { name = "pyyaml" },
     { name = "requests" },
 ]
@@ -267,6 +268,7 @@ dev = [
 requires-dist = [
     { name = "azure-identity", specifier = ">=1.19.0" },
     { name = "colorlog", specifier = ">=6.9.0" },
+    { name = "packaging", specifier = ">=24.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.3" },
 ]
