@@ -312,6 +312,7 @@ class FabricWorkspace:
 
         for item_name, item_details in lookup_dict[item_type].items():
             print("item name in convert function:", item_name)
+            print("followed by item details:", item_details)
             if item_details.get(lookup_key) == generic_id:
                 return item_name
         # if not found
