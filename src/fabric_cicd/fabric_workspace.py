@@ -285,11 +285,11 @@ class FabricWorkspace:
                     print("item_id_path", item_id_path)
                     item_id = dpath.util.get(item_content_dict, item_id_path)
                     print("item_id", item_id)
-                    lookup_type = "Deployed" if item_type == "SemanticModel" else "Repository"
+                    #lookup_type = "Deployed" if item_type == "SemanticModel" else "Repository"
                     print(lookup_type)
                     # Convert the item ID to a name to check if it exists in the repository
                     item_name = self._convert_id_to_name(
-                        item_type=item_type, generic_id=item_id, lookup_type=lookup_type
+                        item_type=item_type, generic_id=item_id, lookup_type="Repository"
                     )
                     print(item_name)
                     # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
