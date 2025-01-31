@@ -311,6 +311,7 @@ class FabricWorkspace:
         lookup_key = "logical_id" if lookup_type == "Repository" else "guid"
 
         for item_name, item_details in lookup_dict[item_type].items():
+            print("item name in convert function:", item_name)
             if item_details.get(lookup_key) == generic_id:
                 return item_name
         # if not found
