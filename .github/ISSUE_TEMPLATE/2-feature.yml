@@ -10,26 +10,10 @@ body:
     - type: textarea
       id: problem-description
       attributes:
-          label: What is the problem?
-          description: Describe what the gap is.
+          label: What is the feature?
+          description: Describe what the gap is and the ideal solution.
       validations:
           required: true
-
-    - type: textarea
-      id: solution-description
-      attributes:
-          label: What is the solution?
-          description: Describe the solution you'd like
-      validations:
-          required: true
-
-    - type: textarea
-      id: alternatives-considered
-      attributes:
-          label: What alternatives have you considered?
-          description: Describe alternatives you've considered
-      validations:
-          required: false
 
     - type: textarea
       id: additional-context

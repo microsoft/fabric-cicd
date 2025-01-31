@@ -10,8 +10,8 @@ body:
     - type: input
       id: documentation-location
       attributes:
-          label: Location
-          description: What part of the documentation does this feedback pertain to?  Provide a URL where applicable.
+          label: URL to documentation
+          description: Provide a URL to the documentation location.
       validations:
           required: true
 
@@ -19,15 +19,7 @@ body:
       id: feedback
       attributes:
           label: Feedback
-          description: What is your feedback?
-      validations:
-          required: true
-
-    - type: textarea
-      id: improvements
-      attributes:
-          label: Suggested Improvements
-          description: What improvements would you suggest?
+          description: What is the feedback?
       validations:
           required: true
 

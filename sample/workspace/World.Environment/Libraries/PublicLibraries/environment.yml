@@ -1,0 +1,4 @@
+dependencies:
+  - pip:
+      - fuzzywuzzy==0.18.0
+      - python-levenshtein==0.26.0
