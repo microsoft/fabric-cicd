@@ -263,35 +263,25 @@ class FabricWorkspace:
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
         
         # Activities mapping dictionary
-        activities_mapping = {
-            "RefreshDataflow": ["Dataflow", "dataflowId", "workspaceId"], 
-            "PBISemanticModelRefresh": ["SemanticModel", "datasetId", "groupId"]
-        }      
+        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}      
         
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
             if value in activities_mapping:
-                item_type, item_id_name, workspace_id_property = activities_mapping[value]
                 # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
                 path = path.split("/")
-                workspace_id_path = (*path[:-1], "typeProperties", workspace_id_property)
-                print("workspace_id_path", workspace_id_path)
+                workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
                 workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
-                print("workspace_id", workspace_id)
                 # Check if the workspace ID is a valid GUID and is not the target workspace ID
                 if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
+                    item_type, item_id_name = activities_mapping[value]
                     # Create a path to the item's ID and get the item ID value
                     item_id_path = (*path[:-1], "typeProperties", item_id_name)
-                    print("item_id_path", item_id_path)
                     item_id = dpath.util.get(item_content_dict, item_id_path)
-                    print("item_id", item_id)
-                    #lookup_type = "Deployed" if item_type == "SemanticModel" else "Repository"
-                    #print(lookup_type)
                     # Convert the item ID to a name to check if it exists in the repository
                     item_name = self._convert_id_to_name(
                         item_type=item_type, generic_id=item_id, lookup_type="Repository"
                     )
-                    print(item_name)
                     # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
                     if item_name:
                         dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
@@ -311,8 +301,6 @@ class FabricWorkspace:
         lookup_key = "logical_id" if lookup_type == "Repository" else "guid"
 
         for item_name, item_details in lookup_dict[item_type].items():
-            print("item name in convert function:", item_name)
-            print("followed by item details:", item_details)
             if item_details.get(lookup_key) == generic_id:
                 return item_name
         # if not found
