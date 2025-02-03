@@ -266,10 +266,7 @@ class FabricWorkspace:
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-        activities_mapping = {
-            "RefreshDataflow": ["Dataflow", "dataflowId"],
-            "InvokePipeline": ["DataPipeline", "pipelineId"],
-        }
+        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
 
         # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
@@ -278,19 +275,17 @@ class FabricWorkspace:
                 path = path.split("/")
                 workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
                 workspace_id = dpath.get(item_content_dict, workspace_id_path)
-                print("workspace_id", workspace_id)
+
                 # Check if the workspace ID is a valid GUID and is not the target workspace ID
                 if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
                     item_type, item_id_name = activities_mapping[activity_value]
                     # Create a path to the item's ID and get the item ID value
                     item_id_path = (*path[:-1], "typeProperties", item_id_name)
                     item_id = dpath.get(item_content_dict, item_id_path)
-                    print("item_id", item_id)
                     # Convert the item ID to a name to check if it exists in the repository
                     item_name = self._convert_id_to_name(
                         item_type=item_type, generic_id=item_id, lookup_type="Repository"
                     )
-                    print("item_name", item_name)
                     # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
                     if item_name:
                         dpath.set(item_content_dict, workspace_id_path, target_workspace_id)
