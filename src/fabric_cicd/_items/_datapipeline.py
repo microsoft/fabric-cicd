@@ -173,7 +173,6 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
 
     for _key, value in dpath.search(item_content_dict, "**", yielded=True):
         if isinstance(value, str):
-            print("value", value)
             match = guid_pattern.search(value)
             if match:
                 print("match", match)
