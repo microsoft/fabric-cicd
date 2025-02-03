@@ -171,12 +171,12 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
     reference_list = []
     guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
-    for _key, value in dpath.search(item_content_dict, "**/activities", yielded=True):
+    for _key, value in dpath.search(item_content_dict, "**", yielded=True):
         if isinstance(value, str):
             print("value", value)
             match = guid_pattern.search(value)
-            print("match", match)
             if match:
+                print("match", match)
                 # If a valid GUID is found, convert it to name. If name is not None, it's a pipeline and will be added to the reference list
                 referenced_id = match.group(0)
                 print("referenced_id", referenced_id)
