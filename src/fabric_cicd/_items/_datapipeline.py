@@ -171,7 +171,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
     reference_list = []
     guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
-    for _key, value in dpath.search(item_content_dict, "**/type", yielded=True):
+    for _key, value in dpath.search(item_content_dict, "**/activities", yielded=True):
         if isinstance(value, str):
             print("value", value)
             match = guid_pattern.search(value)
