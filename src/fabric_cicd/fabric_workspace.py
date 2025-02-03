@@ -261,22 +261,23 @@ class FabricWorkspace:
         Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
         with target workspace ID found in DataPipeline activities.
         """
+        # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
         
-        # Activities mapping dictionary
+        # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
         activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}      
         
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
-        for path, value in dpath.util.search(item_content_dict, "**/type", yielded=True):
-            if value in activities_mapping:
+        for path, activity_value in dpath.util.search(item_content_dict, "**/type", yielded=True):
+            if activity_value in activities_mapping:
                 # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
                 path = path.split("/")
                 workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
                 workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
                 # Check if the workspace ID is a valid GUID and is not the target workspace ID
                 if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                    item_type, item_id_name = activities_mapping[value]
+                    item_type, item_id_name = activities_mapping[activity_value]
                     # Create a path to the item's ID and get the item ID value
                     item_id_path = (*path[:-1], "typeProperties", item_id_name)
                     item_id = dpath.util.get(item_content_dict, item_id_path)
