@@ -52,5 +52,6 @@
     "prettier": {
         "tabWidth": 4,
         "useTabs": false
-    }
+    },
+    "python.terminal.activateEnvironment": false
 }
