@@ -264,10 +264,10 @@ class FabricWorkspace:
         # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
-        
+
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}      
-        
+        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+
         # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, activity_value in dpath.util.search(item_content_dict, "**/type", yielded=True):
             if activity_value in activities_mapping:
@@ -275,6 +275,7 @@ class FabricWorkspace:
                 path = path.split("/")
                 workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
                 workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
+
                 # Check if the workspace ID is a valid GUID and is not the target workspace ID
                 if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
                     item_type, item_id_name = activities_mapping[activity_value]
@@ -291,7 +292,7 @@ class FabricWorkspace:
 
         # Convert the updated dict back to a JSON string
         return json.dumps(item_content_dict, indent=2)
-    
+
     def _convert_id_to_name(self, item_type, generic_id, lookup_type):
         """
         For a given item_type and id, returns the item name.  Special handling for both deployed and repository items
