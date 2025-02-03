@@ -7,8 +7,10 @@ import base64
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
+import dpath.util
 import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
@@ -231,55 +233,62 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_activity_workspace_ids(self, raw_file, lookup_type):
+    def _replace_workspace_ids(self, raw_file, item_type):
         """
-        Replaces feature branch workspace ID referenced in data pipeline activities with target workspace ID
-        in the raw file content.
+        Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
+        (actual workspace ID guid) values, with target workspace ID in the raw file content.
 
         :param raw_file: The raw file content where workspace IDs need to be replaced.
+        :param item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
         :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
         """
-        # Create a dictionary from the raw_file
+        # Replace all instances of default feature branch workspace ID with target workspace ID
+        target_workspace_id = self.workspace_id
+        default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
+        target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
+
+        if default_workspace_string in raw_file:
+            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+
+        # For DataPipeline item, additional replacements may be required
+        if item_type == "DataPipeline":
+            raw_file = self._replace_activity_workspace_ids(raw_file, target_workspace_id)
+
+        return raw_file
+
+    def _replace_activity_workspace_ids(self, raw_file, target_workspace_id):
+        """
+        Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
+        with target workspace ID found in DataPipeline activities.
+        """
+        # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
+        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
-        def _find_and_replace_activity_workspace_ids(input_object):
-            """
-            Recursively scans through JSON to find and replace feature branch workspace IDs in nested and
-            non-nested activities where workspaceId
-            property exists (e.g. Trident Notebook). Note: the function can be modified to process other pipeline
-            activities where workspaceId exists.
+        # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
+        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
 
-            :param input_object: Object can be a dictionary or list present in the input JSON.
-            """
-            # Check if the current object is a dictionary
-            if isinstance(input_object, dict):
-                target_workspace_id = self.workspace_id
+        # dpath.util library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
+        for path, activity_value in dpath.util.search(item_content_dict, "**/type", yielded=True):
+            if activity_value in activities_mapping:
+                # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
+                path = path.split("/")
+                workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
+                workspace_id = dpath.util.get(item_content_dict, workspace_id_path)
 
-                # Iterate through the activities and search for TridentNotebook activities
-                for key, value in input_object.items():
-                    if key == "type" and value == "TridentNotebook":
-                        # Convert the notebook ID to its name
-                        item_type = "Notebook"
-                        referenced_id = input_object["typeProperties"]["notebookId"]
-                        referenced_name = self._convert_id_to_name(
-                            item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
-                        )
-                        # Replace workspace ID with target workspace ID if the referenced notebook exists in the repo
-                        if referenced_name:
-                            input_object["typeProperties"]["workspaceId"] = target_workspace_id
-
-                    # Recursively search in the value
-                    else:
-                        _find_and_replace_activity_workspace_ids(value)
-
-            # Check if the current object is a list
-            elif isinstance(input_object, list):
-                # Recursively search in each item
-                for item in input_object:
-                    _find_and_replace_activity_workspace_ids(item)
-
-        # Start the recursive search and replace from the root of the JSON data
-        _find_and_replace_activity_workspace_ids(item_content_dict)
+                # Check if the workspace ID is a valid GUID and is not the target workspace ID
+                if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
+                    item_type, item_id_name = activities_mapping[activity_value]
+                    # Create a path to the item's ID and get the item ID value
+                    item_id_path = (*path[:-1], "typeProperties", item_id_name)
+                    item_id = dpath.util.get(item_content_dict, item_id_path)
+                    # Convert the item ID to a name to check if it exists in the repository
+                    item_name = self._convert_id_to_name(
+                        item_type=item_type, generic_id=item_id, lookup_type="Repository"
+                    )
+                    # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
+                    if item_name:
+                        dpath.util.set(item_content_dict, workspace_id_path, target_workspace_id)
 
         # Convert the updated dict back to a JSON string
         return json.dumps(item_content_dict, indent=2)
@@ -351,15 +360,9 @@ class FabricWorkspace:
                         with Path.open(full_path, encoding="utf-8") as f:
                             raw_file = f.read()
 
-                        # Replace feature branch workspace IDs with target workspace IDs in data pipeline activities.
-                        if item_type == "DataPipeline":
-                            raw_file = self._replace_activity_workspace_ids(raw_file, "Repository")
-
-                        # Replace default workspace id with target workspace id
-                        if item_type == "Notebook":
-                            default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-                            target_workspace_string = f'"workspaceId": "{self.workspace_id}"'
-                            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+                        # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
+                        if item_type in ["DataPipeline", "Notebook"]:
+                            raw_file = self._replace_workspace_ids(raw_file, item_type)
 
                         # Replace connections in report
                         if item_type == "Report" and Path(file).name == "definition.pbir":
