@@ -83,11 +83,7 @@ def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_ch
         response_state = fabric_workspace_obj.endpoint.invoke(
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/"
         )
-        print("response_state", response_state)
-        # current_state = response_state["body"].get("properties", {}).get("publishDetails", {}).get("state", "").lower()
-        # print("current_state", current_state)
         current_state = dpath.get(response_state, "body/properties/publishDetails/state", default="").lower()
-        print("current_state_dpath", current_state)
 
         if initial_check:
             prepend_message = "Existing Environment publish is in progess."
