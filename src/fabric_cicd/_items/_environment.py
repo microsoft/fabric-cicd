@@ -123,9 +123,7 @@ def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_ch
             },
             "status_code": 200,
         }
-        current_state_dpath = dpath.get(
-            test_response, "body/properties/publishDetails/state", default="No state provided"
-        ).lower()
+        current_state_dpath = dpath.get(test_response, "body/properties/publishDetails/state", default="").lower()
         print("current_state_dpath", current_state_dpath)
 
         if initial_check:
