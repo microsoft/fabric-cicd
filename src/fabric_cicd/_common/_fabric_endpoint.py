@@ -43,134 +43,29 @@ class FabricEndpoint:
 
         while not exit_loop:
             try:
+                headers = {"Authorization": f"Bearer {self.aad_token}"}
                 if files is None:
-                    headers = {
-                        "Authorization": f"Bearer {self.aad_token}",
-                        "Content-Type": "application/json; charset=utf-8",
-                    }
-                    response = requests.request(method=method, url=url, headers=headers, json=body)
-                else:
-                    headers = {"Authorization": f"Bearer {self.aad_token}"}
-                    response = requests.request(method=method, url=url, headers=headers, files=files)
+                    headers["Content-Type"] = "application/json; charset=utf-8"
+                response = requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
 
-                retry_after = response.headers.get("Retry-After", 60)
                 invoke_log_message = _format_invoke_log(response, method, url, body)
 
-                # Handle long-running operations
-                # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
-                if (response.status_code == 200 and long_running) or response.status_code == 202:
-                    url = response.headers.get("Location")
-                    method = "GET"
-                    body = "{}"
-                    response_json = response.json()
-
-                    if long_running:
-                        status = response_json.get("status")
-                        if status == "Succeeded":
-                            long_running = False
-                            # If location not included in operation success call, no body is expected to be returned
-                            exit_loop = url is None
-
-                        elif status == "Failed":
-                            response_error = response_json["error"]
-                            msg = (
-                                f"Operation failed. Error Code: {response_error['errorCode']}. "
-                                f"Error Message: {response_error['message']}"
-                            )
-                            raise Exception(msg)
-                        elif status == "Undefined":
-                            msg = f"Operation is in an undefined state. Full Body: {response_json}"
-                            raise Exception(msg)
-                        else:
-                            handle_retry(
-                                attempt=iteration_count - 1,
-                                base_delay=0.5,
-                                response_retry_after=retry_after,
-                                max_retries=kwargs.get("max_retries", 5),
-                                prepend_message="Operation in progress.",
-                            )
-                    else:
-                        time.sleep(1)
-                        long_running = True
-
-                # Handle successful responses
-                elif response.status_code in {200, 201} or (
-                    # Valid response for environmentlibrariesnotfound
-                    response.status_code == 404
-                    and response.headers.get("x-ms-public-api-error-code") == "EnvironmentLibrariesNotFound"
-                ):
-                    exit_loop = True
-
-                # Handle API throttling
-                elif response.status_code == 429:
-                    handle_retry(
-                        attempt=iteration_count,
-                        base_delay=10,
-                        max_retries=5,
-                        response_retry_after=retry_after,
-                        prepend_message="API is throttled.",
-                    )
-
                 # Handle expired authentication token
-                elif (
-                    response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired"
-                ):
+                if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
                     logger.info("AAD token expired. Refreshing token.")
                     self._refresh_token()
-
-                # Handle unauthorized access
-                elif (
-                    response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized"
-                ):
-                    msg = f"The executing identity is not authorized to call {method} on '{url}'."
-                    raise Exception(msg)
-
-                # Handle item name conflicts
-                elif (
-                    response.status_code == 400
-                    and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
-                ):
-                    handle_retry(
-                        attempt=iteration_count,
-                        base_delay=2.5,
-                        max_retries=5,
-                        prepend_message="Item name is reserved. ",
-                    )
-
-                # Handle scenario where library removed from environment before being removed from repo
-                elif response.status_code == 400 and "is not present in the environment." in response.json().get(
-                    "message", "No message provided"
-                ):
-                    msg = (
-                        f"Deployment attempted to remove a library that is not present in the environment. "
-                        f"Description: {response.json().get('message')}"
-                    )
-                    raise Exception(msg)
-
-                # Handle unsupported principal type
-                elif (
-                    response.status_code == 400
-                    and response.headers.get("x-ms-public-api-error-code") == "PrincipalTypeNotSupported"
-                ):
-                    msg = f"The executing principal type is not supported to call {method} on '{url}'."
-                    raise Exception(msg)
-
-                # Handle unsupported item types
-                elif response.status_code == 403 and response.reason == "FeatureNotAvailable":
-                    msg = f"Item type not supported. Description: {response.reason}"
-                    raise Exception(msg)
-
-                # Handle unexpected errors
                 else:
-                    err_msg = (
-                        f" Message: {response.json()['message']}"
-                        if "application/json" in (response.headers.get("Content-Type") or "")
-                        else ""
+                    exit_loop, method, url, body, long_running = _handle_response(
+                        response,
+                        method,
+                        url,
+                        body,
+                        long_running,
+                        iteration_count,
+                        **kwargs,
                     )
-                    msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
-                    raise Exception(msg)
 
                 # Log if reached to end of loop iteration
                 if logger.isEnabledFor(logging.DEBUG):
@@ -230,6 +125,132 @@ class FabricEndpoint:
             except Exception as e:
                 msg = f"An unexpected error occurred while decoding the credential token. {e}"
                 raise TokenError(msg, logger) from e
+
+
+def _handle_response(response, method, url, body, long_running, iteration_count, **kwargs):
+    """
+    Handles the response from an HTTP request, including retries, throttling, and token expiration.
+    Technical debt: this method needs to be refactored to be more testable and requires less paramters.
+    Initial approach is only temporary to support testing, but only temporary.
+
+    ::param response: The response object from the HTTP request.
+    ::param method: The HTTP method used in the request.
+    ::param url: The URL used in the request.
+    ::param body: The JSON body used in the request.
+    ::param long_running: A boolean indicating if the operation is long-running.
+    ::param invoke_log_message: The formatted log message for the request.
+    ::param iteration_count: The current iteration count of the loop.
+    ::param kwargs: Additional keyword arguments to pass to the method.
+    """
+    exit_loop = False
+    retry_after = response.headers.get("Retry-After", 60)
+
+    # Handle long-running operations
+    # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
+    if (response.status_code == 200 and long_running) or response.status_code == 202:
+        url = response.headers.get("Location")
+        method = "GET"
+        body = "{}"
+        response_json = response.json()
+
+        if long_running:
+            status = response_json.get("status")
+            if status == "Succeeded":
+                long_running = False
+                # If location not included in operation success call, no body is expected to be returned
+                exit_loop = url is None
+
+            elif status == "Failed":
+                response_error = response_json["error"]
+                msg = (
+                    f"Operation failed. Error Code: {response_error['errorCode']}. "
+                    f"Error Message: {response_error['message']}"
+                )
+                raise Exception(msg)
+            elif status == "Undefined":
+                msg = f"Operation is in an undefined state. Full Body: {response_json}"
+                raise Exception(msg)
+            else:
+                handle_retry(
+                    attempt=iteration_count - 1,
+                    base_delay=0.5,
+                    response_retry_after=retry_after,
+                    max_retries=kwargs.get("max_retries", 5),
+                    prepend_message="Operation in progress.",
+                )
+        else:
+            time.sleep(1)
+            long_running = True
+
+    # Handle successful responses
+    elif response.status_code in {200, 201} or (
+        # Valid response for environmentlibrariesnotfound
+        response.status_code == 404
+        and response.headers.get("x-ms-public-api-error-code") == "EnvironmentLibrariesNotFound"
+    ):
+        exit_loop = True
+
+    # Handle API throttling
+    elif response.status_code == 429:
+        handle_retry(
+            attempt=iteration_count,
+            base_delay=10,
+            max_retries=5,
+            response_retry_after=retry_after,
+            prepend_message="API is throttled.",
+        )
+
+    # Handle unauthorized access
+    elif response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized":
+        msg = f"The executing identity is not authorized to call {method} on '{url}'."
+        raise Exception(msg)
+
+    # Handle item name conflicts
+    elif (
+        response.status_code == 400
+        and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
+    ):
+        handle_retry(
+            attempt=iteration_count,
+            base_delay=2.5,
+            max_retries=5,
+            prepend_message="Item name is reserved. ",
+        )
+
+    # Handle scenario where library removed from environment before being removed from repo
+    elif response.status_code == 400 and "is not present in the environment." in response.json().get(
+        "message", "No message provided"
+    ):
+        msg = (
+            f"Deployment attempted to remove a library that is not present in the environment. "
+            f"Description: {response.json().get('message')}"
+        )
+        raise Exception(msg)
+
+    # Handle unsupported principal type
+    elif (
+        response.status_code == 400
+        and response.headers.get("x-ms-public-api-error-code") == "PrincipalTypeNotSupported"
+    ):
+        msg = f"The executing principal type is not supported to call {method} on '{url}'."
+        raise Exception(msg)
+
+    # Handle unsupported item types
+    elif response.status_code == 403 and response.reason == "FeatureNotAvailable":
+        msg = f"Item type not supported. Description: {response.reason}"
+        raise Exception(msg)
+
+    # Handle unexpected errors
+    else:
+        err_msg = (
+            f" Message: {response.json()['message']}"
+            if "application/json" in (response.headers.get("Content-Type") or "")
+            else ""
+        )
+        msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
+        raise Exception(msg)
+
+    return exit_loop, method, url, body, long_running
 
 
 def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prepend_message=""):
