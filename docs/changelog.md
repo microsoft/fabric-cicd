@@ -2,6 +2,13 @@
 
 The following contains all major, minor, and patch version release notes.
 
+## Version 0.1.4
+
+<span class="md-h2-subheader">Release Date: 2025-02-05</span>
+
+-   Workspace ID replacement improved
+-   Increased error handling in activate script
+
 ## Version 0.1.3
 
 <span class="md-h2-subheader">Release Date: 2025-01-29</span>
