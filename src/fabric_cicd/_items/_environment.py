@@ -86,7 +86,47 @@ def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_ch
         print("response_state", response_state)
         current_state = response_state["body"].get("properties", {}).get("publishDetails", {}).get("state", "").lower()
         print("current_state", current_state)
-        current_state_dpath = dpath.get(response_state, "body/properties/publishDetails/state", default="").lower()
+
+        test_response = {
+            "header": {
+                "Cache-Control": "no-store, must-revalidate, no-cache",
+                "Pragma": "no-cache",
+                "Content-Length": "325",
+                "Content-Type": "application/json; charset=utf-8",
+                "Content-Encoding": "gzip",
+                "ETag": '""',
+                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+                "X-Frame-Options": "deny",
+                "X-Content-Type-Options": "nosniff",
+                "RequestId": "475ea013-162c-4a20-9e30-d439a118a7bd",
+                "Access-Control-Expose-Headers": "RequestId,ETag",
+                "Date": "Tue, 04 Feb 2025 15:42:03 GMT",
+            },
+            "body": {
+                "id": "1097e2ba-533f-48b4-aaba-87e8caadd69d",
+                "type": "Environment",
+                "displayName": "Env_FITGAI",
+                "description": "Environment",
+                "workspaceId": "24a801cd-fad0-431a-a450-a5d5667fd697",
+                "properties": {
+                    "$type": "EnvironmentArtifactPublicContent",
+                    "publishDetails": {
+                        "state": "",
+                        "targetVersion": "70a95591-43d3-46cb-984f-45ddae215f6f",
+                        "startTime": "2025-02-04T15:42:02.9879145Z",
+                        "endTime": "2025-02-04T15:42:03.7537062Z",
+                        "componentPublishInfo": {
+                            "sparkLibraries": {"state": "Success"},
+                            "sparkSettings": {"state": "Success"},
+                        },
+                    },
+                },
+            },
+            "status_code": 200,
+        }
+        current_state_dpath = dpath.get(
+            test_response, "body/properties/publishDetails/state", default="No state provided"
+        ).lower()
         print("current_state_dpath", current_state_dpath)
 
         if initial_check:
