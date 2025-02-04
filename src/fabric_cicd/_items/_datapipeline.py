@@ -109,25 +109,24 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
     return sorted_items
 
 
-"""
 def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, lookup_type):
-    
+    """
     Scan through item path and find pipeline references (including nested pipelines).
 
     :param item_content_dict: Dict representation of the pipeline-content file.
     :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     :return: a list of referenced pipeline names.
-    
+    """
     item_type = "DataPipeline"
     reference_list = []
     guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
     def find_datapipeline(input_object):
-        
+        """
         Recursively scans through JSON to find all pipeline references.
 
         :param input_object: Object can be a dict or list present in the input JSON.
-        
+        """
         # Check if the current object is a dict
         if isinstance(input_object, dict):
             for value in input_object.values():
@@ -154,12 +153,11 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
 
     # Start the recursive search from the root of the JSON data
     find_datapipeline(item_content_dict)
-
+    print("reference_list:", reference_list)
     return reference_list
-"""
 
 
-def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, lookup_type):
+def _find_referenced_datapipelines_new(fabric_workspace_obj, item_content_dict, lookup_type):
     """
     Scan through item path and find pipeline references (including nested pipelines).
 
