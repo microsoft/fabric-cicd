@@ -111,7 +111,6 @@ def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_ch
                 "properties": {
                     "$type": "EnvironmentArtifactPublicContent",
                     "publishDetails": {
-                        "state": "",
                         "targetVersion": "70a95591-43d3-46cb-984f-45ddae215f6f",
                         "startTime": "2025-02-04T15:42:02.9879145Z",
                         "endTime": "2025-02-04T15:42:03.7537062Z",
