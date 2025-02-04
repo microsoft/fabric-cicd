@@ -74,7 +74,8 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
         # Ensure every item has an entry in the in-degree map
         if item_name not in in_degree:
             in_degree[item_name] = 0
-
+    print("graph:", graph)
+    print("in_degree:", in_degree)
     # In an unpublish case, adjust in_degree to include entire dependency chain for each pipeline
     if lookup_type == "Deployed":
         for item_name in graph:
@@ -180,7 +181,7 @@ def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, look
                 referenced_name = fabric_workspace_obj._convert_id_to_name(
                     item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
                 )
-                if referenced_name:
+                if referenced_name and referenced_name not in reference_list:
                     reference_list.append(referenced_name)
     print("reference_list", reference_list)
     return reference_list
