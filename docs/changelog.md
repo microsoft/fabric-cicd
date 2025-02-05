@@ -4,10 +4,11 @@ The following contains all major, minor, and patch version release notes.
 
 ## Version 0.1.4
 
-<span class="md-h2-subheader">Release Date: 2025-02-05</span>
+<span class="md-h2-subheader">Release Date: 2025-02-10</span>
 
 -   Workspace ID replacement improved
 -   Increased error handling in activate script
+-   Resolves [#87](https://github.com/microsoft/fabric-cicd/issues/87) - Support Python Installed From Windows Store
 
 ## Version 0.1.3
 
