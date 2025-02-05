@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 <#
 .SYNOPSIS
 Script to check and install required Python packages, add directories to PATH, and activate a virtual environment.
@@ -14,6 +17,24 @@ This script performs the following tasks:
 .NOTES
 Make sure that Python and pip are installed and available in the system PATH.
 #>
+
+# Function to check if a dependency is available
+function Test-Dependancy {
+    param (
+        [string]$commandName
+    )
+
+    if (-not (Get-Command $commandName -ErrorAction SilentlyContinue)) {
+        Write-Host " $commandName is not installed or not in PATH. Please install $commandName and make sure it's available in the PATH."
+        exit 1
+    }
+    else {
+        $commandPath = (Get-Command $commandName).Path
+        $commandDirectory = [System.IO.Path]::GetDirectoryName($commandPath)
+        Write-Host "$commandName is installed in $commandPath" 
+        Add-DirectoryToPath -directory $commandDirectory
+    }
+}
 
 # Function to install required packages if not already installed
 function Test-And-Install-Package {
@@ -50,55 +71,33 @@ function Add-DirectoryToPath {
     }
 }
 
-# Check if Python is installed
-if (Get-Command python -ErrorAction SilentlyContinue) {
-    Write-Host "Python is installed in " -NoNewline
-    Write-Host (Get-Command python).Path
-    
-    # Check if pip is installed
-    if (Get-Command pip -ErrorAction SilentlyContinue) {
-        Write-Host "Pip is installed in " -NoNewline
-        Write-Host (Get-Command pip).Path
-        
-        # Check and install required packages
-        Test-And-Install-Package -packageName "uv"
-        Test-And-Install-Package -packageName "ruff"
-    }
-    else {
-        Write-Host "pip is not installed or not in PATH. Please install pip and make sure it's available in the PATH."
-        exit 1
-    }
-}
-else {
-    Write-Host "Python is not installed. Please install Python and make sure it's available in the PATH."
-    exit 1
-}
+# Check if dependencies are installed and add directory to PATH
+Test-Dependancy -commandName "python"
+Test-Dependancy -commandName "pip"
 
-# Ensure uv is in PATH
+# Check and install required packages
+Test-And-Install-Package -packageName "uv"
+Test-And-Install-Package -packageName "ruff"
+
+# uv fallback to default path if unavailable in python directory
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Host "uv is not recognized. Attempting to add uv to PATH..."
     $localBinPath = [System.IO.Path]::Combine($env:USERPROFILE, '.local', 'bin')
     Add-DirectoryToPath -directory $localBinPath
+    Test-Dependancy -commandName "uv"
 }
 
 # Activate the environment
-if (Get-Command uv -ErrorAction SilentlyContinue) {
-    uv sync  --python 3.11
-    $venvPath = ".venv\Scripts\activate.ps1"
-    
-    if (Test-Path $venvPath) {
-        & $venvPath
-        Write-Host "venv activated"
-    }
-    else {
-        Write-Host "venv not found"
-    }
+uv sync --python 3.11
+$venvPath = ".venv\Scripts\activate.ps1"
+
+if (Test-Path $venvPath) {
+    & $venvPath
+    Write-Host "venv activated"
 }
 else {
-    Write-Host "uv is not installed or not in PATH. Please install uv and make sure it's available in the PATH."
-    exit 1
+    Write-Host "venv not found"
 }
-
 
 Write-Host ""
 Write-Host "To deactivate the environment, run " -NoNewline
