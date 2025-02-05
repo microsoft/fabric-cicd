@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
 
-    def __init__(self, token_credential):
+    def __init__(self, token_credential, requests_module=requests):
         """Initializes the FabricEndpoint instance, sets up the authentication token."""
         self.aad_token = None
         self.aad_token_expiration = None
         self.token_credential = token_credential
+        self.requests = requests_module
         self._refresh_token()
 
     def invoke(self, method, url, body="{}", files=None, **kwargs):
@@ -40,13 +41,14 @@ class FabricEndpoint:
         exit_loop = False
         iteration_count = 0
         long_running = False
+        start_time = time.time()
 
         while not exit_loop:
             try:
                 headers = {"Authorization": f"Bearer {self.aad_token}"}
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
-                response = requests.request(method=method, url=url, headers=headers, json=body, files=files)
+                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
 
@@ -74,6 +76,9 @@ class FabricEndpoint:
             except Exception as e:
                 logger.debug(invoke_log_message)
                 raise InvokeError(e, logger, invoke_log_message) from e
+
+        end_time = time.time()
+        logger.debug(f"Request completed in {end_time - start_time} seconds")
 
         return {
             "header": dict(response.headers),
