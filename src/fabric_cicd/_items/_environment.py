@@ -1,10 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-
 import logging
 import os
 from pathlib import Path
 
+import dpath
 import yaml
 
 from fabric_cicd._common._fabric_endpoint import handle_retry
@@ -83,7 +83,7 @@ def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_ch
         response_state = fabric_workspace_obj.endpoint.invoke(
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/"
         )
-        current_state = response_state["body"].get("properties", {}).get("publishDetails", {}).get("state", "").lower()
+        current_state = dpath.get(response_state, "body/properties/publishDetails/state", default="").lower()
 
         if initial_check:
             prepend_message = "Existing Environment publish is in progess."
