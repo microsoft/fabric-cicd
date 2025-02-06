@@ -21,9 +21,6 @@ class DummyLogger:
     def info(self, message):
         self.messages.append(message)
 
-    def isEnabledFor(self, level):
-        return True
-
     def debug(self, message):
         self.messages.append(message)
 
@@ -33,7 +30,7 @@ class DummyCredential:
         self.token = token
         self.raise_exception = None
 
-    def get_token(self, *args, **kwargs):
+    def get_token(self, *_, **__):
         if self.raise_exception:
             raise self.raise_exception
         return Mock(token=self.token)
@@ -42,15 +39,19 @@ class DummyCredential:
 @pytest.fixture
 def setup_mocks(monkeypatch, mocker):
     dl = DummyLogger()
-    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint.logger", dl)
+    mock_logger = mocker.Mock()
+    mock_logger.isEnabledFor.return_value = True
+    mock_logger.info.side_effect = dl.info
+    mock_logger.debug.side_effect = dl.debug
+    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint.logger", mock_logger)
     mock_requests = mocker.patch("requests.request")
     return dl, mock_requests
 
 
-def generate_mock_jwt(authType=""):
+def generate_mock_jwt(authtype=""):
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
     payload = (
-        base64.urlsafe_b64encode(json.dumps({authType: f"{authType}Example", "exp": 9999999999}).encode())
+        base64.urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
         .decode()
         .strip("=")
     )
@@ -87,7 +88,7 @@ def test_performance(setup_mocks):
 
 
 @pytest.mark.parametrize(
-    "method, url, body, files",
+    ("method", "url", "body", "files"),
     [
         ("GET", "http://example.com", "{}", None),
         ("POST", "http://example.com", "{}", {"file": "test.txt"}),
@@ -118,7 +119,7 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
     endpoint.aad_token_expiration = datetime.datetime.utcnow() - datetime.timedelta(seconds=1)
     endpoint._refresh_token = Mock()
-    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *args, **kwargs: "")
+    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *_, **__: "")
 
     response = endpoint.invoke("GET", "http://example.com")
 
@@ -137,7 +138,7 @@ def test_invoke_exception(setup_mocks):
 
 
 @pytest.mark.parametrize(
-    "auth_type, expected_msg, expected_upn_auth",
+    ("auth_type", "expected_msg", "expected_upn_auth"),
     [
         ("upn", "Executing as User 'upnExample'", True),
         ("appid", "Executing as Application Id 'appidExample'", False),
@@ -147,7 +148,7 @@ def test_invoke_exception(setup_mocks):
 )
 def test_refresh_token(setup_mocks, auth_type, expected_msg, expected_upn_auth):
     dl, mock_requests = setup_mocks
-    jwt_token = generate_mock_jwt(authType=auth_type)
+    jwt_token = generate_mock_jwt(authtype=auth_type)
     mock_requests.return_value = Mock(
         status_code=200,
         json=Mock(return_value={"access_token": jwt_token, "expires_in": 3600}),
@@ -162,14 +163,14 @@ def test_refresh_token(setup_mocks, auth_type, expected_msg, expected_upn_auth):
 
 
 @pytest.mark.parametrize(
-    "raise_exception, expected_msg",
+    ("raise_exception", "expected_msg"),
     [
         (ClientAuthenticationError("Auth failed"), "Failed to aquire AAD token. Auth failed"),
         (Exception("Unexpected error"), "An unexpected error occurred when generating the AAD token. Unexpected error"),
     ],
     ids=["auth_error", "unexpected_exception"],
 )
-def test_refresh_token_exceptions(monkeypatch, raise_exception, expected_msg):
+def test_refresh_token_exceptions(raise_exception, expected_msg):
     credential = DummyCredential("irrelevant")
     credential.raise_exception = raise_exception
     with pytest.raises(TokenError, match=expected_msg):
@@ -179,7 +180,7 @@ def test_refresh_token_exceptions(monkeypatch, raise_exception, expected_msg):
 def test_refresh_token_no_exp_claim(monkeypatch):
     test_token = "dummy_token_value"
     credential = DummyCredential(test_token)
-    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._decode_jwt", lambda token: {"upn": "user@example.com"})
+    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._decode_jwt", lambda _: {"upn": "user@example.com"})
     with pytest.raises(TokenError, match="Token does not contain expiration claim."):
         FabricEndpoint(token_credential=credential)
 
@@ -326,7 +327,7 @@ def test_handle_response_exceptions(
         )
 
 
-def test_handle_response_feature_not_available(setup_mocks):
+def test_handle_response_feature_not_available():
     """Test _handle_response for feature not available"""
     response = Mock(status_code=403, reason="FeatureNotAvailable")
     with pytest.raises(Exception, match="Item type not supported. Description: FeatureNotAvailable"):
