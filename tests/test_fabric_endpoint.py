@@ -2,11 +2,13 @@
 # Licensed under the MIT License.
 
 import base64
+import datetime
 import json
 import time
 from unittest.mock import Mock
 
 import pytest
+from azure.core.exceptions import ClientAuthenticationError
 
 from fabric_cicd._common._exceptions import InvokeError, TokenError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _decode_jwt, _format_invoke_log, _handle_response
@@ -19,28 +21,45 @@ class DummyLogger:
     def info(self, message):
         self.messages.append(message)
 
+    def isEnabledFor(self, level):
+        return True
+
+    def debug(self, message):
+        self.messages.append(message)
+
+
+class DummyCredential:
+    def __init__(self, token):
+        self.token = token
+        self.raise_exception = None
+
+    def get_token(self, *args, **kwargs):
+        if self.raise_exception:
+            raise self.raise_exception
+        return Mock(token=self.token)
+
 
 @pytest.fixture
-def dummy_logger(monkeypatch):
+def setup_mocks(monkeypatch, mocker):
     dl = DummyLogger()
     monkeypatch.setattr("fabric_cicd._common._fabric_endpoint.logger", dl)
-    return dl
+    mock_requests = mocker.patch("requests.request")
+    return dl, mock_requests
 
 
-@pytest.fixture
-def mock_requests(mocker):
-    return mocker.patch("requests.request")
-
-
-def generate_mock_jwt():
+def generate_mock_jwt(authType=""):
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
-    payload = base64.urlsafe_b64encode(json.dumps({"exp": 9999999999}).encode()).decode().strip("=")
+    payload = (
+        base64.urlsafe_b64encode(json.dumps({authType: f"{authType}Example", "exp": 9999999999}).encode())
+        .decode()
+        .strip("=")
+    )
     signature = "signature"
     return f"{header}.{payload}.{signature}"
 
 
-def test_integration(mock_requests):
-    """Integration test for FabricEndpoint"""
+def test_integration(setup_mocks):
+    dl, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
     )
@@ -51,8 +70,8 @@ def test_integration(mock_requests):
     assert response["status_code"] == 200
 
 
-def test_performance(mock_requests):
-    """Performance test for _handle_response"""
+def test_performance(setup_mocks):
+    dl, mock_requests = setup_mocks
     response = Mock(status_code=200, headers={}, json=Mock(return_value={"status": "Succeeded"}))
     start_time = time.time()
     _handle_response(
@@ -67,32 +86,48 @@ def test_performance(mock_requests):
     assert (end_time - start_time) < 1  # Ensure the function completes within 1 second
 
 
-def test_invoke(mock_requests):
-    """Test the invoke method of FabricEndpoint"""
+@pytest.mark.parametrize(
+    "method, url, body, files",
+    [
+        ("GET", "http://example.com", "{}", None),
+        ("POST", "http://example.com", "{}", {"file": "test.txt"}),
+    ],
+    ids=["invoke", "invoke_with_files"],
+)
+def test_invoke(setup_mocks, method, url, body, files):
+    dl, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
     )
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value.token = generate_mock_jwt()
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    response = endpoint.invoke(method, url, body, files)
+    assert response["status_code"] == 200
+
+
+def test_invoke_token_expired(setup_mocks, monkeypatch):
+    dl, mock_requests = setup_mocks
+    mock_requests.side_effect = [
+        Mock(status_code=401, headers={"x-ms-public-api-error-code": "TokenExpired"}),
+        Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})),
+    ]
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    endpoint.aad_token_expiration = datetime.datetime.utcnow() - datetime.timedelta(seconds=1)
+    endpoint._refresh_token = Mock()
+    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *args, **kwargs: "")
+
     response = endpoint.invoke("GET", "http://example.com")
+
+    assert "AAD token expired. Refreshing token." in dl.messages
     assert response["status_code"] == 200
 
 
-def test_invoke_with_files(mock_requests):
-    """Test the invoke method of FabricEndpoint with files"""
-    mock_requests.return_value = Mock(
-        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
-    )
-    mock_token_credential = Mock()
-    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
-    endpoint = FabricEndpoint(token_credential=mock_token_credential)
-    response = endpoint.invoke("POST", "http://example.com", files={"file": "test.txt"})
-    assert response["status_code"] == 200
-
-
-def test_invoke_exception(mock_requests):
-    """Test the invoke method of FabricEndpoint with exception"""
+def test_invoke_exception(setup_mocks):
+    dl, mock_requests = setup_mocks
     mock_requests.side_effect = Exception("Test exception")
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value.token = generate_mock_jwt()
@@ -101,80 +136,99 @@ def test_invoke_exception(mock_requests):
         endpoint.invoke("GET", "http://example.com")
 
 
-def test_refresh_token(mock_requests):
-    """Test the _refresh_token method of FabricEndpoint"""
+@pytest.mark.parametrize(
+    "auth_type, expected_msg, expected_upn_auth",
+    [
+        ("upn", "Executing as User 'upnExample'", True),
+        ("appid", "Executing as Application Id 'appidExample'", False),
+        ("oid", "Executing as Object Id 'oidExample'", False),
+    ],
+    ids=["upn", "appid", "oid"],
+)
+def test_refresh_token(setup_mocks, auth_type, expected_msg, expected_upn_auth):
+    dl, mock_requests = setup_mocks
+    jwt_token = generate_mock_jwt(authType=auth_type)
     mock_requests.return_value = Mock(
-        status_code=200, json=Mock(return_value={"access_token": generate_mock_jwt(), "expires_in": 3600})
+        status_code=200,
+        json=Mock(return_value={"access_token": jwt_token, "expires_in": 3600}),
     )
     mock_token_credential = Mock()
-    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    mock_token_credential.get_token.return_value.token = jwt_token
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
     endpoint._refresh_token()
-    assert endpoint.aad_token == generate_mock_jwt()
-
-
-# def test_invoke_token_expired(mock_requests):
-#     """Test the invoke method of FabricEndpoint with expired token"""
-#     mock_requests.side_effect = [
-#         Mock(status_code=401, headers={"x-ms-public-api-error-code": "TokenExpired"}),
-#         Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})),
-#     ]
-#     mock_token_credential = Mock()
-#     mock_token_credential.get_token.return_value.token = generate_mock_jwt()
-#     endpoint = FabricEndpoint(token_credential=mock_token_credential)
-#     response = endpoint.invoke("GET", "http://example.com")
-#     assert response["status_code"] == 200
+    assert dl.messages == [expected_msg]
+    assert endpoint.aad_token == jwt_token
+    assert endpoint.upn_auth is expected_upn_auth
 
 
 @pytest.mark.parametrize(
-    ("status_code", "request_method", "expected_long_running", "expected_exit_loop", "response_header"),
+    "raise_exception, expected_msg",
     [
-        (200, "POST", False, True, {}),
-        (202, "POST", True, False, {"Retry-After": 20, "Location": "new"})
+        (ClientAuthenticationError("Auth failed"), "Failed to aquire AAD token. Auth failed"),
+        (Exception("Unexpected error"), "An unexpected error occurred when generating the AAD token. Unexpected error"),
+    ],
+    ids=["auth_error", "unexpected_exception"],
+)
+def test_refresh_token_exceptions(monkeypatch, raise_exception, expected_msg):
+    credential = DummyCredential("irrelevant")
+    credential.raise_exception = raise_exception
+    with pytest.raises(TokenError, match=expected_msg):
+        FabricEndpoint(token_credential=credential)
+
+
+def test_refresh_token_no_exp_claim(monkeypatch):
+    test_token = "dummy_token_value"
+    credential = DummyCredential(test_token)
+    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._decode_jwt", lambda token: {"upn": "user@example.com"})
+    with pytest.raises(TokenError, match="Token does not contain expiration claim."):
+        FabricEndpoint(token_credential=credential)
+
+
+@pytest.mark.parametrize(
+    (
+        "status_code",
+        "request_method",
+        "expected_long_running",
+        "expected_exit_loop",
+        "input_long_running",
+        "input_iteration_count",
+        "response_header",
+        "response_json",
+    ),
+    [
+        (200, "POST", False, True, False, 1, {}, {}),
+        (202, "POST", True, False, False, 1, {"Retry-After": 20, "Location": "new"}, {}),
+        (200, "GET", True, False, True, 2, {"Retry-After": 20, "Location": "old"}, {"status": "Running"}),
+        (200, "GET", False, True, True, 2, {}, {"status": "Succeeded"}),
+        (200, "GET", False, False, True, 2, {"Retry-After": 20, "Location": "old"}, {"status": "Succeeded"}),
     ],
     ids=[
         "success",
         "long_running_redirect",
-    ])  # fmt: skip
-def test_handle_response(status_code, request_method, expected_long_running, expected_exit_loop, response_header):
-    """Long running scenarios expected to pass"""
-    response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value={}))
+        "long_running_running",
+        "long_running_success",
+        "long_running_success_with_result",
+    ],
+)
+def test_handle_response(
+    status_code,
+    request_method,
+    expected_long_running,
+    expected_exit_loop,
+    input_long_running,
+    input_iteration_count,
+    response_header,
+    response_json,
+):
+    response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=response_json))
 
     exit_loop, _method, url, _body, long_running = _handle_response(
         response=response,
         method=request_method,
         url="old",
         body="{}",
-        long_running=False,
-        iteration_count=1,
-    )
-    assert exit_loop == expected_exit_loop
-    assert long_running == expected_long_running
-
-
-@pytest.mark.parametrize(
-    ("expected_long_running", "expected_exit_loop", "response_json", "response_header"),
-    [
-        (True, False, {"status": "Running"}, {"Retry-After": 20, "Location": "old"}),
-        (False, True, {"status": "Succeeded"}, {}),
-        (False, False, {"status": "Succeeded"}, {"Retry-After": 20, "Location": "old"}),
-    ],
-    ids=[
-        "long_running_running",
-        "long_running__success",
-        "long_running__success_with_result",
-    ])  # fmt: skip
-def test_handle_response_longrunning(expected_long_running, expected_exit_loop, response_json, response_header):
-    """Long running scenarios expected to pass"""
-    response = Mock(status_code=200, headers=response_header, json=Mock(return_value=response_json))
-
-    exit_loop, _method, _url, _body, long_running = _handle_response(
-        response=response,
-        method="GET",
-        url="old",
-        body="{}",
-        long_running=True,
-        iteration_count=2,
+        long_running=input_long_running,
+        iteration_count=input_iteration_count,
     )
     assert exit_loop == expected_exit_loop
     assert long_running == expected_long_running
@@ -183,18 +237,15 @@ def test_handle_response_longrunning(expected_long_running, expected_exit_loop, 
 @pytest.mark.parametrize(
     ("exception_match", "response_json"),
     [
-        ("[Operation failed].*", {"status": "Failed","error": {"errorCode": "SampleErrorCode", "message": "Sample failure message"}}),
+        (
+            "[Operation failed].*",
+            {"status": "Failed", "error": {"errorCode": "SampleErrorCode", "message": "Sample failure message"}},
+        ),
         ("[Operation is in an undefined state].*", {"status": "Undefined"}),
     ],
-    ids=[
-        "failed",
-        "undefined",
-    ])  # fmt: skip
-def test_handle_response_longrunning_exception(
-    exception_match,
-    response_json,
-):
-    """Long running scenarios expected to pass"""
+    ids=["failed", "undefined"],
+)
+def test_handle_response_longrunning_exception(exception_match, response_json):
     response = Mock(status_code=200, headers={}, json=Mock(return_value=response_json))
 
     with pytest.raises(Exception, match=exception_match):
@@ -208,92 +259,74 @@ def test_handle_response_longrunning_exception(
         )
 
 
-def test_handle_response_environment_libraries_not_found(mock_requests):
-    """Test _handle_response for environment libraries not found"""
-    response = Mock(status_code=404, headers={"x-ms-public-api-error-code": "EnvironmentLibrariesNotFound"})
-    exit_loop, method, url, body, long_running = _handle_response(
-        response=response,
-        method="GET",
-        url="http://example.com",
-        body="{}",
-        long_running=False,
-        iteration_count=1,
-    )
-    assert exit_loop is True
-    assert long_running is False
-
-
-def test_handle_response_throttled(dummy_logger):
-    """Test _handle_response for API throttling"""
-    response = Mock(status_code=429, headers={"Retry-After": "10"})
-    _handle_response(response, "GET", "http://example.com", "{}", False, 1)
-    expected = "API is throttled. Checking again in 10 seconds (Attempt 1/5)..."
-    assert dummy_logger.messages == [expected]
-
-
-def test_handle_response_unauthorized(mock_requests):
-    """Test _handle_response for unauthorized access"""
-    response = Mock(status_code=401, headers={"x-ms-public-api-error-code": "Unauthorized"})
-    with pytest.raises(
-        Exception, match="The executing identity is not authorized to call GET on 'http://example.com'."
-    ):
+@pytest.mark.parametrize(
+    (
+        "status_code",
+        "input_iteration_count",
+        "input_long_running",
+        "response_header",
+        "return_value",
+        "exception_match",
+    ),
+    [
+        (
+            401,
+            1,
+            False,
+            {"x-ms-public-api-error-code": "Unauthorized"},
+            {},
+            "The executing identity is not authorized to call GET on 'http://example.com'.",
+        ),
+        (
+            400,
+            1,
+            False,
+            {"x-ms-public-api-error-code": "PrincipalTypeNotSupported"},
+            {},
+            "The executing principal type is not supported to call GET on 'http://example.com'.",
+        ),
+        (
+            400,
+            1,
+            False,
+            {"x-ms-public-api-error-code": "PrincipalTypeNotSupported"},
+            {"message": "Test Libabry is not present in the environment."},
+            "Deployment attempted to remove a library that is not present in the environment. ",
+        ),
+        (
+            500,
+            1,
+            False,
+            {"Content-Type": "application/json"},
+            {"message": "Internal Server Error"},
+            "Unhandled error occurred calling GET on 'http://example.com'. Message: Internal Server Error",
+        ),
+        (429, 5, True, {"Retry-After": "10"}, {}, r"Maximum retry attempts \(5\) exceeded."),
+    ],
+    ids=[
+        "unauthorized",
+        "principal_type_not_supported",
+        "failed_library_removal",
+        "unexpected_error",
+        "retry",
+    ],
+)
+def test_handle_response_exceptions(
+    status_code, input_iteration_count, input_long_running, response_header, return_value, exception_match
+):
+    response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=return_value))
+    with pytest.raises(Exception, match=exception_match):
         _handle_response(
             response=response,
             method="GET",
             url="http://example.com",
             body="{}",
-            long_running=False,
-            iteration_count=1,
+            long_running=input_long_running,
+            iteration_count=input_iteration_count,
         )
 
 
-def test_handle_response_item_display_name_already_in_use(dummy_logger):
-    """Test _handle_response for item display name already in use"""
-    response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameAlreadyInUse"})
-    _handle_response(response, "GET", "http://example.com", "{}", False, 1)
-    expected = "Item name is reserved. Checking again in 5 seconds (Attempt 1/5)..."
-    assert dummy_logger.messages == [expected]
-
-
-def test_handle_response_failed_library_removal(mock_requests):
-    """Test _handle_response for principal type not supported"""
-    response = Mock(
-        status_code=400,
-        headers={"x-ms-public-api-error-code": "PrincipalTypeNotSupported"},
-        json=Mock(return_value={"message": "Test Libabry is not present in the environment."}),
-    )
-    with pytest.raises(
-        Exception, match="Deployment attempted to remove a library that is not present in the environment. "
-    ):
-        _handle_response(
-            response=response,
-            method="GET",
-            url="http://example.com",
-            body="{}",
-            long_running=False,
-            iteration_count=1,
-        )
-
-
-def test_handle_response_principal_type_not_supported(mock_requests):
-    """Test _handle_response for principal type not supported"""
-    response = Mock(
-        status_code=400, headers={"x-ms-public-api-error-code": "PrincipalTypeNotSupported"}, json=Mock(return_value={})
-    )
-    with pytest.raises(
-        Exception, match="The executing principal type is not supported to call GET on 'http://example.com'."
-    ):
-        _handle_response(
-            response=response,
-            method="GET",
-            url="http://example.com",
-            body="{}",
-            long_running=False,
-            iteration_count=1,
-        )
-
-
-def test_handle_response_feature_not_available(mock_requests):
+def test_handle_response_feature_not_available(setup_mocks):
     """Test _handle_response for feature not available"""
     response = Mock(status_code=403, reason="FeatureNotAvailable")
     with pytest.raises(Exception, match="Item type not supported. Description: FeatureNotAvailable"):
@@ -307,35 +340,41 @@ def test_handle_response_feature_not_available(mock_requests):
         )
 
 
-def test_handle_response_max_retry(mock_requests):
-    """Test _handle_response for retry"""
-    response = Mock(status_code=429, headers={"Retry-After": "10"})
-    with pytest.raises(Exception, match=r"Maximum retry attempts \(5\) exceeded."):
-        _handle_response(
-            response=response,
-            method="GET",
-            url="http://example.com",
-            body="{}",
-            long_running=True,
-            iteration_count=5,
-        )
+def test_handle_response_item_display_name_already_in_use(setup_mocks):
+    dl, mock_requests = setup_mocks
+    response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameAlreadyInUse"})
+    _handle_response(response, "GET", "http://example.com", "{}", False, 1)
+    expected = "Item name is reserved. Checking again in 5 seconds (Attempt 1/5)..."
+    assert dl.messages == [expected]
+
+
+def test_handle_response_environment_libraries_not_found(setup_mocks):
+    dl, mock_requests = setup_mocks
+    response = Mock(status_code=404, headers={"x-ms-public-api-error-code": "EnvironmentLibrariesNotFound"})
+    exit_loop, method, url, body, long_running = _handle_response(
+        response=response,
+        method="GET",
+        url="http://example.com",
+        body="{}",
+        long_running=False,
+        iteration_count=1,
+    )
+    assert exit_loop is True
+    assert long_running is False
 
 
 def test_decode_jwt():
-    """Test _decode_jwt function"""
     token = generate_mock_jwt()
     decoded = _decode_jwt(token)
     assert decoded["exp"] == 9999999999
 
 
 def test_decode_jwt_invalid():
-    """Test _decode_jwt function with invalid token"""
     with pytest.raises(TokenError):
         _decode_jwt("invalid.token")
 
 
 def test_format_invoke_log():
-    """Test _format_invoke_log function"""
     response = Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={}))
     log_message = _format_invoke_log(response, "GET", "http://example.com", "{}")
     assert "Method: GET" in log_message
