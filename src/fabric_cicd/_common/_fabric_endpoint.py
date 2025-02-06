@@ -42,6 +42,7 @@ class FabricEndpoint:
         iteration_count = 0
         long_running = False
         start_time = time.time()
+        invoke_log_message = ""
 
         while not exit_loop:
             try:
@@ -219,7 +220,7 @@ def _handle_response(response, method, url, body, long_running, iteration_count,
             attempt=iteration_count,
             base_delay=2.5,
             max_retries=5,
-            prepend_message="Item name is reserved. ",
+            prepend_message="Item name is reserved.",
         )
 
     # Handle scenario where library removed from environment before being removed from repo

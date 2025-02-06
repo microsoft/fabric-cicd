@@ -28,6 +28,7 @@ dev = [
     "pytest>=8.3.4",
     "pytest-mock>=3.14.0",
     "ruff>=0.9.3",
+    "coverage>=7.6.10",
 ]
 
 
@@ -45,6 +46,6 @@ python-preference = "only-managed"
 
 
 [tool.pytest.ini_options]
-addopts = "-v --tb=short --disable-warnings"
+addopts = "-v --tb=short"
 testpaths = ["tests"]
 pythonpath = ["src"]
