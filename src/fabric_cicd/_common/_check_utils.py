@@ -1,5 +1,6 @@
 from importlib.metadata import version as lib_version
 
+import filetype
 import requests
 from colorama import Fore, Style
 from packaging import version
@@ -18,3 +19,10 @@ def check_version():
             print(msg)
     except:
         pass
+
+
+def is_image_file(file_path):
+    kind = filetype.guess(file_path)
+    if kind is None:
+        return False
+    return kind.mime.startswith("image/")
