@@ -357,46 +357,51 @@ class FabricWorkspace:
                     relative_path = str(full_path.relative_to(item_path).as_posix())
 
                     if file not in excluded_files:
-                        with Path.open(full_path, encoding="utf-8") as f:
-                            raw_file = f.read()
+                        if self._is_image_file(file):
+                            with Path.open(full_path, "rb") as f:
+                                byte_file = f.read()
+                        else:
+                            with Path.open(full_path, encoding="utf-8") as f:
+                                raw_file = f.read()
 
-                        # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
-                        if item_type in ["DataPipeline", "Notebook"]:
-                            raw_file = self._replace_workspace_ids(raw_file, item_type)
+                            # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
+                            if item_type in ["DataPipeline", "Notebook"]:
+                                raw_file = self._replace_workspace_ids(raw_file, item_type)
 
-                        # Replace connections in report
-                        if item_type == "Report" and Path(file).name == "definition.pbir":
-                            definition_body = json.loads(raw_file)
-                            if (
-                                "datasetReference" in definition_body
-                                and "byPath" in definition_body["datasetReference"]
-                            ):
-                                model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
-                                model_path = str((Path(item_path) / model_rel_path).resolve())
-                                model_id = self._convert_path_to_id("SemanticModel", model_path)
+                            # Replace connections in report
+                            if item_type == "Report" and Path(file).name == "definition.pbir":
+                                definition_body = json.loads(raw_file)
+                                if (
+                                    "datasetReference" in definition_body
+                                    and "byPath" in definition_body["datasetReference"]
+                                ):
+                                    model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
+                                    model_path = str((Path(item_path) / model_rel_path).resolve())
+                                    model_id = self._convert_path_to_id("SemanticModel", model_path)
 
-                                if not model_id:
-                                    msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
-                                    raise ItemDependencyError(msg, logger)
+                                    if not model_id:
+                                        msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
+                                        raise ItemDependencyError(msg, logger)
 
-                                definition_body["datasetReference"] = {
-                                    "byConnection": {
-                                        "connectionString": None,
-                                        "pbiServiceModelId": None,
-                                        "pbiModelVirtualServerName": "sobe_wowvirtualserver",
-                                        "pbiModelDatabaseName": f"{model_id}",
-                                        "name": "EntityDataSource",
-                                        "connectionType": "pbiServiceXmlaStyleLive",
+                                    definition_body["datasetReference"] = {
+                                        "byConnection": {
+                                            "connectionString": None,
+                                            "pbiServiceModelId": None,
+                                            "pbiModelVirtualServerName": "sobe_wowvirtualserver",
+                                            "pbiModelDatabaseName": f"{model_id}",
+                                            "name": "EntityDataSource",
+                                            "connectionType": "pbiServiceXmlaStyleLive",
+                                        }
                                     }
-                                }
 
-                                raw_file = json.dumps(definition_body, indent=4)
+                                    raw_file = json.dumps(definition_body, indent=4)
 
-                        # Replace logical IDs with deployed GUIDs.
-                        replaced_raw_file = self._replace_logical_ids(raw_file)
-                        replaced_raw_file = self._replace_parameters(replaced_raw_file)
+                            # Replace logical IDs with deployed GUIDs.
+                            replaced_raw_file = self._replace_logical_ids(raw_file)
+                            replaced_raw_file = self._replace_parameters(replaced_raw_file)
 
-                        byte_file = replaced_raw_file.encode("utf-8")
+                            byte_file = replaced_raw_file.encode("utf-8")
+
                         payload = base64.b64encode(byte_file).decode("utf-8")
 
                         item_payload.append({"path": relative_path, "payload": payload, "payloadType": "InlineBase64"})
@@ -461,3 +466,14 @@ class FabricWorkspace:
             logger.info("Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+
+    def _is_image_file(self, file_name):
+        """
+        Checks if a file is an image based on its extension.
+
+        :param file_name: The name of the file to check.
+        :return: True if the file is an image, False otherwise.
+        """
+        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif"}
+        print(f"Checking if '{file_name}' is an image file.")
+        return Path(file_name).suffix.lower() in image_extensions
