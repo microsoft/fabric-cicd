@@ -475,5 +475,4 @@ class FabricWorkspace:
         :return: True if the file is an image, False otherwise.
         """
         image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif"}
-        print(f"Checking if '{file_name}' is an image file.")
         return Path(file_name).suffix.lower() in image_extensions
