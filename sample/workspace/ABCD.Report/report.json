@@ -1,0 +1,84 @@
+{
+  "config": "{\"version\":\"5.59\",\"themeCollection\":{\"baseTheme\":{\"name\":\"CY24SU10\",\"version\":\"5.61\",\"type\":2}},\"activeSectionIndex\":0,\"defaultDrillFilterOtherVisuals\":true,\"linguisticSchemaSyncVersion\":2,\"settings\":{\"useNewFilterPaneExperience\":true,\"allowChangeFilterTypes\":true,\"useStylableVisualContainerHeader\":true,\"queryLimitOption\":6,\"useEnhancedTooltips\":true,\"exportDataMode\":1,\"useDefaultAggregateDisplayName\":true},\"objects\":{\"section\":[{\"properties\":{\"verticalAlignment\":{\"expr\":{\"Literal\":{\"Value\":\"'Top'\"}}}}}]}}",
+  "layoutOptimization": 0,
+  "resourcePackages": [
+    {
+      "resourcePackage": {
+        "disabled": false,
+        "items": [
+          {
+            "name": "CY24SU10",
+            "path": "BaseThemes/CY24SU10.json",
+            "type": 202
+          }
+        ],
+        "name": "SharedResources",
+        "type": 2
+      }
+    }
+  ],
+  "sections": [
+    {
+      "config": "{}",
+      "displayName": "Page 3",
+      "displayOption": 1,
+      "filters": "[]",
+      "height": 720.00,
+      "name": "63e290aa19e7bea3d03d",
+      "ordinal": 2,
+      "visualContainers": [
+        {
+          "config": "{\"name\":\"39eb354ddb07467c1948\",\"layouts\":[{\"id\":0,\"position\":{\"x\":525.312,\"y\":169.984,\"z\":0,\"width\":279.552,\"height\":279.552,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"hundredPercentStackedBarChart\",\"projections\":{\"Category\":[{\"queryRef\":\"Table.Column1\",\"active\":true}]},\"prototypeQuery\":{\"Version\":2,\"From\":[{\"Name\":\"t\",\"Entity\":\"Table\",\"Type\":0}],\"Select\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t\"}},\"Property\":\"Column1\"},\"Name\":\"Table.Column1\",\"NativeReferenceName\":\"Column1\"}]},\"drillFilterOtherVisuals\":true}}",
+          "filters": "[]",
+          "height": 279.55,
+          "width": 279.55,
+          "x": 525.31,
+          "y": 169.98,
+          "z": 0.00
+        }
+      ],
+      "width": 1280.00
+    },
+    {
+      "config": "{}",
+      "displayName": "Page 1",
+      "displayOption": 1,
+      "filters": "[]",
+      "height": 720.00,
+      "name": "90cb47b35aee21c5a77c",
+      "visualContainers": [
+        {
+          "config": "{\"name\":\"d15aa7ce4fc6c2acb4f2\",\"layouts\":[{\"id\":0,\"position\":{\"x\":342,\"y\":104,\"z\":0,\"width\":280,\"height\":280,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"tableEx\",\"projections\":{\"Values\":[{\"queryRef\":\"Table.Column1\"},{\"queryRef\":\"Table.Column2\"}]},\"prototypeQuery\":{\"Version\":2,\"From\":[{\"Name\":\"t\",\"Entity\":\"Table\",\"Type\":0}],\"Select\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t\"}},\"Property\":\"Column1\"},\"Name\":\"Table.Column1\",\"NativeReferenceName\":\"Column1\"},{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t\"}},\"Property\":\"Column2\"},\"Name\":\"Table.Column2\",\"NativeReferenceName\":\"Column2\"}]},\"drillFilterOtherVisuals\":true}}",
+          "filters": "[]",
+          "height": 280.00,
+          "width": 280.00,
+          "x": 342.00,
+          "y": 104.00,
+          "z": 0.00
+        }
+      ],
+      "width": 1280.00
+    },
+    {
+      "config": "{}",
+      "displayName": "Page 2",
+      "displayOption": 1,
+      "filters": "[]",
+      "height": 720.00,
+      "name": "f072cad6a715c38915c7",
+      "ordinal": 1,
+      "visualContainers": [
+        {
+          "config": "{\"name\":\"1e78447fe04d60e1956f\",\"layouts\":[{\"id\":0,\"position\":{\"x\":317.44,\"y\":69.632,\"z\":0,\"width\":279.552,\"height\":279.552,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"areaChart\",\"projections\":{\"Category\":[{\"queryRef\":\"Table.Column1\",\"active\":true}],\"Y\":[{\"queryRef\":\"CountNonNull(Table.Column2)\"}],\"Series\":[{\"queryRef\":\"Table_2.Column1\"}]},\"prototypeQuery\":{\"Version\":2,\"From\":[{\"Name\":\"t\",\"Entity\":\"Table\",\"Type\":0},{\"Name\":\"t1\",\"Entity\":\"Table_2\",\"Type\":0}],\"Select\":[{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t\"}},\"Property\":\"Column1\"},\"Name\":\"Table.Column1\",\"NativeReferenceName\":\"Column1\"},{\"Aggregation\":{\"Expression\":{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t\"}},\"Property\":\"Column2\"}},\"Function\":5},\"Name\":\"CountNonNull(Table.Column2)\",\"NativeReferenceName\":\"Column2\"},{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t1\"}},\"Property\":\"Column1\"},\"Name\":\"Table_2.Column1\",\"NativeReferenceName\":\"Column11\"}],\"OrderBy\":[{\"Direction\":2,\"Expression\":{\"Aggregation\":{\"Expression\":{\"Column\":{\"Expression\":{\"SourceRef\":{\"Source\":\"t\"}},\"Property\":\"Column2\"}},\"Function\":5}}}]},\"drillFilterOtherVisuals\":true,\"hasDefaultSort\":true}}",
+          "filters": "[]",
+          "height": 279.55,
+          "width": 279.55,
+          "x": 317.44,
+          "y": 69.63,
+          "z": 0.00
+        }
+      ],
+      "width": 1280.00
+    }
+  ]
+}

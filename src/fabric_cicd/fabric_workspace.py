@@ -429,10 +429,29 @@ class FabricWorkspace:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
 
     def _process_image(self, file_path):
+        """
+        Reads an image file as binary data.
+
+        :param file_path: The path to the image file.
+        """
         with Path.open(file_path, "rb") as f:
             return f.read()
 
     def _process_file(self, file_path, item_type, item_path):
+        """
+        Processes a non-image file by reading its content, performing necessary substitutions,
+        and returning the processed content as UTF-8 encoded bytes.
+
+        This includes:
+            - Replacing feature branch workspace IDs with target workspace IDs (for DataPipeline and Notebook).
+            - Processing report files to replace connection details if the file is 'definition.pbir'.
+            - Replacing logical IDs with deployed GUIDs.
+            - Replacing parameter placeholders with environment-specific values.
+
+        :param file_path: The path to the file.
+        :param item_type: The type of the item (e.g., DataPipeline, Notebook, Report).
+        :param item_path: The base directory path of the item.
+        """
         with Path.open(file_path, encoding="utf-8") as f:
             raw_file = f.read()
 
