@@ -13,6 +13,22 @@ from fabric_cicd.publish import publish_all_items, unpublish_all_orphan_items
 
 logger = logging.getLogger(__name__)
 
+feature_flag = set()
+
+
+def append_feature_flag(feature: str) -> None:
+    """
+    Append a feature flag to the global feature_flag set.
+
+    Parameters
+    ----------
+    feature : str
+        The feature flag to be included.
+
+    """
+    global feature_flag
+    feature_flag.add(feature)
+
 
 def change_log_level(level: str = "DEBUG") -> None:
     """
@@ -51,6 +67,7 @@ check_version()
 
 __all__ = [
     "FabricWorkspace",
+    "append_feature_flag",
     "change_log_level",
     "publish_all_items",
     "unpublish_all_orphan_items",

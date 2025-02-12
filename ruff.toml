@@ -30,10 +30,17 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"{devtools,tests}/*" = [
+"{tests}/*" = [
     "D",   # pydocstyle
     "INP", # flake8-no-pep420
 ]
+
+"{devtools}/*" = [
+    "D",    # pydocstyle
+    "INP",  # flake8-no-pep420
+    "F401", # unused import
+]
+
 [format]
 preview = true
 docstring-code-format = false

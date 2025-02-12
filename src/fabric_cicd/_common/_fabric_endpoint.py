@@ -119,18 +119,26 @@ class FabricEndpoint:
                     raise TokenError(msg, logger)
 
                 if upn:
-                    logger.info(f"Executing as User '{upn}'")
+                    _log_executing_identity(f"Executing as User '{upn}'")
                     self.upn_auth = True
                 else:
                     self.upn_auth = False
                     if appid:
-                        logger.info(f"Executing as Application Id '{appid}'")
+                        _log_executing_identity(f"Executing as Application Id '{appid}'")
                     elif oid:
-                        logger.info(f"Executing as Object Id '{oid}'")
+                        _log_executing_identity(f"Executing as Object Id '{oid}'")
 
             except Exception as e:
                 msg = f"An unexpected error occurred while decoding the credential token. {e}"
                 raise TokenError(msg, logger) from e
+
+
+def _log_executing_identity(msg):
+    # Import feature_flag here to avoid circular import
+    from fabric_cicd import feature_flag
+
+    if "disable_executing_identity" not in feature_flag:
+        logger.info(msg)
 
 
 def _handle_response(response, method, url, body, long_running, iteration_count, **kwargs):
