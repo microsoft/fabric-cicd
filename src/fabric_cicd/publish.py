@@ -128,7 +128,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
             for item_name in to_delete_list:
                 # Get deployed item definition
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item-definition
-                item_guid = fabric_workspace_obj.deployed_items[item_type][item_name]["guid"]
+                item_guid = fabric_workspace_obj.deployed_items[item_type][item_name].guid
                 response = fabric_workspace_obj.endpoint.invoke(
                     method="POST", url=f"{fabric_workspace_obj.base_api_url}/items/{item_guid}/getDefinition"
                 )
