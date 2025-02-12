@@ -11,6 +11,7 @@ The following contains all major, minor, and patch version release notes.
 -   Onboard pytest and coverage
 -   Resolves [#37](https://github.com/microsoft/fabric-cicd/issues/37) - Improvements to nested dictionaries
 -   Resolves [#87](https://github.com/microsoft/fabric-cicd/issues/87) - Support Python Installed From Windows Store
+-   Resolves [#96](https://github.com/microsoft/fabric-cicd/issues/96)- Support Feature Flagging
 -   Fixes [#88](https://github.com/microsoft/fabric-cicd/issues/88) - Image support in report deployment
 -   Fixes [#92](https://github.com/microsoft/fabric-cicd/issues/92) - Broken README link
 
