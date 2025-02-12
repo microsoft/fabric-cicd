@@ -60,6 +60,7 @@ def generate_mock_jwt(authtype=""):
 
 
 def test_integration(setup_mocks):
+    """Test integration of FabricEndpoint for GET request."""
     dl, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
@@ -72,6 +73,7 @@ def test_integration(setup_mocks):
 
 
 def test_performance(setup_mocks):
+    """Test that _handle_response completes quickly under long-running simulation."""
     dl, mock_requests = setup_mocks
     response = Mock(status_code=200, headers={}, json=Mock(return_value={"status": "Succeeded"}))
     start_time = time.time()
@@ -96,6 +98,7 @@ def test_performance(setup_mocks):
     ids=["invoke", "invoke_with_files"],
 )
 def test_invoke(setup_mocks, method, url, body, files):
+    """Test FabricEndpoint invoke method success + with optional files."""
     dl, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
@@ -108,6 +111,7 @@ def test_invoke(setup_mocks, method, url, body, files):
 
 
 def test_invoke_token_expired(setup_mocks, monkeypatch):
+    """Test invoking endpoint when the AAD token is expired and refreshed."""
     dl, mock_requests = setup_mocks
     mock_requests.side_effect = [
         Mock(status_code=401, headers={"x-ms-public-api-error-code": "TokenExpired"}),
@@ -128,6 +132,7 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
 
 def test_invoke_exception(setup_mocks):
+    """Test invoking endpoint when the AAD token is expired and refreshed."""
     dl, mock_requests = setup_mocks
     mock_requests.side_effect = Exception("Test exception")
     mock_token_credential = Mock()
@@ -147,6 +152,7 @@ def test_invoke_exception(setup_mocks):
     ids=["upn", "appid", "oid"],
 )
 def test_refresh_token(setup_mocks, auth_type, expected_msg, expected_upn_auth):
+    """Test refreshing token and setting correct identity."""
     dl, mock_requests = setup_mocks
     jwt_token = generate_mock_jwt(authtype=auth_type)
     mock_requests.return_value = Mock(
@@ -171,6 +177,7 @@ def test_refresh_token(setup_mocks, auth_type, expected_msg, expected_upn_auth):
     ids=["auth_error", "unexpected_exception"],
 )
 def test_refresh_token_exceptions(raise_exception, expected_msg):
+    """Test token refresh exception handling for authentication failures."""
     credential = DummyCredential("irrelevant")
     credential.raise_exception = raise_exception
     with pytest.raises(TokenError, match=expected_msg):
@@ -178,6 +185,7 @@ def test_refresh_token_exceptions(raise_exception, expected_msg):
 
 
 def test_refresh_token_no_exp_claim(monkeypatch):
+    """Test token refresh raising TokenError when token lacks expiration."""
     test_token = "dummy_token_value"
     credential = DummyCredential(test_token)
     monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._decode_jwt", lambda _: {"upn": "user@example.com"})
@@ -221,6 +229,7 @@ def test_handle_response(
     response_header,
     response_json,
 ):
+    """Test _handle_response behavior for various HTTP responses and long-running operations."""
     response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=response_json))
 
     exit_loop, _method, url, _body, long_running = _handle_response(
@@ -247,6 +256,7 @@ def test_handle_response(
     ids=["failed", "undefined"],
 )
 def test_handle_response_longrunning_exception(exception_match, response_json):
+    """Test _handle_response raises exception for longrunning failure conditions."""
     response = Mock(status_code=200, headers={}, json=Mock(return_value=response_json))
 
     with pytest.raises(Exception, match=exception_match):
@@ -315,6 +325,7 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
 def test_handle_response_exceptions(
     status_code, input_iteration_count, input_long_running, response_header, return_value, exception_match
 ):
+    """Test _handle_response raises appropriate exceptions based on response error codes."""
     response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=return_value))
     with pytest.raises(Exception, match=exception_match):
         _handle_response(
@@ -342,6 +353,7 @@ def test_handle_response_feature_not_available():
 
 
 def test_handle_response_item_display_name_already_in_use(setup_mocks):
+    """Test _handle_response logs a retry message when item display name is already in use."""
     dl, mock_requests = setup_mocks
     response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameAlreadyInUse"})
     _handle_response(response, "GET", "http://example.com", "{}", False, 1)
@@ -350,6 +362,7 @@ def test_handle_response_item_display_name_already_in_use(setup_mocks):
 
 
 def test_handle_response_environment_libraries_not_found(setup_mocks):
+    """Test _handle_response exits loop when environment libraries are not found (404)."""
     dl, mock_requests = setup_mocks
     response = Mock(status_code=404, headers={"x-ms-public-api-error-code": "EnvironmentLibrariesNotFound"})
     exit_loop, method, url, body, long_running = _handle_response(
@@ -365,17 +378,20 @@ def test_handle_response_environment_libraries_not_found(setup_mocks):
 
 
 def test_decode_jwt():
+    """Test _decode_jwt decodes JWT and validates expiration claim."""
     token = generate_mock_jwt()
     decoded = _decode_jwt(token)
     assert decoded["exp"] == 9999999999
 
 
 def test_decode_jwt_invalid():
+    """Test _decode_jwt raises TokenError on invalid JWT."""
     with pytest.raises(TokenError):
         _decode_jwt("invalid.token")
 
 
 def test_format_invoke_log():
+    """Test formatting of the invoke log message."""
     response = Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={}))
     log_message = _format_invoke_log(response, "GET", "http://example.com", "{}")
     assert "Method: GET" in log_message
