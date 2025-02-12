@@ -206,10 +206,10 @@ class FabricWorkspace:
         :param raw_file: The raw file content where logical IDs need to be replaced.
         :return: The raw file content with logical IDs replaced by GUIDs.
         """
-        for items in self.repository_items.values():
-            for item_dict in items.values():
-                logical_id = item_dict.logical_id
-                item_guid = item_dict.guid
+        for item_name in self.repository_items.values():
+            for item_details in item_name.values():
+                logical_id = item_details.logical_id
+                item_guid = item_details.guid
 
                 if logical_id in raw_file:
                     if item_guid == "":
