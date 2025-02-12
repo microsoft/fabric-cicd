@@ -18,6 +18,7 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._check_utils import is_image_file
 from fabric_cicd._common._exceptions import ItemDependencyError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
 
@@ -164,20 +165,18 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
+                item_path = str(directory)
 
                 # Get the GUID if the item is already deployed
-                item_guid = self.deployed_items.get(item_type, {}).get(item_name, {}).get("guid", "")
+                item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
 
                 if item_type not in self.repository_items:
                     self.repository_items[item_type] = {}
 
                 # Add the item to the repository_items dictionary
-                self.repository_items[item_type][item_name] = {
-                    "description": item_description,
-                    "path": str(directory),
-                    "guid": item_guid,
-                    "logical_id": item_logical_id,
-                }
+                self.repository_items[item_type][item_name] = Item(
+                    item_description, item_guid, item_logical_id, item_path
+                )
 
     def _refresh_deployed_items(self):
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
@@ -198,7 +197,7 @@ class FabricWorkspace:
                 self.deployed_items[item_type] = {}
 
             # Add item details to the deployed_items dictionary
-            self.deployed_items[item_type][item_name] = {"description": item_description, "guid": item_guid}
+            self.deployed_items[item_type][item_name] = Item(item_description, item_guid)
 
     def _replace_logical_ids(self, raw_file):
         """
@@ -209,8 +208,8 @@ class FabricWorkspace:
         """
         for items in self.repository_items.values():
             for item_dict in items.values():
-                logical_id = item_dict["logical_id"]
-                item_guid = item_dict["guid"]
+                logical_id = item_dict.logical_id
+                item_guid = item_dict.guid
 
                 if logical_id in raw_file:
                     if item_guid == "":
@@ -303,10 +302,9 @@ class FabricWorkspace:
         :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository)
         """
         lookup_dict = self.repository_items if lookup_type == "Repository" else self.deployed_items
-        lookup_key = "logical_id" if lookup_type == "Repository" else "guid"
 
         for item_name, item_details in lookup_dict[item_type].items():
-            if item_details.get(lookup_key) == generic_id:
+            if item_details.logical_id == generic_id or item_details.guid == generic_id:
                 return item_name
         # if not found
         return None
@@ -319,8 +317,8 @@ class FabricWorkspace:
         :param path: Full path of the desired item.
         """
         for item_details in self.repository_items[item_type].values():
-            if Path(item_details.get("path")) == Path(path):
-                return item_details["logical_id"]
+            if Path(item_details.path) == Path(path):
+                return item_details.logical_id
         # if not found
         return None
 
@@ -336,9 +334,9 @@ class FabricWorkspace:
         :param full_publish: If True, publishes the full item with its content. If False, only
             publishes metadata (for items like Environments).
         """
-        item_path = self.repository_items[item_type][item_name]["path"]
-        item_guid = self.repository_items[item_type][item_name]["guid"]
-        item_description = self.repository_items[item_type][item_name]["description"]
+        item_path = self.repository_items[item_type][item_name].path
+        item_guid = self.repository_items[item_type][item_name].guid
+        item_description = self.repository_items[item_type][item_name].description
 
         max_retries = 10 if item_type == "SemanticModel" else 5
 
@@ -381,7 +379,7 @@ class FabricWorkspace:
                 method="POST", url=f"{self.base_api_url}/items", body=combined_body, max_retries=max_retries
             )
             item_guid = item_create_response["body"]["id"]
-            self.repository_items[item_type][item_name]["guid"] = item_guid
+            self.repository_items[item_type][item_name].guid = item_guid
         else:
             if full_publish:
                 # Update the item's definition if full publish is required
@@ -416,7 +414,7 @@ class FabricWorkspace:
         :param item_name: Name of the item to unpublish.
         :param item_type: Type of the item (e.g., Notebook, Environment).
         """
-        item_guid = self.deployed_items[item_type][item_name]["guid"]
+        item_guid = self.deployed_items[item_type][item_name].guid
 
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
