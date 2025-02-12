@@ -30,7 +30,7 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"{devtools}/*" = [
+"{devtools,tests}/*" = [
     "D",   # pydocstyle
     "INP", # flake8-no-pep420
 ]

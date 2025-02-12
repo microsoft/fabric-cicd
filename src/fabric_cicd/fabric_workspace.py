@@ -15,6 +15,7 @@ import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
+from fabric_cicd._common._check_utils import is_image_file
 from fabric_cicd._common._exceptions import ItemDependencyError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 
@@ -357,46 +358,11 @@ class FabricWorkspace:
                     relative_path = str(full_path.relative_to(item_path).as_posix())
 
                     if file not in excluded_files:
-                        with Path.open(full_path, encoding="utf-8") as f:
-                            raw_file = f.read()
+                        if is_image_file(full_path):
+                            byte_file = self._process_image(full_path)
+                        else:
+                            byte_file = self._process_file(full_path, item_type, item_path)
 
-                        # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
-                        if item_type in ["DataPipeline", "Notebook"]:
-                            raw_file = self._replace_workspace_ids(raw_file, item_type)
-
-                        # Replace connections in report
-                        if item_type == "Report" and Path(file).name == "definition.pbir":
-                            definition_body = json.loads(raw_file)
-                            if (
-                                "datasetReference" in definition_body
-                                and "byPath" in definition_body["datasetReference"]
-                            ):
-                                model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
-                                model_path = str((Path(item_path) / model_rel_path).resolve())
-                                model_id = self._convert_path_to_id("SemanticModel", model_path)
-
-                                if not model_id:
-                                    msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
-                                    raise ItemDependencyError(msg, logger)
-
-                                definition_body["datasetReference"] = {
-                                    "byConnection": {
-                                        "connectionString": None,
-                                        "pbiServiceModelId": None,
-                                        "pbiModelVirtualServerName": "sobe_wowvirtualserver",
-                                        "pbiModelDatabaseName": f"{model_id}",
-                                        "name": "EntityDataSource",
-                                        "connectionType": "pbiServiceXmlaStyleLive",
-                                    }
-                                }
-
-                                raw_file = json.dumps(definition_body, indent=4)
-
-                        # Replace logical IDs with deployed GUIDs.
-                        replaced_raw_file = self._replace_logical_ids(raw_file)
-                        replaced_raw_file = self._replace_parameters(replaced_raw_file)
-
-                        byte_file = replaced_raw_file.encode("utf-8")
                         payload = base64.b64encode(byte_file).decode("utf-8")
 
                         item_payload.append({"path": relative_path, "payload": payload, "payloadType": "InlineBase64"})
@@ -461,3 +427,65 @@ class FabricWorkspace:
             logger.info("Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+
+    def _process_image(self, file_path):
+        """
+        Reads an image file as binary data.
+
+        :param file_path: The path to the image file.
+        """
+        with Path.open(file_path, "rb") as f:
+            return f.read()
+
+    def _process_file(self, file_path, item_type, item_path):
+        """
+        Processes a non-image file by reading its content, performing necessary substitutions,
+        and returning the processed content as UTF-8 encoded bytes.
+
+        This includes:
+            - Replacing feature branch workspace IDs with target workspace IDs (for DataPipeline and Notebook).
+            - Processing report files to replace connection details if the file is 'definition.pbir'.
+            - Replacing logical IDs with deployed GUIDs.
+            - Replacing parameter placeholders with environment-specific values.
+
+        :param file_path: The path to the file.
+        :param item_type: The type of the item (e.g., DataPipeline, Notebook, Report).
+        :param item_path: The base directory path of the item.
+        """
+        with Path.open(file_path, encoding="utf-8") as f:
+            raw_file = f.read()
+
+        # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
+        if item_type in ["DataPipeline", "Notebook"]:
+            raw_file = self._replace_workspace_ids(raw_file, item_type)
+
+        # Replace connections in report
+        if item_type == "Report" and Path(file_path).name == "definition.pbir":
+            definition_body = json.loads(raw_file)
+            if "datasetReference" in definition_body and "byPath" in definition_body["datasetReference"]:
+                model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
+                model_path = str((Path(item_path) / model_rel_path).resolve())
+                model_id = self._convert_path_to_id("SemanticModel", model_path)
+
+                if not model_id:
+                    msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
+                    raise ItemDependencyError(msg, logger)
+
+                definition_body["datasetReference"] = {
+                    "byConnection": {
+                        "connectionString": None,
+                        "pbiServiceModelId": None,
+                        "pbiModelVirtualServerName": "sobe_wowvirtualserver",
+                        "pbiModelDatabaseName": f"{model_id}",
+                        "name": "EntityDataSource",
+                        "connectionType": "pbiServiceXmlaStyleLive",
+                    }
+                }
+
+                raw_file = json.dumps(definition_body, indent=4)
+
+        # Replace logical IDs with deployed GUIDs.
+        replaced_raw_file = self._replace_logical_ids(raw_file)
+        replaced_raw_file = self._replace_parameters(replaced_raw_file)
+
+        return replaced_raw_file.encode("utf-8")

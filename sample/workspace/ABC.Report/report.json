@@ -1,5 +1,5 @@
 {
-  "config": "{\"version\":\"5.59\",\"themeCollection\":{\"baseTheme\":{\"name\":\"CY24SU10\",\"version\":\"5.61\",\"type\":2}},\"activeSectionIndex\":2,\"defaultDrillFilterOtherVisuals\":true,\"settings\":{\"useNewFilterPaneExperience\":true,\"allowChangeFilterTypes\":true,\"useStylableVisualContainerHeader\":true,\"queryLimitOption\":6,\"useEnhancedTooltips\":true,\"exportDataMode\":1,\"useDefaultAggregateDisplayName\":true},\"objects\":{\"section\":[{\"properties\":{\"verticalAlignment\":{\"expr\":{\"Literal\":{\"Value\":\"'Top'\"}}}}}]}}",
+  "config": "{\"version\":\"5.59\",\"themeCollection\":{\"baseTheme\":{\"name\":\"CY24SU10\",\"version\":\"5.61\",\"type\":2}},\"activeSectionIndex\":3,\"defaultDrillFilterOtherVisuals\":true,\"linguisticSchemaSyncVersion\":2,\"settings\":{\"useNewFilterPaneExperience\":true,\"allowChangeFilterTypes\":true,\"useStylableVisualContainerHeader\":true,\"queryLimitOption\":6,\"useEnhancedTooltips\":true,\"exportDataMode\":1,\"useDefaultAggregateDisplayName\":true},\"objects\":{\"section\":[{\"properties\":{\"verticalAlignment\":{\"expr\":{\"Literal\":{\"Value\":\"'Top'\"}}}}}]}}",
   "layoutOptimization": 0,
   "resourcePackages": [
     {
@@ -14,6 +14,40 @@
         ],
         "name": "SharedResources",
         "type": 2
+      }
+    },
+    {
+      "resourcePackage": {
+        "disabled": false,
+        "items": [
+          {
+            "name": "test_image13726994662591707.bmp",
+            "path": "test_image13726994662591707.bmp",
+            "type": 100
+          },
+          {
+            "name": "test_image15532910574958114.gif",
+            "path": "test_image15532910574958114.gif",
+            "type": 100
+          },
+          {
+            "name": "test_image25861853181026917.tif",
+            "path": "test_image25861853181026917.tif",
+            "type": 100
+          },
+          {
+            "name": "test_image9544675947263683.jpg",
+            "path": "test_image9544675947263683.jpg",
+            "type": 100
+          },
+          {
+            "name": "test_image9896482226816141.png",
+            "path": "test_image9896482226816141.png",
+            "type": 100
+          }
+        ],
+        "name": "RegisteredResources",
+        "type": 1
       }
     }
   ],
@@ -55,6 +89,63 @@
           "x": 342.00,
           "y": 104.00,
           "z": 0.00
+        }
+      ],
+      "width": 1280.00
+    },
+    {
+      "config": "{}",
+      "displayName": "Page 4",
+      "displayOption": 1,
+      "filters": "[]",
+      "height": 720.00,
+      "name": "c744048b570d475206d0",
+      "ordinal": 3,
+      "visualContainers": [
+        {
+          "config": "{\"name\":\"63c15486d69a1d77ad82\",\"layouts\":[{\"id\":0,\"position\":{\"x\":937.5,\"y\":27,\"width\":161,\"height\":161,\"z\":4,\"tabOrder\":4}}],\"singleVisual\":{\"visualType\":\"image\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"imageUrl\":{\"expr\":{\"ResourcePackageItem\":{\"PackageName\":\"RegisteredResources\",\"PackageType\":1,\"ItemName\":\"test_image25861853181026917.tif\"}}}}}]}},\"howCreated\":\"InsertVisualButton\"}",
+          "filters": "[]",
+          "height": 161.00,
+          "width": 161.00,
+          "x": 937.50,
+          "y": 27.00,
+          "z": 4.00
+        },
+        {
+          "config": "{\"name\":\"6ac48140b12eb0ab5bac\",\"layouts\":[{\"id\":0,\"position\":{\"x\":22.426995457495135,\"y\":49.00713822193381,\"z\":0,\"width\":161.14211550940948,\"height\":161.14211550940948,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"image\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"imageUrl\":{\"expr\":{\"ResourcePackageItem\":{\"PackageName\":\"RegisteredResources\",\"PackageType\":1,\"ItemName\":\"test_image13726994662591707.bmp\"}}}}}]}},\"howCreated\":\"InsertVisualButton\"}",
+          "filters": "[]",
+          "height": 161.14,
+          "width": 161.14,
+          "x": 22.43,
+          "y": 49.01,
+          "z": 0.00
+        },
+        {
+          "config": "{\"name\":\"8bce33fe60a0c78d1459\",\"layouts\":[{\"id\":0,\"position\":{\"x\":224.26995457495133,\"y\":49.00713822193381,\"z\":1,\"width\":161.14211550940948,\"height\":161.14211550940948,\"tabOrder\":1}}],\"singleVisual\":{\"visualType\":\"image\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"imageUrl\":{\"expr\":{\"ResourcePackageItem\":{\"PackageName\":\"RegisteredResources\",\"PackageType\":1,\"ItemName\":\"test_image15532910574958114.gif\"}}}}}]}},\"howCreated\":\"InsertVisualButton\"}",
+          "filters": "[]",
+          "height": 161.14,
+          "width": 161.14,
+          "x": 224.27,
+          "y": 49.01,
+          "z": 1.00
+        },
+        {
+          "config": "{\"name\":\"ac2f524856312c1c0882\",\"layouts\":[{\"id\":0,\"position\":{\"x\":706.8656716417911,\"y\":27.410772225827387,\"z\":3,\"width\":161.14211550940948,\"height\":161.14211550940948,\"tabOrder\":3}}],\"singleVisual\":{\"visualType\":\"image\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"imageUrl\":{\"expr\":{\"ResourcePackageItem\":{\"PackageName\":\"RegisteredResources\",\"PackageType\":1,\"ItemName\":\"test_image9896482226816141.png\"}}}}}]}},\"howCreated\":\"InsertVisualButton\"}",
+          "filters": "[]",
+          "height": 161.14,
+          "width": 161.14,
+          "x": 706.87,
+          "y": 27.41,
+          "z": 3.00
+        },
+        {
+          "config": "{\"name\":\"bb2e1aaeee837cbc07c6\",\"layouts\":[{\"id\":0,\"position\":{\"x\":443.5561323815704,\"y\":49.00713822193381,\"z\":2,\"width\":161.14211550940948,\"height\":161.14211550940948,\"tabOrder\":2}}],\"singleVisual\":{\"visualType\":\"image\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"imageUrl\":{\"expr\":{\"ResourcePackageItem\":{\"PackageName\":\"RegisteredResources\",\"PackageType\":1,\"ItemName\":\"test_image9544675947263683.jpg\"}}}}}]}},\"howCreated\":\"InsertVisualButton\"}",
+          "filters": "[]",
+          "height": 161.14,
+          "width": 161.14,
+          "x": 443.56,
+          "y": 49.01,
+          "z": 2.00
         }
       ],
       "width": 1280.00
