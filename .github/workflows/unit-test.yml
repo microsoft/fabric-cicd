@@ -20,12 +20,12 @@ jobs:
             - name: Install dependencies
               run: |
                 python -m pip install --upgrade pip
-                pip install .[dev]
-                pip install pytest pytest-mock coverage ruff
+                pip install uv pytest pytest-mock coverage ruff
+                uv sync
 
             - name: Test with pytest
               run: |
-                coverage run -m pytest -v -s 
+                python -m coverage run -m pytest -v -s
             - name: Generate Coverage Report
               run: |
-                coverage report -m                    
+                python -m coverage report -m                    
