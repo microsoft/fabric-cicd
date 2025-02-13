@@ -45,8 +45,8 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
     :param item_name: Name of the environment item whose compute settings are to be published.
     """
     item_type = "Environment"
-    item_path = fabric_workspace_obj.repository_items[item_type][item_name]["path"]
-    item_guid = fabric_workspace_obj.repository_items[item_type][item_name]["guid"]
+    item_path = fabric_workspace_obj.repository_items[item_type][item_name].path
+    item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
 
     # Check for ongoing publish
     _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_check=True)
