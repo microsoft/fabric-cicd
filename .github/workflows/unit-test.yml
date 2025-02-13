@@ -22,7 +22,7 @@ jobs:
 
             - name: Test with pytest
               run: |
-                coverage run -m pytest  -v -s || exit 1
+                python -m coverage run -m pytest -v -s || exit 1
             - name: Generate Coverage Report
               run: |
-                coverage report -m                     
+                python -m coverage report -m                    
