@@ -5,9 +5,6 @@ on: [push]
 jobs:
     unit_test:
         runs-on: ubuntu-latest
-        strategy:
-          matrix:
-              python-version: ["3.12"] # ["3.9", "3.10", "3.11", "3.12"]
         steps:
             - name: Checkout code
               uses: actions/checkout@v2
@@ -15,12 +12,12 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@v2
               with:
-                  python-version: ${{ matrix.python-version }}
+                  python-version: "3.x"
 
             - name: Run unit tests
               run: |
                 python -m pip install --upgrade pip
                 pip install uv
-                python -m uv sync --dev
-                python -m uv run pytest -v -s
+                uv sync --dev
+                uv run pytest -v -s || exit 1  # Fail the job if any tests fail
                 
