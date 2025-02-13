@@ -1,0 +1,27 @@
+name: Run Unit Tests
+
+on: [push]
+
+jobs:
+    unit_test:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with:
+                  python-version: "3.x"
+
+            - name: Install dependencies
+              run: |
+                python -m pip install --upgrade pip
+                if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+            - name: Test with pytest
+              run: |
+                coverage run -m pytest  -v -s || exit 1
+            - name: Generate Coverage Report
+              run: |
+                coverage report -m                     
