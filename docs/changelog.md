@@ -2,6 +2,12 @@
 
 The following contains all major, minor, and patch version release notes.
 
+## Version 0.1.5
+
+<span class="md-h2-subheader">Release Date: 2025-02-24</span>
+
+-   Resolves [#100](https://github.com/microsoft/fabric-cicd/issues/100) - Introduces pytest check for PRs
+
 ## Version 0.1.4
 
 <span class="md-h2-subheader">Release Date: 2025-02-12</span>
