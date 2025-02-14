@@ -175,7 +175,7 @@ class FabricWorkspace:
 
                 # Add the item to the repository_items dictionary
                 self.repository_items[item_type][item_name] = Item(
-                    item_description, item_guid, item_logical_id, item_path
+                    item_type, item_name, item_description, item_guid, item_logical_id, item_path
                 )
 
     def _refresh_deployed_items(self):
@@ -197,7 +197,7 @@ class FabricWorkspace:
                 self.deployed_items[item_type] = {}
 
             # Add item details to the deployed_items dictionary
-            self.deployed_items[item_type][item_name] = Item(item_description, item_guid)
+            self.deployed_items[item_type][item_name] = Item(item_type, item_name, item_description, item_guid)
 
     def _replace_logical_ids(self, raw_file):
         """
