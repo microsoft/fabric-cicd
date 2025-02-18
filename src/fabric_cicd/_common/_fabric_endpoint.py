@@ -255,14 +255,14 @@ def _handle_response(response, method, url, body, long_running, iteration_count,
         raise Exception(msg)
 
     # Handle unexpected errors
-    # else:
-    #     err_msg = (
-    #         f" Message: {response.json()['message']}"
-    #         if "application/json" in (response.headers.get("Content-Type") or "")
-    #         else ""
-    #     )
-    #     msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
-    #     raise Exception(msg)
+    else:
+        err_msg = (
+            f" Message: {response.json()['message']}"
+            if "application/json" in (response.headers.get("Content-Type") or "")
+            else ""
+        )
+        msg = f"Unhandled error occurred calling {method} on '{url}'.{err_msg}"
+        raise Exception(msg)
 
     return exit_loop, method, url, body, long_running
 
