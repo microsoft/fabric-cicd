@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/about/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/changelog/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/code_reference/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/contribution/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/how_to/example/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/how_to/getting_started/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.5/how_to/parameterization/</loc>
+         <lastmod>2025-02-18</lastmod>
+    </url>
+</urlset>
