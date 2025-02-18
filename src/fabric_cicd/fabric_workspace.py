@@ -304,7 +304,8 @@ class FabricWorkspace:
         lookup_dict = self.repository_items if lookup_type == "Repository" else self.deployed_items
 
         for item_name, item_details in lookup_dict[item_type].items():
-            if item_details.logical_id == generic_id or item_details.guid == generic_id:
+            lookup_id = item_details.logical_id if lookup_type == "Repository" else item_details.guid
+            if lookup_id == generic_id:
                 return item_name
         # if not found
         return None
