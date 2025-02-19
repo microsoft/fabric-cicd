@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
-    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel")
-    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel")
+    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
+    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
 
     def __init__(
         self,
