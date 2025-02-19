@@ -30,8 +30,7 @@ def publish_datapipelines(fabric_workspace_obj):
     # Construct unsorted_pipeline_dict with dict of pipeline
     unsorted_pipeline_dict = {}
     for item_name, item_details in pipelines.items():
-        with Path.open(
-            Path(item_details.path, "pipeline-content.json"),
+        with Path(item_details.path, "pipeline-content.json").open(
             encoding="utf-8",
         ) as f:
             raw_file = f.read()
