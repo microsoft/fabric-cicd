@@ -15,5 +15,5 @@ def publish_semanticmodels(fabric_workspace_obj):
     item_type = "SemanticModel"
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        exclude_path = r".*[/\\]\.pbi[/\\]?.*"
+        exclude_path = r".*\.pbi[/\\].*"
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
