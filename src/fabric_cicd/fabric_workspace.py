@@ -323,40 +323,31 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(
-        self, item_name, item_type, excluded_files=None, excluded_directories=None, full_publish=True, **kwargs
-    ):
+    def _publish_item(self, item_name, item_type, exclude_path=r"^(?!.*)", full_publish=True, **kwargs):
         """
         Publishes or updates an item in the Fabric Workspace.
 
         :param item_name: Name of the item to publish.
         :param item_type: Type of the item (e.g., Notebook, Environment).
-        :param excluded_files: Set of file names to exclude from the publish process.
+        :param exclude_path: Regex string of paths to exclude.
         :param full_publish: If True, publishes the full item with its content. If False, only
             publishes metadata (for items like Environments).
         """
         item_path = self.repository_items[item_type][item_name].path
         item_guid = self.repository_items[item_type][item_name].guid
-        item_description = self.repository_items[item_type][item_name].description
 
         max_retries = 10 if item_type == "SemanticModel" else 5
 
-        excluded_files = excluded_files or {".platform"}
-        excluded_directories = excluded_directories or None
-
-        metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
+        metadata_body = {"displayName": item_name, "type": item_type}
 
         if full_publish:
             item_payload = []
-            for root, dirs, files in os.walk(item_path):
-                # modify dirs in place
-                dirs[:] = [d for d in dirs if d not in excluded_directories]
-
+            for root, _dirs, files in os.walk(item_path):
                 for file in files:
                     full_path = Path(root, file)
                     relative_path = str(full_path.relative_to(item_path).as_posix())
 
-                    if file not in excluded_files:
+                    if not re.match(exclude_path, relative_path):
                         if is_image_file(full_path):
                             byte_file = self._process_image(full_path)
                         else:
@@ -387,22 +378,10 @@ class FabricWorkspace:
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
                 self.endpoint.invoke(
                     method="POST",
-                    url=f"{self.base_api_url}/items/{item_guid}/updateDefinition",
+                    url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                     body=definition_body,
                     max_retries=max_retries,
                 )
-
-            # Remove the 'type' key as it's not supported in the update-item API
-            metadata_body.pop("type", None)
-
-            # Update the item's metadata
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
-                method="PATCH",
-                url=f"{self.base_api_url}/items/{item_guid}",
-                body=metadata_body,
-                max_retries=max_retries,
-            )
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
@@ -484,7 +463,8 @@ class FabricWorkspace:
                 raw_file = json.dumps(definition_body, indent=4)
 
         # Replace logical IDs with deployed GUIDs.
-        replaced_raw_file = self._replace_logical_ids(raw_file)
-        replaced_raw_file = self._replace_parameters(replaced_raw_file)
+        if not str(file_path).endswith(".platform"):
+            raw_file = self._replace_logical_ids(raw_file)
+            raw_file = self._replace_parameters(raw_file)
 
-        return replaced_raw_file.encode("utf-8")
+        return raw_file.encode("utf-8")
