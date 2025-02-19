@@ -176,7 +176,11 @@ def _remove_libraries(fabric_workspace_obj, item_guid, repo_library_files):
     )
 
     if response_environment["body"].get("errorCode", "") != "EnvironmentLibrariesNotFound":
-        if "environmentYml" in response_environment["body"] and "environment.yml" not in repo_library_files:
+        if (
+            "environmentYml" in response_environment["body"]
+            and response_environment["body"]["environmentYml"]  # not none or ''
+            and "environment.yml" not in repo_library_files
+        ):
             _remove_library(fabric_workspace_obj, item_guid, "environment.yml")
 
         custom_libraries = response_environment["body"].get("customLibraries", None)
