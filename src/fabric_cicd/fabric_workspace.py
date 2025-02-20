@@ -26,7 +26,6 @@ class FabricWorkspace:
 
     ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel")
     ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel")
-    UNSUPPORTED_ITEM_TYPES_UPDATE_DEFINITION = ["Environment"]
 
     def __init__(
         self,
