@@ -24,8 +24,11 @@ def check_version():
         pass
 
 
-def is_image_file(file_path):
+def check_file_type(file_path):
     kind = filetype.guess(file_path)
-    if kind is None:
-        return False
-    return kind.mime.startswith("image/")
+    if kind is not None:
+        if kind.mime.startswith("application/"):
+            return "binary"
+        if kind.mime.startswith("image/"):
+            return "image"
+    return "text"

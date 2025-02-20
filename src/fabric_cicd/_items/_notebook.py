@@ -15,4 +15,11 @@ def publish_notebooks(fabric_workspace_obj):
     item_type = "Notebook"
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
+        fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=item_type, custom_file_processing=custom_file_processing
+        )
+
+
+def custom_file_processing(workspace_obj, item_obj, file_obj):
+    """Custom file processing for notebook items."""
+    return workspace_obj._replace_workspace_ids(file_obj.contents, item_obj.type)

@@ -42,7 +42,14 @@ def publish_datapipelines(fabric_workspace_obj):
 
     # Publish
     for item_name in publish_order:
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
+        fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=item_type, custom_file_processing=custom_file_processing
+        )
+
+
+def custom_file_processing(workspace_obj, item_obj, file_obj):
+    """Custom file processing for datapipeline items."""
+    return workspace_obj._replace_workspace_ids(file_obj.contents, item_obj.type)
 
 
 def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type):

@@ -16,6 +16,7 @@ Functions to process and deploy Environment item.
 logger = logging.getLogger(__name__)
 
 
+# TODO - binaries and compute.yml are read into files, but not actually needed since we only need the file
 def publish_environments(fabric_workspace_obj):
     """
     Publishes all environment items from the repository.

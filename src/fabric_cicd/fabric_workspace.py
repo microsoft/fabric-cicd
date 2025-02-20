@@ -3,7 +3,6 @@
 
 """Module provides the FabricWorkspace class to manage and publish workspace items to the Fabric API."""
 
-import base64
 import json
 import logging
 import os
@@ -15,8 +14,7 @@ import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._check_utils import is_image_file
-from fabric_cicd._common._exceptions import ItemDependencyError, ParsingError
+from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 
@@ -165,7 +163,7 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                item_path = str(directory)
+                item_path = Path(directory)
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -177,6 +175,7 @@ class FabricWorkspace:
                 self.repository_items[item_type][item_name] = Item(
                     item_type, item_name, item_description, item_guid, item_logical_id, item_path
                 )
+                self.repository_items[item_type][item_name].collect_item_files()
 
     def _refresh_deployed_items(self):
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
@@ -323,18 +322,21 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, exclude_path=r"^(?!.*)", full_publish=True, **kwargs):
+    def _publish_item(
+        self, item_name, item_type, exclude_path=r"^(?!.*)", full_publish=True, custom_file_processing=None, **kwargs
+    ):
         """
         Publishes or updates an item in the Fabric Workspace.
 
         :param item_name: Name of the item to publish.
         :param item_type: Type of the item (e.g., Notebook, Environment).
         :param exclude_path: Regex string of paths to exclude.
-        :param full_publish: If True, publishes the full item with its content. If False, only
-            publishes metadata (for items like Environments).
+        :param full_publish: If False, only publishes shell (for items like Environments).
+        :param custom_file_processing: Custom function to process file contents.
         """
-        item_path = self.repository_items[item_type][item_name].path
-        item_guid = self.repository_items[item_type][item_name].guid
+        item = self.repository_items[item_type][item_name]
+        item_guid = item.guid
+        item_files = item.item_files
 
         max_retries = 10 if item_type == "SemanticModel" else 5
 
@@ -342,20 +344,17 @@ class FabricWorkspace:
 
         if full_publish:
             item_payload = []
-            for root, _dirs, files in os.walk(item_path):
-                for file in files:
-                    full_path = Path(root, file)
-                    relative_path = str(full_path.relative_to(item_path).as_posix())
+            for file in item_files:
+                if not re.match(exclude_path, file.relative_path):
+                    if file.type == "text":
+                        file.contents = (
+                            custom_file_processing(self, item, file) if custom_file_processing else file.contents
+                        )
+                        if not str(file.file_path).endswith(".platform"):
+                            file.contents = self._replace_logical_ids(file.contents)
+                            file.contents = self._replace_parameters(file.contents)
 
-                    if not re.match(exclude_path, relative_path):
-                        if is_image_file(full_path):
-                            byte_file = self._process_image(full_path)
-                        else:
-                            byte_file = self._process_file(full_path, item_type, item_path)
-
-                        payload = base64.b64encode(byte_file).decode("utf-8")
-
-                        item_payload.append({"path": relative_path, "payload": payload, "payloadType": "InlineBase64"})
+                    item_payload.append(file.base64_payload)
 
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
@@ -372,16 +371,16 @@ class FabricWorkspace:
             )
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
-        else:
-            if full_publish:
-                # Update the item's definition if full publish is required
-                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-                self.endpoint.invoke(
-                    method="POST",
-                    url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
-                    body=definition_body,
-                    max_retries=max_retries,
-                )
+
+        elif full_publish:
+            # Update the item's definition if full publish is required
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
+            self.endpoint.invoke(
+                method="POST",
+                url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
+                body=definition_body,
+                max_retries=max_retries,
+            )
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
@@ -405,66 +404,3 @@ class FabricWorkspace:
             logger.info("Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
-
-    def _process_image(self, file_path):
-        """
-        Reads an image file as binary data.
-
-        :param file_path: The path to the image file.
-        """
-        with Path.open(file_path, "rb") as f:
-            return f.read()
-
-    def _process_file(self, file_path, item_type, item_path):
-        """
-        Processes a non-image file by reading its content, performing necessary substitutions,
-        and returning the processed content as UTF-8 encoded bytes.
-
-        This includes:
-            - Replacing feature branch workspace IDs with target workspace IDs (for DataPipeline and Notebook).
-            - Processing report files to replace connection details if the file is 'definition.pbir'.
-            - Replacing logical IDs with deployed GUIDs.
-            - Replacing parameter placeholders with environment-specific values.
-
-        :param file_path: The path to the file.
-        :param item_type: The type of the item (e.g., DataPipeline, Notebook, Report).
-        :param item_path: The base directory path of the item.
-        """
-        with Path.open(file_path, encoding="utf-8") as f:
-            raw_file = f.read()
-
-        # Replace feature branch workspace IDs with target workspace IDs in a data pipeline/notebook file.
-        if item_type in ["DataPipeline", "Notebook"]:
-            raw_file = self._replace_workspace_ids(raw_file, item_type)
-
-        # Replace connections in report
-        if item_type == "Report" and Path(file_path).name == "definition.pbir":
-            definition_body = json.loads(raw_file)
-            if "datasetReference" in definition_body and "byPath" in definition_body["datasetReference"]:
-                model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
-                model_path = str((Path(item_path) / model_rel_path).resolve())
-                model_id = self._convert_path_to_id("SemanticModel", model_path)
-
-                if not model_id:
-                    msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
-                    raise ItemDependencyError(msg, logger)
-
-                definition_body["datasetReference"] = {
-                    "byConnection": {
-                        "connectionString": None,
-                        "pbiServiceModelId": None,
-                        "pbiModelVirtualServerName": "sobe_wowvirtualserver",
-                        "pbiModelDatabaseName": f"{model_id}",
-                        "name": "EntityDataSource",
-                        "connectionType": "pbiServiceXmlaStyleLive",
-                    }
-                }
-
-                raw_file = json.dumps(definition_body, indent=4)
-
-        # Replace logical IDs with deployed GUIDs.
-        if not str(file_path).endswith(".platform"):
-            raw_file = self._replace_logical_ids(raw_file)
-            raw_file = self._replace_parameters(raw_file)
-
-        return raw_file.encode("utf-8")
