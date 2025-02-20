@@ -322,14 +322,14 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, exclude_path=r"^(?!.*)", custom_file_processing=None, **kwargs):
+    def _publish_item(self, item_name, item_type, exclude_path=r"^(?!.*)", func_process_file=None, **kwargs):
         """
         Publishes or updates an item in the Fabric Workspace.
 
         :param item_name: Name of the item to publish.
         :param item_type: Type of the item (e.g., Notebook, Environment).
         :param exclude_path: Regex string of paths to exclude.
-        :param custom_file_processing: Custom function to process file contents.
+        :param func_process_file: Custom function to process file contents.
         """
         item = self.repository_items[item_type][item_name]
         item_guid = item.guid
@@ -349,9 +349,7 @@ class FabricWorkspace:
             for file in item_files:
                 if not re.match(exclude_path, file.relative_path):
                     if file.type == "text":
-                        file.contents = (
-                            custom_file_processing(self, item, file) if custom_file_processing else file.contents
-                        )
+                        file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file.contents)

@@ -23,11 +23,11 @@ def publish_reports(fabric_workspace_obj):
             item_name=item_name,
             item_type=item_type,
             exclude_path=exclude_path,
-            custom_file_processing=custom_file_processing,
+            func_process_file=func_process_file,
         )
 
 
-def custom_file_processing(workspace_obj, item_obj, file_obj):
+def func_process_file(workspace_obj, item_obj, file_obj):
     """Custom file processing for report items."""
     if file_obj.name == "definition.pbir":
         definition_body = json.loads(file_obj.contents)
