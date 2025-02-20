@@ -150,9 +150,11 @@ class FabricWorkspace:
                     with Path.open(item_metadata_path) as file:
                         item_metadata = json.load(file)
                 except FileNotFoundError as e:
-                    ParsingError(f"{item_metadata_path} path does not exist in the specified repository. {e}", logger)
+                    msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"
+                    ParsingError(msg, logger)
                 except json.JSONDecodeError as e:
-                    ParsingError(f"Error decoding JSON in {item_metadata_path}. {e}", logger)
+                    msg = f"Error decoding JSON in {item_metadata_path}. {e}"
+                    ParsingError(msg, logger)
 
                 # Ensure required metadata fields are present
                 if "type" not in item_metadata["metadata"] or "displayName" not in item_metadata["metadata"]:

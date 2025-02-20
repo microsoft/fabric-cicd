@@ -27,3 +27,7 @@ class InvokeError(BaseCustomError):
 
 class ItemDependencyError(BaseCustomError):
     pass
+
+
+class FileTypeError(BaseCustomError):
+    pass
