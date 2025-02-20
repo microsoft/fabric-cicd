@@ -26,6 +26,7 @@ class FabricWorkspace:
 
     ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel")
     ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel")
+    UNSUPPORTED_ITEM_TYPES_UPDATE_DEFINITION = ["Environment"]
 
     def __init__(
         self,
@@ -322,16 +323,13 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(
-        self, item_name, item_type, exclude_path=r"^(?!.*)", full_publish=True, custom_file_processing=None, **kwargs
-    ):
+    def _publish_item(self, item_name, item_type, exclude_path=r"^(?!.*)", custom_file_processing=None, **kwargs):
         """
         Publishes or updates an item in the Fabric Workspace.
 
         :param item_name: Name of the item to publish.
         :param item_type: Type of the item (e.g., Notebook, Environment).
         :param exclude_path: Regex string of paths to exclude.
-        :param full_publish: If False, only publishes shell (for items like Environments).
         :param custom_file_processing: Custom function to process file contents.
         """
         item = self.repository_items[item_type][item_name]
@@ -342,7 +340,12 @@ class FabricWorkspace:
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
-        if full_publish:
+        # Only shell deployment, no definition support
+        shell_only_publish = item_type in ["Environment"]
+
+        if shell_only_publish:
+            combined_body = metadata_body
+        else:
             item_payload = []
             for file in item_files:
                 if not re.match(exclude_path, file.relative_path):
@@ -358,12 +361,12 @@ class FabricWorkspace:
 
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
-        else:
-            combined_body = metadata_body
 
         logger.info(f"Publishing {item_type} '{item_name}'")
 
-        if not item_guid:
+        is_deployed = bool(item_guid)
+
+        if not is_deployed:
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
@@ -372,7 +375,7 @@ class FabricWorkspace:
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
 
-        elif full_publish:
+        elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
             self.endpoint.invoke(
