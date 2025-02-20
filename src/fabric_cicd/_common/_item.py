@@ -24,6 +24,7 @@ class Item:
         super().__setattr__(key, value)
 
     def collect_item_files(self):
+        self.item_files = []
         for root, _dirs, files in os.walk(self.path):
             for file in files:
                 full_path = Path(root, file)
