@@ -34,9 +34,9 @@ spark_pool:
 
 When deploying the `Example` notebook from a feature workspace to PPE and PROD environments, the attached `Example_LH` lakehouse needs to be updated to point to the correct lakehouse in the respective environments.
 
-In the `notebook-content.py` file, the referenced lakehouse GUID `123e4567-e89b-12d3-a456-426614174000` must be replaced with the corresponding GUID for the `Example_LH` lakehouse in the target environment. This replacement is managed by the library, which finds all instances of the GUID specified in `Parameters.yml` within the repository files and replaces it with the GUID for the deployed environment.
+In the `notebook-content.py` file, the referenced lakehouse GUID `123e4567-e89b-12d3-a456-426614174000` must be replaced with the corresponding GUID for the `Example_LH` lakehouse in the target environment. This replacement is managed by the library, which takes the `find_replace` input in `Parameter.yml` to find all instances of the GUID string within the repository files and replaces it with the GUID for the deployed environment.
 
-Note: In this example, a `find_replace` operation would also be required to update the lakehouse workspace ID found in the notebook file.
+Note: In this example, the lakehouse workspace ID in the notebook file is also replaced using `Parameter.yml`.
 
 ### Parameters.yml
 
