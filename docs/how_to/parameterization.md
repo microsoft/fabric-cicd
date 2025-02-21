@@ -43,11 +43,11 @@ Note: In this example, the lakehouse workspace id in the notebook file is also r
 ```yaml
 find_replace:
     "123e4567-e89b-12d3-a456-426614174000": # lakehouse guid to be replaced
-        PPE: f47ac10b-58cc-4372-a567-0e02b2c3d479 # PPE lakehouse guid
-        PROD: 9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c # PROD lakehouse guid
+        PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE lakehouse guid
+        PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse guid
     "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c": # workspace id to be replaced
-        PPE: d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a # PPE workspace id
-        PROD: a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d # PROD workspace id
+        PPE: "d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a" # PPE workspace id
+        PROD: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" # PROD workspace id
 ```
 
 ### notebook-content.py
