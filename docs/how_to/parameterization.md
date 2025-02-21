@@ -6,7 +6,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 ## find_replace
 
-For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find` value as the key and the `replace` value for each environment. Refer to the example for a complete yaml file at the end of this page or see the [Example](example.md) page.
+For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find` value as the key and the `replace` value for each environment. See the [Example](example.md) page for a complete yaml file.
 
 Note: A common use case for this function is to replace connection strings. I.e. find and replace a connection guid referenced in data pipeline.
 
@@ -30,24 +30,24 @@ spark_pool:
         name: <pool-name>
 ```
 
-## Parameter.yml File
+## find_replace Example
 
-<!--prettier-ignore-->
-```yml
-{% include "../../sample/workspace/parameter.yml" %}
-```
+`Hello World` notebook is attached to the `Hello_World_LH` lakehouse. When deploying `Hello World` from a feature workspace to environment workspaces PPE and PROD, the attached lakehouse needs to be updated to point to the correct lakehouse in the respective environments.
 
-## find_replace Use Case Example
+In the `notebook-content.py` file, the referenced lakehouse GUID `123e4567-e89b-12d3-a456-426614174000` needs to be replaced with the GUID of the `Hello_World_LH` lakehouse found in the PPE/PROD workspace. This replacement is handled by finding all instances of the GUID supplied by `Parameters.yml` in all files in the repository directory and replacing it with the GUID associated with the deployed environment.
 
-'Hello World' notebook is attached to 'Hello_World_LH' lakehouse. When deploying 'Hello World' from a feature workspace to environment workspaces PPE and PROD, the attached lakehouse needs to be updated to point to the correct lakehouse in the respective environments. In the .py notebook file, the lakehouse Id references the following GUID 123e4567-e89b-12d3-a456-426614174000 which needs to be replaced with the GUID of the 'Hello_World_LH' lakehouse found in PPE/PROD workspace. Through parameterization, a brute force replacement is handled by finding all instances of the string '123e4567-e89b-12d3-a456-426614174000' in all files and replacing it with the string associated with the deployed environment.
+Note: In this example, a `find_replace` operation would also be required to update the lakehouse workspace ID found in the notebook file.
 
 ### Parameters.yml
 
 ```yaml
 find_replace:
-    123e4567-e89b-12d3-a456-426614174000: # 'Hello_World_LH' GUID to be replaced
-        PPE: f47ac10b-58cc-4372-a567-0e02b2c3d479 # 'Hello_World_LH' GUID in PPE
-        PROD: 9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c # 'Hello_World_LH' GUID in PROD
+    123e4567-e89b-12d3-a456-426614174000: # lakehouse GUID to be replaced
+        PPE: f47ac10b-58cc-4372-a567-0e02b2c3d479 # PPE lakehouse GUID
+        PROD: 9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c # PROD lakehouse GUID
+    8f5c0cec-a8ea-48cd-9da4-871dc2642f4c: # workspace ID to be replaced
+        PPE: d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a # PPE workspace ID
+        PROD: a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d # PROD workspace ID
 ```
 
 ### notebook-content.py
