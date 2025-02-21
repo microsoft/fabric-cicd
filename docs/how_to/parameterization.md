@@ -6,7 +6,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 ## find_replace
 
-For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find` value as the key and the `replace` value for each environment. See the [Example](example.md) page for a complete yaml file.
+For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find` value as the key and the `replace` value for each environment. See example at the end for a complete yaml file.
 
 Note: A common use case for this function is to replace connection strings. I.e. find and replace a connection guid referenced in data pipeline.
 
@@ -28,4 +28,11 @@ spark_pool:
     <instance-pool-id>:
         type: <Capacity-or-Workspace>
         name: <pool-name>
+```
+
+## Parameter.yml File
+
+<!--prettier-ignore-->
+```yml
+{% include "../../sample/workspace/parameter.yml" %}
 ```
