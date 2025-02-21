@@ -50,3 +50,7 @@ python-preference = "only-managed"
 addopts = "-v --tb=short"
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
