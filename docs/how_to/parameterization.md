@@ -30,11 +30,11 @@ spark_pool:
         name: <pool-name>
 ```
 
-## find_replace Example
+## Example Use Case
 
-`Hello World` notebook is attached to the `Hello_World_LH` lakehouse. When deploying `Hello World` from a feature workspace to environment workspaces PPE and PROD, the attached lakehouse needs to be updated to point to the correct lakehouse in the respective environments.
+When deploying the `Example` notebook from a feature workspace to PPE and PROD environments, the attached `Example_LH` lakehouse needs to be updated to point to the correct lakehouse in the respective environments.
 
-In the `notebook-content.py` file, the referenced lakehouse GUID `123e4567-e89b-12d3-a456-426614174000` needs to be replaced with the GUID of the `Hello_World_LH` lakehouse found in the PPE/PROD workspace. This replacement is handled by finding all instances of the GUID supplied by `Parameters.yml` in all files in the repository directory and replacing it with the GUID associated with the deployed environment.
+In the `notebook-content.py` file, the referenced lakehouse GUID `123e4567-e89b-12d3-a456-426614174000` must be replaced with the corresponding GUID for the `Example_LH` lakehouse in the target environment. This replacement is managed by the library, which finds all instances of the GUID specified in `Parameters.yml` within the repository files and replaces it with the GUID for the deployed environment.
 
 Note: In this example, a `find_replace` operation would also be required to update the lakehouse workspace ID found in the notebook file.
 
@@ -64,7 +64,7 @@ find_replace:
 # META   "dependencies": {
 # META     "lakehouse": {
 # META       "default_lakehouse": "123e4567-e89b-12d3-a456-426614174000",
-# META       "default_lakehouse_name": "Hello_World_LH",
+# META       "default_lakehouse_name": "Example_LH",
 # META       "default_lakehouse_workspace_id": "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
 # META     },
 # META     "environment": {
@@ -76,7 +76,19 @@ find_replace:
 
 # CELL ********************
 
-print("Hello World")
+print("Example notebook")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+df = spark.sql("SELECT * FROM Example_LH.Table1 LIMIT 1000")
+display(df)
 
 # METADATA ********************
 
