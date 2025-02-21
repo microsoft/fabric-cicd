@@ -20,11 +20,8 @@ def append_feature_flag(feature: str) -> None:
     """
     Append a feature flag to the global feature_flag set.
 
-    Parameters
-    ----------
-    feature : str
-        The feature flag to be included.
-
+    Args:
+        feature: The feature flag to be included.
     """
     global feature_flag
     feature_flag.add(feature)
@@ -34,24 +31,20 @@ def change_log_level(level: str = "DEBUG") -> None:
     """
     Sets the log level for all loggers within the fabric_cicd package. Currently only supports DEBUG.
 
-    Parameters
-    ----------
-    level : str
-        The logging level to set (e.g., DEBUG).
+    Args:
+        level: The logging level to set (e.g., DEBUG).
 
-    Examples
-    --------
-    Basic usage
-    >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, change_log_level
-    >>> change_log_level("DEBUG")
-    >>> workspace = FabricWorkspace(
-    ...     workspace_id="your-workspace-id",
-    ...     repository_directory="/path/to/repo",
-    ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-    ... )
-    >>> publish_all_items(workspace)
-    >>> unpublish_orphaned_items(workspace)
-
+    Examples:
+        Basic usage
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, change_log_level
+        >>> change_log_level("DEBUG")
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> publish_all_items(workspace)
+        >>> unpublish_orphaned_items(workspace)
     """
     if level.upper() == "DEBUG":
         configure_logger(logging.DEBUG)

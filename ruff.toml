@@ -5,6 +5,7 @@ exclude = ["sample/*"]
 # https://docs.astral.sh/ruff/rules/
 select = [
     "A",   # flake8-builtins
+    "ANN", # flake8-annotations-complexity
     "ARG", # flake8-unused-arguments
     "B",   # flake8-bugbear
     "D",   # pydocstyle
@@ -21,24 +22,29 @@ select = [
     "UP",  # pyupgrade
 ]
 ignore = [
-    "D203", # No blank lines between a section header and its content
-    "D205", # 1 blank line required between summary line and description
-    "D212", # Multi-line docstring summary should start at the first line
-    "D400", # First line should end with a period
-    "D401", # First line should be in imperative mood
-    "D415", # First line should end with a period, question mark, or exclamation point
+    "D203",   # No blank lines between a section header and its content
+    "D205",   # 1 blank line required between summary line and description
+    "D212",   # Multi-line docstring summary should start at the first line
+    "D400",   # First line should end with a period
+    "D401",   # First line should be in imperative mood
+    "D415",   # First line should end with a period, question mark, or exclamation point
+    "ANN003", # Missing type annotation for kwargs
 ]
+
+pydocstyle.convention = "google"
 
 [lint.per-file-ignores]
 "{tests}/*" = [
     "D",   # pydocstyle
     "INP", # flake8-no-pep420
+    "ANN", # flake8-annotations-complexity
 ]
 
 "{devtools}/*" = [
     "D",    # pydocstyle
     "INP",  # flake8-no-pep420
     "F401", # unused import
+    "ANN",  # flake8-annotations-complexity
 ]
 
 [format]

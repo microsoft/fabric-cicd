@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Functions and classes to manage file operations."""
+
 import base64
 import logging
 from dataclasses import dataclass, field
@@ -9,10 +11,6 @@ from typing import ClassVar
 
 from fabric_cicd._common._check_utils import check_file_type
 from fabric_cicd._common._exceptions import FileTypeError
-
-"""
-Functions and classes to manage file operations.
-"""
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +25,14 @@ class File:
     contents: str = field(default="", init=False)
     IMMUTABLE_FIELDS: ClassVar[set] = {"item_path", "file_path"}
 
-    def __setattr__(self, key, value):
-        """Override setattr for 'immutable' fields"""
+    def __setattr__(self, key: str, value: any) -> None:
+        """
+        Override setattr for 'immutable' fields.
+
+        Args:
+            key: The attribute name.
+            value: The attribute value.
+        """
         if key in self.IMMUTABLE_FIELDS and hasattr(self, key):
             msg = f"item {key} is immutable"
             raise AttributeError(msg)
@@ -39,8 +43,8 @@ class File:
             raise AttributeError(msg)
         super().__setattr__(key, value)
 
-    def __post_init__(self):
-        """After initializaing the object, read the file contents and set the type"""
+    def __post_init__(self) -> None:
+        """After initializing the object, read the file contents and set the type."""
         file_type = check_file_type(self.file_path)
 
         if file_type != "text":
@@ -66,15 +70,18 @@ class File:
         self.type = file_type
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Return the file name."""
         return self.file_path.name
 
     @property
-    def relative_path(self):
+    def relative_path(self) -> str:
+        """Return the relative path of the file."""
         return str(self.file_path.relative_to(self.item_path).as_posix())
 
     @property
-    def base64_payload(self):
+    def base64_payload(self) -> dict:
+        """Return the file contents as a base64 encoded payload."""
         byte_file = self.contents.encode("utf-8") if self.type == "text" else self.contents
 
         return {

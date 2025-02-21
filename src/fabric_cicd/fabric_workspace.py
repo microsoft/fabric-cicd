@@ -8,6 +8,7 @@ import logging
 import os
 import re
 from pathlib import Path
+from typing import Optional
 
 import dpath
 import yaml
@@ -39,57 +40,48 @@ class FabricWorkspace:
         """
         Initializes the FabricWorkspace instance.
 
-        Parameters
-        ----------
-        workspace_id : str
-            The ID of the workspace to interact with.
-        repository_directory : str
-            Local directory path of the repository where items are to be deployed from.
-        item_type_in_scope : list
-            Item types that should be deployed for given workspace.
-        base_api_url : str, optional
-            Base URL for the Fabric API. Defaults to the Fabric API endpoint.
-        environment : str, optional
-            The environment to be used for parameterization.
-        token_credential : str, optional
-            The token credential to use for API requests.
+        Args:
+            workspace_id: The ID of the workspace to interact with.
+            repository_directory: Local directory path of the repository where items are to be deployed from.
+            item_type_in_scope: Item types that should be deployed for a given workspace.
+            base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
+            environment: The environment to be used for parameterization.
+            token_credential: The token credential to use for API requests.
 
-        Examples
-        --------
-        Basic usage
-        >>> from fabric_cicd import FabricWorkspace
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-        ... )
+        Examples:
+            Basic usage
+            >>> from fabric_cicd import FabricWorkspace
+            >>> workspace = FabricWorkspace(
+            ...     workspace_id="your-workspace-id",
+            ...     repository_directory="/path/to/repo",
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ... )
 
-        With optional parameters
-        >>> from fabric_cicd import FabricWorkspace
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/your/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-        ...     base_api_url="https://orgapi.fabric.microsoft.com",
-        ...     environment="your-target-environment"
-        ... )
+            With optional parameters
+            >>> from fabric_cicd import FabricWorkspace
+            >>> workspace = FabricWorkspace(
+            ...     workspace_id="your-workspace-id",
+            ...     repository_directory="/your/path/to/repo",
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+            ...     base_api_url="https://orgapi.fabric.microsoft.com",
+            ...     environment="your-target-environment"
+            ... )
 
-        With token credential
-        >>> from fabric_cicd import FabricWorkspace
-        >>> from azure.identity import ClientSecretCredential
-        >>> client_id = "your-client-id"
-        >>> client_secret = "your-client-secret"
-        >>> tenant_id = "your-tenant-id"
-        >>> token_credential = ClientSecretCredential(
-        ...     client_id=client_id, client_secret=client_secret, tenant_id=tenant_id
-        ... )
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/your/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-        ...     token_credential=token_credential
-        ... )
-
+            With token credential
+            >>> from fabric_cicd import FabricWorkspace
+            >>> from azure.identity import ClientSecretCredential
+            >>> client_id = "your-client-id"
+            >>> client_secret = "your-client-secret"
+            >>> tenant_id = "your-tenant-id"
+            >>> token_credential = ClientSecretCredential(
+            ...     client_id=client_id, client_secret=client_secret, tenant_id=tenant_id
+            ... )
+            >>> workspace = FabricWorkspace(
+            ...     workspace_id="your-workspace-id",
+            ...     repository_directory="/your/path/to/repo",
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+            ...     token_credential=token_credential
+            ... )
         """
         from fabric_cicd._common._validate_input import (
             validate_base_api_url,
@@ -120,8 +112,8 @@ class FabricWorkspace:
         self._refresh_deployed_items()
         self._refresh_repository_items()
 
-    def _refresh_parameter_file(self):
-        """Load parameters if file is present"""
+    def _refresh_parameter_file(self) -> None:
+        """Load parameters if file is present."""
         parameter_file_path = Path(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
@@ -130,7 +122,7 @@ class FabricWorkspace:
             with Path.open(parameter_file_path) as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
-    def _refresh_repository_items(self):
+    def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
 
@@ -179,7 +171,7 @@ class FabricWorkspace:
                 )
                 self.repository_items[item_type][item_name].collect_item_files()
 
-    def _refresh_deployed_items(self):
+    def _refresh_deployed_items(self) -> None:
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
         # Get all items in workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item
@@ -200,12 +192,12 @@ class FabricWorkspace:
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(item_type, item_name, item_description, item_guid)
 
-    def _replace_logical_ids(self, raw_file):
+    def _replace_logical_ids(self, raw_file: str) -> str:
         """
         Replaces logical IDs with deployed GUIDs in the raw file content.
 
-        :param raw_file: The raw file content where logical IDs need to be replaced.
-        :return: The raw file content with logical IDs replaced by GUIDs.
+        Args:
+            raw_file: The raw file content where logical IDs need to be replaced.
         """
         for item_name in self.repository_items.values():
             for item_details in item_name.values():
@@ -220,11 +212,12 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters(self, raw_file):
+    def _replace_parameters(self, raw_file: str) -> str:
         """
         Replaces values found in parameter file with the chosen environment value.
 
-        :param raw_file: The raw file content where parameter values need to be replaced.
+        Args:
+            raw_file: The raw file content where parameter values need to be replaced.
         """
         if "find_replace" in self.environment_parameter:
             for key, parameter_dict in self.environment_parameter["find_replace"].items():
@@ -234,14 +227,14 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file, item_type):
+    def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
         (actual workspace ID guid) values, with target workspace ID in the raw file content.
 
-        :param raw_file: The raw file content where workspace IDs need to be replaced.
-        :param item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
-        :return: The raw file content with feature branch workspace IDs replaced by target workspace IDs.
+        Args:
+            raw_file: The raw file content where workspace IDs need to be replaced.
+            item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
         """
         # Replace all instances of default feature branch workspace ID with target workspace ID
         target_workspace_id = self.workspace_id
@@ -257,10 +250,14 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_activity_workspace_ids(self, raw_file, target_workspace_id):
+    def _replace_activity_workspace_ids(self, raw_file: str, target_workspace_id: str) -> str:
         """
         Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
         with target workspace ID found in DataPipeline activities.
+
+        Args:
+            raw_file: The raw file content where workspace IDs need to be replaced.
+            target_workspace_id: The target workspace ID to replace with.
         """
         # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
@@ -294,13 +291,14 @@ class FabricWorkspace:
         # Convert the updated dict back to a JSON string
         return json.dumps(item_content_dict, indent=2)
 
-    def _convert_id_to_name(self, item_type, generic_id, lookup_type):
+    def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
-        For a given item_type and id, returns the item name.  Special handling for both deployed and repository items
+        For a given item_type and id, returns the item name. Special handling for both deployed and repository items.
 
-        :param item_type: Type of the item (e.g., Notebook, Environment).
-        :param generic_id: Logical id or item guid of the item based on lookup_type.
-        :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository)
+        Args:
+            item_type: Type of the item (e.g., Notebook, Environment).
+            generic_id: Logical id or item guid of the item based on lookup_type.
+            lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
         """
         lookup_dict = self.repository_items if lookup_type == "Repository" else self.deployed_items
 
@@ -311,12 +309,13 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _convert_path_to_id(self, item_type, path):
+    def _convert_path_to_id(self, item_type: str, path: str) -> str:
         """
         For a given path and item type, returns the logical id.
 
-        :param item_type: Type of the item (e.g., Notebook, Environment).
-        :param path: Full path of the desired item.
+        Args:
+            item_type: Type of the item (e.g., Notebook, Environment).
+            path: Full path of the desired item.
         """
         for item_details in self.repository_items[item_type].values():
             if Path(item_details.path) == Path(path):
@@ -324,14 +323,23 @@ class FabricWorkspace:
         # if not found
         return None
 
-    def _publish_item(self, item_name, item_type, exclude_path=r"^(?!.*)", func_process_file=None, **kwargs):
+    def _publish_item(
+        self,
+        item_name: str,
+        item_type: str,
+        exclude_path: str = r"^(?!.*)",
+        func_process_file: Optional[callable] = None,
+        **kwargs,
+    ) -> None:
         """
         Publishes or updates an item in the Fabric Workspace.
 
-        :param item_name: Name of the item to publish.
-        :param item_type: Type of the item (e.g., Notebook, Environment).
-        :param exclude_path: Regex string of paths to exclude.
-        :param func_process_file: Custom function to process file contents.
+        Args:
+            item_name: Name of the item to publish.
+            item_type: Type of the item (e.g., Notebook, Environment).
+            exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
+            func_process_file: Custom function to process file contents. Defaults to None.
+            **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
         item_guid = item.guid
@@ -388,12 +396,13 @@ class FabricWorkspace:
         if not kwargs.get("skip_publish_logging", False):
             logger.info("Published")
 
-    def _unpublish_item(self, item_name, item_type):
+    def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """
         Unpublishes an item from the Fabric workspace.
 
-        :param item_name: Name of the item to unpublish.
-        :param item_type: Type of the item (e.g., Notebook, Environment).
+        Args:
+            item_name: Name of the item to unpublish.
+            item_type: Type of the item (e.g., Notebook, Environment).
         """
         item_guid = self.deployed_items[item_type][item_name].guid
 

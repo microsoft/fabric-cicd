@@ -1,9 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Logging utilities for the fabric_cicd package."""
+
 import inspect
 import logging
 import sys
+import traceback
 from pathlib import Path
 
 import colorlog
@@ -15,7 +18,8 @@ def configure_logger(level: int = logging.INFO) -> None:
     """
     Configure the logger.
 
-    :param level: The log level to set. Must be one of the standard logging levels.
+    Args:
+        level: The log level to set. Must be one of the standard logging levels.
     """
     # Configure default logging
     logging.basicConfig(
@@ -53,13 +57,14 @@ def configure_logger(level: int = logging.INFO) -> None:
     console_only_logger.propagate = False  # Prevent logs from being propagated to other loggers
 
 
-def exception_handler(exception_type, exception, traceback):
+def exception_handler(exception_type: type[BaseException], exception: BaseException, traceback: traceback) -> None:
     """
     Handle exceptions that are instances of any class from the _common._exceptions module.
 
-    :param exception_type: The type of the exception.
-    :param exception: The exception instance.
-    :param traceback: The traceback object.
+    Args:
+        exception_type: The type of the exception.
+        exception: The exception instance.
+        traceback: The traceback object.
     """
     # Get all exception classes from the _common._exceptions module
     exception_classes = [cls for _, cls in inspect.getmembers(_exceptions, inspect.isclass)]

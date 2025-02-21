@@ -1,6 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""
+Following functions are leveraged to validate user input for the fabric-cicd package
+Primarily used for the FabricWorkspace class, but also intended to be leveraged for
+any user input throughout the package
+"""
+
 import logging
 import re
 from pathlib import Path
@@ -10,17 +16,18 @@ from azure.core.credentials import TokenCredential
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
-"""
-Following functions are leveraged to validate user input for the fabric-cicd package
-Primarily used for the FabricWorkspace class, but also intended to be leveraged for
-any user input throughout the package
-
-"""
-
 logger = logging.getLogger(__name__)
 
 
-def validate_data_type(expected_type, variable_name, input_value):
+def validate_data_type(expected_type: str, variable_name: str, input_value: any) -> any:
+    """
+    Validate the data type of the input value.
+
+    Args:
+        expected_type: The expected data type.
+        variable_name: The name of the variable.
+        input_value: The input value to validate.
+    """
     # Mapping of expected types to their validation functions
     type_validators = {
         "string": lambda x: isinstance(x, str),
@@ -39,7 +46,14 @@ def validate_data_type(expected_type, variable_name, input_value):
     return input_value
 
 
-def validate_item_type_in_scope(input_value, upn_auth):
+def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
+    """
+    Validate the item type in scope.
+
+    Args:
+        input_value: The input value to validate.
+        upn_auth: Whether UPN authentication is used.
+    """
     accepted_item_types_upn = FabricWorkspace.ACCEPTED_ITEM_TYPES_UPN
     accepted_item_types_non_upn = FabricWorkspace.ACCEPTED_ITEM_TYPES_NON_UPN
 
@@ -60,7 +74,13 @@ def validate_item_type_in_scope(input_value, upn_auth):
     return input_value
 
 
-def validate_repository_directory(input_value):
+def validate_repository_directory(input_value: str) -> str:
+    """
+    Validate the repository directory.
+
+    Args:
+        input_value: The input value to validate.
+    """
     validate_data_type("string", "repository_directory", input_value)
 
     if not Path(input_value).is_dir():
@@ -70,7 +90,13 @@ def validate_repository_directory(input_value):
     return input_value
 
 
-def validate_base_api_url(input_value):
+def validate_base_api_url(input_value: str) -> str:
+    """
+    Validate the base API URL.
+
+    Args:
+        input_value: The input value to validate.
+    """
     validate_data_type("string", "base_api_url", input_value)
 
     if not re.match(r"^https:\/\/([a-zA-Z0-9]+)\.fabric\.microsoft\.com\/$", input_value):
@@ -84,7 +110,13 @@ def validate_base_api_url(input_value):
     return input_value
 
 
-def validate_workspace_id(input_value):
+def validate_workspace_id(input_value: str) -> str:
+    """
+    Validate the workspace ID.
+
+    Args:
+        input_value: The input value to validate.
+    """
     validate_data_type("string", "workspace_id", input_value)
 
     if not re.match(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$", input_value):
@@ -94,19 +126,37 @@ def validate_workspace_id(input_value):
     return input_value
 
 
-def validate_environment(input_value):
+def validate_environment(input_value: str) -> str:
+    """
+    Validate the environment.
+
+    Args:
+        input_value: The input value to validate.
+    """
     validate_data_type("string", "environment", input_value)
 
     return input_value
 
 
-def validate_fabric_workspace_obj(input_value):
+def validate_fabric_workspace_obj(input_value: FabricWorkspace) -> FabricWorkspace:
+    """
+    Validate the FabricWorkspace object.
+
+    Args:
+        input_value: The input value to validate.
+    """
     validate_data_type("FabricWorkspace", "fabric_workspace_obj", input_value)
 
     return input_value
 
 
-def validate_token_credential(input_value):
+def validate_token_credential(input_value: TokenCredential) -> TokenCredential:
+    """
+    Validate the token credential.
+
+    Args:
+        input_value: The input value to validate.
+    """
     validate_data_type("TokenCredential", "credential", input_value)
 
     return input_value

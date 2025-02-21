@@ -1,8 +1,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Utility functions for checking file types and versions."""
+
 import logging
 from importlib.metadata import version as lib_version
+from pathlib import Path
 
 import filetype
 import requests
@@ -14,7 +17,8 @@ from fabric_cicd._common._exceptions import FileTypeError
 logger = logging.getLogger(__name__)
 
 
-def check_version():
+def check_version() -> None:
+    """Check the current version of the fabric-cicd package and compare it with the latest version."""
     try:
         current_version = lib_version("fabric-cicd")
         response = requests.get("https://pypi.org/pypi/fabric-cicd/json")
@@ -29,7 +33,13 @@ def check_version():
         pass
 
 
-def check_file_type(file_path):
+def check_file_type(file_path: Path) -> str:
+    """
+    Check the type of the provided file.
+
+    Args:
+        file_path: The path to the file.
+    """
     try:
         kind = filetype.guess(file_path)
     except Exception as e:

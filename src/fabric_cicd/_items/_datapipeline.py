@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Functions to process and deploy DataPipeline item."""
+
 import json
 import logging
 import re
@@ -9,17 +11,21 @@ from pathlib import Path
 
 import dpath
 
+from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
-
-"""
-Functions to process and deploy DataPipeline item.
-"""
+from fabric_cicd._common._file import File
+from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
 
 
-def publish_datapipelines(fabric_workspace_obj):
-    """Publishes all data pipeline items from the repository in the correct order based on their dependencies."""
+def publish_datapipelines(fabric_workspace_obj: FabricWorkspace) -> None:
+    """
+    Publishes all data pipeline items from the repository in the correct order based on their dependencies.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
+    """
     item_type = "DataPipeline"
 
     # Get all data pipelines from the repository
@@ -47,17 +53,26 @@ def publish_datapipelines(fabric_workspace_obj):
         )
 
 
-def func_process_file(workspace_obj, item_obj, file_obj):
-    """Custom file processing for datapipeline items."""
+def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
+    """
+    Custom file processing for datapipeline items.
+
+    Args:
+        workspace_obj: The FabricWorkspace object.
+        item_obj: The item object.
+        file_obj: The file object.
+    """
     return workspace_obj._replace_workspace_ids(file_obj.contents, item_obj.type)
 
 
-def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type):
+def sort_datapipelines(fabric_workspace_obj: FabricWorkspace, unsorted_pipeline_dict: dict, lookup_type: str) -> list:
     """
     Output a sorted list that datapipelines should be published or unpublished with based on item dependencies.
 
-    :param item_content_dict: Dict representation of the pipeline-content file.
-    :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository)
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        unsorted_pipeline_dict: Dict representation of the pipeline-content file.
+        lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     """
     # Step 1: Create a graph to manage dependencies
     graph = defaultdict(list)
@@ -115,13 +130,16 @@ def sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, lookup_type
     return sorted_items
 
 
-def _find_referenced_datapipelines(fabric_workspace_obj, item_content_dict, lookup_type):
+def _find_referenced_datapipelines(
+    fabric_workspace_obj: FabricWorkspace, item_content_dict: dict, lookup_type: str
+) -> list:
     """
     Scan through item dictionary and find pipeline references (including nested pipelines).
 
-    :param item_content_dict: Dict representation of the pipeline-content file.
-    :param lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
-    :return: a list of referenced pipeline names.
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_content_dict: Dict representation of the pipeline-content file.
+        lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     """
     item_type = "DataPipeline"
     reference_list = []

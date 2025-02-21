@@ -59,7 +59,7 @@ plugins:
               python:
                   paths: ["src"]
                   options:
-                      docstring_style: numpy
+                      docstring_style: google
                       docstring_options:
                           ignore_init_summary: true
                       summary:

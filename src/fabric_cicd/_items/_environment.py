@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Functions to process and deploy Environment item."""
+
 import logging
 import os
 from pathlib import Path
@@ -8,21 +10,21 @@ from pathlib import Path
 import dpath
 import yaml
 
+from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._fabric_endpoint import handle_retry
-
-"""
-Functions to process and deploy Environment item.
-"""
 
 logger = logging.getLogger(__name__)
 
 
 # TODO - binaries and compute.yml are read into files, but not actually needed since we only need the file
-def publish_environments(fabric_workspace_obj):
+def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all environment items from the repository.
 
     Environments can only deploy the shell; compute and spark configurations are published separately.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
     """
     item_type = "Environment"
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
@@ -35,7 +37,7 @@ def publish_environments(fabric_workspace_obj):
         _publish_environment_metadata(fabric_workspace_obj, item_name=item_name)
 
 
-def _publish_environment_metadata(fabric_workspace_obj, item_name):
+def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
     """
     Publishes compute settings and libraries for a given environment item.
 
@@ -46,7 +48,9 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
     4. Delete libraries in the environment that are not present in repository.
     5. Publish the updated settings.
 
-    :param item_name: Name of the environment item whose compute settings are to be published.
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_name: Name of the environment item whose compute settings are to be published.
     """
     item_type = "Environment"
     item_path = fabric_workspace_obj.repository_items[item_type][item_name].path
@@ -79,8 +83,17 @@ def _publish_environment_metadata(fabric_workspace_obj, item_name):
     logger.info("Published")
 
 
-def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_check=False):
-    """Check if publish is in progress"""
+def _check_environment_publish_state(
+    fabric_workspace_obj: FabricWorkspace, item_guid: str, initial_check: bool = False
+) -> None:
+    """
+    Check the state of the environment publish operation.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_guid: The GUID of the environment item.
+        initial_check: Whether this is the initial check for ongoing publish.
+    """
     publishing = True
     iteration = 1
     while publishing:
@@ -115,8 +128,15 @@ def _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_ch
             iteration += 1
 
 
-def _update_compute_settings(fabric_workspace_obj, item_path, item_guid):
-    """Update spark compute settings"""
+def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: Path, item_guid: str) -> None:
+    """
+    Update spark compute settings.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_path: The path to the environment item.
+        item_guid: The GUID of the environment item.
+    """
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
         yaml_body = yaml.safe_load(f)
@@ -143,8 +163,13 @@ def _update_compute_settings(fabric_workspace_obj, item_path, item_guid):
         logger.info("Updated Spark Settings")
 
 
-def _get_repo_libraries(item_path):
-    """Add libraries to environment, overwriting anything with the same name and returns a list of the libraries in the repo."""
+def _get_repo_libraries(item_path: Path) -> dict:
+    """
+    Add libraries to environment, overwriting anything with the same name and returns a list of the libraries in the repo.
+
+    Args:
+        item_path: The path to the environment item.
+    """
     repo_library_files = {}
 
     repo_library_path = Path(item_path, "Libraries")
@@ -156,8 +181,15 @@ def _get_repo_libraries(item_path):
     return repo_library_files
 
 
-def _add_libraries(fabric_workspace_obj, item_guid, repo_library_files):
-    """Add libraries to environment, overwriting anything with the same name"""
+def _add_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_library_files: dict) -> None:
+    """
+    Add libraries to environment, overwriting anything with the same name.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_guid: The GUID of the environment item.
+        repo_library_files: The list of libraries in the repository.
+    """
     for file_name, file_path in repo_library_files.items():
         library_file = {"file": (file_name, file_path.open("rb"))}
 
@@ -171,8 +203,16 @@ def _add_libraries(fabric_workspace_obj, item_guid, repo_library_files):
         logger.info(f"Updated Library {file_path.name}")
 
 
-def _remove_libraries(fabric_workspace_obj, item_guid, repo_library_files):
-    """Remove libraries not in repository"""
+def _remove_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_library_files: dict) -> None:
+    """
+    Remove libraries not in repository.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_guid: The GUID of the environment item.
+        repo_library_files: The list of libraries in the repository.
+
+    """
     # Get staged libraries
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/get-staging-libraries
     response_environment = fabric_workspace_obj.endpoint.invoke(
@@ -195,8 +235,14 @@ def _remove_libraries(fabric_workspace_obj, item_guid, repo_library_files):
                         _remove_library(fabric_workspace_obj, item_guid, file)
 
 
-def _remove_library(fabric_workspace_obj, item_guid, file_name):
-    """Remove library from workspace environment"""
+def _remove_library(fabric_workspace_obj: FabricWorkspace, item_guid: str, file_name: str) -> None:
+    """Remove library from workspace environment.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_guid: The GUID of the environment item.
+        file_name: The name of the file to be removed.
+    """
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/delete-staging-library
     fabric_workspace_obj.endpoint.invoke(
         method="DELETE",
@@ -206,11 +252,13 @@ def _remove_library(fabric_workspace_obj, item_guid, file_name):
     logger.info(f"Removed {file_name}")
 
 
-def _convert_environment_compute_to_camel(fabric_workspace_obj, input_dict):
+def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace, input_dict: dict) -> dict:
     """
     Converts dictionary keys stored in snake_case to camelCase, except for 'spark_conf'.
 
-    :param input_dict: Dictionary with snake_case keys.
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        input_dict: Dictionary with snake_case keys.
     """
     new_input_dict = {}
 

@@ -1,17 +1,22 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Functions to process and deploy Semantic Model item."""
+
 import logging
 
-"""
-Functions to process and deploy Semantic Model item.
-"""
+from fabric_cicd import FabricWorkspace
 
 logger = logging.getLogger(__name__)
 
 
-def publish_semanticmodels(fabric_workspace_obj):
-    """Publishes all semantic model items from the repository."""
+def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
+    """
+    Publishes all semantic model items from the repository.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
+    """
     item_type = "SemanticModel"
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):

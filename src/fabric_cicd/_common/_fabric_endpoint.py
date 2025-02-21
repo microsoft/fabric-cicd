@@ -1,13 +1,17 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""Handles interactions with the Fabric API, including authentication and request management."""
+
 import base64
 import datetime
 import json
 import logging
 import time
+from typing import Optional
 
 import requests
+from azure.core.credentials import TokenCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
 )
@@ -20,23 +24,30 @@ logger = logging.getLogger(__name__)
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
 
-    def __init__(self, token_credential, requests_module=requests):
-        """Initializes the FabricEndpoint instance, sets up the authentication token."""
+    def __init__(self, token_credential: TokenCredential, requests_module: requests = requests) -> None:
+        """
+        Initializes the FabricEndpoint instance, sets up the authentication token.
+
+        Args:
+            token_credential: The token credential.
+            requests_module: The requests module.
+        """
         self.aad_token = None
         self.aad_token_expiration = None
         self.token_credential = token_credential
         self.requests = requests_module
         self._refresh_token()
 
-    def invoke(self, method, url, body="{}", files=None, **kwargs):
+    def invoke(self, method: str, url: str, body: str = "{}", files: Optional[dict] = None, **kwargs) -> dict:
         """
         Sends an HTTP request to the specified URL with the given method and body.
 
-        :param method: HTTP method to use for the request (e.g., 'GET', 'POST', 'PATCH', 'DELETE').
-        :param url: URL to send the request to.
-        :param body: The JSON body to include in the request. Defaults to an empty JSON object.
-        :param files: The file path to be included in the request. Defaults to None.
-        :return: A dictionary containing the response headers, body, and status code.
+        Args:
+            method: HTTP method to use for the request (e.g., 'GET', 'POST', 'PATCH', 'DELETE').
+            url: URL to send the request to.
+            body: The JSON body to include in the request. Defaults to an empty JSON object.
+            files: The file path to be included in the request. Defaults to None.
+            **kwargs: Additional keyword arguments to pass to the method.
         """
         exit_loop = False
         iteration_count = 0
@@ -87,8 +98,8 @@ class FabricEndpoint:
             "status_code": response.status_code,
         }
 
-    def _refresh_token(self):
-        """Refreshes the AAD token if empty or expiration has passed"""
+    def _refresh_token(self) -> None:
+        """Refreshes the AAD token if empty or expiration has passed."""
         if (
             self.aad_token is None
             or self.aad_token_expiration is None
@@ -133,7 +144,7 @@ class FabricEndpoint:
                 raise TokenError(msg, logger) from e
 
 
-def _log_executing_identity(msg):
+def _log_executing_identity(msg: str) -> None:
     # Import feature_flag here to avoid circular import
     from fabric_cicd import feature_flag
 
@@ -141,20 +152,28 @@ def _log_executing_identity(msg):
         logger.info(msg)
 
 
-def _handle_response(response, method, url, body, long_running, iteration_count, **kwargs):
+def _handle_response(
+    response: requests.Response,
+    method: str,
+    url: str,
+    body: str,
+    long_running: bool,
+    iteration_count: int,
+    **kwargs: any,
+) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
-    Technical debt: this method needs to be refactored to be more testable and requires less paramters.
+    Technical debt: this method needs to be refactored to be more testable and requires less parameters.
     Initial approach is only temporary to support testing, but only temporary.
 
-    ::param response: The response object from the HTTP request.
-    ::param method: The HTTP method used in the request.
-    ::param url: The URL used in the request.
-    ::param body: The JSON body used in the request.
-    ::param long_running: A boolean indicating if the operation is long-running.
-    ::param invoke_log_message: The formatted log message for the request.
-    ::param iteration_count: The current iteration count of the loop.
-    ::param kwargs: Additional keyword arguments to pass to the method.
+    Args:
+        response: The response object from the HTTP request.
+        method: The HTTP method used in the request.
+        url: The URL used in the request.
+        body: The JSON body used in the request.
+        long_running: A boolean indicating if the operation is long-running.
+        iteration_count: The current iteration count of the loop.
+        kwargs: Additional keyword arguments to pass to the method.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
@@ -267,15 +286,18 @@ def _handle_response(response, method, url, body, long_running, iteration_count,
     return exit_loop, method, url, body, long_running
 
 
-def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prepend_message=""):
+def handle_retry(
+    attempt: int, base_delay: float, max_retries: int, response_retry_after: float = 60, prepend_message: str = ""
+) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
 
-    :param attempt: The current attempt number.
-    :param base_delay: Base delay in seconds for backoff.
-    :param max_retries: Maximum number of retry attempts.
-    :param response_retry_after: The value of the Retry-After header from the response.
-    :param prepend_message: Message to prepend to the retry log.
+    Args:
+        attempt: The current attempt number.
+        base_delay: Base delay in seconds for backoff.
+        max_retries: Maximum number of retry attempts.
+        response_retry_after: The value of the Retry-After header from the response.
+        prepend_message: Message to prepend to the retry log.
     """
     if attempt < max_retries:
         retry_after = float(response_retry_after)
@@ -294,8 +316,13 @@ def handle_retry(attempt, base_delay, max_retries, response_retry_after=60, prep
         raise Exception(msg)
 
 
-def _decode_jwt(token):
-    """Decodes a JWT token and returns the payload as a dictionary."""
+def _decode_jwt(token: str) -> dict:
+    """
+    Decodes a JWT token and returns the payload as a dictionary.
+
+    Args:
+        token: The JWT token to decode.
+    """
     try:
         # Split the token into its parts
         parts = token.split(".")
@@ -315,7 +342,16 @@ def _decode_jwt(token):
         raise TokenError(msg, logger) from e
 
 
-def _format_invoke_log(response, method, url, body):
+def _format_invoke_log(response: requests.Response, method: str, url: str, body: str) -> str:
+    """
+    Format the log message for the invoke method.
+
+    Args:
+        response: The response object from the HTTP request.
+        method: The HTTP method used in the request.
+        url: The URL used in the request.
+        body: The JSON body used in the request.
+    """
     message = [
         f"\nURL: {url}",
         f"Method: {method}",
