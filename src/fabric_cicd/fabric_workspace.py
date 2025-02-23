@@ -350,9 +350,12 @@ class FabricWorkspace:
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in ["Environment"]
+        shell_only_publish = item_type in ["Environment", "Lakehouse"]
 
-        if shell_only_publish:
+        if kwargs["creation_payload"] is not None:
+            creation_payload = {"creationPayload": kwargs["creation_payload"]}
+            combined_body = {**metadata_body, **creation_payload}
+        elif shell_only_publish:
             combined_body = metadata_body
         else:
             item_payload = []
