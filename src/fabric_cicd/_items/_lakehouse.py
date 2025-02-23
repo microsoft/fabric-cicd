@@ -19,10 +19,12 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "Lakehouse"
 
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        item_files = fabric_workspace_obj.repository_items[item_type][item_name].item_files
+    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+        creation_payload = None
 
-        for file in item_files:
-            enable_schemas = file.name == "lakehouse-content.json" and "defaultSchema" in file.contents
-            creation_payload = {"enableSchemas": enable_schemas}
+        for file in item.item_files:
+            if file.name == "lakehouse.metadata.json" and "defaultSchema" in file.contents:
+                creation_payload = {"enableSchemas": True}
+                break
+
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, creation_payload=creation_payload)

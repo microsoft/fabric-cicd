@@ -148,7 +148,7 @@ def _log_executing_identity(msg: str) -> None:
     # Import feature_flag here to avoid circular import
     from fabric_cicd import feature_flag
 
-    if "disable_executing_identity" not in feature_flag:
+    if "disable_print_identity" not in feature_flag:
         logger.info(msg)
 
 

@@ -352,7 +352,7 @@ class FabricWorkspace:
         # Only shell deployment, no definition support
         shell_only_publish = item_type in ["Environment", "Lakehouse"]
 
-        if kwargs["creation_payload"] is not None:
+        if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
             combined_body = {**metadata_body, **creation_payload}
         elif shell_only_publish:
