@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-
+# START-EXAMPLE
 """
 Example of leveraging default authentication flows
 Refer to the authentication section in the README for details:
