@@ -2,6 +2,17 @@
 
 The following contains all major, minor, and patch version release notes.
 
+## Version 0.1.6
+
+<span class="md-h2-subheader">Release Date: 2025-02-24</span>
+
+-   Standardized docstrings to Google format
+-   Onboard file object
+-   Resolves [#28](https://github.com/microsoft/fabric-cicd/issues/28) - Leverage UpdateDefintion Flag
+-   Resolves [#45](https://github.com/microsoft/fabric-cicd/issues/28) - Convert repo and workspace dictionaries
+-   Resolves [#110](https://github.com/microsoft/fabric-cicd/issues/110) - Update find_replace docs
+-   Resolves [#116](https://github.com/microsoft/fabric-cicd/issues/116) - Onboard Lakehouse item type
+
 ## Version 0.1.5
 
 <span class="md-h2-subheader">Release Date: 2025-02-18</span>
