@@ -1,11 +1,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-# START-EXAMPLE
+
 """
 Example of authenticating with SPN + Secret
 Can be expanded to retrieve values from Key Vault or other sources
 """
-
+# START-EXAMPLE
 from azure.identity import ClientSecretCredential
 
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items

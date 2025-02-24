@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-# START-EXAMPLE
+
 """
 Example of leveraging default authentication flows
 Refer to the authentication section in the README for details:
 https://github.com/microsoft/fabric-cicd/tree/main?tab=readme-ov-file#authentication
 """
-
+# START-EXAMPLE
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 # Sample values for FabricWorkspace parameters

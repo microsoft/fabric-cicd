@@ -12,8 +12,8 @@ nav:
           - Getting Started: how_to/getting_started.md
           - Item Types: how_to/item_types.md
           - Parameterization: how_to/parameterization.md
-          - Feature Flags: how_to/feature_flag.md
-          - Examples: how_to/example.md
+          - Optional Features: how_to/optional_feature.md
+    - Code Samples: code_sample.md
     - Code Reference: code_reference.md
     - Contribution: contribution.md
     - Changelog: changelog.md

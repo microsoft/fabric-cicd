@@ -1,11 +1,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-# START-EXAMPLE
+
 """
 Example to set variables based on the target environment.
 Environment is determined based on the branch that produced the build.
 """
-
+# START-EXAMPLE
 import os
 from pathlib import Path
 
