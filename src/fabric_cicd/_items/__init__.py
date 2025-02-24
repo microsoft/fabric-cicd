@@ -6,7 +6,6 @@ from fabric_cicd._items._datapipeline import (
     sort_datapipelines,
 )
 from fabric_cicd._items._environment import publish_environments
-from fabric_cicd._items._lakehouse import publish_lakehouses
 from fabric_cicd._items._notebook import publish_notebooks
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
@@ -14,7 +13,6 @@ from fabric_cicd._items._semanticmodel import publish_semanticmodels
 __all__ = [
     "publish_datapipelines",
     "publish_environments",
-    "publish_lakehouses",
     "publish_notebooks",
     "publish_reports",
     "publish_semanticmodels",

@@ -35,9 +35,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
         >>> publish_all_items(workspace)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
-    if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing Lakehouses")
-        items.publish_lakehouses(fabric_workspace_obj)
+
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
@@ -95,16 +93,13 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     fabric_workspace_obj._refresh_deployed_items()
     _print_header("Unpublishing Orphaned Items")
 
-    # Import feature_flag here to avoid circular import
-    from fabric_cicd import feature_flag
-
-    # Define order to unpublish items
-    unpublish_order = []
-    for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment", "Lakehouse"]:
-        if x in fabric_workspace_obj.item_type_in_scope and (
-            x != "Lakehouse" or "enable_lakehouse_unpublish" in feature_flag
-        ):
-            unpublish_order.append(x)
+    # Order of unpublishing to handle dependencies cleanly
+    # TODO need to expand this to be more dynamic
+    unpublish_order = [
+        x
+        for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment"]
+        if x in fabric_workspace_obj.item_type_in_scope
+    ]
 
     for item_type in unpublish_order:
         deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())

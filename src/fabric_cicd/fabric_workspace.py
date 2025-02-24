@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
-    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
-    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
+    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel")
+    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel")
 
     def __init__(
         self,
@@ -350,12 +350,9 @@ class FabricWorkspace:
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in ["Environment", "Lakehouse"]
+        shell_only_publish = item_type in ["Environment"]
 
-        if kwargs.get("creation_payload"):
-            creation_payload = {"creationPayload": kwargs["creation_payload"]}
-            combined_body = {**metadata_body, **creation_payload}
-        elif shell_only_publish:
+        if shell_only_publish:
             combined_body = metadata_body
         else:
             item_payload = []
@@ -392,18 +389,6 @@ class FabricWorkspace:
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
-                max_retries=max_retries,
-            )
-        elif is_deployed and shell_only_publish:
-            # Remove the 'type' key as it's not supported in the update-item API
-            metadata_body.pop("type", None)
-
-            # Update the item's metadata
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
-                method="PATCH",
-                url=f"{self.base_api_url}/items/{item_guid}",
-                body=metadata_body,
                 max_retries=max_retries,
             )
 
