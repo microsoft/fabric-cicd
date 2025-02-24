@@ -25,7 +25,7 @@ jobs:
             - name: Install Requirements
               run: |
                   python -m pip install --upgrade pip
-                  python -m pip install -r requirements-doc.txt
+                  python -m pip install uv
 
             - name: Read version from file
               id: get_version
@@ -40,10 +40,11 @@ jobs:
                   git config user.name github-actions[bot]
                   git config user.email github-actions[bot]@users.noreply.github.com
                   git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
-                  mike deploy \
+                  uv sync
+                  uv run mike deploy \
                     --update-aliases \
                     --branch gh-pages \
                     --push \
                     ${{ env.VERSION }} \
                     latest
-                  mike set-default --push latest
+                  uv run mike set-default --push latest

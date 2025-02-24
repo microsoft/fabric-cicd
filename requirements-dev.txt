@@ -1,5 +1,0 @@
-ruff
-gitpython
-pytest
-pytest-mock
-coverage
