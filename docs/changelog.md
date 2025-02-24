@@ -11,59 +11,59 @@ The following contains all major, minor, and patch version release notes.
 
 <span class="md-h2-subheader">Release Date: 2025-02-24</span>
 
--   ✨ Resolves [#116](https://github.com/microsoft/fabric-cicd/issues/116) - Onboard Lakehouse item type
--   📝 Resolves [#25](https://github.com/microsoft/fabric-cicd/issues/25) - Refine documentation
--   📝 Resolves [#110](https://github.com/microsoft/fabric-cicd/issues/110) - Update find_replace docs
+-   ✨ Onboard Lakehouse item type ([#116](https://github.com/microsoft/fabric-cicd/issues/116))
+-   📝 Update example docs ([#25](https://github.com/microsoft/fabric-cicd/issues/25))
+-   📝 Update find_replace docs ([#110](https://github.com/microsoft/fabric-cicd/issues/110))
 -   ⚡ Standardized docstrings to Google format
--   ⚡ Onboard file objects
--   ⚡ Resolves [#28](https://github.com/microsoft/fabric-cicd/issues/28) - Leverage UpdateDefinition Flag
--   ⚡ Resolves [#45](https://github.com/microsoft/fabric-cicd/issues/28) - Convert repo and workspace dictionaries
+-   ⚡ Onboard file objects ([#46](https://github.com/microsoft/fabric-cicd/issues/46))
+-   ⚡ Leverage UpdateDefinition Flag ([#28](https://github.com/microsoft/fabric-cicd/issues/28))
+-   ⚡ Convert repo and workspace dictionaries ([#45](https://github.com/microsoft/fabric-cicd/issues/45))
 
 ## Version 0.1.5
 
 <span class="md-h2-subheader">Release Date: 2025-02-18</span>
 
--   🔧 Fixes [#103](https://github.com/microsoft/fabric-cicd/issues/103) - Environment Failure without Public Library
--   ⚡ Resolves [#100](https://github.com/microsoft/fabric-cicd/issues/100) - Introduces pytest check for PRs
+-   🔧 Fix Environment Failure without Public Library ([#103](https://github.com/microsoft/fabric-cicd/issues/103))
+-   ⚡ Introduces pytest check for PRs ([#100](https://github.com/microsoft/fabric-cicd/issues/100))
 
 ## Version 0.1.4
 
 <span class="md-h2-subheader">Release Date: 2025-02-12</span>
 
--   ✨ Resolves [#96](https://github.com/microsoft/fabric-cicd/issues/96)- Support Feature Flagging
--   🔧 Fixes [#88](https://github.com/microsoft/fabric-cicd/issues/88) - Image support in report deployment
--   🔧 Fixes [#92](https://github.com/microsoft/fabric-cicd/issues/92) - Broken README link
+-   ✨ Support Feature Flagging ([#96](https://github.com/microsoft/fabric-cicd/issues/96))
+-   🔧 Fix Image support in report deployment ([#88](https://github.com/microsoft/fabric-cicd/issues/88))
+-   🔧 Fix Broken README link ([#92](https://github.com/microsoft/fabric-cicd/issues/92))
 -   ⚡ Workspace ID replacement improved
 -   ⚡ Increased error handling in activate script
 -   ⚡ Onboard pytest and coverage
--   ⚡ Resolves [#37](https://github.com/microsoft/fabric-cicd/issues/37) - Improvements to nested dictionaries
--   ⚡ Resolves [#87](https://github.com/microsoft/fabric-cicd/issues/87) - Support Python Installed From Windows Store
+-   ⚡ Improvements to nested dictionaries ([#37](https://github.com/microsoft/fabric-cicd/issues/37))
+-   ⚡ Support Python Installed From Windows Store ([#87](https://github.com/microsoft/fabric-cicd/issues/87))
 
 ## Version 0.1.3
 
 <span class="md-h2-subheader">Release Date: 2025-01-29</span>
 
--   ✨ Resolves [#75](https://github.com/microsoft/fabric-cicd/issues/75) - Add PyPI check version to encourage version bumps
--   🔧 Fixes [#61](https://github.com/microsoft/fabric-cicd/issues/61) - Semantic model initial publish results in None Url error
--   🔧 Fixes [#63](https://github.com/microsoft/fabric-cicd/issues/63) - Integer parsed as float failing in handle_retry for <3.12 python
--   🔧 Fixes [#76](https://github.com/microsoft/fabric-cicd/issues/76) - Default item types fail to unpublish
--   🔧 Fixes [#77](https://github.com/microsoft/fabric-cicd/issues/77) - Items in subfolders are skipped
+-   ✨ Add PyPI check version to encourage version bumps ([#75](https://github.com/microsoft/fabric-cicd/issues/75))
+-   🔧 Fix Semantic model initial publish results in None Url error ([#61](https://github.com/microsoft/fabric-cicd/issues/61))
+-   🔧 Fix Integer parsed as float failing in handle_retry for <3.12 python ([#63](https://github.com/microsoft/fabric-cicd/issues/63))
+-   🔧 Fix Default item types fail to unpublish ([#76](https://github.com/microsoft/fabric-cicd/issues/76))
+-   🔧 Fix Items in subfolders are skipped ([#77](https://github.com/microsoft/fabric-cicd/issues/77))
 -   📝 Update documentation & examples
 
 ## Version 0.1.2
 
 <span class="md-h2-subheader">Release Date: 2025-01-27</span>
 
--   ✨ Resolves [#27](https://github.com/microsoft/fabric-cicd/issues/27) - Introduces max retry and backoff for long running / throttled calls
--   🔧 Fixes [#50](https://github.com/microsoft/fabric-cicd/issues/50) - Environment publish uses arbitrary wait time
--   🔧 Fixes [#56](https://github.com/microsoft/fabric-cicd/issues/56) - Environment publish doesn't wait for success
--   🔧 Fixes [#58](https://github.com/microsoft/fabric-cicd/issues/58) - Long running operation steps out early for notebook publish
+-   ✨ Introduces max retry and backoff for long running / throttled calls ([#27](https://github.com/microsoft/fabric-cicd/issues/27))
+-   🔧 Fix Environment publish uses arbitrary wait time ([#50](https://github.com/microsoft/fabric-cicd/issues/50))
+-   🔧 Fix Environment publish doesn't wait for success ([#56](https://github.com/microsoft/fabric-cicd/issues/56))
+-   🔧 Fix Long running operation steps out early for notebook publish ([#58](https://github.com/microsoft/fabric-cicd/issues/58))
 
 ## Version 0.1.1
 
 <span class="md-h2-subheader">Release Date: 2025-01-23</span>
 
--   🔧 Fixes [#51](https://github.com/microsoft/fabric-cicd/issues/51) - Environment stuck in publish
+-   🔧 Fix Environment stuck in publish ([#51](https://github.com/microsoft/fabric-cicd/issues/51))
 
 ## Version 0.1.0
 
