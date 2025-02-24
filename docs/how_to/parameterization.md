@@ -38,7 +38,7 @@ In the `notebook-content.py` file, the referenced lakehouse guid `123e4567-e89b-
 
 Note: In this example, the lakehouse workspace id in the notebook file is also replaced using `Parameter.yml`.
 
-<p style="font-size: 1.25em; font-weight: 500; color: #012826">Parameters.yml file</p>
+<span class="md-h3-nonanchor">Parameters.yml file</span>
 
 ```yaml
 find_replace:
@@ -50,7 +50,7 @@ find_replace:
         PROD: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" # PROD workspace id
 ```
 
-<p style="font-size: 1.25em; font-weight: 500; color: #012826">notebook-content.py file</p>
+<span class="md-h3-nonanchor">notebook-content.py file</span>
 
 ```python
 # Fabric notebook source

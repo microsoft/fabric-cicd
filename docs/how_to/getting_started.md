@@ -57,7 +57,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | enable_lakehouse_unpublish | Set to enable the deletion of Lakehouses            |
 | disable_print_identity     | Set to disable printing the executing identity name |
 
-<p style="font-size: 1.25em; font-weight: 500; color: #012826">Example</p>
+<span class="md-h3-nonanchor">Example</span>
 
 ```python
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, append_feature_flag
