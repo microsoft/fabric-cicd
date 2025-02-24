@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-# START-EXAMPLE
+
 """
 Example of optional parameters for FabricWorkspace and publish functions.
 """

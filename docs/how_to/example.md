@@ -1,42 +1,34 @@
-## Authentication
-
-### Default Credentials
+## Authenticate with Default Credentials
 
 ```python
-{% include "../../sample/auth_default_credential.py" start="# START-EXAMPLE"%}
+{% include "../../sample/auth_default_credential.py" %}
 ```
 
-### SPN Credentials
+## Authenticate with SPN Credentials
 
 ```python
-{% include "../../sample/auth_spn_secret.py" start="# START-EXAMPLE"%}
+{% include "../../sample/auth_spn_secret.py" %}
 ```
 
-## Deployment Variables
-
-### Azure DevOps Releases
+## Setting Variables within Azure DevOps Release
 
 ```python
-{% include "../../sample/set_vars_from_ado_build.py" start="# START-EXAMPLE"%}
+{% include "../../sample/set_vars_from_ado_build.py" %}
 ```
 
-### Local GIT Branch
+## Setting Variables within Local GIT Branch
 
 ```python
-{% include "../../sample/set_vars_from_git_branch.py" start="# START-EXAMPLE"%}
+{% include "../../sample/set_vars_from_git_branch.py" %}
 ```
 
-## Fabric Workspace Interactions
-
-### Optional Parameters
+## Using Optional Parameters
 
 ```python
-{% include "../../sample/optional_parameters.py" start="# START-EXAMPLE"%}
+{% include "../../sample/optional_parameters.py" %}
 ```
 
-## Parameterization
-
-### Parameter.yml File
+## Parameter.yml File
 
 <!--prettier-ignore-->
 ```yml

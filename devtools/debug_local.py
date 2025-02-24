@@ -33,8 +33,7 @@ environment = "dev"
 repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
-item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel", "Report", "Lakehouse"]
-item_type_in_scope = ["Lakehouse"]
+item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel", "Report"]
 
 # Uncomment to use SPN auth
 # client_id = "your-client-id"
@@ -56,7 +55,7 @@ target_workspace = FabricWorkspace(
 
 # Uncomment to publish
 # Publish all items defined in item_type_in_scope
-publish_all_items(target_workspace)
+# publish_all_items(target_workspace)
 
 # Uncomment to unpublish
 # Unpublish all items defined in scope not found in repository
