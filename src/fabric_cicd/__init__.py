@@ -22,6 +22,11 @@ def append_feature_flag(feature: str) -> None:
 
     Args:
         feature: The feature flag to be included.
+
+    Examples:
+        Basic usage
+        >>> from fabric_cicd import append_feature_flag
+        >>> append_feature_flag("enable_lakehouse_unpublish")
     """
     global feature_flag
     feature_flag.add(feature)
@@ -36,15 +41,8 @@ def change_log_level(level: str = "DEBUG") -> None:
 
     Examples:
         Basic usage
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, change_log_level
+        >>> from fabric_cicd import change_log_level
         >>> change_log_level("DEBUG")
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-        ... )
-        >>> publish_all_items(workspace)
-        >>> unpublish_orphaned_items(workspace)
     """
     if level.upper() == "DEBUG":
         configure_logger(logging.DEBUG)

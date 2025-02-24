@@ -5,7 +5,7 @@
 Example to set variables based on the target environment.
 Environment is determined based on the current branch name.
 """
-
+# START-EXAMPLE
 from pathlib import Path
 
 import git  # Depends on pip install gitpython

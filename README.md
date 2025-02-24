@@ -18,10 +18,8 @@ All documentation is hosted on our [fabric-cicd](https://microsoft.github.io/fab
 Section Overview:
 
 -   [Home](https://microsoft.github.io/fabric-cicd/latest/)
--   How To:
-    -   [Example](https://microsoft.github.io/fabric-cicd/latest/how_to/example/)
-    -   [Getting Started](https://microsoft.github.io/fabric-cicd/latest/how_to/getting_started/)
-    -   [Parameterization](https://microsoft.github.io/fabric-cicd/latest/how_to/parameterization/)
+-   [How To](https://microsoft.github.io/fabric-cicd/latest/how_to/)
+-   [Code Samples](https://microsoft.github.io/fabric-cicd/latest/code_sample/)
 -   [Contribution](https://microsoft.github.io/fabric-cicd/latest/contribution/)
 -   [Changelog](https://microsoft.github.io/fabric-cicd/latest/changelog/)
 -   [About](https://microsoft.github.io/fabric-cicd/latest/help/) - Inclusive of Support & Security Policies

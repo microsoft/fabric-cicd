@@ -1,5 +1,5 @@
 line-length = 120
-exclude = ["sample/*"]
+exclude = ["sample/*", "docs/*"]
 
 [lint]
 # https://docs.astral.sh/ruff/rules/
