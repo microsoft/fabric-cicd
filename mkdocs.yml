@@ -50,7 +50,7 @@ theme:
 extra_css:
     - config/stylesheets/extra.css
 hooks:
-    - docs\config\pre-build\update_item_types.py
+    - docs/config/pre-build/update_item_types.py
 
 plugins:
     - search:
