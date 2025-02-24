@@ -16,6 +16,12 @@
 -   **Resources** are not source controlled and will not be deployed.
 -   Environments with libraries will have **high initial publish times** (sometimes 20+ minutes).
 
+## Lakehouses
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   **Shortcuts** are not deployed with Lakehouses.
+
 ## Notebooks
 
 -   **Parameterization:**
