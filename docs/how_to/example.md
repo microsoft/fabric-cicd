@@ -12,7 +12,7 @@
 {% include "../../sample/auth_spn_secret.py" start="# START-EXAMPLE"%}
 ```
 
-## Configuring Environment Variables
+## Deployment Variables
 
 ### Azure DevOps Releases
 
