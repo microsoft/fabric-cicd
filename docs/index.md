@@ -7,11 +7,8 @@ fabric-cicd is a Python library designed for use with [Microsoft Fabric](https:/
 
 ## Supported Item Types
 
-{%
-    include-markdown "../docs/how_to/supported_item_types.md"
-    start="# Supported Item Types"
-    end="##"
-%}
+<!--BEGIN-SUPPORTED-ITEM-TYPES-->
+<!--END-SUPPORTED-ITEM-TYPES-->
 
 ## Installation
 

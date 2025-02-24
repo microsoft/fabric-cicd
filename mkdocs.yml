@@ -10,9 +10,8 @@ nav:
     - Home: index.md
     - How To:
           - Getting Started: how_to/getting_started.md
-          - Feature Flags: how_to/feature_flag.md
+          - Item Types: how_to/item_types.md
           - Parameterization: how_to/parameterization.md
-          - Supported Item Types: how_to/supported_item_types.md
           - Examples: how_to/example.md
     - Code Reference: code_reference.md
     - Contribution: contribution.md
@@ -49,6 +48,8 @@ theme:
 
 extra_css:
     - config/stylesheets/extra.css
+hooks:
+    - docs\config\pre-build\update_item_types.py
 
 plugins:
     - search:

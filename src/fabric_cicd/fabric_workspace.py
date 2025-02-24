@@ -394,6 +394,18 @@ class FabricWorkspace:
                 body=definition_body,
                 max_retries=max_retries,
             )
+        elif is_deployed and shell_only_publish:
+            # Remove the 'type' key as it's not supported in the update-item API
+            metadata_body.pop("type", None)
+
+            # Update the item's metadata
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
+            self.endpoint.invoke(
+                method="PATCH",
+                url=f"{self.base_api_url}/items/{item_guid}",
+                body=metadata_body,
+                max_retries=max_retries,
+            )
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
