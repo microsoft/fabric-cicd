@@ -9,6 +9,7 @@ remote_name: origin
 nav:
     - Home: index.md
     - How To:
+          - How To: how_to/index.md
           - Getting Started: how_to/getting_started.md
           - Item Types: how_to/item_types.md
           - Parameterization: how_to/parameterization.md
@@ -51,6 +52,7 @@ extra_css:
     - config/stylesheets/extra.css
 hooks:
     - docs/config/pre-build/update_item_types.py
+    - docs/config/pre-build/section_toc.py
 
 plugins:
     - search:
@@ -103,7 +105,7 @@ extra:
               data: 0
               note: >-
                   Thanks for your feedback! Help us improve this page by using our 
-                  <a href="https://github.com/microsoft/fabric-cicd/issues/new?template=bug_report.md&documentation-location={url}" target="_blank" rel="noopener">feedback form</a>.
+                  <a href="https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml&documentation-location={url}" target="_blank" rel="noopener">feedback form</a>.
 
 markdown_extensions:
     - abbr

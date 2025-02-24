@@ -16,6 +16,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 ```python
 from fabric_cicd import append_feature_flag
 append_feature_flag("enable_lakehouse_unpublish")
+append_feature_flag("disable_print_identity")
 ```
 
 ## Debugging
