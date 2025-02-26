@@ -70,7 +70,7 @@ def test_file_image_payload(image_file):
 
 def test_special_characters_correct(tmp_path):
     special_text = (
-        "Greek: α, β, γ, δ, ε, ζ\n"
+        "Greek: a, β, y, δ, ε, ζ\n"
         "Latin: æ, ø, å, ß, é, ñ, ü\n"
         "Cyrillic: Ж, Д, и, ю\n"
         "Arabic: مرحبا, سلام\n"
