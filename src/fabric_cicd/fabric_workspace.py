@@ -588,4 +588,4 @@ class FabricWorkspace:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
             logger.info("Unpublished")
         except Exception as e:
-            logger.info(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+            logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
