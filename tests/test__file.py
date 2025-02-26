@@ -68,7 +68,7 @@ def test_file_image_payload(image_file):
     }
 
 
-def test_special_characters_correct(tmp_path):
+def test_file_text_special_characters(tmp_path):
     special_text = (
         "Greek: a, β, y, δ, ε, ζ\n"
         "Latin: æ, ø, å, ß, é, ñ, ü\n"
