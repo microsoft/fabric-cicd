@@ -60,7 +60,7 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_check=True)
 
     # Update compute settings
-    _update_compute_settings(fabric_workspace_obj, item_path, item_guid)
+    _update_compute_settings(fabric_workspace_obj, item_path, item_guid, item_name)
 
     repo_library_files = _get_repo_libraries(item_path)
 
@@ -128,7 +128,9 @@ def _check_environment_publish_state(
             iteration += 1
 
 
-def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: Path, item_guid: str) -> None:
+def _update_compute_settings(
+    fabric_workspace_obj: FabricWorkspace, item_path: Path, item_guid: str, item_name: str
+) -> None:
     """
     Update spark compute settings.
 
@@ -136,6 +138,7 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: P
         fabric_workspace_obj: The FabricWorkspace object.
         item_path: The path to the environment item.
         item_guid: The GUID of the environment item.
+        item_name: Name of the environment item.
     """
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
@@ -146,10 +149,22 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: P
             pool_id = yaml_body["instance_pool_id"]
             if "spark_pool" in fabric_workspace_obj.environment_parameter:
                 parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
-                if pool_id in parameter_dict:
-                    # replace any found references with specified environment value
-                    yaml_body["instancePool"] = parameter_dict[pool_id]
-                    del yaml_body["instance_pool_id"]
+                # Handle original parameter file format
+                if isinstance(parameter_dict, dict):
+                    if pool_id in parameter_dict:
+                        # replace any found references with specified environment value
+                        yaml_body["instancePool"] = parameter_dict[pool_id]
+                        del yaml_body["instance_pool_id"]
+                # Handle new parameter file format
+                elif isinstance(parameter_dict, list):
+                    for key in parameter_dict:
+                        instance_pool_id = key["instance_pool_id"]
+                        replace_value = key["replace_value"]
+                        input_name = key.get("item_name")
+                        if instance_pool_id == pool_id and (input_name == item_name or not input_name):
+                            # replace any found references with specified environment value
+                            yaml_body["instancePool"] = replace_value[fabric_workspace_obj.environment]
+                            del yaml_body["instance_pool_id"]
 
         yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
 

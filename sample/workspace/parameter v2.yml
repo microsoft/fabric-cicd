@@ -4,16 +4,12 @@ find_replace:
     # Required Fields
     - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0" # String to find in the local repository
       replace_value:
-          dev: "81bbb339-8d0b-46e8-bfa6-289a159c0733" # String to replace when deploying to Environment_1
-          prod: "5d6a1b16-447f-464a-b959-45d0fed35ca0" # String to replace when deploying to Environment_...
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733" # String to replace when deploying to Environment_1
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0" # String to replace when deploying to Environment_...
       # Optional Fields
-      item_type: #"datapipeline" # Replacement occurs only for items of this item type
-      item_name: #"Run Hello World 2" # Replacement occurs only for items of this item name
-      file_path: #"C:\\Users\\shirasassoon\\Data Engineering Repos\\fabric-cicd-1\\sample\\workspace\\Run Hello World 2.DataPipeline\\pipeline-content.json" #"sample\\workspace\\Run Hello World.DataPipeline\\pipeline-content.json" # Replacement occurs only for items with this file path (relative to workspace root)
-      # Alternative Optional Fields
-      item_type_array: #["DataPipeline", "Notebook"] # Array input value
-      item_name_array: ["Hello World", "Run Hello World 2"] # Array input value
-      file_path_array: # Array input value
+      item_type: # Replacement occurs only for items of this item type, Note: Inputs are case sensitive and must be a String or Array 
+      item_name: # Replacement occurs only for items of this item name, Note: Inputs are case sensitive and must be a String or Array
+      file_path: # Replacement occurs only for items with this file path (full path only), Note: Inputs are case sensitive and must be a String or Array
 
 # spark_pool will find any custom pool references in sparkcompute.yml files and replace
 # and replace the id with the provided type and name for the specified `environment` Workspace object parameter
@@ -24,12 +20,12 @@ spark_pool:
       replace_value:
           PPE:
               type: "Capacity" # "Workspace" or "Capacity" custom pool type when deploying to Environment_1
-              name: "CapacityPool_Large" # Name of custom pool type when deploying to Environment_1
+              name: "CapacityPool_Large_Static" #"CapacityPool_Large" # Name of custom pool type when deploying to Environment_1
           PROD:
               type: "Workspace" # "Workspace" or "Capacity" custom pool type when deploying to Environment_...
               name: "WorkspacePool_Medium" # Name of custom pool type when deploying to Environment_...
       # Optional Fields
-      item_name: "World" # Replacement occurs only for items of this item name
+      item_name: # Replacement occurs only for items of this item name
     - instance_pool_id: "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d" # String of the insance_pool_id found in the sparkcompute.yml for environment item
       replace_value:
           PPE:
