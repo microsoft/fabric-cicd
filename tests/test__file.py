@@ -66,3 +66,27 @@ def test_file_image_payload(image_file):
         "payload": expected_payload,
         "payloadType": "InlineBase64",
     }
+
+
+def test_special_characters_correct(tmp_path):
+    special_text = (
+        "Greek: α, β, γ, δ, ε, ζ\n"
+        "Latin: æ, ø, å, ß, é, ñ, ü\n"
+        "Cyrillic: Ж, Д, и, ю\n"
+        "Arabic: مرحبا, سلام\n"
+        "Chinese: 你好, 世界\n"
+        "Emoji: 😊, 🚀, 🌟\n"
+        "Symbols: ©, ®, ™, €, £, ¥, ∞, ≠, ≤, ≥"
+    )
+    item_path = tmp_path / "workspace/SpecialTextModel"
+    file_path = item_path / "definition/special.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(special_text, encoding="utf-8")
+    file_obj = File(item_path=item_path, file_path=file_path)
+    expected_payload = base64.b64encode(special_text.encode("utf-8")).decode("utf-8")
+    assert file_obj.contents == special_text
+    assert file_obj.base64_payload == {
+        "path": "definition/special.txt",
+        "payload": expected_payload,
+        "payloadType": "InlineBase64",
+    }

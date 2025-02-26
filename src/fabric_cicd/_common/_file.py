@@ -58,7 +58,7 @@ class File:
                 FileTypeError(msg, logger)
         else:
             try:
-                self.contents = self.file_path.read_text()
+                self.contents = self.file_path.read_text(encoding="utf-8")
             except Exception:
                 msg = (
                     f"Error reading file {self.file_path} as text.  "
