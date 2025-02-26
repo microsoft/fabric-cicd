@@ -227,6 +227,162 @@ class FabricWorkspace:
 
         return raw_file
 
+    def _replace_parameters_v2(self, raw_file: str, item_type: str, item_name: str, file_path: str) -> str:
+        """
+        Replaces values found in parameter file with the chosen environment value. Handles two accepted parameter file formats.
+        ACCEPTS multiple optional inputs and supports string and array values
+        Args:
+            raw_file: The raw file content where parameter values need to be replaced.
+            item_type: The type of the item (e.g., Notebook, Environment).
+            item_name: The name of the item.
+            file_path: The path of the file.
+        """
+        if "find_replace" in self.environment_parameter:
+            # Handle new parameter file format
+            if isinstance(self.environment_parameter["find_replace"], list):
+                for parameter_dict in self.environment_parameter["find_replace"]:
+                    find_value = parameter_dict["find_value"]
+                    replace_value = parameter_dict["replace_value"]
+                    input_type = parameter_dict.get("item_type")
+                    input_name = parameter_dict.get("item_name")
+                    # (
+                    #    parameter_dict.get("item_type").replace(" ", "").lower()
+                    #    if parameter_dict.get("item_type")
+                    #    else None
+                    # )
+                    # input_name = parameter_dict.get("item_name").lower() if parameter_dict.get("item_name") else None
+                    input_path = Path(parameter_dict.get("file_path")) if parameter_dict.get("file_path") else None
+
+                    input_type_array = (
+                        parameter_dict.get("item_type_array") if parameter_dict.get("item_type_array") else []
+                    )
+                    input_name_array = (
+                        parameter_dict.get("item_name_array") if parameter_dict.get("item_name_array") else []
+                    )
+
+                    if parameter_dict.get("file_path_array"):
+                        input_path_array = [Path(path) for path in parameter_dict.get("file_path_array")]
+                    else:
+                        input_path_array = []
+
+                    # item_type = item_type.replace(" ", "").lower()
+                    # item_name = item_name.lower()
+                    file_path = Path(file_path)
+
+                    # Conditions for replacement based on matches with optional parameter input values
+                    replace_conditions = (
+                        # No optional input values present
+                        (
+                            not input_type
+                            and not input_name
+                            and not input_path
+                            and input_type_array == []
+                            and input_name_array == []
+                            and input_path_array == []
+                        ),
+                        (
+                            # All optional input values present and match
+                            (input_type == item_type or item_type in input_type_array)
+                            and (input_name == item_name or item_name in input_name_array)
+                            and (input_path == file_path or file_path in input_path_array)
+                        ),
+                        (  # Two optional input values present and match (type and name)
+                            (input_type == item_type or item_type in input_type_array)
+                            and (input_name == item_name or item_name in input_name_array)
+                            and (not input_path or input_path_array == [])
+                        ),
+                        (  # Two optional input values present and match (type and path)
+                            (input_type == item_type or item_type in input_type_array)
+                            and (input_path == file_path or file_path in input_path_array)
+                            and (not input_name or input_name_array == [])
+                        ),
+                        (  # Two optional input values present and match (name and path)
+                            (input_name == item_name or item_name in input_name_array)
+                            and (input_path == file_path or file_path in input_path_array)
+                            and (not input_type or input_type_array == [])
+                        ),
+                        (  # One optional input value present and match (type)
+                            (input_type == item_type or item_type in input_type_array)
+                            and (not input_name or input_name_array == [])
+                            and (not input_path or input_path_array == [])
+                        ),
+                        (  # One optional input value present and match (name)
+                            (input_name == item_name or item_name in input_name_array)
+                            and (not input_type or input_type_array == [])
+                            and (not input_path or input_path_array == [])
+                        ),
+                        (  # One optional input value present and match (path)
+                            (input_path == file_path or file_path in input_path_array)
+                            and (not input_type or input_type_array == [])
+                            and (not input_name or input_name_array == [])
+                        ),
+                    )
+                    # Perform replacement if any condition is true and replace any found references with specified environment value
+                    if any(replace_conditions) and (find_value in raw_file and self.environment in replace_value):
+                        logger.info(f"Replacing {find_value} with {replace_value[self.environment]}")
+                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
+                        print("replaced with new format")
+
+            # Handle original parameter file format
+            elif isinstance(self.environment_parameter["find_replace"], dict):
+                for key, parameter_dict in self.environment_parameter["find_replace"].items():
+                    if key in raw_file and self.environment in parameter_dict:
+                        # replace any found references with specified environment value
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                        print("replaced with old format")
+
+        return raw_file
+
+    def _replace_parameters_v3(self, raw_file: str, item_type: str, item_name: str, file_path: str) -> str:
+        """
+        Replaces values found in parameter file with the chosen environment value. Handles two accepted parameter file formats.
+        ONLY one optional input value is allowed.
+
+        Args:
+            raw_file: The raw file content where parameter values need to be replaced.
+            item_type: The type of the item (e.g., Notebook, Environment).
+            item_name: The name of the item.
+            file_path: The path of the file.
+        """
+        if "find_replace" in self.environment_parameter:
+            # Handle new parameter file format
+            if isinstance(self.environment_parameter["find_replace"], list):
+                for parameter_dict in self.environment_parameter["find_replace"]:
+                    find_value = parameter_dict["find_value"]
+                    replace_value = parameter_dict["replace_value"]
+                    input_type = parameter_dict.get("item_type")
+                    input_name = parameter_dict.get("item_name")
+                    input_path = Path(parameter_dict.get("file_path")) if parameter_dict.get("file_path") else None
+                    file_path = Path(file_path)
+
+                    # Conditions for replacement based on matches with optional parameter input values
+                    replace_conditions = (
+                        # No optional input values present
+                        (not input_type and not input_name and not input_path),
+                        (  # One optional input value present and match (type)
+                            input_type == item_type and not input_name and not input_path
+                        ),
+                        (  # One optional input value present and match (name)
+                            input_name == item_name and not input_type and not input_path
+                        ),
+                        (  # One optional input value present and match (path)
+                            input_path == file_path and not input_type and not input_name
+                        ),
+                    )
+                    # Perform replacement if any condition is true and replace any found references with specified environment value
+                    if any(replace_conditions) and (find_value in raw_file and self.environment in replace_value):
+                        logger.info(f"Replacing {find_value} with {replace_value[self.environment]}")
+                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
+
+            # Handle original parameter file format
+            elif isinstance(self.environment_parameter["find_replace"], dict):
+                for key, parameter_dict in self.environment_parameter["find_replace"].items():
+                    if key in raw_file and self.environment in parameter_dict:
+                        # replace any found references with specified environment value
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+
+        return raw_file
+
     def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
@@ -365,7 +521,10 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            file.contents = self._replace_parameters(file.contents)
+                            # file.contents = self._replace_parameters(file.contents)
+                            file.contents = self._replace_parameters_v2(
+                                file.contents, item_type, item_name, file.file_path
+                            )
 
                     item_payload.append(file.base64_payload)
 
@@ -429,4 +588,4 @@ class FabricWorkspace:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
             logger.info("Unpublished")
         except Exception as e:
-            logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+            logger.info(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
