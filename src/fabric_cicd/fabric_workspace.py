@@ -119,7 +119,7 @@ class FabricWorkspace:
 
         if Path(parameter_file_path).is_file():
             logger.info(f"Found parameter file '{parameter_file_path}'")
-            with Path.open(parameter_file_path) as yaml_file:
+            with Path.open(parameter_file_path, encoding="utf-8") as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
     def _refresh_repository_items(self) -> None:
@@ -139,7 +139,7 @@ class FabricWorkspace:
 
                 # Attempt to read metadata file
                 try:
-                    with Path.open(item_metadata_path) as file:
+                    with Path.open(item_metadata_path, encoding="utf-8") as file:
                         item_metadata = json.load(file)
                 except FileNotFoundError as e:
                     msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"

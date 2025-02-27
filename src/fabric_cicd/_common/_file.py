@@ -53,7 +53,7 @@ class File:
             except Exception:
                 msg = (
                     f"Error reading file {self.file_path} as binary.  "
-                    "Please submit this as a bug https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md. Exception: {e}"
+                    f"Please submit this as a bug https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md. Exception: {e}"
                 )
                 FileTypeError(msg, logger)
         else:
@@ -62,7 +62,7 @@ class File:
             except Exception:
                 msg = (
                     f"Error reading file {self.file_path} as text.  "
-                    "Please submit this as a bug https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md. Exception: {e}"
+                    f"Please submit this as a bug https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md. Exception: {e}"
                 )
                 FileTypeError(msg, logger)
 
