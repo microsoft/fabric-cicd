@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import dpath
 import yaml
@@ -18,6 +18,7 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._validate_parameterization import check_replacement_condition
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +239,7 @@ class FabricWorkspace:
             file_path: The path of the file.
         """
         if "find_replace" in self.environment_parameter:
-            # Handle new parameter file format
+            # Handle new parameter file structure
             if isinstance(self.environment_parameter["find_replace"], list):
                 for parameter_dict in self.environment_parameter["find_replace"]:
                     find_value = parameter_dict["find_value"]
@@ -247,65 +248,26 @@ class FabricWorkspace:
                     input_name = parameter_dict.get("item_name")
                     input_path = parameter_dict.get("file_path")
 
-                    def _set_replacement_conditions(
-                        input_value: Union[str, Path, list[str], list[Path], None], compare_value: Union[str, Path]
-                    ) -> bool:
-                        """A helper function to determine the proper replacement condition based on input_value type."""
-                        if isinstance(input_value, (str, Path)):
-                            input_value_condition = compare_value == input_value
-                        elif isinstance(input_value, list):
-                            input_value_condition = compare_value in input_value
-                        else:
-                            input_value_condition = False
-
-                        return input_value_condition
-
-                    # Set conditions for optional parameters based on input value type
-                    item_type_condition = _set_replacement_conditions(input_type, item_type)
-                    item_name_condition = _set_replacement_conditions(input_name, item_name)
-                    input_path = (
-                        [Path(path) for path in input_path]
-                        if isinstance(input_path, list)
-                        else Path(input_path)
-                        if input_path
-                        else None
-                    )
-                    file_path_condition = _set_replacement_conditions(input_path, Path(file_path))
-
-                    # List of conditions for replacement
-                    replace_conditions = [
-                        # Condition 1: Zero optional inputs present
-                        (not input_type and not input_name and not input_path),
-                        # Condition 2: Type, Name, and Path inputs are present and match
-                        (item_type_condition and item_name_condition and file_path_condition),
-                        # Condition 3: Only Type and Name inputs are present and match
-                        (item_type_condition and item_name_condition and not input_path),
-                        # Condition 4: Only Type and Path inputs are present and match
-                        (item_type_condition and file_path_condition and not input_name),
-                        # Condition 5: Only Name and Path inputs are present and match
-                        (item_name_condition and file_path_condition and not input_type),
-                        # Condition 6: Only Type input is present and matches
-                        (item_type_condition and not input_name and not input_path),
-                        # Condition 7: Only Name input is present and matches
-                        (item_name_condition and not input_type and not input_path),
-                        # Condition 8: Only Path input is present and matches
-                        (file_path_condition and not input_type and not input_name),
-                    ]
-
-                    # Perform replacement if any condition is true and replace any found references with specified environment value
-                    if (find_value in raw_file and self.environment in replace_value) and any(replace_conditions):
+                    # Perform replacement if a condition is met and replace any found references with specified environment value
+                    if (find_value in raw_file and self.environment in replace_value) and check_replacement_condition(
+                        input_type, input_name, input_path, item_type, item_name, file_path
+                    ):
                         raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                        logger.info(
+                        print("replaced value")
+                        logger.debug(
                             f"Replacing {find_value} with {replace_value[self.environment]} in {item_name}.{item_type}"
                         )
 
-            # Handle original parameter file format
+            # Handle original parameter file structure
             elif isinstance(self.environment_parameter["find_replace"], dict):
+                logger.warning(
+                    "The parameter file structure used will no longer be supported in a future version. Please update to the new structure."
+                )
                 for key, parameter_dict in self.environment_parameter["find_replace"].items():
                     if key in raw_file and self.environment in parameter_dict:
                         # replace any found references with specified environment value
                         raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                        logger.info(
+                        logger.debug(
                             f"Replacing {key} with {parameter_dict[self.environment]} in {item_name}.{item_type}"
                         )
 
