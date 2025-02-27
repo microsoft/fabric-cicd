@@ -18,6 +18,7 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._validate_parameterization import check_replacement_condition
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,51 @@ class FabricWorkspace:
 
         return raw_file
 
+    def _replace_parameters_v2(self, raw_file: str, item_type: str, item_name: str, file_path: str) -> str:
+        """
+        Replaces values found in parameter file with the chosen environment value. Handles two accepted parameter file formats.
+
+        Args:
+            raw_file: The raw file content where parameter values need to be replaced.
+            item_type: The type of the item (e.g., Notebook, Environment).
+            item_name: The name of the item.
+            file_path: The path of the file.
+        """
+        if "find_replace" in self.environment_parameter:
+            # Handle new parameter file structure
+            if isinstance(self.environment_parameter["find_replace"], list):
+                for parameter_dict in self.environment_parameter["find_replace"]:
+                    find_value = parameter_dict["find_value"]
+                    replace_value = parameter_dict["replace_value"]
+                    input_type = parameter_dict.get("item_type")
+                    input_name = parameter_dict.get("item_name")
+                    input_path = parameter_dict.get("file_path")
+
+                    # Perform replacement if a condition is met and replace any found references with specified environment value
+                    if (find_value in raw_file and self.environment in replace_value) and check_replacement_condition(
+                        input_type, input_name, input_path, item_type, item_name, file_path
+                    ):
+                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
+                        print("replaced value")
+                        logger.debug(
+                            f"Replacing {find_value} with {replace_value[self.environment]} in {item_name}.{item_type}"
+                        )
+
+            # Handle original parameter file structure
+            elif isinstance(self.environment_parameter["find_replace"], dict):
+                logger.warning(
+                    "The parameter file structure used will no longer be supported in a future version. Please update to the new structure."
+                )
+                for key, parameter_dict in self.environment_parameter["find_replace"].items():
+                    if key in raw_file and self.environment in parameter_dict:
+                        # replace any found references with specified environment value
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                        logger.debug(
+                            f"Replacing {key} with {parameter_dict[self.environment]} in {item_name}.{item_type}"
+                        )
+
+        return raw_file
+
     def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
@@ -365,7 +411,10 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            file.contents = self._replace_parameters(file.contents)
+                            # file.contents = self._replace_parameters(file.contents)
+                            file.contents = self._replace_parameters_v2(
+                                file.contents, item_type, item_name, file.file_path
+                            )
 
                     item_payload.append(file.base64_payload)
 
