@@ -50,7 +50,7 @@ class File:
         if file_type != "text":
             try:
                 self.contents = self.file_path.read_bytes()
-            except Exception:
+            except Exception as e:
                 msg = (
                     f"Error reading file {self.file_path} as binary.  "
                     f"Please submit this as a bug https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md. Exception: {e}"
@@ -59,7 +59,7 @@ class File:
         else:
             try:
                 self.contents = self.file_path.read_text(encoding="utf-8")
-            except Exception:
+            except Exception as e:
                 msg = (
                     f"Error reading file {self.file_path} as text.  "
                     f"Please submit this as a bug https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md. Exception: {e}"
