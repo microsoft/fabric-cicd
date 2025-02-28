@@ -11,14 +11,17 @@ from pathlib import Path
 from typing import Optional
 
 import dpath
-import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._validate_parameterization import check_replacement_condition
+from fabric_cicd._common._validate_parameterization import (
+    check_replacement,
+    load_parameters_to_dict,
+    new_parameter_structure,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +124,10 @@ class FabricWorkspace:
         if Path(parameter_file_path).is_file():
             logger.info(f"Found parameter file '{parameter_file_path}'")
             with Path.open(parameter_file_path) as yaml_file:
-                self.environment_parameter = yaml.safe_load(yaml_file)
+                yaml_file_content = yaml_file.read()
+                self.environment_parameter = load_parameters_to_dict(
+                    self.environment_parameter, yaml_file_content, "parameter.yml"
+                )
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -230,7 +236,7 @@ class FabricWorkspace:
 
     def _replace_parameters_v2(self, raw_file: str, item_type: str, item_name: str, file_path: str) -> str:
         """
-        Replaces values found in parameter file with the chosen environment value. Handles two accepted parameter file formats.
+        Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
         Args:
             raw_file: The raw file content where parameter values need to be replaced.
@@ -240,29 +246,26 @@ class FabricWorkspace:
         """
         if "find_replace" in self.environment_parameter:
             # Handle new parameter file structure
-            if isinstance(self.environment_parameter["find_replace"], list):
+            if new_parameter_structure(self.environment_parameter, key="find_replace"):
                 for parameter_dict in self.environment_parameter["find_replace"]:
                     find_value = parameter_dict["find_value"]
                     replace_value = parameter_dict["replace_value"]
                     input_type = parameter_dict.get("item_type")
                     input_name = parameter_dict.get("item_name")
                     input_path = parameter_dict.get("file_path")
+                    input_file_regex = parameter_dict.get("file_regex")
 
                     # Perform replacement if a condition is met and replace any found references with specified environment value
-                    if (find_value in raw_file and self.environment in replace_value) and check_replacement_condition(
-                        input_type, input_name, input_path, item_type, item_name, file_path
+                    if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                        input_type, input_name, input_path, input_file_regex, item_type, item_name, file_path
                     ):
                         raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                        print("replaced value")
                         logger.debug(
                             f"Replacing {find_value} with {replace_value[self.environment]} in {item_name}.{item_type}"
                         )
 
             # Handle original parameter file structure
-            elif isinstance(self.environment_parameter["find_replace"], dict):
-                logger.warning(
-                    "The parameter file structure used will no longer be supported in a future version. Please update to the new structure."
-                )
+            else:
                 for key, parameter_dict in self.environment_parameter["find_replace"].items():
                     if key in raw_file and self.environment in parameter_dict:
                         # replace any found references with specified environment value
