@@ -145,3 +145,17 @@ def test_platform_metadata_with_utf8_chars(
     item = workspace.repository_items["Notebook"][item_name]
     assert item.name == item_name
     assert item.description == f"Description with {utf8_test_chars['mixed']}"
+
+
+def test_environment_with_utf8_chars(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id, utf8_test_chars):
+    """Test that environment parameter with UTF-8 characters is preserved."""
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Environment"],
+            environment=utf8_test_chars["nordic"],
+        )
+
+    assert workspace.environment == utf8_test_chars["nordic"]
