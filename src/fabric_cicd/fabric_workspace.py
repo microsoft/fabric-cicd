@@ -102,7 +102,7 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.workspace_id = validate_workspace_id(workspace_id)
-        self.repository_directory = validate_repository_directory(repository_directory)
+        self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
         self.environment = validate_environment(environment)
@@ -114,12 +114,12 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
-        parameter_file_path = Path(self.repository_directory, "parameter.yml")
+        parameter_file_path = self.repository_directory / "parameter.yml"
         self.environment_parameter = {}
 
-        if Path(parameter_file_path).is_file():
+        if parameter_file_path.is_file():
             logger.info(f"Found parameter file '{parameter_file_path}'")
-            with Path.open(parameter_file_path, encoding="utf-8") as yaml_file:
+            with parameter_file_path.open(encoding="utf-8") as yaml_file:
                 self.environment_parameter = yaml.safe_load(yaml_file)
 
     def _refresh_repository_items(self) -> None:
@@ -130,7 +130,7 @@ class FabricWorkspace:
             directory = Path(root)
             # valid item directory with .platform file within
             if ".platform" in files:
-                item_metadata_path = Path(directory, ".platform")
+                item_metadata_path = directory / ".platform"
 
                 # Print a warning and skip directory if empty
                 if not os.listdir(directory):
@@ -224,6 +224,7 @@ class FabricWorkspace:
                 if key in raw_file and self.environment in parameter_dict:
                     # replace any found references with specified environment value
                     raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                    logger.debug(f"Replaced '{key}' with '{parameter_dict[self.environment]}'")
 
         return raw_file
 
@@ -318,7 +319,7 @@ class FabricWorkspace:
             path: Full path of the desired item.
         """
         for item_details in self.repository_items[item_type].values():
-            if Path(item_details.path) == Path(path):
+            if item_details.path == Path(path):
                 return item_details.logical_id
         # if not found
         return None
