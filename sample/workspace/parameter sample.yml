@@ -1,0 +1,29 @@
+# find_replace will find any matching find_value string in any file under the specified `repository_directory` Workspace object parameter
+# and replace it with the replace_value for the specified `environment` Workspace object parameter
+find_replace:
+    # Required Fields
+    - find_value: # String to find in the local repository files
+      replace_value:
+          <Environment_1>: # String to replace when deploying to Environment_1
+          <Environment_..>: # String to replace when deploying to Environment_...
+      # Optional Fields: case sensitive, accepts String or Array
+      item_type: # Replacement occurs only for items of this item type (valid item types: https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype), Note: Inputs are case sensitive and must be a String or Array 
+      item_name: # Replacement occurs only for items of this item name
+      file_path: # Replacement occurs only for items with this file path (relative or absolute path))
+      file_regex: # Replacement occurs only for items that match the regex pattern (respected as standalone parameter even when other optional parameters are provided)
+
+# spark_pool will find any custom pool references in sparkcompute.yml files and replace
+# and replace the id with the provided type and name for the specified `environment` Workspace object parameter
+# If this is not specified for environments attached to custom pools, they will be deployed attached to the starter pool
+spark_pool:
+    # Required Fields
+    - instance_pool_id: # String of the insance_pool_id found in the sparkcompute.yml for environment item
+      replace_value:
+          <Environment_1>:
+              type: # "Workspace" or "Capacity" custom pool type when deploying to Environment_1
+              name: #"CapacityPool_Large" # Name of custom pool type when deploying to Environment_1
+          <Environment_..>:
+              type: # "Workspace" or "Capacity" custom pool type when deploying to Environment_...
+              name: # Name of custom pool type when deploying to Environment_...
+      # Optional Fields
+      item_name: # Replacement occurs only for items of this item name
