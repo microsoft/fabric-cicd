@@ -62,7 +62,6 @@ def create_platform_metadata(dir_path, utf8_chars):
     """Create a .platform metadata file with UTF-8 characters."""
     item_dir = dir_path / "test_item"
     item_dir.mkdir(parents=True, exist_ok=True)
-
     platform_file_path = item_dir / ".platform"
     metadata_content = {
         "metadata": {
@@ -108,7 +107,6 @@ def test_parameter_file_with_utf8_chars(
 ):
     """Test that parameter file with UTF-8 characters is read correctly."""
     create_parameter_file(temp_workspace_dir, utf8_test_chars)
-
     with patch.object(FabricWorkspace, "_refresh_repository_items"):
         workspace = patched_fabric_workspace(
             workspace_id=valid_workspace_id,
@@ -130,7 +128,6 @@ def test_platform_metadata_with_utf8_chars(
 ):
     """Test that .platform metadata file with UTF-8 characters is read correctly."""
     create_platform_metadata(temp_workspace_dir, utf8_test_chars)
-
     with patch.object(FabricWorkspace, "_refresh_parameter_file"):
         workspace = patched_fabric_workspace(
             workspace_id=valid_workspace_id,
@@ -139,17 +136,18 @@ def test_platform_metadata_with_utf8_chars(
         )
 
     item_name = f"Test Notebook with {utf8_test_chars['nordic']}"
+    item = workspace.repository_items["Notebook"][item_name]
+
     assert "Notebook" in workspace.repository_items
     assert item_name in workspace.repository_items["Notebook"]
-
-    item = workspace.repository_items["Notebook"][item_name]
     assert item.name == item_name
     assert item.description == f"Description with {utf8_test_chars['mixed']}"
 
 
-def test_environment_with_utf8_chars(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id, utf8_test_chars):
+def test_environment_param_with_utf8_chars(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id, utf8_test_chars
+):
     """Test that environment parameter with UTF-8 characters is preserved."""
-
     with patch.object(FabricWorkspace, "_refresh_repository_items"):
         workspace = patched_fabric_workspace(
             workspace_id=valid_workspace_id,
