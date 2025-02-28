@@ -134,6 +134,6 @@ def _check_regex_match(input_regex: Union[str, list], path_string: str) -> bool:
             for match in matches.values():
                 if match:
                     return True
-        return bool(re.search(input_regex, path_string))
+        return re.search(input_regex, path_string)
     logger.debug(f"No match found for pattern '{input_regex}'")
     return False
