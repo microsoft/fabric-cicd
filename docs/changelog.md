@@ -7,6 +7,13 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.8
+
+<span class="md-h2-subheader">Release Date: 2025-03-04</span>
+
+-   🔧 Increase special character support ([#134](https://github.com/microsoft/fabric-cicd/issues/134))
+-   ⚡ Changelog now available with version check ([#127](https://github.com/microsoft/fabric-cicd/issues/127))
+
 ## Version 0.1.7
 
 <span class="md-h2-subheader">Release Date: 2025-02-26</span>
