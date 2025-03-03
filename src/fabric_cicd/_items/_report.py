@@ -44,7 +44,7 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
     """
     if file_obj.name == "definition.pbir":
         definition_body = json.loads(file_obj.contents)
-        if "datasetReference" in definition_body and "byPath" in definition_body["datasetReference"]:
+        if "datasetReference" in definition_body and "byPath" in definition_body["datasetReference"] and definition_body["datasetReference"]["byPath"] is not None:
             model_rel_path = definition_body["datasetReference"]["byPath"]["path"]
             model_path = str((item_obj.path / model_rel_path).resolve())
             model_id = workspace_obj._convert_path_to_id("SemanticModel", model_path)
