@@ -17,7 +17,7 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._validate_parameterization import (
+from fabric_cicd._common._parameterization_utils import (
     check_replacement,
     load_parameters_to_dict,
     new_parameter_structure,

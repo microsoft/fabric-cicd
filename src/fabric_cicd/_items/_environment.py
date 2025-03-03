@@ -12,7 +12,7 @@ import yaml
 
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._fabric_endpoint import handle_retry
-from fabric_cicd._common._validate_parameterization import new_parameter_structure
+from fabric_cicd._common._parameterization_utils import new_parameter_structure
 
 logger = logging.getLogger(__name__)
 
