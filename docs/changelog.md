@@ -11,6 +11,7 @@ The following contains all major, minor, and patch version release notes.
 
 <span class="md-h2-subheader">Release Date: 2025-03-04</span>
 
+-   🔧 Support relative directories ([#136](https://github.com/microsoft/fabric-cicd/issues/136)) ([#132](https://github.com/microsoft/fabric-cicd/issues/132))
 -   🔧 Increase special character support ([#134](https://github.com/microsoft/fabric-cicd/issues/134))
 -   ⚡ Changelog now available with version check ([#127](https://github.com/microsoft/fabric-cicd/issues/127))
 
