@@ -22,8 +22,6 @@ C:/dev/workspace
     /parameter.yml
 ```
 
-The `parameter.yml` file should be located directly within the `reposistory_directory` field passed into the `FabricWorkspace` object.
-
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
 
 ## Inputs
