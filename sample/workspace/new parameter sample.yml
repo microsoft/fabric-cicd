@@ -1,0 +1,125 @@
+# find_replace will find any matching find_value string in any file under the specified `repository_directory` Workspace object parameter
+# and replace it with the replace_value for the specified `environment` Workspace object parameter
+find_replace:
+    # Required Fields
+    - find_value: # String to find in the local repository files
+      replace_value:
+          <Environment_1>: # String to replace when deploying to Environment_1
+          <Environment_..>: # String to replace when deploying to Environment_...
+      # Optional Fields (see examples below)
+      item_type: # Specify valid item type(s) so that replacement occurs only for items of this item type(s)
+      item_name: # Specify item name(s) from repository so that replacement occurs only for items of this item name(s)
+      file_path: # Specify relative file path(s) so that replacement occurs only for items with this file path(s)
+      
+# spark_pool will find any custom pool references in sparkcompute.yml files
+# and replace the id with the provided type and name for the specified `environment` Workspace object parameter
+# If this is not specified for environments attached to custom pools, they will be attached to the starter pool when deployed 
+spark_pool:
+    # Required Fields
+    - instance_pool_id: # String of the insance_pool_id found in the sparkcompute.yml for environment item
+      replace_value:
+          <Environment_1>:
+              type: # "Workspace" or "Capacity" custom pool type when deploying to Environment_1
+              name: # Name of custom pool type when deploying to Environment_1
+          <Environment_..>:
+              type: # "Workspace" or "Capacity" custom pool type when deploying to Environment_...
+              name: # Name of custom pool type when deploying to Environment_...
+      # Optional Fields
+      item_name: # Specify item name(s) from repository so that replacement occurs only for Environments of this item name(s)
+
+########### Optional Parameter Examples ###########:
+# item_type Parameter: 
+# item_type: "Notebook" 
+# item_type: ["DataPipeline", "Notebook", "SemanticModel"]
+# item_type:
+#  - "DataPipeline"
+#  - "Notebook" 
+#  - "SemanticModel"
+
+# item_name Parameter:
+# item_name: "Hello World"
+# item_name: ["Hello World", "Hello World Subfolder", "Run Hello World"]
+# item_name:
+#  - "Hello World"      
+#  - "Hello World Subfolder"
+#  - "Run Hello World"
+
+# file_path Parameter:
+# file_path: "sample\\workspace\\Hello World.Notebook\\notebook-content.py"
+# file_path: ["sample\\workspace\\Hello World.Notebook\\notebook-content.py", "sample\\workspace\\Run Hello World.DataPipeline\\pipeline-content.json"]
+# file_path:
+# - "sample\\workspace\\Hello World.Notebook\\notebook-content.py"
+# - "sample\\workspace\\Run Hello World.DataPipeline\\pipeline-content.json"
+# - "sample\\workspace\\subfolder\\Hello World Subfolder.Notebook\\notebook-content.py"
+
+
+
+############ NOTES ON OPTIONAL PARAMETERS ############:
+# Input values are CASE SENSITIVE
+# Acceptable input values: STRING or ARRAY
+# Array inputs can be provided with [] or -
+# Strings should be wrapped in quotes (make sure to escape \ character in path inputs) 
+# item types MUST be valid, see valid types here: https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype
+# Relative paths MUST be relative to the repository directory 
+ 
+
+############# Parameter File Example 1 ##############:
+find_replace:
+    # Required Fields
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0" 
+      replace_value:
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional Fields
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path: 
+spark_pool:
+    # Required Fields
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "CapacityPool_Large_PPE"
+          PROD:
+              type: "Capacity"
+              name: "CapacityPool_Large_PROD"
+      # Optional Fields
+      item_name: "World"
+
+############ Parameter File Example 2 ##############:
+find_replace:
+    # Required Fields
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0" 
+      replace_value:
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional Fields
+      item_type: 
+      item_name: 
+      file_path:
+       - "sample\\workspace\\Hello World.Notebook\\notebook-content.py"  # Relative path
+       - sample\workspace\subfolder\Hello World Subfolder.Notebook\notebook-content.py # Relative path
+spark_pool:
+    # Required Fields
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "CapacityPool_Large_PPE"
+          PROD:
+              type: "Capacity"
+              name: "CapacityPool_Large_PROD"
+      # Optional Fields
+      item_name: "World"
+    # Required Fields
+    - instance_pool_id: "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d"
+      replace_value:
+          PPE:
+              type: "Workspace"
+              name: "WorkspacePool_Medium"
+          PROD:
+              type: "Capacity"
+              name: "CapacityPool_Large"
+      # Optional Fields
+      item_name: ["Env_1", "Env_2", "Env_3"]
