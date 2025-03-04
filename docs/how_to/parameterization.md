@@ -1,6 +1,26 @@
 # Parameterization
 
-To handle environment-specific values committed to git, use a `parameter.yml` file. This file supports programmatically changing values based on the `environment` field passed into the `FabricWorkspace` object. If the environment value is not found in the `parameter.yml` file, any dependent replacements will be skipped. This file should sit within the same `workspace` folder specified in the FabricWorkspace object.
+To handle environment-specific values committed to git, use a `parameter.yml` file. This file supports programmatically changing values based on the `environment` field passed into the `FabricWorkspace` object. If the environment value is not found in the `parameter.yml` file, any dependent replacements will be skipped. This file should sit in the root of the `repository_directory` folder specified in the FabricWorkspace object.
+
+Example of parameter.yml location based on provided repository directory:
+
+```python
+from fabric_cicd import FabricWorkspace
+workspace = FabricWorkspace(
+    workspace_id="your-workspace-id",
+    repository_directory="C:/dev/workspace",
+    item_type_in_scope=["Notebook"]
+)
+```
+
+```
+C:/dev/workspace
+    /HelloWorld.Notebook
+        ...
+    /GoodbyeWorld.Notebook
+        ...
+    /parameter.yml
+```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
 
