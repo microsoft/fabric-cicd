@@ -7,12 +7,17 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Union
 
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
-from fabric_cicd._parameterization._parameterization_utils import load_parameters_to_dict, new_parameter_structure
+from fabric_cicd._parameterization._parameterization_utils import (
+    load_parameters_to_dict,
+    new_parameter_structure,
+    process_input_path,
+)
 
 # Configure logging to output to the console
 logger = logging.getLogger(__name__)
@@ -25,19 +30,20 @@ class ParameterValidation:
         self,
         repository_directory: str,
         item_type_in_scope: list[str],
-        environments: list[str],
+        environment: str = "N/A",
         token_credential: TokenCredential = None,
     ) -> None:
         """
         Initializes the ParameterValidation instance.
 
         Args:
-            repository_directory: Local directory path of the repository where items are to be deployed from.
+            repository_directory: Local directory path of the repository where items are to be deployed from and parameter file lives.
             item_type_in_scope: Item types that should be deployed for a given workspace.
-            environments: The environments to be used for parameterization.
+            environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
         """
         from fabric_cicd._common._validate_input import (
+            validate_environment,
             validate_item_type_in_scope,
             validate_repository_directory,
             validate_token_credential,
@@ -54,163 +60,241 @@ class ParameterValidation:
         # Validate and set class variables
         self.repository_directory = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
-        self.environments = environments
+        self.environment = validate_environment(environment)
 
-    def validate_parameters(self) -> bool:
-        """Validates parameters"""
-        # If parameter file could not be loaded, return False
-        if not self._validate_parameter_load():
-            logger.debug("Parameter file is not found or invalid.")
-            return False
+    # Define expected keys for the find_replace and spark_pool parameters
+    FIND_REPLACE_REQUIRED_KEYS = ("find_value", "replace_value")
+    FIND_REPLACE_ALL_KEYS = ("find_value", "replace_value", "item_type", "item_name", "file_path")
+    SPARK_POOL_REQUIRED_KEYS = ("instance_pool_id", "replace_value")
+    SPARK_POOL_ALL_KEYS = ("instance_pool_id", "replace_value", "item_name")
 
-        # Otherwise, validate the parameter dictionary
-        if self._validate_parameter_keys():
-            logger.debug("Parameter keys are valid.")
-            # If both find_replace and spark_pool parameters are present, validate them
-            if self._validate_both_parameter_keys() and self._validate_find_replace_parameter():
-                logger.debug("Find replace parameter is valid.")
-                if self._validate_spark_pool_parameter():
-                    logger.debug("Spark pool parameter is valid.")
-                    return True
-            # If find_replace or spark_pool parameter is present, validate it
-            for key in self.environment_parameter:
-                if key == "find_replace" and self._validate_find_replace_parameter():
-                    logger.debug("Find replace parameter is valid.")
-                    return True
-                if key == "spark_pool" and self._validate_spark_pool_parameter():
-                    logger.debug("Spark pool parameter is valid.")
-                    return True
+    def validate_parameter_file(self) -> bool:
+        """Validates the parameter file."""
+        if self._validate_parameter_file_load():
+            if not new_parameter_structure(self.environment_parameter):
+                logger.warning("Validation skipped for old parameter structure")
+                return True
 
-        logger.error("Parameter validation failed.")
+            if self._validate_parameters():
+                logger.info("Parameter file validation passed")
+                return True
+
+        logger.error("Parameter file validation failed")
         return False
 
-    def _validate_parameter_load(self) -> bool:
-        """Validate parameter file load."""
+    def _validate_parameter_file_load(self) -> bool:
+        """Validates the parameter file load to a dictionary."""
         parameter_file_path = Path(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
-        if Path(parameter_file_path).is_file():
-            logger.info(f"Found parameter file '{parameter_file_path}'")
-            with Path.open(parameter_file_path) as yaml_file:
-                yaml_file_content = yaml_file.read()
-                self.environment_parameter = load_parameters_to_dict(
-                    self.environment_parameter, yaml_file_content, "parameter.yml"
-                )
-
+        self.environment_parameter = load_parameters_to_dict(
+            self.environment_parameter,
+            parameter_file_path,
+            "parameter.yml",
+        )
         return bool(self.environment_parameter)
 
-    def _validate_parameter_keys(self) -> bool:
-        """Validate the keys in the parameter dictionary."""
-        return bool(key in ["find_replace", "spark_pool"] for key in self.environment_parameter)
+    def _validate_parameters(self) -> bool:
+        """Validates the parameters in the parameter dictionary."""
+        logger.info("Validating the parameters")
 
-    def _validate_both_parameter_keys(self) -> bool:
-        """Validates whether both find_replace and spark_pool keys are present in the parameter dictionary."""
-        return bool("find_replace" in self.environment_parameter and "spark_pool" in self.environment_parameter)
+        if not all(key in ["find_replace", "spark_pool"] for key in self.environment_parameter):
+            logger.error("Missing or Invalid parameters in parameter file")
+            return False
+
+        find_replace_validation = self._validate_find_replace_parameter()
+        spark_pool_validation = self._validate_spark_pool_parameter()
+
+        parameters = list(self.environment_parameter.keys())
+        if len(parameters) == 1:
+            parameter = parameters[0]
+            if parameter == "find_replace":
+                return find_replace_validation
+            if parameter == "spark_pool":
+                return spark_pool_validation
+
+        return spark_pool_validation and find_replace_validation
 
     def _validate_find_replace_parameter(self) -> bool:
-        """Validate the find_replace parameter."""
-        if new_parameter_structure(self.environment_parameter, "find_replace"):
-            return self._validate_find_replace_new()
-        return self._validate_find_replace_old()
+        """Validates the find_replace parameter."""
+        if not self.environment_parameter.get("find_replace"):
+            return False
+
+        # Validate find_replace keys, required values and optional values
+        logger.info("Validating find_replace parameter")
+        msg_header = "find_replace validation issue:"
+
+        for parameter_dict in self.environment_parameter["find_replace"]:
+            parameter_keys = tuple(parameter_dict.keys())
+            if not self._validate_parameter_keys(
+                self.FIND_REPLACE_REQUIRED_KEYS, self.FIND_REPLACE_ALL_KEYS, parameter_keys, msg_header
+            ):
+                return False
+
+            if not parameter_dict["find_value"]:
+                logger.debug(f"{msg_header} Missing value for find_value key")
+                return False
+
+            if not self._validate_replace_value(parameter_dict, "find_replace", msg_header):
+                return False
+
+            if not self._validate_optional_parameters(parameter_dict, "find_replace", msg_header):
+                logger.warning(f"{msg_header} Optional values are not valid")
+
+        return True
 
     def _validate_spark_pool_parameter(self) -> bool:
-        """Validate the spark_pool parameter."""
-        if new_parameter_structure(self.environment_parameter, "spark_pool"):
-            return self._validate_spark_pool_new()
-        return self._validate_spark_pool_old()
+        """Validates the spark_pool parameter."""
+        if not self.environment_parameter.get("spark_pool"):
+            return False
 
-    def _validate_new_parameter_structure(self, key: str) -> bool:
-        """Returns True if the parameter dictionary contains the new structure, i.e. a list of values when indexed by the key."""
-        return isinstance(self.environment_parameter[key], list)
+        # Validate spark_pool keys, required values and optional values
+        logger.info("Validating spark_pool parameter")
+        msg_header = "spark_pool validation issue:"
 
-    def _validate_find_replace_new(self) -> bool:
-        """Validates the find_replace parameter based on the new structure."""
-        for parameter_dict in self.environment_parameter["find_replace"]:
-            # Validate required keys
-            if not parameter_dict["find_value"] or not parameter_dict["replace_value"]:
+        for parameter_dict in self.environment_parameter["spark_pool"]:
+            parameter_keys = tuple(parameter_dict.keys())
+            if not self._validate_parameter_keys(
+                self.SPARK_POOL_REQUIRED_KEYS, self.SPARK_POOL_ALL_KEYS, parameter_keys, msg_header
+            ):
                 return False
-            for environment in parameter_dict["replace_value"]:
-                if environment not in self.environments:
+
+            if not parameter_dict["instance_pool_id"]:
+                logger.debug(f"{msg_header} Missing value for instance_pool_id key")
+                return False
+
+            if not self._validate_replace_value(parameter_dict, "spark_pool", msg_header):
+                return False
+
+            if not self._validate_optional_parameters(parameter_dict, "spark_pool", msg_header):
+                logger.warning(f"{msg_header} Optional values are not valid")
+
+        return True
+
+    def _validate_parameter_keys(self, minimum_keys: tuple, maximum_keys: tuple, param_keys: tuple, msg: str) -> bool:
+        """Validates the keys in the parameter."""
+        minimum_set = set(minimum_keys)
+        maximum_set = set(maximum_keys)
+        param_keys_set = set(param_keys)
+
+        # if minimum_set is not a subset of key_set, return False
+        if not minimum_set <= param_keys_set:
+            logger.debug(f"{msg} Missing required keys")
+            return False
+
+        # if key_set is not a subset of maximum_set, return False
+        if not param_keys_set <= maximum_set:
+            logger.debug(f"{msg} Invalid keys found")
+            return False
+
+        return True
+
+    def _validate_replace_value(self, param_dict: dict, param_name: str, msg: str) -> bool:
+        """Validates the values in replace_value."""
+        required_values = []
+        replace_value_dict = param_dict["replace_value"]
+
+        if not replace_value_dict:
+            logger.debug(f"{msg} Missing value for 'replace_value' key")
+            return False
+
+        if not self._validate_environment(replace_value_dict):
+            logger.warning(
+                f"Target environment: '{self.environment}' does not exist as a key in 'replace_value' in {param_name}"
+            )
+
+        if param_name == "find_replace":
+            required_values.append(param_dict["find_value"])
+
+            for environment in param_dict["replace_value"]:
+                if not param_dict["replace_value"][environment]:
+                    logger.debug(f"{msg} Missing replace_value for {environment} key")
                     return False
-                if not parameter_dict["replace_value"][environment]:
+
+                required_values.append(param_dict["replace_value"][environment])
+
+        if param_name == "spark_pool":
+            required_values.append(param_dict["instance_pool_id"])
+
+            for environment, value in param_dict["replace_value"].items():
+                if not value:
+                    logger.debug(f"{msg} Missing replace_value for {environment} key")
                     return False
-            # Validate optional keys
+                if not all(key in value for key in ["type", "name"]) or any(
+                    key not in ["type", "name"] for key in value
+                ):
+                    logger.debug(f"{msg} Missing or Invalid key(s) found in replace_value")
+                    return False
+                if not value["type"] or value["type"] not in ["Capacity", "Workspace"]:
+                    logger.debug(f"{msg} Missing or Invalid 'type' value in replace_value")
+                    return False
+                if not value["name"]:
+                    logger.debug(f"{msg} Missing 'name' value in replace_value")
+                    return False
+
+                required_values.append(value["type"])
+                required_values.append(value["name"])
+
+        if not self._validate_data_type(required_values):
+            logger.debug(f"{msg} Required values must be String type")
+            return False
+
+        return True
+
+    def _validate_optional_parameters(self, parameter_dict: dict, param_name: str, msg: str) -> bool:
+        """Validates the optional parameter values."""
+        if param_name == "find_replace":
             item_type = parameter_dict.get("item_type")
             item_name = parameter_dict.get("item_name")
             file_path = parameter_dict.get("file_path")
+            optional_values = [item_type, item_name, file_path]
 
+            if not self._validate_data_type(optional_values, required=False):
+                logger.debug(f"{msg} Provided optional values must be String or List type")
+                return False
             if item_type and not self._validate_item_type(item_type):
+                logger.debug(f"Item type '{item_type}' is not in scope")
                 return False
             if item_name and not self._validate_item_name(item_name):
+                logger.debug(f"{msg} '{item_name}' not found in the repository directory")
                 return False
             if file_path and not self._validate_file_path(file_path):
+                logger.debug("File path not found in the repository directory")
                 return False
 
-        return True
-
-    def _validate_find_replace_old(self) -> bool:
-        """Validates the find_replace parameter based on the old structure."""
-        for find_value, parameter_dict in self.environment_parameter["find_replace"].items():
-            if not find_value or not parameter_dict:
-                return False
-            for environment in parameter_dict:
-                if environment not in self.environments:
-                    return False
-                for value in parameter_dict[environment]:
-                    if not value:
-                        return False
-        return True
-
-    def _validate_spark_pool_new(self) -> bool:
-        """Validates the spark_pool parameter based on the new structure."""
-        for parameter_dict in self.environment_parameter["spark_pool"]:
-            # Validate required keys
-            if not parameter_dict["instance_pool_id"] or not parameter_dict["replace_value"]:
-                return False
-            for environment in parameter_dict["replace_value"]:
-                if environment not in self.environments:
-                    return False
-                for value in parameter_dict["replace_value"][environment]:
-                    if not value:
-                        return False
-                    if value == "type" and parameter_dict["replace_value"][environment][value] not in [
-                        "Capacity",
-                        "Workspace",
-                    ]:
-                        return False
-                    if value == "name" and not parameter_dict["replace_value"][environment][value]:
-                        return False
-            # Validate optional keys
+        if param_name == "spark_pool":
             item_name = parameter_dict.get("item_name")
+            optional_values = [item_name]
+
+            if not self._validate_data_type(optional_values, required=False):
+                logger.debug(f"{msg} Provided optional values must be String or List type")
+                return False
             if item_name and not self._validate_item_name(item_name):
+                logger.debug(f"{msg} '{item_name}' is not found in the repository directory")
                 return False
 
         return True
 
-    def _validate_spark_pool_old(self) -> bool:
-        """Validates the spark_pool parameter based on the old structure."""
-        parameter_dict = self.environment_parameter["spark_pool"]
-        for pool_id in parameter_dict:
-            if not pool_id or not parameter_dict[pool_id]:
-                return False
-            for value in parameter_dict[pool_id]:
-                if not value:
-                    return False
-                if value == "type" and parameter_dict[pool_id][value] not in [
-                    "Capacity",
-                    "Workspace",
-                ]:
-                    return False
-                if value == "name" and not parameter_dict[pool_id][value]:
-                    return False
-        return True
+    def _validate_data_type(self, value_list: list, required: bool = True) -> bool:
+        """Validates the required or optional value data types."""
+        if not required:
+            optional = Union[str, list, None]
+            return all(isinstance(value, optional) for value in value_list)
+
+        return all(isinstance(value, str) for value in value_list)
+
+    def _validate_environment(self, replace_dict: dict) -> bool:
+        """Validates the target environment exists as a key in the replace_value dictionary."""
+        return self.environment in replace_dict
 
     def _validate_item_type(self, input_type: str) -> bool:
-        """Validates the item type."""
+        """Validates the item type is in scope."""
+        if isinstance(input_type, list):
+            return all(item_type in self.item_type_in_scope for item_type in input_type)
         return bool(input_type in self.item_type_in_scope)
 
     def _validate_item_name(self, input_name: str) -> bool:
-        """Validates the item name by scanning item metadata in the repository directory."""
+        """Validates the item name is found in the repository directory."""
         item_name_list = []
 
         for root, _dirs, files in os.walk(self.repository_directory):
@@ -227,14 +311,16 @@ class ParameterValidation:
                     item_name = item_metadata["metadata"]["displayName"]
                     item_name_list.append(item_name)
 
+        if isinstance(input_name, list):
+            return all(item_name in item_name_list for item_name in input_name)
+
         return bool(input_name in item_name_list)
 
-    def _validate_file_path(self, input_path: str) -> bool:
-        """Validates the file path."""
-        input_path = Path(input_path)
+    def _validate_file_path(self, input_path: Union[Path, list, None]) -> bool:
+        """Validates the file path by resolving a relative path if needed and checking if it exists."""
+        output_path = process_input_path(self.repository_directory, input_path)
 
-        if not input_path.is_absolute():
-            absolute_input_path = Path(self.repository_directory, input_path)
-            input_path = absolute_input_path
+        if isinstance(output_path, list):
+            return all(Path(path).exists() for path in output_path)
 
-        return bool(input_path.exists())
+        return output_path.exists()

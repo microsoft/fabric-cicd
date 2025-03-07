@@ -17,11 +17,6 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd._parameterization._parameterization_utils import (
-    check_replacement,
-    load_parameters_to_dict,
-    new_parameter_structure,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -118,16 +113,16 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
+        from fabric_cicd._parameterization._parameterization_utils import (
+            load_parameters_to_dict,
+        )
+
         parameter_file_path = Path(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
-        if Path(parameter_file_path).is_file():
-            logger.info(f"Found parameter file '{parameter_file_path}'")
-            with Path.open(parameter_file_path) as yaml_file:
-                yaml_file_content = yaml_file.read()
-                self.environment_parameter = load_parameters_to_dict(
-                    self.environment_parameter, yaml_file_content, "parameter.yml"
-                )
+        self.environment_parameter = load_parameters_to_dict(
+            self.environment_parameter, parameter_file_path, "parameter.yml"
+        )
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -164,7 +159,7 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                item_path = Path(directory)
+                item_path = directory
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -234,7 +229,7 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters_v2(self, raw_file: str, item_type: str, item_name: str, file_path: str) -> str:
+    def _replace_parameters_v2(self, raw_file: str, item_type: str, item_name: str, file_path: Path) -> str:
         """
         Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
@@ -244,6 +239,12 @@ class FabricWorkspace:
             item_name: The name of the item.
             file_path: The path of the file.
         """
+        from fabric_cicd._parameterization._parameterization_utils import (
+            check_replacement,
+            new_parameter_structure,
+            process_input_path,
+        )
+
         if "find_replace" in self.environment_parameter:
             # Handle new parameter file structure
             if new_parameter_structure(self.environment_parameter, key="find_replace"):
@@ -253,11 +254,13 @@ class FabricWorkspace:
                     input_type = parameter_dict.get("item_type")
                     input_name = parameter_dict.get("item_name")
                     input_path = parameter_dict.get("file_path")
-                    input_file_regex = parameter_dict.get("file_regex")
+
+                    if input_path:
+                        input_path = process_input_path(self.repository_directory, input_path)
 
                     # Perform replacement if a condition is met and replace any found references with specified environment value
                     if (find_value in raw_file and self.environment in replace_value) and check_replacement(
-                        input_type, input_name, input_path, input_file_regex, item_type, item_name, file_path
+                        input_type, input_name, input_path, item_type, item_name, file_path
                     ):
                         raw_file = raw_file.replace(find_value, replace_value[self.environment])
                         logger.debug(
