@@ -253,10 +253,7 @@ class FabricWorkspace:
                     replace_value = parameter_dict["replace_value"]
                     input_type = parameter_dict.get("item_type")
                     input_name = parameter_dict.get("item_name")
-                    input_path = parameter_dict.get("file_path")
-
-                    if input_path:
-                        input_path = process_input_path(self.repository_directory, input_path)
+                    input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
 
                     # Perform replacement if a condition is met and replace any found references with specified environment value
                     if (find_value in raw_file and self.environment in replace_value) and check_replacement(

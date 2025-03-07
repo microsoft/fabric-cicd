@@ -7,7 +7,7 @@ import logging
 import sys
 
 from fabric_cicd._common._logging import configure_logger, exception_handler
-from fabric_cicd._parameterization.parameter_validation import ParameterValidation
+from fabric_cicd._parameterization._parameter_validation import ParameterValidation
 
 logger = logging.getLogger(__name__)
 
