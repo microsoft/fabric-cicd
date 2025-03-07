@@ -23,6 +23,13 @@
 -   **Shortcuts** are not deployed with Lakehouses.
 -   **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`
 
+## Mirrored Database
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   **Initial deployment** for Azure SQL Database or Azure SQL Managed Instance requires manual granting of System Assigned Managed Identity (SAMI) Read and Write permission to the mirrored database for replication to be succesful after deployment. ref -> ([Prerequisites](https://learn.microsoft.com/en-us/fabric/database/mirrored-database/mirrored-database-rest-api#create-mirrored-database))
+-   **Unpublish** a warning is shown for any default Semantic Models created by the Mirror Database. This is a current limitation of the Fabric API and can be ignored.
+
 ## Notebooks
 
 -   **Parameterization:**
