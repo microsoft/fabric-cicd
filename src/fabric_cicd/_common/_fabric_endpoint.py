@@ -245,8 +245,9 @@ def _handle_response(
     ):
         handle_retry(
             attempt=iteration_count,
-            base_delay=2.5,
+            base_delay=30,
             max_retries=5,
+            response_retry_after=300,
             prepend_message="Item name is reserved.",
         )
 
