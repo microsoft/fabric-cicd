@@ -31,6 +31,9 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
     try:
         logger.info(f"Found parameter file '{param_file_name}'")
         with Path.open(param_file_path) as yaml_file:
+            # Check for UTF-8 compliance
+            if not check_utf_compliance(yaml_file):
+                logger.warning("The YAML file content is not UTF-8 compliant")
             param_dict = yaml.full_load(yaml_file)
             logger.info(f"Successfully loaded {param_file_name}")
 
@@ -62,6 +65,19 @@ def new_parameter_structure(param_dict: dict, param_name: Optional[str] = None) 
 
     # Check the structure of all parameters
     return all(isinstance(param_dict[param], list) for param in param_dict)
+
+
+def check_utf_compliance(yaml_file_content: any) -> bool:
+    """Performs a UTF-8 compliance check on the yaml file content prior to loading.
+
+    Args:
+        yaml_file_content: The content of the yaml file.
+    """
+    try:
+        yaml_file_content.read().encode("utf-8").decode("utf-8")
+        return True
+    except UnicodeDecodeError:
+        return False
 
 
 def process_input_path(

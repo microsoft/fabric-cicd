@@ -27,6 +27,8 @@ validate_parameter_file(
     item_type_in_scope=item_type_in_scope,
     # Uncomment to include target environment in validation
     # environment=environment,
+    # Uncomment to provide alternative parameter file name
+    # parameter_file_name="alternative_name_parameter.yml",
     # Uncomment to use SPN auth
     # token_credential=token_credential,
     # Uncomment to set log level to DEBUG

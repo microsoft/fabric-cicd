@@ -31,6 +31,7 @@ class ParameterValidation:
         repository_directory: str,
         item_type_in_scope: list[str],
         environment: str,
+        parameter_file_name: str,
         token_credential: TokenCredential = None,
     ) -> None:
         """
@@ -40,6 +41,7 @@ class ParameterValidation:
             repository_directory: Local directory path of the repository where items are to be deployed from and parameter file lives.
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
+            parameter_file_name: The name of the parameter file.
             token_credential: The token credential to use for API requests.
         """
         from fabric_cicd._common._validate_input import (
@@ -61,6 +63,20 @@ class ParameterValidation:
         self.repository_directory = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
+        self.parameter_file_name = parameter_file_name
+
+        self._refresh_parameter_file()
+
+    def _refresh_parameter_file(self) -> None:
+        """Loads parameters if file is present."""
+        parameter_file_path = Path(self.repository_directory, self.parameter_file_name)
+        self.environment_parameter = {}
+
+        self.environment_parameter = load_parameters_to_dict(
+            self.environment_parameter,
+            parameter_file_path,
+            self.parameter_file_name,
+        )
 
     def _validate_parameter_file(self) -> bool:
         """Validates the parameter file."""
@@ -79,14 +95,6 @@ class ParameterValidation:
 
     def _validate_parameter_file_load(self) -> bool:
         """Validates the parameter file load to a dictionary."""
-        parameter_file_path = Path(self.repository_directory, "parameter.yml")
-        self.environment_parameter = {}
-
-        self.environment_parameter = load_parameters_to_dict(
-            self.environment_parameter,
-            parameter_file_path,
-            "parameter.yml",
-        )
         return bool(self.environment_parameter)
 
     def _validate_all_parameters(self) -> bool:
