@@ -7,6 +7,13 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.9
+
+<span class="md-h2-subheader">Release Date: 2025-03-11</span>
+
+-   ✨ Support for Mirrored Database item type ([#145](https://github.com/microsoft/fabric-cicd/issues/145))
+-   ⚡ Increase reserved name wait time ([#135](https://github.com/microsoft/fabric-cicd/issues/135))
+
 ## Version 0.1.8
 
 <span class="md-h2-subheader">Release Date: 2025-03-04</span>
