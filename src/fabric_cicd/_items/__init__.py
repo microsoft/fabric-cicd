@@ -11,6 +11,7 @@ from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
 from fabric_cicd._items._notebook import publish_notebooks
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
+from fabric_cicd._items._variablelibrary import publish_variablelibraries
 
 __all__ = [
     "publish_datapipelines",
@@ -20,5 +21,6 @@ __all__ = [
     "publish_notebooks",
     "publish_reports",
     "publish_semanticmodels",
+    "publish_variablelibraries",
     "sort_datapipelines",
 ]

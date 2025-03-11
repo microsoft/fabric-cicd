@@ -48,3 +48,12 @@
     -   Semantic Models connected to sources outside of the same workspace always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     -   Semantic Models connected to sources within the same workspace may or may not be re-pointed; it is best to test this before taking a dependency. Use the `find_replace` section of the `parameter.yml` file as needed.
 -   **Initial deployment** requires manual configuration of the connection after deployment.
+
+## Variable Libraries
+
+-   **Parameterization:**
+    -   The active value set of the variable library is defined by the the `environment` field passed into the `FabricWorkspace` object. If no `environment` is specified, the active Value Set will not be changed.
+-   **Changing Value Sets:**
+    -   Variable Libraries do not support programmatically changing the name of value set which is active
+    -   After the initial deployment, if an active set is renamed, or removed, the deployment will fail
+    -   Manual intervention will be required to make the necessary changes in the Fabric UI and then restart the deployment

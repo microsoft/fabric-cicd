@@ -45,6 +45,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
+    if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing Variable Libraries")
+        items.publish_variablelibraries(fabric_workspace_obj)
     if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
@@ -107,7 +110,16 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
     # Define order to unpublish items
     unpublish_order = []
-    for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment", "MirroredDatabase", "Lakehouse"]:
+    for x in [
+        "DataPipeline",
+        "Report",
+        "SemanticModel",
+        "Notebook",
+        "Environment",
+        "MirroredDatabase",
+        "Lakehouse",
+        "VariableLibrary",
+    ]:
         if x in fabric_workspace_obj.item_type_in_scope and (
             x != "Lakehouse" or "enable_lakehouse_unpublish" in constants.FEATURE_FLAG
         ):
