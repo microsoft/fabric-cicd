@@ -12,7 +12,7 @@ import yaml
 
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._fabric_endpoint import handle_retry
-from fabric_cicd._parameterization._parameterization_utils import new_parameter_structure
+from fabric_cicd._parameterization._parameterization_utils import check_parameter_structure
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def _update_compute_settings(
             if "spark_pool" in fabric_workspace_obj.environment_parameter:
                 parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
                 # Handle new parameter file format
-                if new_parameter_structure(parameter_dict, key="spark_pool"):
+                if check_parameter_structure(parameter_dict, param_name="spark_pool") == "new":
                     for key in parameter_dict:
                         instance_pool_id = key["instance_pool_id"]
                         replace_value = key["replace_value"]
@@ -162,11 +162,13 @@ def _update_compute_settings(
                             del yaml_body["instance_pool_id"]
 
                 # Handle original parameter file format
-                else:
-                    if pool_id in parameter_dict:
-                        # replace any found references with specified environment value
-                        yaml_body["instancePool"] = parameter_dict[pool_id]
-                        del yaml_body["instance_pool_id"]
+                if (
+                    check_parameter_structure(parameter_dict, param_name="spark_pool") == "old"
+                    and pool_id in parameter_dict
+                ):
+                    # replace any found references with specified environment value
+                    yaml_body["instancePool"] = parameter_dict[pool_id]
+                    del yaml_body["instance_pool_id"]
 
         yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
 

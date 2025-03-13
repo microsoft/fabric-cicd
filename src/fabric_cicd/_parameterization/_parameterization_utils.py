@@ -45,12 +45,10 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
             logger.info(f"Successfully loaded {param_file_name}")
 
             # Log a warning for old parameter file structure
-            for param in param_dict:
-                if not new_parameter_structure(param_dict, param):
-                    logger.warning(
-                        "The parameter file structure used will no longer be supported in a future version. Please update to the new structure"
-                    )
-                break
+            if check_parameter_structure(param_dict) == "old":
+                logger.warning(
+                    "The parameter file structure used will no longer be supported in a future version. Please update to the new structure"
+                )
             return param_dict
     except yaml.YAMLError as e:
         logger.error(f"Error loading {param_file_name}: {e}")
@@ -84,7 +82,7 @@ def _validate_yaml(content: str) -> list[str]:
     return errors
 
 
-def new_parameter_structure(param_dict: dict, param_name: Optional[str] = None) -> bool:
+def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None) -> str:
     """
     Checks the parameter dictionary structure and determines if it
     contains the new structure (i.e. a list of values when indexed by the key).
@@ -93,12 +91,24 @@ def new_parameter_structure(param_dict: dict, param_name: Optional[str] = None) 
         param_dict: The parameter dictionary to check.
         param_name: The name of the parameter to check, if specified.
     """
-    # Only check the structure of the specified parameter
+    # Check if the specified parameter is a list (new structure)
     if param_name:
-        return isinstance(param_dict[param_name], list)
+        if isinstance(param_dict.get(param_name), list):
+            return "new"
+        if isinstance(param_dict.get(param_name), dict):
+            return "old"
+        return "invalid"
 
-    # Check the structure of all parameters
-    return all(isinstance(param_dict[param], list) for param in param_dict)
+    # Check if both 'find_replace' and 'spark_pool' are lists (new structure)
+    if isinstance(param_dict.get("find_replace"), list) and isinstance(param_dict.get("spark_pool"), list):
+        return "new"
+
+    # Check if both 'find_replace' and 'spark_pool' are dictionaries (old structure)
+    if isinstance(param_dict.get("find_replace"), dict) and isinstance(param_dict.get("spark_pool"), dict):
+        return "old"
+
+    # If neither condition is met, return 'invalid'
+    return "invalid"
 
 
 def process_input_path(

@@ -14,6 +14,7 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._parameterization._parameterization_utils import (
+    check_parameter_structure,
     load_parameters_to_dict,
     process_input_path,
 )
@@ -64,6 +65,7 @@ class ParameterValidation:
         self.environment = validate_environment(environment)
         self.parameter_file_name = parameter_file_name
 
+        # Initialize the parameter dictionary
         self._refresh_parameter_file()
 
     def _refresh_parameter_file(self) -> None:
@@ -89,24 +91,25 @@ class ParameterValidation:
             logger.error("Parameter file validation failed")
             return False
 
-        # Step 3: Validate the parameters in the parameter dictionary
-        keys = list(self.environment_parameter.keys())
-        if len(keys) == 1 and self._validate_parameter(keys[0]):
+        # Step 3: Validate the parameter file structure
+        if not self._validate_parameter_structure():
+            return False
+
+        # Step 4: Validate the parameters in the parameter dictionary
+        params = list(self.environment_parameter.keys())
+        if len(params) == 1 and self._validate_parameter(params[0]):
             logger.info("Parameter file validation passed")
             return True
 
         find_replace_validation = self._validate_parameter("find_replace")
         spark_pool_validation = self._validate_parameter("spark_pool")
+
         if find_replace_validation and spark_pool_validation:
             logger.info("Parameter file validation passed")
             return True
 
         logger.error("Parameter file validation failed")
         return False
-
-        # if not new_parameter_structure(self.environment_parameter):
-        # logger.warning("Validation skipped for old parameter structure")
-        # return True
 
     def _validate_parameter_file_load(self) -> bool:
         """Validates the parameter file load to a dictionary."""
@@ -121,20 +124,30 @@ class ParameterValidation:
     def _validate_parameter_names(self) -> bool:
         """Validates the parameter names in the parameter dictionary."""
         logger.info("Validating parameter names")
-        for key in self.environment_parameter:
-            if not self._validate_data_type(key, "string"):
-                return False
-            if key not in ["find_replace", "spark_pool"]:
-                logger.error(f"Invalid parameter '{key}' in the parameter file")
+        for param in self.environment_parameter:
+            if not self._validate_data_type(param, "string") or param not in ["find_replace", "spark_pool"]:
+                logger.error(f"Invalid parameter '{param}' in the parameter file")
                 return False
 
         if "find_replace" not in self.environment_parameter:
             logger.warning("find_replace parameter is not present in the dictionary")
-
         if "spark_pool" not in self.environment_parameter:
             logger.warning("spark_pool parameter is not present in the dictionary")
 
         logger.debug("Parameter names are valid")
+        return True
+
+    def _validate_parameter_structure(self) -> bool:
+        """Validates the parameter structure."""
+        logger.info("Validating parameter structure")
+        if check_parameter_structure(self.environment_parameter) == "old":
+            logger.warning("Validation skipped for old parameter file structure")
+            return False
+        if check_parameter_structure(self.environment_parameter) == "invalid":
+            logger.error("Validation failed for invalid parameter file structure")
+            return False
+
+        logger.debug("Parameter file structure is valid")
         return True
 
     def _validate_parameter(self, param_name: str) -> bool:
@@ -154,8 +167,8 @@ class ParameterValidation:
             if self.environment != "N/A":
                 self._validate_environment(parameter_dict["replace_value"], param_name)
 
-            # Step 4: Validate replace_value dict values
-            if not self._validate_replace_value_dict_values(parameter_dict["replace_value"], param_name):
+            # Step 4: Validate replace_value dict
+            if not self._validate_replace_value_dict(parameter_dict["replace_value"], param_name):
                 return False
 
             # Step 5: Validate optional values
@@ -216,7 +229,7 @@ class ParameterValidation:
         logger.debug(f"Required values are present in {param_name} and are of valid data types")
         return True
 
-    def _validate_replace_value_dict_values(self, replace_value_dict: dict, param_name: str) -> bool:
+    def _validate_replace_value_dict(self, replace_value_dict: dict, param_name: str) -> bool:
         """Validates the values in the replace_value dictionary."""
         if param_name == "find_replace" and not self._validate_find_replace_replace_value(replace_value_dict):
             return False
@@ -257,16 +270,13 @@ class ParameterValidation:
                 if key != "type" and key != "name":
                     logger.debug(f"Missing 'type' and/or 'name' key in {environment} environment for spark_pool")
                     return False
-                if key == "type" and (
-                    environment_dict[key] not in ["Capacity", "Workspace"]
-                    or not self._validate_data_type(environment_dict[key], "string")
-                ):
-                    logger.debug(
-                        f"'{environment_dict[key]}' is an invalid value for 'type' key in {environment} environment for spark_pool"
-                    )
+                if not self._validate_data_type(environment_dict[key], "string"):
+                    logger.debug(f"'Invalid value found for '{key}' key in {environment} environment for spark_pool")
                     return False
-                if key == "name" and not self._validate_data_type(environment_dict[key], "string"):
-                    logger.debug(f"'Invalid value found for 'name' key in {environment} environment in spark_pool")
+                if key == "type" and environment_dict[key] not in ["Capacity", "Workspace"]:
+                    logger.debug(
+                        f"'{environment_dict[key]}' is an invalid value for '{key}' key in {environment} environment for spark_pool"
+                    )
                     return False
 
         return True
@@ -275,29 +285,37 @@ class ParameterValidation:
         """Validates the optional values in the parameter."""
         valid_data_type = "string or list"
 
-        logger.info("Validating optional values")
+        item_type = param_dict.get("item_type")
         item_name = param_dict.get("item_name")
-        if item_name and (
-            not self._validate_data_type(item_name, valid_data_type) or not self._validate_item_name(item_name)
+        file_path = param_dict.get("file_path")
+
+        logger.info("Validating optional values")
+        if (param_name == "find_replace" and (not item_type and not item_name and not file_path)) or (
+            param_name == "spark_pool" and not item_name
         ):
-            logger.warning("item_name value is invalid")
-            return False
+            logger.debug(f"No optional parameter values in {param_name}, validation passed")
+            return True
 
-        if param_name == "find_replace":
-            item_type = param_dict.get("item_type")
-            file_path = param_dict.get("file_path")
-
-            if item_type and (
-                not self._validate_data_type(item_type, valid_data_type) or not self._validate_item_type(item_type)
-            ):
-                logger.warning("item_type value is invalid")
-                return False
-
-            if file_path and (
-                not self._validate_data_type(file_path, valid_data_type) or not self._validate_file_path(file_path)
-            ):
-                logger.warning("file_path value is invalid")
-                return False
+        optional_values = {
+            "item_type": item_type,
+            "item_name": item_name,
+            "file_path": file_path,
+        }
+        for param, values in optional_values.items():
+            if values:
+                # Check value data type
+                if not self._validate_data_type(values, valid_data_type):
+                    logger.warning(f"{param} value is invalid")
+                    return False
+                if param == "item_type" and not self._validate_item_type(values):
+                    logger.warning(f"{param} value is invalid")
+                    return False
+                if param == "item_name" and not self._validate_item_name(values):
+                    logger.warning(f"{param} value is invalid")
+                    return False
+                if param == "file_path" and not self._validate_file_path(values):
+                    logger.warning(f"{param} value is invalid")
+                    return False
 
         logger.debug(f"Optional parameter values are valid for {param_name}")
         return True
@@ -310,10 +328,19 @@ class ParameterValidation:
             "dictionary": dict,
             "string or list": Union[str, list],
         }
-        if not isinstance(input_value, type_dict[valid_data_type]):
-            data_type = str(type(input_value))
-            logger.debug(f"'{input_value}' is of type {data_type} and must be {valid_data_type} type")
+        if input_value == None:
+            logger.debug(f"Value is None and must be {valid_data_type} type")
             return False
+
+        if not isinstance(input_value, type_dict[valid_data_type]):
+            logger.debug(f"'{input_value}' must be {valid_data_type} type")
+            return False
+
+        if isinstance(input_value, list):
+            for item in input_value:
+                if not isinstance(item, str):
+                    logger.debug(f"'{item}' in list must be string type")
+                    return False
 
         return True
 

@@ -240,14 +240,14 @@ class FabricWorkspace:
             file_path: The path of the file.
         """
         from fabric_cicd._parameterization._parameterization_utils import (
+            check_parameter_structure,
             check_replacement,
-            new_parameter_structure,
             process_input_path,
         )
 
         if "find_replace" in self.environment_parameter:
             # Handle new parameter file structure
-            if new_parameter_structure(self.environment_parameter, key="find_replace"):
+            if check_parameter_structure(self.environment_parameter, param_name="find_replace") == "new":
                 for parameter_dict in self.environment_parameter["find_replace"]:
                     find_value = parameter_dict["find_value"]
                     replace_value = parameter_dict["replace_value"]
@@ -265,7 +265,7 @@ class FabricWorkspace:
                         )
 
             # Handle original parameter file structure
-            else:
+            if check_parameter_structure(self.environment_parameter, param_name="find_replace") == "old":
                 for key, parameter_dict in self.environment_parameter["find_replace"].items():
                     if key in raw_file and self.environment in parameter_dict:
                         # replace any found references with specified environment value
