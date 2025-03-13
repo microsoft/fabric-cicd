@@ -8,6 +8,7 @@ parameter dictionary structure and managing parameter value replacements.
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Union
 
@@ -31,10 +32,16 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
     try:
         logger.info(f"Found parameter file '{param_file_name}'")
         with Path.open(param_file_path) as yaml_file:
-            # Check for UTF-8 compliance
-            if not check_utf_compliance(yaml_file):
-                logger.warning("The YAML file content is not UTF-8 compliant")
-            param_dict = yaml.full_load(yaml_file)
+            yaml_content = yaml_file.read()
+
+            logger.info(f"Validating {param_file_name} content")
+            validation_errors = _validate_yaml(yaml_content)
+            if validation_errors:
+                for error in validation_errors:
+                    logger.error(f"Validation error in {param_file_name}: {error}")
+                    return param_dict
+
+            param_dict = yaml.full_load(yaml_content)
             logger.info(f"Successfully loaded {param_file_name}")
 
             # Log a warning for old parameter file structure
@@ -48,6 +55,33 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
     except yaml.YAMLError as e:
         logger.error(f"Error loading {param_file_name}: {e}")
         return param_dict
+
+
+def _validate_yaml(content: str) -> list[str]:
+    """
+    Validates the content of a YAML file for invalid characters and unclosed brackets or quotes.
+
+    Args:
+        content: The content of the YAML file to validate.
+    """
+    errors = []
+
+    # Check for invalid characters
+    if not re.match(r"^[\x00-\x7F]*$", content):
+        errors.append("Invalid characters found.")
+
+    # Check for unclosed brackets or quotes
+    brackets = ["()", "[]", "{}"]
+    for bracket in brackets:
+        if content.count(bracket) != content.count(bracket):
+            errors.append(f"Unclosed bracket: {bracket}")
+
+    quotes = ['"', "'"]
+    for quote in quotes:
+        if content.count(quote) % 2 != 0:
+            errors.append(f"Unclosed quote: {quote}")
+
+    return errors
 
 
 def new_parameter_structure(param_dict: dict, param_name: Optional[str] = None) -> bool:
@@ -65,19 +99,6 @@ def new_parameter_structure(param_dict: dict, param_name: Optional[str] = None) 
 
     # Check the structure of all parameters
     return all(isinstance(param_dict[param], list) for param in param_dict)
-
-
-def check_utf_compliance(yaml_file_content: any) -> bool:
-    """Performs a UTF-8 compliance check on the yaml file content prior to loading.
-
-    Args:
-        yaml_file_content: The content of the yaml file.
-    """
-    try:
-        yaml_file_content.read().encode("utf-8").decode("utf-8")
-        return True
-    except UnicodeDecodeError:
-        return False
 
 
 def process_input_path(
