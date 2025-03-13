@@ -116,13 +116,19 @@ class FabricWorkspace:
         from fabric_cicd._parameterization._parameterization_utils import (
             load_parameters_to_dict,
         )
+        from fabric_cicd._parameterization._validate_parameter_file import validate_parameter_file
 
         parameter_file_path = Path(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
-        self.environment_parameter = load_parameters_to_dict(
-            self.environment_parameter, parameter_file_path, "parameter.yml"
+        valid_parameter_file = validate_parameter_file(
+            self.repository_directory, self.item_type_in_scope, self.environment, "parameter.yml"
         )
+        # FIGURE OUT OLD FILE SCENARIO WITH VALIDATION - NEEDS TO RETURN TRUE
+        if valid_parameter_file:
+            self.environment_parameter = load_parameters_to_dict(
+                self.environment_parameter, parameter_file_path, "parameter.yml"
+            )
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -214,22 +220,7 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters(self, raw_file: str) -> str:
-        """
-        Replaces values found in parameter file with the chosen environment value.
-
-        Args:
-            raw_file: The raw file content where parameter values need to be replaced.
-        """
-        if "find_replace" in self.environment_parameter:
-            for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                if key in raw_file and self.environment in parameter_dict:
-                    # replace any found references with specified environment value
-                    raw_file = raw_file.replace(key, parameter_dict[self.environment])
-
-        return raw_file
-
-    def _replace_parameters_v2(self, raw_file: str, item_type: str, item_name: str, file_path: Path) -> str:
+    def _replace_parameters(self, raw_file: str, item_type: str, item_name: str, file_path: Path) -> str:
         """
         Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
@@ -414,8 +405,7 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            # file.contents = self._replace_parameters(file.contents)
-                            file.contents = self._replace_parameters_v2(
+                            file.contents = self._replace_parameters(
                                 file.contents, item_type, item_name, file.file_path
                             )
 
