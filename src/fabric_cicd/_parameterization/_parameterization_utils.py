@@ -31,7 +31,7 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
         return param_dict
     try:
         logger.info(f"Found parameter file '{param_file_name}'")
-        with Path.open(param_file_path) as yaml_file:
+        with Path.open(param_file_path, encoding="utf-8") as yaml_file:
             yaml_content = yaml_file.read()
 
             logger.debug(f"Validating {param_file_name} content")
@@ -59,8 +59,8 @@ def _validate_yaml(content: str) -> list[str]:
     """
     errors = []
 
-    # Check for invalid characters
-    if not re.match(r"^[\x00-\x7F]*$", content):
+    # Check for invalid characters (non-UTF-8)
+    if not re.match(r"^[\u0000-\uFFFF]*$", content):
         errors.append("Invalid characters found.")
 
     # Check for unclosed brackets or quotes
