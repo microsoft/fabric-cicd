@@ -18,6 +18,7 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._powerbi_endpoint import PowerBiEndpoint
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,10 @@ class FabricWorkspace:
         repository_directory: str,
         item_type_in_scope: list[str],
         base_api_url: str = "https://api.fabric.microsoft.com/",
+        base_api_url_powerbi: str = "https://api.powerbi.com/",
         environment: str = "N/A",
         token_credential: TokenCredential = None,
+        token_credential_powerbi: TokenCredential = None,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
@@ -85,12 +88,16 @@ class FabricWorkspace:
         """
         from fabric_cicd._common._validate_input import (
             validate_base_api_url,
+            validate_base_api_url_powerbi,
             validate_environment,
             validate_item_type_in_scope,
             validate_repository_directory,
             validate_token_credential,
             validate_workspace_id,
         )
+
+        # duplicate credentails object for Power BI REST API
+        token_credential_powerbi = token_credential
 
         # Initialize endpoint
         self.endpoint = FabricEndpoint(
@@ -100,11 +107,24 @@ class FabricWorkspace:
             )
         )
 
+        self.endpoint_powerbi = PowerBiEndpoint(
+            # if credential is not defined, use DefaultAzureCredential
+            token_credential_powerbi=(
+                DefaultAzureCredential()
+                if token_credential_powerbi is None
+                else validate_token_credential(token_credential_powerbi)
+            )
+        )
+
         # Validate and set class variables
         self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
+        self.base_api_url_powerbi = (
+            f"{validate_base_api_url_powerbi(base_api_url_powerbi)}v1.0/myorg/groups/{workspace_id}"
+        )
+
         self.environment = validate_environment(environment)
 
         # Initialize dictionaries to store repository and deployed items
@@ -225,6 +245,24 @@ class FabricWorkspace:
                     # replace any found references with specified environment value
                     raw_file = raw_file.replace(key, parameter_dict[self.environment])
                     logger.debug(f"Replaced '{key}' with '{parameter_dict[self.environment]}'")
+
+        return raw_file
+
+    def _replace_semanticmodel_parameters(self, raw_file: str) -> str:
+        """
+        Replaces values found in parameter file with the chosen environment value.
+
+        Args:
+            raw_file: The raw file content where parameter values need to be replaced.
+        """
+        if "semanticmodel_parameters" in self.environment_parameter:
+            for key, parameter_dict in self.environment_parameter["semanticmodel_parameters"].items():
+                pattern_str = "expression\\s*" + key + '\\s*\\=\\s*"[^"()]*"\\s*meta\\s*\\[IsParameterQuery\\s=\\strue'
+                replace_str = (
+                    "expression " + key + ' = "' + parameter_dict[self.environment] + '" meta [IsParameterQuery=true'
+                )
+                raw_file = re.sub(pattern_str, replace_str, raw_file)
+                logger.debug(f"Replaced '{key}' with '{parameter_dict[self.environment]}'")
 
         return raw_file
 
@@ -367,6 +405,8 @@ class FabricWorkspace:
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file.contents)
+                        if str(file.name) == "expressions.tmdl":
+                            file.contents = self._replace_semanticmodel_parameters(file.contents)
 
                     item_payload.append(file.base64_payload)
 
@@ -411,6 +451,16 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info("Published")
+
+        if is_deployed and item_type == "SemanticModel":
+            # Take over dataset and connect to the datasources
+            self.endpoint_powerbi.invoke(
+                method="POST",
+                url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/Default.TakeOver",
+                body="",
+                max_retries=max_retries,
+            )
+            logger.info("Semantic model take over ownership")
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """

@@ -13,3 +13,13 @@ spark_pool:
     "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d":
         type: "Workspace"
         name: "WorkspacePool_Medium"
+        
+semanticmodel_parameters:
+    # SQL Server
+    "DataSourceServer":
+        PPE: "hrlivelabsql-dev.database.windows.net"
+        PROD: "hrlivelabsql-prod.database.windows.net"        
+    # SQL Server Database
+    "DataSourceDatabase":
+        PPE: "HRLiveLab-db-dev"
+        PROD: "HRLiveLab-db-prod"        

@@ -117,6 +117,26 @@ def validate_base_api_url(input_value: str) -> str:
     return input_value
 
 
+def validate_base_api_url_powerbi(input_value: str) -> str:
+    """
+    Validate the base API URL.
+
+    Args:
+        input_value: The input value to validate.
+    """
+    validate_data_type("string", "base_api_url_powerbi", input_value)
+
+    if not re.match(r"^https:\/\/([a-zA-Z0-9]+)\.powerbi\.com\/$", input_value):
+        msg = (
+            "The provided base_api_url_powerbi does not follow the 'https://<word>.powerbi.com/' syntax. "
+            "Ensure the URL has a single word in between 'https://' and '.powerbi.com/', "
+            "and only contains alphanumeric characters."
+        )
+        raise InputError(msg, logger)
+
+    return input_value
+
+
 def validate_workspace_id(input_value: str) -> str:
     """
     Validate the workspace ID.
