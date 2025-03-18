@@ -124,6 +124,7 @@ class FabricWorkspace:
             environment=self.environment,
             parameter_file_name="parameter.yml",
         )
+        # Validate the parameter file and set the environment_parameter dictionary
         if pv._validate_parameter_file():
             self.environment_parameter = pv.environment_parameter
         else:
