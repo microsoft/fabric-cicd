@@ -128,7 +128,6 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
-
         from fabric_cicd._parameterization import ParameterValidation
 
         self.environment_parameter = {}
@@ -145,7 +144,6 @@ class FabricWorkspace:
             self.environment_parameter = pv.environment_parameter
         else:
             logger.warning("Parameter dictionary is empty due to validation errors")
-
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -182,7 +180,7 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                item_path = directory
+                item_path = Path(directory)
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -255,7 +253,7 @@ class FabricWorkspace:
 
         if "find_replace" in self.environment_parameter:
             structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
-            
+
             # Handle new parameter file structure
             if structure_type == "new":
                 for parameter_dict in self.environment_parameter["find_replace"]:
