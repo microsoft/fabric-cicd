@@ -1,6 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+"""
+Following function is leveraged to validate a Parameter YAML file used in the fabric-cicd package
+Primarily intented for users to validate and debug parameterization.
+"""
 
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
@@ -54,5 +58,5 @@ def validate_parameter_file(
         parameter_file_name=parameter_file_name,
     )
 
-    # Validate by calling _validate_parameter_file() method
+    # Validate with _validate_parameter_file() method
     return pv._validate_parameter_file()
