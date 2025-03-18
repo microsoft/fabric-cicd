@@ -226,7 +226,7 @@ class FabricWorkspace:
 
         Args:
             raw_file: The raw file content where parameter values need to be replaced.
-            item_type: The type of the item (e.g., Notebook, Environment).
+            item_type: The type of the item.
             item_name: The name of the item.
             file_path: The path of the file.
         """
@@ -237,8 +237,9 @@ class FabricWorkspace:
         )
 
         if "find_replace" in self.environment_parameter:
+            structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
             # Handle new parameter file structure
-            if check_parameter_structure(self.environment_parameter, param_name="find_replace") == "new":
+            if structure_type == "new":
                 for parameter_dict in self.environment_parameter["find_replace"]:
                     find_value = parameter_dict["find_value"]
                     replace_value = parameter_dict["replace_value"]
@@ -256,7 +257,7 @@ class FabricWorkspace:
                         )
 
             # Handle original parameter file structure
-            if check_parameter_structure(self.environment_parameter, param_name="find_replace") == "old":
+            if structure_type == "old":
                 for key, parameter_dict in self.environment_parameter["find_replace"].items():
                     if key in raw_file and self.environment in parameter_dict:
                         # replace any found references with specified environment value
