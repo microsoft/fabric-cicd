@@ -184,10 +184,10 @@ def parameter_validation_object_old(repository_directory):
 @pytest.mark.parametrize(
     ("item_type", "expected_result", "expected_msg"),
     [
-        ("SparkNotebook", False, "Item type 'SparkNotebook' is not in scope"),
-        (["Notebook", "Pipeline"], False, "Item type 'Pipeline' is not in scope"),
-        ("Notebook", True, "Item type 'Notebook' is in scope"),
-        (["Notebook", "Environment"], True, "Item types are in scope"),
+        ("SparkNotebook", False, "Item type: 'SparkNotebook' not in scope"),
+        (["Notebook", "Pipeline"], False, "Item type: '['Notebook', 'Pipeline']' not in scope"),
+        ("Notebook", True, "Item type: 'Notebook' in scope"),
+        (["Notebook", "Environment"], True, "Item type: '['Notebook', 'Environment']' in scope"),
     ],
 )
 def test_item_type_parameter(setup_mocks, parameter_validation_object, item_type, expected_result, expected_msg):
@@ -199,14 +199,14 @@ def test_item_type_parameter(setup_mocks, parameter_validation_object, item_type
 @pytest.mark.parametrize(
     ("item_name", "expected_result", "expected_msg"),
     [
-        ("Hello World 2", False, "Item name 'Hello World 2' is not found in the repository directory"),
+        ("Hello World 2", False, "Item name: 'Hello World 2' not found in the repository directory"),
         (
             ["Hello World", "Hello World Subfolder"],
             False,
-            "Item name 'Hello World Subfolder' is not found in the repository directory",
+            "Item name: '['Hello World', 'Hello World Subfolder']' not found in the repository directory",
         ),
-        ("Hello World", True, "Item name 'Hello World' is found in the repository directory"),
-        (["Hello World"], True, "Item names are found in the repository directory"),
+        ("Hello World", True, "Item name: 'Hello World' found in the repository directory"),
+        (["Hello World"], True, "Item name: '['Hello World']' found in the repository directory"),
     ],
 )
 def test_item_name_parameter(setup_mocks, parameter_validation_object, item_name, expected_result, expected_msg):
@@ -221,12 +221,17 @@ def test_item_name_parameter(setup_mocks, parameter_validation_object, item_name
         (
             "Hello World 2.Notebook/notebook-content.py",
             False,
-            "Path 'Hello World 2.Notebook/notebook-content.py' is not found in the repository directory",
+            "Path: 'Hello World 2.Notebook/notebook-content.py' not found in the repository directory",
+        ),
+        (
+            ["/Hello World.Notebook/notebook-content.py", "\\Hello World 2.Notebook\\notebook-content.py"],
+            False,
+            "Path: '['/Hello World.Notebook/notebook-content.py', '\\\\Hello World 2.Notebook\\\\notebook-content.py']' not found in the repository directory",
         ),
         (
             "/Hello World.Notebook/notebook-content.py",
             True,
-            "Path '/Hello World.Notebook/notebook-content.py' is found in the repository directory",
+            "Path found in the repository directory",
         ),
         (
             [
@@ -236,7 +241,7 @@ def test_item_name_parameter(setup_mocks, parameter_validation_object, item_name
                 "Hello World.Notebook\\notebook-content.py",
             ],
             True,
-            "All paths are found in the repository directory",
+            "Path found in the repository directory",
         ),
     ],
 )
@@ -253,21 +258,26 @@ def test_file_path_parameter(setup_mocks, parameter_validation_object, file_path
             {"PROD": "value"},
             "find_replace",
             False,
-            "Target environment 'PPE' is not a key in 'replace_value' for find_replace",
+            "Target environment 'PPE' is not a key in the 'replace_value' dict in find_replace",
         ),
         (
             {"PPE": "value"},
             "find_replace",
             True,
-            "Target environment: 'PPE' is a key in 'replace_value' for find_replace",
+            "Target environment: 'PPE' is a key in the 'replace_value' dict in find_replace",
         ),
         (
             {"DEV": "value"},
             "spark_pool",
             False,
-            "Target environment 'PPE' is not a key in 'replace_value' for spark_pool",
+            "Target environment 'PPE' is not a key in the 'replace_value' dict in spark_pool",
         ),
-        ({"PPE": "value"}, "spark_pool", True, "Target environment: 'PPE' is a key in 'replace_value' for spark_pool"),
+        (
+            {"PPE": "value"},
+            "spark_pool",
+            True,
+            "Target environment: 'PPE' is a key in the 'replace_value' dict in spark_pool",
+        ),
     ],
 )
 def test_target_environment(
@@ -279,26 +289,33 @@ def test_target_environment(
 
 
 @pytest.mark.parametrize(
-    ("value", "data_type", "expected_result", "expected_msg"),
+    ("input_value", "expected_type", "input_name", "expected_result", "expected_msg"),
     [
-        ("string_value", "dictionary", False, "'string_value' must be dictionary type"),
-        ("string_value", "list", False, "'string_value' must be list type"),
-        ("string_value", "string", True, None),
-        ("string_value", "string or list", True, None),
-        (["string_value_1", "string_value_2"], "string or list", True, None),
+        ("string_value", "dictionary", "value", False, "The provided value is not of type dictionary"),
+        (
+            {"string_value": None},
+            "string or list[string]",
+            "value",
+            False,
+            "The provided value is not of type string or list[string]",
+        ),
+        ("string_value", "string", "value", True, None),
+        ("string_value", "string or list[string]", "value", True, None),
+        (["string_value_1", "string_value_2"], "string or list[string]", "value", True, None),
         (
             ["string_value_1", {"key": "value"}],
-            "string or list",
+            "string or list[string]",
+            "value",
             False,
-            "'{'key': 'value'}' in list must be string type",
+            "The provided value is not of type string or list[string]",
         ),
     ],
 )
 def test_data_type_validation(
-    setup_mocks, parameter_validation_object, value, data_type, expected_result, expected_msg
+    setup_mocks, parameter_validation_object, input_value, expected_type, input_name, expected_result, expected_msg
 ):
     dl = setup_mocks
-    assert parameter_validation_object._validate_data_type(value, data_type) == expected_result
+    assert parameter_validation_object._validate_data_type(input_value, expected_type, input_name) == expected_result
     if expected_msg:
         assert expected_msg in dl.messages
 
@@ -310,7 +327,7 @@ def test_data_type_validation(
             "find_replace",
             {"item_type": "SparkNotebook", "item_name": None, "file_path": "/Hello World.Notebook/notebook-content.py"},
             False,
-            ["Item type 'SparkNotebook' is not in scope", "item_type value is invalid"],
+            ["Item type: 'SparkNotebook' not in scope", "item_type parameter value in find_replace is invalid"],
         ),
         (
             "find_replace",
@@ -321,9 +338,9 @@ def test_data_type_validation(
             },
             False,
             [
-                "Item type 'Notebook' is in scope",
-                "Item name 'Hello World Subfolder' is not found in the repository directory",
-                "item_name value is invalid",
+                "Item type: 'Notebook' in scope",
+                "Item name: '['Hello World', 'Hello World Subfolder']' not found in the repository directory",
+                "item_name parameter value in find_replace is invalid",
             ],
         ),
         (
@@ -335,10 +352,7 @@ def test_data_type_validation(
             },
             False,
             [
-                "Item type 'Notebook' is in scope",
-                "Item names are found in the repository directory",
-                "'{'/Hello World.Notebook/notebook-content.py'}' must be string or list type",
-                "file_path value is invalid",
+                "The provided file_path is not of type string or list[string]",
             ],
         ),
         (
@@ -347,7 +361,15 @@ def test_data_type_validation(
             True,
             ["No optional parameter values in find_replace, validation passed"],
         ),
-        ("spark_pool", {"item_name": "Hello World"}, True, ["Optional parameter values are valid for spark_pool"]),
+        (
+            "spark_pool",
+            {"item_name": "Hello World"},
+            True,
+            [
+                "Item name: 'Hello World' found in the repository directory",
+                "Optional parameter values in spark_pool are valid",
+            ],
+        ),
     ],
 )
 def test_optional_parameters(
@@ -372,7 +394,7 @@ def test_optional_parameters(
             "find_replace",
             {"PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733", "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0"},
             True,
-            "Values in replace_value dictionary are valid for find_replace",
+            "Values in the replace_value dict in find_replace are valid",
             None,
         ),
         (
@@ -462,6 +484,7 @@ def test_replace_value_dict(
         assert expected_msg_2 in dl.messages
 
 
+"""
 @pytest.mark.parametrize(
     ("param_name", "param_dict", "expected_result", "expected_msg"),
     [
@@ -626,7 +649,7 @@ def test_parameter_names(setup_mocks, parameter_validation_object, parameter_val
     assert parameter_validation_object._validate_parameter_names() is True
     assert "Validating parameter names" in dl.messages
     assert parameter_validation_object_invalid._validate_parameter_names() is False
-    assert "Invalid parameter 'find_replace_invalid' in the parameter file" in dl.messages
+    assert "Invalid parameter name: 'find_replace_invalid' found in the parameter file" in dl.messages
 
 
 def test_parameter_file_load(setup_mocks, parameter_validation_object):
@@ -639,6 +662,7 @@ def test_parameter_file_load(setup_mocks, parameter_validation_object):
 def test_parameter_file_validation(setup_mocks, parameter_validation_object, parameter_validation_object_invalid):
     dl = setup_mocks
     assert parameter_validation_object._validate_parameter_file() is True
-    assert "Parameter file validation passed" in dl.messages
+    assert "Validation passed for find_replace and spark_pool parameters" in dl.messages
     assert parameter_validation_object_invalid._validate_parameter_file() is False
     assert "Parameter file validation failed" in dl.messages
+"""

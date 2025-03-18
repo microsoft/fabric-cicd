@@ -113,22 +113,21 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
-        from fabric_cicd._parameterization._parameterization_utils import (
-            load_parameters_to_dict,
-        )
-        from fabric_cicd._parameterization._validate_parameter_file import validate_parameter_file
+        from fabric_cicd._parameterization import ParameterValidation
 
-        parameter_file_path = Path(self.repository_directory, "parameter.yml")
         self.environment_parameter = {}
 
-        valid_parameter_file = validate_parameter_file(
-            self.repository_directory, self.item_type_in_scope, self.environment, "parameter.yml"
+        # Initialize the ParameterValidation object
+        pv = ParameterValidation(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+            parameter_file_name="parameter.yml",
         )
-        # FIGURE OUT OLD FILE SCENARIO WITH VALIDATION - NEEDS TO RETURN TRUE
-        if valid_parameter_file:
-            self.environment_parameter = load_parameters_to_dict(
-                self.environment_parameter, parameter_file_path, "parameter.yml"
-            )
+        if pv._validate_parameter_file():
+            self.environment_parameter = pv.environment_parameter
+        else:
+            logger.warning("Parameter dictionary is empty due to failed validation")
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""

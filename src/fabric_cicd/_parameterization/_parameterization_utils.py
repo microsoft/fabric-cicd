@@ -27,14 +27,14 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
         param_file_name: The name of the parameter file.
     """
     if not Path(param_file_path).is_file():
-        logger.warning(f"No parameter file found with path: {param_file_path}")
+        logger.warning(f"Parameter file not found with path: {param_file_path}")
         return param_dict
     try:
         logger.info(f"Found parameter file '{param_file_name}'")
         with Path.open(param_file_path) as yaml_file:
             yaml_content = yaml_file.read()
 
-            logger.info(f"Validating {param_file_name} content")
+            logger.debug(f"Validating {param_file_name} content")
             validation_errors = _validate_yaml(yaml_content)
             if validation_errors:
                 for error in validation_errors:
@@ -44,11 +44,6 @@ def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_
             param_dict = yaml.full_load(yaml_content)
             logger.info(f"Successfully loaded {param_file_name}")
 
-            # Log a warning for old parameter file structure
-            if check_parameter_structure(param_dict) == "old":
-                logger.warning(
-                    "The parameter file structure used will no longer be supported in a future version. Please update to the new structure"
-                )
             return param_dict
     except yaml.YAMLError as e:
         logger.error(f"Error loading {param_file_name}: {e}")
@@ -91,23 +86,37 @@ def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None
         param_dict: The parameter dictionary to check.
         param_name: The name of the parameter to check, if specified.
     """
-    # Check if the specified parameter is a list (new structure)
+    # Check the structure of the specified parameter
     if param_name:
-        if isinstance(param_dict.get(param_name), list):
-            return "new"
-        if isinstance(param_dict.get(param_name), dict):
-            return "old"
+        return _check_structure(param_dict.get(param_name))
+
+    # Otherwise, check the structure of the entire parameter dictionary
+    find_replace_parameter = param_dict.get("find_replace")
+    spark_pool_parameter = param_dict.get("spark_pool")
+
+    # If both parameters are present, check their structures
+    if find_replace_parameter and spark_pool_parameter:
+        find_replace_structure = _check_structure(find_replace_parameter)
+        spark_pool_structure = _check_structure(spark_pool_parameter)
+        # If both structures are the same, return the structure
+        if find_replace_structure == spark_pool_structure:
+            return find_replace_structure
         return "invalid"
 
-    # Check if both 'find_replace' and 'spark_pool' are lists (new structure)
-    if isinstance(param_dict.get("find_replace"), list) and isinstance(param_dict.get("spark_pool"), list):
+    # If only one parameter is present, return its structure
+    if find_replace_parameter:
+        return _check_structure(find_replace_parameter)
+    if spark_pool_parameter:
+        return _check_structure(spark_pool_parameter)
+    return "invalid"
+
+
+def _check_structure(param_value: any) -> str:
+    """Checks the structure of a parameter value"""
+    if isinstance(param_value, list):
         return "new"
-
-    # Check if both 'find_replace' and 'spark_pool' are dictionaries (old structure)
-    if isinstance(param_dict.get("find_replace"), dict) and isinstance(param_dict.get("spark_pool"), dict):
+    if isinstance(param_value, dict):
         return "old"
-
-    # If neither condition is met, return 'invalid'
     return "invalid"
 
 
