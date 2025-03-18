@@ -14,7 +14,7 @@ find_replace:
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
       # Optional Fields
       item_type: "Notebook"
-      item_name: ["Hello World", "Hello World Subfolder"]
+      item_name: ["Hello World"] 
       file_path: "/Hello World.Notebook/notebook-content.py"
 spark_pool:
     # Required Fields
@@ -32,6 +32,19 @@ spark_pool:
 
 SAMPLE_PARAMETER_FILE_INVALID = """ 
 find_replace_invalid:
+    # Required Fields 
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional Fields
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path: "/Hello World.Notebook/notebook-content.py"
+"""
+
+SAMPLE_PARAMETER_FILE_INVALID_2 = """ 
+[find_replace]:
     # Required Fields 
     - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
       replace_value:
@@ -91,6 +104,9 @@ def repository_directory(tmp_path):
 
     parameter_file_path = workspace_dir / "invalid_parameter.yml"
     parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_INVALID)
+
+    parameter_file_path = workspace_dir / "invalid_parameter_2.yml"
+    parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_INVALID_2)
 
     parameter_file_path = workspace_dir / "old_parameter.yml"
     parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_OLD)
@@ -158,6 +174,20 @@ def parameter_validation_object_invalid(repository_directory):
     item_type_in_scope = ["DataPipeline", "Environment", "Notebook"]
     environment = "PPE"
     parameter_file = "invalid_parameter.yml"
+
+    return ParameterValidation(
+        repository_directory=str(repository_directory),
+        item_type_in_scope=item_type_in_scope,
+        environment=environment,
+        parameter_file_name=parameter_file,
+    )
+
+
+@pytest.fixture
+def parameter_validation_object_invalid_2(repository_directory):
+    item_type_in_scope = ["DataPipeline", "Environment", "Notebook"]
+    environment = "PPE"
+    parameter_file = "invalid_parameter_2.yml"
 
     return ParameterValidation(
         repository_directory=str(repository_directory),
@@ -388,21 +418,19 @@ def test_optional_parameters(
 
 
 @pytest.mark.parametrize(
-    ("param_name", "replace_val_dict", "expected_result", "expected_msg_1", "expected_msg_2"),
+    ("param_name", "replace_val_dict", "expected_result", "expected_msg"),
     [
         (
             "find_replace",
             {"PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733", "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0"},
             True,
-            "Values in the replace_value dict in find_replace are valid",
-            None,
+            "Values in replace_value dict in find_replace are valid",
         ),
         (
             "find_replace",
             {"PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733", "PROD": None},
             False,
             "find_replace is missing a replace_value for PROD environment",
-            None,
         ),
         (
             "spark_pool",
@@ -411,36 +439,31 @@ def test_optional_parameters(
                 "PROD": {"type": "Capacity", "name": "CapacityPool_Large_PROD"},
             },
             True,
-            "Values in replace_value dictionary are valid for spark_pool",
-            None,
+            "Values in replace_value dict in spark_pool are valid",
         ),
         (
             "spark_pool",
             {"PPE": {"type": "Capacity", "name": "value"}, "PROD": None},
             False,
             "spark_pool is missing replace_value for PROD environment",
-            None,
         ),
         (
             "spark_pool",
             {"PPE": {"type": "Capacity", "name": "value"}, "PROD": ["type", "name"]},
             False,
-            "'['type', 'name']' must be dictionary type",
-            None,
+            "The provided PROD key is not of type dictionary",
         ),
         (
             "spark_pool",
             {"PPE": {"type_1": "Capacity", "name": "value"}},
             False,
-            "'type_1' is an invalid key in PPE environment for spark_pool",
-            None,
+            "The 'PPE' environment dict in spark_pool must contain a 'type' and a 'name' key",
         ),
         (
             "spark_pool",
-            {"PPE": {"type": "Capacity"}, "PROD": {"type": "CapacityWorkspace", "name": "value"}},
+            {"PPE": {"type": "Capacity", "name": "value"}, "PROD": {"type": "CapacityWorkspace", "name": "value"}},
             False,
-            "'CapacityWorkspace' is an invalid value for 'type' key in PROD environment for spark_pool",
-            None,
+            "The 'PROD' environment_dict in spark_pool contains an invalid value: 'CapacityWorkspace' for 'type' key",
         ),
         (
             "spark_pool",
@@ -449,42 +472,30 @@ def test_optional_parameters(
                 "PROD": {"type": ["Capacity", "Workspace"], "name": "value"},
             },
             False,
-            "'Invalid value found for 'type' key in PROD environment for spark_pool",
-            "'['Capacity', 'Workspace']' must be string type",
+            "The provided type key is not of type string",
         ),
         (
             "spark_pool",
             {"PPE": {"type": "Capacity", "name": "value"}, "PROD": {"type": "Capacity", "name": None}},
             False,
-            "Value is None and must be string type",
-            "'Invalid value found for 'name' key in PROD environment for spark_pool",
+            "The 'PROD' environment dict in spark_pool is missing a value for 'name' key",
         ),
         (
             "spark_pool",
             {"PPE": {"type": "Capacity", "name": "value"}, "PROD": {"type": "Capacity", "name": {"key": "value"}}},
             False,
-            "'{'key': 'value'}' must be string type",
-            "'Invalid value found for 'name' key in PROD environment for spark_pool",
+            "The provided name key is not of type string",
         ),
     ],
 )
 def test_replace_value_dict(
-    setup_mocks,
-    parameter_validation_object,
-    param_name,
-    replace_val_dict,
-    expected_result,
-    expected_msg_1,
-    expected_msg_2,
+    setup_mocks, parameter_validation_object, param_name, replace_val_dict, expected_result, expected_msg
 ):
     dl = setup_mocks
     assert parameter_validation_object._validate_replace_value_dict(replace_val_dict, param_name) == expected_result
-    assert expected_msg_1 in dl.messages
-    if expected_msg_2:
-        assert expected_msg_2 in dl.messages
+    assert expected_msg in dl.messages
 
 
-"""
 @pytest.mark.parametrize(
     ("param_name", "param_dict", "expected_result", "expected_msg"),
     [
@@ -498,7 +509,7 @@ def test_replace_value_dict(
                 },
             },
             True,
-            "Required values are present in find_replace and are of valid data types",
+            "Required values in find_replace are valid",
         ),
         (
             "find_replace",
@@ -531,7 +542,7 @@ def test_replace_value_dict(
                 },
             },
             True,
-            "Required values are present in spark_pool and are of valid data types",
+            "Required values in spark_pool are valid",
         ),
         (
             "spark_pool",
@@ -569,11 +580,11 @@ def test_required_values(
     ("param_name", "param_keys", "expected_result", "expected_msg"),
     [
         ("find_replace", ("find_value", "replace_value"), True, "find_replace contains valid keys"),
-        ("find_replace", ("find_value"), False, "find_replace is missing required keys"),
-        ("find_replace", ("find_value_new", "replace_value"), False, "find_replace is missing required keys"),
+        ("find_replace", ("find_value"), False, "find_replace is missing keys"),
+        ("find_replace", ("find_value_new", "replace_value"), False, "find_replace is missing keys"),
         ("spark_pool", ("instance_pool_id", "replace_value"), True, "spark_pool contains valid keys"),
-        ("spark_pool", ("replace_value"), False, "spark_pool is missing required keys"),
-        ("spark_pool", ("pool_id", "replace_value_1"), False, "spark_pool is missing required keys"),
+        ("spark_pool", ("replace_value"), False, "spark_pool is missing keys"),
+        ("spark_pool", ("pool_id", "replace_value_1"), False, "spark_pool is missing keys"),
         (
             "find_replace",
             ("find_value", "replace_value", "item_type", "item_name", "file_path"),
@@ -606,21 +617,32 @@ def test_parameter_keys(
     assert expected_msg in dl.messages
 
 
-@pytest.mark.parametrize(("param_name"), [("find_replace"), ("spark_pool")])
-def test_parameter_validation(setup_mocks, parameter_validation_object, param_name):
+def test_find_replace_parameter_validation(setup_mocks, parameter_validation_object):
     dl = setup_mocks
-    assert parameter_validation_object._validate_parameter(param_name) is True
-    assert f"Validating {param_name} parameter" in dl.messages
+    assert parameter_validation_object._validate_parameter("find_replace") is True
+    assert "Validating find_replace parameter" in dl.messages
     assert "Validating replace_value dictionary keys and values" in dl.messages
-    assert f"{param_name} parameter validation passed" in dl.messages
+    assert "find_replace parameter validation passed" in dl.messages
+
+
+def test_spark_pool_parameter_validation(setup_mocks, parameter_validation_object):
+    dl = setup_mocks
+    assert parameter_validation_object._validate_parameter("spark_pool") is True
+    assert "Validating spark_pool parameter" in dl.messages
+    assert "Validating replace_value dictionary keys and values" in dl.messages
+    assert "spark_pool parameter validation passed" in dl.messages
 
 
 @pytest.mark.parametrize(
     ("struc_type", "expected_result", "expected_msg"),
     [
         ("new", True, "Parameter file structure is valid"),
-        ("old", False, "Validation skipped for old parameter file structure"),
-        ("invalid", False, "Validation failed for invalid parameter file structure"),
+        (
+            "old",
+            False,
+            "The parameter file structure used will no longer be supported in a future version. Please update to the new structure",
+        ),
+        ("invalid", False, None),
     ],
 )
 def test_parameter_structure(
@@ -641,7 +663,8 @@ def test_parameter_structure(
         assert parameter_validation_object_invalid._validate_parameter_structure() == expected_result
 
     assert "Validating parameter structure" in dl.messages
-    assert expected_msg in dl.messages
+    if expected_msg:
+        assert expected_msg in dl.messages
 
 
 def test_parameter_names(setup_mocks, parameter_validation_object, parameter_validation_object_invalid):
@@ -652,17 +675,18 @@ def test_parameter_names(setup_mocks, parameter_validation_object, parameter_val
     assert "Invalid parameter name: 'find_replace_invalid' found in the parameter file" in dl.messages
 
 
-def test_parameter_file_load(setup_mocks, parameter_validation_object):
+def test_parameter_file_load(setup_mocks, parameter_validation_object, parameter_validation_object_invalid_2):
     dl = setup_mocks
     assert parameter_validation_object._validate_parameter_file_load() is True
+    assert parameter_validation_object_invalid_2._validate_parameter_file_load() is False
     assert "Validating parameter file load" in dl.messages
     assert "Parameter file load validation passed" in dl.messages
+    assert "Parameter file load failed" in dl.messages
 
 
-def test_parameter_file_validation(setup_mocks, parameter_validation_object, parameter_validation_object_invalid):
+def test_parameter_file_validation(setup_mocks, parameter_validation_object, parameter_validation_object_old):
     dl = setup_mocks
     assert parameter_validation_object._validate_parameter_file() is True
     assert "Validation passed for find_replace and spark_pool parameters" in dl.messages
-    assert parameter_validation_object_invalid._validate_parameter_file() is False
-    assert "Parameter file validation failed" in dl.messages
-"""
+    assert parameter_validation_object_old._validate_parameter_file() is True
+    assert "Validation skipped: old parameter file structure" in dl.messages

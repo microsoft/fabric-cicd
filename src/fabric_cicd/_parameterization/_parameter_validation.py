@@ -215,7 +215,7 @@ class ParameterValidation:
             if key == "replace_value" and not self._validate_data_type(param_dict[key], "dictionary", key):
                 return False
 
-        logger.debug(f"Required values are present in {param_name} and are of valid data types")
+        logger.debug(f"Required values in {param_name} are valid")
         return True
 
     def _validate_replace_value_dict(self, replace_value_dict: dict, param_name: str) -> bool:
@@ -247,7 +247,7 @@ class ParameterValidation:
             if not environment_dict:
                 logger.debug(f"spark_pool is missing replace_value for {environment} environment")
                 return False
-            if not self._validate_data_type(environment_dict, "dictionary", environment):
+            if not self._validate_data_type(environment_dict, "dictionary", environment + " key"):
                 return False
 
             # Validate keys for the environment
@@ -265,16 +265,15 @@ class ParameterValidation:
                         f"The '{environment}' environment dict in spark_pool is missing a value for '{key}' key"
                     )
                     return False
-                if not self._validate_data_type(environment_dict[key], "string", key) or environment_dict[
-                    "type"
-                ] not in [
-                    "Capacity",
-                    "Workspace",
-                ]:
-                    logger.debug(
-                        f"The '{environment}' environment_dict in spark_pool contains an invalid value: '{environment_dict[key]}' for '{key}' key"
-                    )
+                if not self._validate_data_type(environment_dict[key], "string", key + " key"):
                     return False
+
+            if environment_dict["type"] not in ["Capacity", "Workspace"]:
+                logger.debug(
+                    f"The '{environment}' environment_dict in spark_pool contains an invalid value: '{environment_dict['type']}' for 'type' key"
+                )
+                return False
+
         return True
 
     def _validate_optional_values(self, param_dict: dict, param_name: str) -> bool:
