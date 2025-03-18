@@ -127,7 +127,7 @@ class FabricWorkspace:
         if pv._validate_parameter_file():
             self.environment_parameter = pv.environment_parameter
         else:
-            logger.warning("Parameter dictionary is empty due to failed validation")
+            logger.warning("Parameter dictionary is empty due to validation errors")
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
