@@ -24,8 +24,23 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
-    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
-    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
+    ACCEPTED_ITEM_TYPES_UPN = (
+        "DataPipeline",
+        "Environment",
+        "Notebook",
+        "Report",
+        "SemanticModel",
+        "Lakehouse",
+        "MirroredDatabase",
+    )
+    ACCEPTED_ITEM_TYPES_NON_UPN = (
+        "Environment",
+        "Notebook",
+        "Report",
+        "SemanticModel",
+        "Lakehouse",
+        "MirroredDatabase",
+    )
 
     def __init__(
         self,
@@ -101,7 +116,7 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.workspace_id = validate_workspace_id(workspace_id)
-        self.repository_directory = validate_repository_directory(repository_directory)
+        self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
         self.environment = validate_environment(environment)
@@ -113,6 +128,7 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
+
         from fabric_cicd._parameterization import ParameterValidation
 
         self.environment_parameter = {}
@@ -130,6 +146,7 @@ class FabricWorkspace:
         else:
             logger.warning("Parameter dictionary is empty due to validation errors")
 
+
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
@@ -138,7 +155,7 @@ class FabricWorkspace:
             directory = Path(root)
             # valid item directory with .platform file within
             if ".platform" in files:
-                item_metadata_path = Path(directory, ".platform")
+                item_metadata_path = directory / ".platform"
 
                 # Print a warning and skip directory if empty
                 if not os.listdir(directory):
@@ -147,7 +164,7 @@ class FabricWorkspace:
 
                 # Attempt to read metadata file
                 try:
-                    with Path.open(item_metadata_path) as file:
+                    with Path.open(item_metadata_path, encoding="utf-8") as file:
                         item_metadata = json.load(file)
                 except FileNotFoundError as e:
                     msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"
@@ -238,6 +255,7 @@ class FabricWorkspace:
 
         if "find_replace" in self.environment_parameter:
             structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
+            
             # Handle new parameter file structure
             if structure_type == "new":
                 for parameter_dict in self.environment_parameter["find_replace"]:
@@ -359,7 +377,7 @@ class FabricWorkspace:
             path: Full path of the desired item.
         """
         for item_details in self.repository_items[item_type].values():
-            if Path(item_details.path) == Path(path):
+            if item_details.path == Path(path):
                 return item_details.logical_id
         # if not found
         return None

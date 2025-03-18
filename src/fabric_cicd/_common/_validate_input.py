@@ -74,20 +74,27 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
     return input_value
 
 
-def validate_repository_directory(input_value: str) -> str:
+def validate_repository_directory(input_value: str) -> Path:
     """
-    Validate the repository directory.
+    Validate the repository directory and convert string to Path object
 
     Args:
         input_value: The input value to validate.
     """
     validate_data_type("string", "repository_directory", input_value)
 
-    if not Path(input_value).is_dir():
+    directory = Path(input_value)
+
+    if not directory.is_dir():
         msg = f"The provided repository_directory '{input_value}' does not exist."
         raise InputError(msg, logger)
 
-    return input_value
+    if not directory.is_absolute():
+        absolute_directory = directory.resolve()
+        logger.info(f"Relative directory path '{directory}' resolved as '{absolute_directory}'")
+        directory = absolute_directory
+
+    return directory
 
 
 def validate_base_api_url(input_value: str) -> str:

@@ -38,6 +38,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
     if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
+    if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing MirroredDatabase")
+        items.publish_mirroreddatabase(fabric_workspace_obj)
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
@@ -100,7 +103,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
     # Define order to unpublish items
     unpublish_order = []
-    for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment", "Lakehouse"]:
+    for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment", "MirroredDatabase", "Lakehouse"]:
         if x in fabric_workspace_obj.item_type_in_scope and (
             x != "Lakehouse" or "enable_lakehouse_unpublish" in feature_flag
         ):
