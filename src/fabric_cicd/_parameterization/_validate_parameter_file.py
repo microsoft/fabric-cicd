@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 
 """
-Following function is leveraged to validate a Parameter YAML file used in the fabric-cicd package
+Following function is leveraged to validate a parameter YAML file used in the fabric-cicd package.
 Primarily intented for users to validate and debug parameterization.
 """
 
