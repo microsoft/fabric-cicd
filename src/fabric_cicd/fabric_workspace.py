@@ -14,7 +14,8 @@ import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd._common._constants import PARAMETER_FILE_NAME
+from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 
@@ -137,13 +138,20 @@ class FabricWorkspace:
             repository_directory=self.repository_directory,
             item_type_in_scope=self.item_type_in_scope,
             environment=self.environment,
-            parameter_file_name="parameter.yml",
         )
-        # Validate and load the parameter file to a dictionary
-        if pv._validate_parameter_file():
+
+        is_valid, msg, desc = pv._validate_parameter_file()
+
+        if is_valid:
             self.environment_parameter = pv.environment_parameter
+            if desc in ("Not found", "old"):
+                logger.warning(msg)
+                if desc == "old":
+                    logger.info("Validation discontinued: old parameter file structure")
+            else:
+                logger.info(msg)
         else:
-            logger.error("Parameter dictionary is empty due to validation errors")
+            raise ParameterFileError(f"Validation error in {PARAMETER_FILE_NAME}: " + msg, logger)
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -276,6 +284,7 @@ class FabricWorkspace:
                         logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
 
             # Handle original parameter file structure
+            # TODO: Deprecate old structure handling by April 7, 2025
             if structure_type == "old":
                 for key, parameter_dict in self.environment_parameter["find_replace"].items():
                     if key in raw_file and self.environment in parameter_dict:

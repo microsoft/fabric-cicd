@@ -100,6 +100,7 @@ def _check_structure(param_value: any) -> str:
     """Checks the structure of a parameter value"""
     if isinstance(param_value, list):
         return "new"
+    # TODO: Remove this condition after deprecation (April 7, 2025)
     if isinstance(param_value, dict):
         return "old"
     return "invalid"
