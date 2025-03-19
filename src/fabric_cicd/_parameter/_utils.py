@@ -8,73 +8,58 @@ parameter dictionary structure and managing parameter value replacements.
 """
 
 import logging
-import re
 from pathlib import Path
 from typing import Optional, Union
 
-import yaml
+from azure.core.credentials import TokenCredential
 
 logger = logging.getLogger(__name__)
 
 
-def load_parameters_to_dict(param_dict: dict, param_file_path: Path, param_file_name: str) -> dict:
+def validate_parameter_file(
+    repository_directory: str,
+    item_type_in_scope: list,
+    environment: str = "N/A",
+    parameter_file_name: str = "parameter.yml",
+    token_credential: TokenCredential = None,
+) -> bool:
     """
-    Loads the parameter file to a dictionary.
+    A wrapper function that validates a parameter.yml file, using
+    the ParameterValidation class.
 
     Args:
-        param_dict: The dictionary to load the parameter file into.
-        param_file_path: The path to the parameter file.
-        param_file_name: The name of the parameter file.
+        repository_directory: The directory containing the items and parameter.yml file.
+        item_type_in_scope: A list of item types to validate.
+        environment: The target environment.
+        parameter_file_name: The name of the parameter file, default is "parameter.yml".
+        token_credential: The token credential to use for authentication, use for SPN auth.
     """
-    if not Path(param_file_path).is_file():
-        logger.warning(f"Parameter file not found with path: {param_file_path}")
-        return param_dict
-    try:
-        logger.info(f"Found parameter file '{param_file_name}'")
-        with Path.open(param_file_path, encoding="utf-8") as yaml_file:
-            yaml_content = yaml_file.read()
+    from azure.identity import DefaultAzureCredential
 
-            logger.debug(f"Validating {param_file_name} content")
-            validation_errors = _validate_yaml(yaml_content)
-            if validation_errors:
-                for error in validation_errors:
-                    logger.error(f"Validation error in {param_file_name}: {error}")
-                    return param_dict
+    from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+    from fabric_cicd._common._validate_input import (
+        validate_environment,
+        validate_item_type_in_scope,
+        validate_repository_directory,
+        validate_token_credential,
+    )
+    from fabric_cicd._parameter._parameter import Parameter
 
-            param_dict = yaml.full_load(yaml_content)
-            logger.info(f"Successfully loaded {param_file_name}")
-
-            return param_dict
-    except yaml.YAMLError as e:
-        logger.error(f"Error loading {param_file_name}: {e}")
-        return param_dict
-
-
-def _validate_yaml(content: str) -> list[str]:
-    """
-    Validates the content of a YAML file for invalid characters and unclosed brackets or quotes.
-
-    Args:
-        content: The content of the YAML file to validate.
-    """
-    errors = []
-
-    # Check for invalid characters (non-UTF-8)
-    if not re.match(r"^[\u0000-\uFFFF]*$", content):
-        errors.append("Invalid characters found.")
-
-    # Check for unclosed brackets or quotes
-    brackets = ["()", "[]", "{}"]
-    for bracket in brackets:
-        if content.count(bracket) != content.count(bracket):
-            errors.append(f"Unclosed bracket: {bracket}")
-
-    quotes = ['"', "'"]
-    for quote in quotes:
-        if content.count(quote) % 2 != 0:
-            errors.append(f"Unclosed quote: {quote}")
-
-    return errors
+    endpoint = FabricEndpoint(
+        # if credential is not defined, use DefaultAzureCredential
+        token_credential=(
+            DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
+        )
+    )
+    # Initialize the ParameterValidation object
+    parameter_obj = Parameter(
+        repository_directory=validate_repository_directory(repository_directory),
+        item_type_in_scope=validate_item_type_in_scope(item_type_in_scope, upn_auth=endpoint.upn_auth),
+        environment=validate_environment(environment),
+        parameter_file_name=parameter_file_name,
+    )
+    # Validate with _validate_parameter_file() method
+    return parameter_obj._validate_parameter_file()
 
 
 def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None) -> str:

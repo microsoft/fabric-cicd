@@ -3,7 +3,7 @@
 
 import pytest
 
-from fabric_cicd._parameterization import ParameterValidation
+from fabric_cicd._parameter._parameter import Parameter
 
 SAMPLE_PARAMETER_FILE = """ 
 find_replace:
@@ -161,7 +161,7 @@ def parameter_validation_object(repository_directory):
     environment = "PPE"
     parameter_file = "parameter.yml"
 
-    return ParameterValidation(
+    return Parameter(
         repository_directory=str(repository_directory),
         item_type_in_scope=item_type_in_scope,
         environment=environment,
@@ -175,7 +175,7 @@ def parameter_validation_object_invalid(repository_directory):
     environment = "PPE"
     parameter_file = "invalid_parameter.yml"
 
-    return ParameterValidation(
+    return Parameter(
         repository_directory=str(repository_directory),
         item_type_in_scope=item_type_in_scope,
         environment=environment,
@@ -189,7 +189,7 @@ def parameter_validation_object_invalid_2(repository_directory):
     environment = "PPE"
     parameter_file = "invalid_parameter_2.yml"
 
-    return ParameterValidation(
+    return Parameter(
         repository_directory=str(repository_directory),
         item_type_in_scope=item_type_in_scope,
         environment=environment,
@@ -203,7 +203,7 @@ def parameter_validation_object_old(repository_directory):
     environment = "PPE"
     parameter_file = "old_parameter.yml"
 
-    return ParameterValidation(
+    return Parameter(
         repository_directory=str(repository_directory),
         item_type_in_scope=item_type_in_scope,
         environment=environment,

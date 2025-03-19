@@ -1,17 +1,19 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Module provides the ParameterValidation class to validate the parameter file used for deployment configurations."""
+"""Module provides the Parameter class to load and validate the parameter file used for deployment configurations."""
 
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Union
 
-from fabric_cicd._parameterization._parameterization_utils import (
+import yaml
+
+from fabric_cicd._parameter._utils import (
     check_parameter_structure,
-    load_parameters_to_dict,
     process_input_path,
 )
 
@@ -19,7 +21,7 @@ from fabric_cicd._parameterization._parameterization_utils import (
 logger = logging.getLogger(__name__)
 
 
-class ParameterValidation:
+class Parameter:
     """A class to validate the parameter file."""
 
     def __init__(
@@ -30,7 +32,7 @@ class ParameterValidation:
         parameter_file_name: str,
     ) -> None:
         """
-        Initializes the ParameterValidation instance.
+        Initializes the Parameter instance.
 
         Args:
             repository_directory: Local directory path of the repository where items are to be deployed from and parameter file lives.
@@ -52,15 +54,63 @@ class ParameterValidation:
         parameter_file_path = Path(self.repository_directory, self.parameter_file_name)
         self.environment_parameter = {}
 
-        self.environment_parameter = load_parameters_to_dict(
+        is_valid, self.environment_parameter, msg = self._load_parameters_to_dict(
             self.environment_parameter,
             parameter_file_path,
             self.parameter_file_name,
         )
+        if not is_valid:
+            logger.error(msg)
+        else:
+            logger.info(msg)
+
+    def _load_parameters_to_dict(
+        self, param_dict: dict, param_file_path: Path, param_file_name: str
+    ) -> tuple[bool, dict, str]:
+        """Load the parameter file to a dictionary."""
+        if not param_file_path.is_file():
+            return False, param_dict, f"Parameter file not found with path: {param_file_path}"
+        try:
+            logger.info(f"Found parameter file '{param_file_name}'")
+            logger.info("Validating parameter file")
+            with Path.open(param_file_path, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+
+                logger.debug(f"Validating {param_file_name} content")
+                validation_errors = self._validate_yaml_content(yaml_content)
+                if validation_errors:
+                    for error in validation_errors:
+                        return False, param_dict, f"Validation error in {param_file_name}: {error}"
+
+                param_dict = yaml.full_load(yaml_content)
+                return True, param_dict, f"Successfully loaded {param_file_name}"
+
+        except yaml.YAMLError as e:
+            return False, param_dict, f"Error loading {param_file_name}: {e}"
+
+    def _validate_yaml_content(self, content: str) -> list[str]:
+        """Validate the yaml content of the parameter file"""
+        errors = []
+
+        # Check for invalid characters (non-UTF-8)
+        if not re.match(r"^[\u0000-\uFFFF]*$", content):
+            errors.append("Invalid characters found.")
+
+        # Check for unclosed brackets or quotes
+        brackets = ["()", "[]", "{}"]
+        for bracket in brackets:
+            if content.count(bracket) != content.count(bracket):
+                errors.append(f"Unclosed bracket: {bracket}")
+
+        quotes = ['"', "'"]
+        for quote in quotes:
+            if content.count(quote) % 2 != 0:
+                errors.append(f"Unclosed quote: {quote}")
+
+        return errors
 
     def _validate_parameter_file(self) -> bool:
         """Validate the parameter file."""
-        logger.info("Validating parameter file")
         # Step 1: Validate the parameter file load to a dictionary
         if not self._validate_parameter_file_load():
             return False
