@@ -148,9 +148,12 @@ class FabricWorkspace:
                 item_metadata_path = directory / ".platform"
 
                 # Print a warning and skip directory if empty
-                if not os.listdir(directory):
+                if not any(directory.iterdir()):
                     logger.warning(f"Directory {directory.name} is empty.")
                     continue
+                # if not os.listdir(directory):
+                # logger.warning(f"Directory {directory.name} is empty.")
+                # continue
 
                 # Attempt to read metadata file
                 try:
