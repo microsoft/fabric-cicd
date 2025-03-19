@@ -121,14 +121,30 @@ class FabricWorkspace:
         self._refresh_repository_items()
 
     def _refresh_parameter_file(self) -> None:
-        """Load parameters if file is present."""
+        """Load parameters if file is present.
+           If using Deployment Variables they must be prefixed with $VAR:"""
+        # Import feature_flag here to avoid circular import
+        from fabric_cicd import feature_flag
+
         parameter_file_path = self.repository_directory / "parameter.yml"
         self.environment_parameter = {}
-
+        #
         if parameter_file_path.is_file():
             logger.info(f"Found parameter file '{parameter_file_path}'")
             with parameter_file_path.open(encoding="utf-8") as yaml_file:
-                self.environment_parameter = yaml.safe_load(yaml_file)
+                if "enable_deployment_variables" in feature_flag:
+                    #filter os.environ dict to only allow variables that begin with $VAR:
+                    filter = "$ENV:"
+                    var_dict = {k: v for k, v in os.environ.items() if filter in k}
+                    replace_dict = yaml.safe_load(yaml_file)
+                    for _k, v in replace_dict["find_replace"].items():
+                        try:
+                            v.update({self.environment: var_dict[v.get(self.environment)]})
+                        except Exception as e:
+                            logger.warning(f"{self.environment} variable not found.  Raw exception: {e}")
+                    self.environment_parameter = replace_dict
+                else:
+                    self.environment_parameter = yaml.safe_load(yaml_file)
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""

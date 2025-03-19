@@ -1,8 +1,12 @@
 find_replace:
     # SQL Connection Guid
     "db52be81-c2b2-4261-84fa-840c67f4bbd0":
-        PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+        PPE: "$ENV:SQL_CON_PPE_VAR"
         PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+    "replace_lakehouse_id":
+        PPE: "$ENV:LAKEHOUSE_PPE_VAR"
+    "replace_lakehouse_workspace":
+        PPE: "$ENV:LAKEHOUSE_WORKSPACE_PPE_VAR"
 
 spark_pool:
     # CapacityPool_Large

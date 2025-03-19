@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+uv = "*"
+ruff = "*"
+dpath = "*"
+azure-core = "*"
+azure-identity = "*"
+filetype = "*"
+colorama = "*"
+packaging = "*"
+colorlog = "*"
+pyyaml = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
