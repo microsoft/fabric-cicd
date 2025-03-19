@@ -34,14 +34,7 @@ class FabricWorkspace:
         "Lakehouse",
         "MirroredDatabase",
     )
-    ACCEPTED_ITEM_TYPES_NON_UPN = (
-        "Environment",
-        "Notebook",
-        "Report",
-        "SemanticModel",
-        "Lakehouse",
-        "MirroredDatabase",
-    )
+    ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
     def __init__(
         self,
