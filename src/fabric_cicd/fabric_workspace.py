@@ -280,7 +280,7 @@ class FabricWorkspace:
         guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"], "Lakehouse": ["Lakehouse", "artifactId"]}
+        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
 
         # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
