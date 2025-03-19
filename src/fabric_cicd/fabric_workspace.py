@@ -151,9 +151,6 @@ class FabricWorkspace:
                 if not any(directory.iterdir()):
                     logger.warning(f"Directory {directory.name} is empty.")
                     continue
-                # if not os.listdir(directory):
-                # logger.warning(f"Directory {directory.name} is empty.")
-                # continue
 
                 # Attempt to read metadata file
                 try:
