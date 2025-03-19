@@ -266,6 +266,19 @@ class FabricWorkspace:
 
         return raw_file
 
+    def _get_semanticmodel_connections(self, item_guid: str) -> str:
+        """
+        Gets all data source connections for the semantic model
+
+        Args:
+            raw_file: The raw file content where parameter values need to be replaced.
+        """
+        response = self.endpoint_powerbi.invoke(
+            method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/datasources"
+        )
+
+        return raw_file
+
     def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
@@ -345,6 +358,28 @@ class FabricWorkspace:
             lookup_id = item_details.logical_id if lookup_type == "Repository" else item_details.guid
             if lookup_id == generic_id:
                 return item_details.name
+        # if not found
+        return None
+
+    def _convert_name_to_id(self, item_type: str, generic_name: str, lookup_type: str) -> str:
+        """
+        For a given item_type and id, returns the item name. Special handling for both deployed and repository items.
+
+        Args:
+            item_type: Type of the item (e.g., Notebook, Environment).
+            generic_id: Logical id or item guid of the item based on lookup_type.
+            lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
+        """
+        lookup_dict = self.repository_items if lookup_type == "Repository" else self.deployed_items
+
+        for item_details in lookup_dict[item_type].values():
+            if item_details.name == generic_name:
+                if item_details.guid:
+                    return item_details.guid
+                if item_details.logical_id:
+                    return item_details.logical_id
+                return None
+
         # if not found
         return None
 
@@ -452,16 +487,6 @@ class FabricWorkspace:
         if not kwargs.get("skip_publish_logging", False):
             logger.info("Published")
 
-        if is_deployed and item_type == "SemanticModel":
-            # Take over dataset and connect to the datasources
-            self.endpoint_powerbi.invoke(
-                method="POST",
-                url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/Default.TakeOver",
-                body="",
-                max_retries=max_retries,
-            )
-            logger.info("Semantic model take over ownership")
-
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """
         Unpublishes an item from the Fabric workspace.
@@ -481,3 +506,177 @@ class FabricWorkspace:
             logger.info("Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+
+    def _takeover_semanticmodel(self, item_guid: str) -> None:
+        """
+        Perform a ownership takeover on the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        self.endpoint_powerbi.invoke(
+            method="POST", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/Default.TakeOver", body=""
+        )
+        logger.info("Takeover Semantic model")
+
+    def _keys_to_casefold(dict1: dict) -> dict:
+        dict2 = {}
+        for k, vals in dict1.items():
+            if isinstance(dict1[k], dict):
+                dict2[k] = FabricWorkspace._keys_to_casefold(dict1[k])
+            else:
+                dict2[k] = vals.casefold()
+        return dict2
+
+    def _get_semanticmodel_connections(self, item_guid: str) -> str:
+        """
+        Get connections of the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        response = self.endpoint_powerbi.invoke(
+            method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/datasources"
+        )
+
+        connections = response["body"]["value"]
+        # gatewayconnections = [c for c in connections if c["gatewayType"] != "Personal"]
+        for c in connections:
+            if "connectionDetails" in c:
+                if isinstance(c["connectionDetails"], str):
+                    c["connectionDetails"] = json.loads(c["connectionDetails"])
+                if "sharePointSiteUrl" in c["connectionDetails"]:
+                    c["connectionDetails"]["url"] = c["connectionDetails"]["sharePointSiteUrl"]
+                    del c["connectionDetails"]["sharePointSiteUrl"]
+                # remove trailing "/" as there is some inconsistency in storing the url formats
+                if "url" in c["connectionDetails"]:
+                    c["connectionDetails"]["url"] = re.sub("\\/$", "", c["connectionDetails"]["url"])
+
+                # casefold for all key to case-insensitive compare
+                c["connectionDetails"] = FabricWorkspace._keys_to_casefold(c["connectionDetails"])
+
+        return connections
+
+    def _get_existing_connections(self) -> str:
+        """
+        Get all existing connections on the gateways.
+        """
+        # Found on: https://learn.microsoft.com/en-us/power-bi/connect-data/service-connect-cloud-data-sources
+
+        baseurl = "https://api.powerbi.com/v2.0/myorg/me/"
+        url = baseurl + "gatewayClusterDatasources?$expand=users"
+        response = self.endpoint_powerbi.invoke(method="GET", url=url)
+
+        # Filter out all personal connections.
+        # Personal connections can not be shared with other users
+        # this complicates maintaining and debugging the connection
+        # A shared cloud connections is on the "TenantCloud" gateway
+        connections = response["body"]["value"]
+
+        gatewayconnections = []
+        for c in connections:
+            if c["gatewayType"] != "Personal":
+                if "connectionDetails" in c:
+                    if isinstance(c["connectionDetails"], str):
+                        c["connectionDetails"] = json.loads(c["connectionDetails"])
+                    if "sharePointSiteUrl" in c["connectionDetails"]:
+                        c["connectionDetails"]["url"] = c["connectionDetails"]["sharePointSiteUrl"]
+                        del c["connectionDetails"]["sharePointSiteUrl"]
+                    # remove trailing "/" as there is some inconsistency in storing the url formats
+                    if "url" in c["connectionDetails"]:
+                        c["connectionDetails"]["url"] = re.sub("\\/$", "", c["connectionDetails"]["url"])
+                    # casefold for all key to case-insensitive compare
+                    c["connectionDetails"] = FabricWorkspace._keys_to_casefold(c["connectionDetails"])
+                # Add Key clusterName for TenantCloud connections for easy filtering later on
+                # and set clusterId to "00000000-0000-0000-0000-000000000000".
+                # This is the GUID needed in the REST API to connect to a shared cloud datasource
+                if c["gatewayType"] == "TenantCloud":
+                    c["clusterName"] = "TenantCloud"
+                    c["clusterId"] = "00000000-0000-0000-0000-000000000000"
+                gatewayconnections.append(c)
+
+        return gatewayconnections
+
+    def _get_gateways(self) -> str:
+        """
+        Get all existing connections on the gateways for the choosen environment.
+
+        """
+        gateways = []
+        if "gateways" in self.environment_parameter:
+            for item in self.environment_parameter["gateways"].items():
+                for i in item[1]:
+                    # gateway = [i for i in item[1] if i == self.environment]
+                    if i == self.environment:
+                        gateways.append(item[0])
+
+        return gateways
+
+    def _set_semanticmodel_connections(self, item_guid: str, metadata_body: str) -> None:
+        """
+        Perform a ownership takeover on the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        self.endpoint_powerbi.invoke(
+            method="POST",
+            url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/Default.BindToGateway",
+            body=metadata_body,
+        )
+        logger.info("Sematic model binded to gateway")
+
+    def _get_refreshschedule(self, item_name: str) -> str:
+        """
+        Get connections of the sematic model.
+
+        Args:
+            item_name: name of the semantic model
+        """
+        # first find the schedule on the sematic model name
+        refreshschedule = None
+        if "refreshschedules" in self.environment_parameter:
+            for item in self.environment_parameter["refreshschedules"]:
+                if item_name in item["datasets"]:
+                    refreshschedule = item["value"]
+                    break
+                # Not found on name, look for the default label
+            if refreshschedule == None:
+                for item in self.environment_parameter["refreshschedules"]:
+                    if "default" in item["datasets"]:
+                        refreshschedule = {}
+                        refreshschedule["value"] = item["value"].copy()
+                        break
+
+        return refreshschedule
+
+    def _update_refreshschedule(self, item_guid: str, metadata_body: str) -> None:
+        """
+        Perform a ownership takeover on the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        dataset = self.endpoint_powerbi.invoke(method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}")
+        # The API to be used depends on the isRefreshable property of the dataset
+        if dataset["body"]["isRefreshable"] == True:
+            self.endpoint_powerbi.invoke(
+                method="PATCH",
+                url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshSchedule",
+                body=metadata_body,
+            )
+        else:
+            # Remove some elements from json object.
+            # These are not valid for the API call directQueryRefreshSchedule
+            if "enabled" in metadata_body["value"]:
+                del metadata_body["value"]["enabled"]
+            if "notifyOption" in metadata_body["value"]:
+                del metadata_body["value"]["notifyOption"]
+
+            self.endpoint_powerbi.invoke(
+                method="PATCH",
+                url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/directQueryRefreshSchedule",
+                body=metadata_body,
+            )
+
+        logger.info("refresh schedule updated")

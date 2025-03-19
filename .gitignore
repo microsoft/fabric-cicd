@@ -50,6 +50,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+fabric_deploy.py
 
 # Translations
 *.mo
