@@ -235,15 +235,13 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters(self, raw_file: str, item_type: str, item_name: str, file_path: Path) -> str:
+    def _replace_parameters(self, file_obj: object, item_obj: object) -> str:
         """
         Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
         Args:
-            raw_file: The raw file content where parameter values need to be replaced.
-            item_type: The type of the item.
-            item_name: The name of the item.
-            file_path: The path of the file.
+            file_obj: The File object instance that provides the file content and file path.
+            item_obj: The Item object instance that provides the item type and item name.
         """
         from fabric_cicd._parameter._utils import (
             check_parameter_structure,
@@ -251,8 +249,15 @@ class FabricWorkspace:
             process_input_path,
         )
 
+        # Parse the file_obj and item_obj
+        raw_file = file_obj.contents
+        item_type = item_obj.type
+        item_name = item_obj.name
+        file_path = file_obj.file_path
+
         if "find_replace" in self.environment_parameter:
             structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
+            msg = "Replacing {} with {} in {}.{}"
 
             # Handle new parameter file structure
             if structure_type == "new":
@@ -268,9 +273,7 @@ class FabricWorkspace:
                         input_type, input_name, input_path, item_type, item_name, file_path
                     ):
                         raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                        logger.debug(
-                            f"Replacing {find_value} with {replace_value[self.environment]} in {item_name}.{item_type}"
-                        )
+                        logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
 
             # Handle original parameter file structure
             if structure_type == "old":
@@ -278,59 +281,7 @@ class FabricWorkspace:
                     if key in raw_file and self.environment in parameter_dict:
                         # replace any found references with specified environment value
                         raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                        logger.debug(
-                            f"Replacing {key} with {parameter_dict[self.environment]} in {item_name}.{item_type}"
-                        )
-
-        return raw_file
-
-    def _replace_parameters_v2(self, item_obj: object, file_obj: object) -> str:
-        """
-        Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
-
-        Args:
-            item_obj: The Item object instance parsed to get item_type and item_name.
-            file_obj: The File object instanced parsed to get file content and file path.
-        """
-        from fabric_cicd._parameter._utils import (
-            check_parameter_structure,
-            check_replacement,
-            process_input_path,
-        )
-
-        # Get raw file content
-        raw_file = file_obj.contents
-        find_value = ""
-        msg = "Replacing {} with {} in {}.{}"
-
-        if "find_replace" in self.environment_parameter:
-            structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
-
-            # Handle new parameter file structure
-            if structure_type == "new":
-                for parameter_dict in self.environment_parameter["find_replace"]:
-                    find_value = parameter_dict["find_value"]
-                    replace_value = parameter_dict["replace_value"]
-                    input_type = parameter_dict.get("item_type")
-                    input_name = parameter_dict.get("item_name")
-                    input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
-
-                    # Perform replacement if a condition is met and replace any found references with specified environment value
-                    if (find_value in raw_file and self.environment in replace_value) and check_replacement(
-                        input_type, input_name, input_path, item_obj.type, item_obj.name, file_obj.file_path
-                    ):
-                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                        logger.debug(
-                            msg.format(find_value, replace_value[self.environment], item_obj.name, item_obj.type)
-                        )
-
-            # Handle original parameter file structure
-            if structure_type == "old":
-                for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                    if key in raw_file and self.environment in parameter_dict:
-                        # replace any found references with specified environment value
-                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                        logger.debug(msg.format(key, parameter_dict, item_obj.name, item_obj.type))
+                        logger.debug(msg.format(key, parameter_dict, item_name, item_type))
 
         return raw_file
 
@@ -473,10 +424,7 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            # file.contents = self._replace_parameters(
-                            #    file.contents, item_type, item_name, file.file_path
-                            # )
-                            file.contents = self._replace_parameters_v2(item, file)
+                            file.contents = self._replace_parameters(file, item)
 
                     item_payload.append(file.base64_payload)
 
