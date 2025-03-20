@@ -34,14 +34,7 @@ class FabricWorkspace:
         "Lakehouse",
         "MirroredDatabase",
     )
-    ACCEPTED_ITEM_TYPES_NON_UPN = (
-        "Environment",
-        "Notebook",
-        "Report",
-        "SemanticModel",
-        "Lakehouse",
-        "MirroredDatabase",
-    )
+    ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
     def __init__(
         self,
@@ -148,7 +141,7 @@ class FabricWorkspace:
                 item_metadata_path = directory / ".platform"
 
                 # Print a warning and skip directory if empty
-                if not os.listdir(directory):
+                if not any(directory.iterdir()):
                     logger.warning(f"Directory {directory.name} is empty.")
                     continue
 
@@ -284,7 +277,8 @@ class FabricWorkspace:
 
         # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
         for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
-            if activity_value in activities_mapping:
+            # Ensure the type value is a string and check if it is found in the activities mapping
+            if type(activity_value) == str and activity_value in activities_mapping:
                 # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
                 path = path.split("/")
                 workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")

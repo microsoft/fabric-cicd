@@ -7,6 +7,14 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.10
+
+<span class="md-h2-subheader">Release Date: 2025-03-19</span>
+
+-   ✨ DataPipeline SPN Support ([#133](https://github.com/microsoft/fabric-cicd/issues/133))
+-   🔧 Workspace ID replacement in data pipelines ([#164](https://github.com/microsoft/fabric-cicd/issues/164))
+-   📝 Sample for passing in arguments from Azure DevOps Pipelines
+
 ## Version 0.1.9
 
 <span class="md-h2-subheader">Release Date: 2025-03-11</span>
