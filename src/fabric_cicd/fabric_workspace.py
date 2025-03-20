@@ -11,11 +11,10 @@ from pathlib import Path
 from typing import Optional
 
 import dpath
-import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 
@@ -122,13 +121,21 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
-        parameter_file_path = self.repository_directory / "parameter.yml"
-        self.environment_parameter = {}
+        from fabric_cicd._parameter._parameter import Parameter
 
-        if parameter_file_path.is_file():
-            logger.info(f"Found parameter file '{parameter_file_path}'")
-            with parameter_file_path.open(encoding="utf-8") as yaml_file:
-                self.environment_parameter = yaml.safe_load(yaml_file)
+        # Initialize the parameter dict and Parameter object
+        self.environment_parameter = {}
+        parameter_obj = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+        )
+        is_valid, msg = parameter_obj._validate_parameter_file()
+        if is_valid:
+            self.environment_parameter = parameter_obj.environment_parameter
+            logger.info(msg) if msg.find("terminated") == -1 else logger.warning(msg)
+        else:
+            raise ParameterFileError(msg, logger)
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -165,7 +172,7 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                item_path = Path(directory)
+                item_path = directory
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -220,19 +227,54 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters(self, raw_file: str) -> str:
+    def _replace_parameters(self, file_obj: object, item_obj: object) -> str:
         """
-        Replaces values found in parameter file with the chosen environment value.
+        Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
         Args:
-            raw_file: The raw file content where parameter values need to be replaced.
+            file_obj: The File object instance that provides the file content and file path.
+            item_obj: The Item object instance that provides the item type and item name.
         """
+        from fabric_cicd._parameter._utils import (
+            check_parameter_structure,
+            check_replacement,
+            process_input_path,
+        )
+
+        # Parse the file_obj and item_obj
+        raw_file = file_obj.contents
+        item_type = item_obj.type
+        item_name = item_obj.name
+        file_path = file_obj.file_path
+
         if "find_replace" in self.environment_parameter:
-            for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                if key in raw_file and self.environment in parameter_dict:
-                    # replace any found references with specified environment value
-                    raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                    logger.debug(f"Replaced '{key}' with '{parameter_dict[self.environment]}'")
+            structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
+            msg = "Replacing {} with {} in {}.{}"
+
+            # Handle new parameter file structure
+            if structure_type == "new":
+                for parameter_dict in self.environment_parameter["find_replace"]:
+                    find_value = parameter_dict["find_value"]
+                    replace_value = parameter_dict["replace_value"]
+                    input_type = parameter_dict.get("item_type")
+                    input_name = parameter_dict.get("item_name")
+                    input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+
+                    # Perform replacement if a condition is met and replace any found references with specified environment value
+                    if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                        input_type, input_name, input_path, item_type, item_name, file_path
+                    ):
+                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
+                        logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
+
+            # Handle original parameter file structure
+            # TODO: Deprecate old structure handling by April 21, 2025
+            if structure_type == "old":
+                for key, parameter_dict in self.environment_parameter["find_replace"].items():
+                    if key in raw_file and self.environment in parameter_dict:
+                        # replace any found references with specified environment value
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                        logger.debug(msg.format(key, parameter_dict, item_name, item_type))
 
         return raw_file
 
@@ -375,7 +417,7 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            file.contents = self._replace_parameters(file.contents)
+                            file.contents = self._replace_parameters(file, item)
 
                     item_payload.append(file.base64_payload)
 
