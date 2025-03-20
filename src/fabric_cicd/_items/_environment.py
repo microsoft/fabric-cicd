@@ -163,7 +163,7 @@ def _update_compute_settings(
                             del yaml_body["instance_pool_id"]
 
                 # Handle original parameter file format
-                # TODO: Deprecate old structure handling by April 7, 2025
+                # TODO: Deprecate old structure handling by April 21, 2025
                 if structure_type == "old" and pool_id in parameter_dict:
                     # replace any found references with specified environment value
                     yaml_body["instancePool"] = parameter_dict[pool_id]
