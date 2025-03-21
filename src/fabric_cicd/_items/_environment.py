@@ -43,7 +43,11 @@ def _publish_environment(fabric_workspace_obj: FabricWorkspace, item_guid: str) 
     # Publish updated settings
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
     fabric_workspace_obj.endpoint.invoke(
-        method="POST", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish"
+        method="POST",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish",
+        base_delay=5,
+        retry_after=120,
+        max_retries=20,
     )
 
     logger.info("Published")
