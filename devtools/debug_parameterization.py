@@ -10,6 +10,7 @@ from azure.identity import ClientSecretCredential
 
 from fabric_cicd import change_log_level
 from fabric_cicd._parameter._utils import validate_parameter_file
+from fabric_cicd.constants import PARAMETER_FILE_NAME
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
@@ -31,8 +32,9 @@ validate_parameter_file(
     item_type_in_scope=item_type_in_scope,
     # Comment to exclude target environment in validation
     environment=environment,
-    # Uncomment to provide alternative parameter file name
-    # parameter_file_name="alternative_name_parameter.yml",
+    # Uncomment to pass in an alternative parameter file name
+    # Assign to the constant in constants.py or pass in a string directly
+    # parameter_file_name=PARAMETER_FILE_NAME,
     # Uncomment to use SPN auth
     # token_credential=token_credential,
 )

@@ -17,7 +17,6 @@ from fabric_cicd._parameter._utils import (
     process_input_path,
 )
 from fabric_cicd.constants import (
-    PARAMETER_FILE_NAME,
     PARAMETER_MSGS,
 )
 
@@ -45,6 +44,7 @@ class Parameter:
         repository_directory: str,
         item_type_in_scope: list[str],
         environment: str,
+        parameter_file_name: str = "parameter.yml",
     ) -> None:
         """
         Initializes the Parameter instance.
@@ -53,17 +53,19 @@ class Parameter:
             repository_directory: Local directory path of the repository where items are to be deployed from and parameter file lives.
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
+            parameter_file_name: The name of the parameter file, default is "parameter.yml".
         """
         # Set class variables
         self.repository_directory = repository_directory
         self.item_type_in_scope = item_type_in_scope
         self.environment = environment
+        self.parameter_file_name = parameter_file_name
 
         # Initialize the parameter dictionary and parameter file path
         self.environment_parameter = {}
-        self.parameter_file_path = Path(self.repository_directory, PARAMETER_FILE_NAME)
+        self.parameter_file_path = Path(self.repository_directory, parameter_file_name)
 
-    def _validate_parameter_file(self) -> tuple[bool, str]:
+    def _validate_parameter_file(self) -> bool:
         """Validate the parameter file."""
         validation_steps = [
             ("parameter file exists", self._validate_parameter_file_exists),
@@ -79,18 +81,21 @@ class Parameter:
             if not is_valid:
                 # Return True for specific not is_valid cases
                 if step == "parameter file exists" or (step == "parameter file structure" and msg == "old structure"):
-                    return True, PARAMETER_MSGS["terminate"].format(msg)
+                    logger.warning(PARAMETER_MSGS["terminate"].format(msg))
+                    return True
                 # Throw warning and discontinue validation check for absent parameter
                 if step in ("find_replace parameter", "spark_pool parameter") and msg == "parameter not found":
                     not_found_msg = PARAMETER_MSGS[msg].format(step.split()[0])
                     logger.warning(not_found_msg)
                     continue
                 # Otherwise, return False with error message
-                return False, PARAMETER_MSGS["failed"].format(msg)
+                logger.error(PARAMETER_MSGS["failed"].format(msg))
+                return False
             logger.info(PARAMETER_MSGS["passed"].format(msg))
 
         # Return True if all validation steps pass
-        return True, PARAMETER_MSGS["passed"].format("Parameter file validation")
+        logger.info("Parameter file validation passed")
+        return True
 
     def _validate_parameter_file_exists(self) -> tuple[bool, str]:
         """Validate the parameter file exists."""
@@ -137,6 +142,7 @@ class Parameter:
         # TODO: Deprecate old structure check in future versions
         if check_parameter_structure(self.environment_parameter) == "old":
             logger.warning(PARAMETER_MSGS["old structure"])
+            logger.warning(PARAMETER_MSGS["raise issue"])
             return False, "old structure"
         if check_parameter_structure(self.environment_parameter) == "invalid":
             return False, PARAMETER_MSGS["invalid structure"]

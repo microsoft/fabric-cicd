@@ -17,6 +17,7 @@ from azure.identity import DefaultAzureCredential
 from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
+from fabric_cicd.constants import PARAMETER_FILE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -136,12 +137,13 @@ class FabricWorkspace:
             repository_directory=self.repository_directory,
             item_type_in_scope=self.item_type_in_scope,
             environment=self.environment,
+            parameter_file_name=PARAMETER_FILE_NAME,
         )
-        is_valid, msg = parameter_obj._validate_parameter_file()
+        is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
-            logger.info(msg) if msg.find("terminated") == -1 else logger.warning(msg)
         else:
+            msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
 
     def _refresh_repository_items(self) -> None:
@@ -275,7 +277,7 @@ class FabricWorkspace:
                         logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
 
             # Handle original parameter file structure
-            # TODO: Deprecate old structure handling by April 21, 2025
+            # TODO: Deprecate old structure handling by April 24, 2025
             if structure_type == "old":
                 for key, parameter_dict in self.environment_parameter["find_replace"].items():
                     if key in raw_file and self.environment in parameter_dict:
