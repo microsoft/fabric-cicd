@@ -43,6 +43,7 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
                     fabric_workspace_obj._update_refreshschedule(
                         item_guid=item_guid, metadata_body=refreshschedule.copy()
                     )
+                refresh_dataset(fabric_workspace_obj=fabric_workspace_obj, item_guid=item_guid)
 
 
 def find_datasource_connections(gateways: dict, gatewayconn: dict, datasetconn: dict) -> str:
@@ -81,5 +82,18 @@ def find_datasource_connections(gateways: dict, gatewayconn: dict, datasetconn: 
             returnobject["datasourceObjectIds"] = foundconn
             # return json.dumps(returnobject, indent=2)
             return returnobject
-
+    logger.error("Not all gateway connections found!")
     return None
+
+
+def refresh_dataset(fabric_workspace_obj: FabricWorkspace, item_guid: str):
+    # refresh the dataset.
+    # First get a list of refreshes and check if there is no refresh running
+    refreshes = fabric_workspace_obj._get_refresh_history(item_guid=item_guid)
+    if len(refreshes) > 0:
+        status = refreshes[0]["status"]
+        requestid = refreshes[0]["requestId"]
+    else:
+        status = 0
+        requestid = None
+    refreshes = fabric_workspace_obj._invoke_refresh(item_guid=item_guid)

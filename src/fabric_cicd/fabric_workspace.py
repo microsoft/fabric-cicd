@@ -680,3 +680,39 @@ class FabricWorkspace:
             )
 
         logger.info("refresh schedule updated")
+
+    def _get_refresh_history(self, item_guid: str) -> None:
+        """
+        Perform a ownership takeover on the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        response = self.endpoint_powerbi.invoke(
+            method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshes"
+        )
+
+        return response["body"]["value"]
+
+    def _invoke_refresh(self, item_guid: str) -> None:
+        """
+        Perform a ownership takeover on the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        dataset = self.endpoint_powerbi.invoke(method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}")
+        # The API to be used depends on the isRefreshable property of the dataset
+        if dataset["body"]["isRefreshable"] == True:
+            logger.info("Starting Semantic model data refresh")
+
+            metadata_body = {"notifyOption": "NoNotification"}
+
+            response = self.endpoint_powerbi.invoke(
+                method="POST",
+                url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshes",
+                body=metadata_body,
+                max_retries=10,
+            )
+
+        # return response["body"]["value"]

@@ -180,20 +180,35 @@ def _handle_response(
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
 
-    # Handle long-running operations
+    # Refreshes to be handled differently. There is no return object from the API
+    isrefresh = False
+    if url.rsplit("/", 1)[1] == "refreshes":
+        isrefresh = True
+        long_running = True
+
+        # Handle long-running operations
     # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
     if (response.status_code == 200 and long_running) or response.status_code == 202:
-        url = response.headers.get("Location")
+        if not isrefresh:
+            url = response.headers.get("Location")
         method = "GET"
         body = "{}"
-        response_json = response.json()
+        try:
+            response_json = response.json()
+            status = response_json["value"][0]["status"] if isrefresh else response_json.get("status")
+        except ValueError:
+            response_json = json.loads('{"status" : "Unknown"}')
+            status = "Unknown"
 
         if long_running:
-            status = response_json.get("status")
             if status == "Succeeded":
                 long_running = False
                 # If location not included in operation success call, no body is expected to be returned
                 exit_loop = url is None
+
+            if status == "Completed" and isrefresh:
+                long_running = False
+                exit_loop = True
 
             elif status == "Failed":
                 response_error = response_json["error"]
