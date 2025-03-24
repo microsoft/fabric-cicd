@@ -15,10 +15,10 @@ spark_pool:
     # CapacityPool_Large
     - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
       replace_value:
-         PPE: 
+        PPE: 
            type: "Capacity"
            name: "CapacityPool_Large_PPE"
-         PROD: 
+        PROD: 
            type: "Capacity"
            name: "CapacityPool_Large_PROD"
       # Optional field:
