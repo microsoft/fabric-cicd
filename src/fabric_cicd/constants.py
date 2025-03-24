@@ -1,9 +1,9 @@
 """Constants for the fabric-cicd package."""
 
-# Parameter configs
+# Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
 
-# Parameter Validation Messages
+# Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
 INVALID_REPLACE_VALUE_SPARK_POOL = {
     "missing key": "The '{}' environment dict in spark_pool must contain a 'type' and a 'name' key",
