@@ -193,6 +193,7 @@ def _handle_response(
             url = response.headers.get("Location")
         method = "GET"
         body = "{}"
+        max_retries = kwargs.get("max_retries", 5)
         try:
             response_json = response.json()
             status = response_json["value"][0]["status"] if isrefresh else response_json.get("status")
@@ -220,12 +221,17 @@ def _handle_response(
             elif status == "Undefined":
                 msg = f"Operation is in an undefined state. Full Body: {response_json}"
                 raise Exception(msg)
+
+            elif isrefresh and iteration_count >= max_retries:
+                long_running = False
+                exit_loop = True
+
             else:
                 handle_retry(
                     attempt=iteration_count - 1,
                     base_delay=0.5,
                     response_retry_after=retry_after,
-                    max_retries=kwargs.get("max_retries", 5),
+                    max_retries=max_retries,
                     prepend_message="Operation in progress.",
                 )
         else:
@@ -328,6 +334,8 @@ def handle_retry(
 
         logger.info(f"{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})...")
         time.sleep(delay)
+    elif max_retries <= 1:
+        return
     else:
         msg = f"Maximum retry attempts ({max_retries}) exceeded."
         raise Exception(msg)

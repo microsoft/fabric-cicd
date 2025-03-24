@@ -43,7 +43,8 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
                     fabric_workspace_obj._update_refreshschedule(
                         item_guid=item_guid, metadata_body=refreshschedule.copy()
                     )
-                refresh_dataset(fabric_workspace_obj=fabric_workspace_obj, item_guid=item_guid)
+                if fabric_workspace_obj._get_isrefreshable(item_guid=item_guid):
+                    refresh_dataset(fabric_workspace_obj=fabric_workspace_obj, item_guid=item_guid)
 
 
 def find_datasource_connections(gateways: dict, gatewayconn: dict, datasetconn: dict) -> str:
@@ -87,13 +88,21 @@ def find_datasource_connections(gateways: dict, gatewayconn: dict, datasetconn: 
 
 
 def refresh_dataset(fabric_workspace_obj: FabricWorkspace, item_guid: str):
+    # Import feature_flag here to avoid circular import
+
+    from fabric_cicd import feature_flag
+
+    if "dataset_refresh_norefresh" in feature_flag:
+        logger.info("Skipping Semantic model data refresh")
+        return
     # refresh the dataset.
     # First get a list of refreshes and check if there is no refresh running
-    refreshes = fabric_workspace_obj._get_refresh_history(item_guid=item_guid)
-    if len(refreshes) > 0:
-        status = refreshes[0]["status"]
-        requestid = refreshes[0]["requestId"]
-    else:
-        status = 0
-        requestid = None
-    refreshes = fabric_workspace_obj._invoke_refresh(item_guid=item_guid)
+
+    max_retries = 10
+    if "dataset_refresh_nowait" in feature_flag:
+        max_retries = 1
+
+    fabric_workspace_obj._invoke_refresh(
+        item_guid=item_guid,
+        max_retries=max_retries,
+    )

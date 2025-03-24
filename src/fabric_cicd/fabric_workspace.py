@@ -600,7 +600,6 @@ class FabricWorkspace:
     def _get_gateways(self) -> str:
         """
         Get all existing connections on the gateways for the choosen environment.
-
         """
         gateways = []
         if "gateways" in self.environment_parameter:
@@ -650,6 +649,18 @@ class FabricWorkspace:
 
         return refreshschedule
 
+    def _get_isrefreshable(self, item_guid: str) -> str:
+        """
+        Perform a ownership takeover on the sematic model.
+
+        Args:
+            item_guid: GUID of the semantic model
+        """
+        dataset = self.endpoint_powerbi.invoke(method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}")
+        # The API to be used depends on the isRefreshable property of the dataset
+
+        return dataset["body"]["isRefreshable"] == True
+
     def _update_refreshschedule(self, item_guid: str, metadata_body: str) -> None:
         """
         Perform a ownership takeover on the sematic model.
@@ -694,25 +705,20 @@ class FabricWorkspace:
 
         return response["body"]["value"]
 
-    def _invoke_refresh(self, item_guid: str) -> None:
+    def _invoke_refresh(self, item_guid: str, max_retries: str) -> None:
         """
         Perform a ownership takeover on the sematic model.
 
         Args:
             item_guid: GUID of the semantic model
         """
-        dataset = self.endpoint_powerbi.invoke(method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}")
-        # The API to be used depends on the isRefreshable property of the dataset
-        if dataset["body"]["isRefreshable"] == True:
-            logger.info("Starting Semantic model data refresh")
+        logger.info("Starting Semantic model data refresh")
 
-            metadata_body = {"notifyOption": "NoNotification"}
+        metadata_body = {"notifyOption": "NoNotification"}
 
-            response = self.endpoint_powerbi.invoke(
-                method="POST",
-                url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshes",
-                body=metadata_body,
-                max_retries=10,
-            )
-
-        # return response["body"]["value"]
+        self.endpoint_powerbi.invoke(
+            method="POST",
+            url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshes",
+            body=metadata_body,
+            max_retries=max_retries,
+        )
