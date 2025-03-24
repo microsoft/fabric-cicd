@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 """
-Following functions are parameterization utilities used by the FabricWorkspace and
-ParameterValidation classes. The utilities include loading the parameter.yml file, determining
-parameter dictionary structure and managing parameter value replacements.
+Following functions are parameter utilities used by the FabricWorkspace and Parameter classes,
+and for debugging the parameter file. The utilities include validating the parameter.yml file, determining
+parameter dictionary structure, processing parameter values, and handling parameter value replacements.
 """
 
 import logging
@@ -25,7 +25,7 @@ def validate_parameter_file(
 ) -> bool:
     """
     A wrapper function that validates a parameter.yml file, using
-    the ParameterValidation class.
+    the Parameter class.
 
     Args:
         repository_directory: The directory containing the items and parameter.yml file.
@@ -43,6 +43,8 @@ def validate_parameter_file(
         validate_repository_directory,
         validate_token_credential,
     )
+
+    # Import the Parameter class here to avoid circular imports
     from fabric_cicd._parameter._parameter import Parameter
 
     endpoint = FabricEndpoint(
@@ -51,7 +53,7 @@ def validate_parameter_file(
             DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
         )
     )
-    # Initialize the ParameterValidation object
+    # Initialize the Parameter object with the validated inputs
     parameter_obj = Parameter(
         repository_directory=validate_repository_directory(repository_directory),
         item_type_in_scope=validate_item_type_in_scope(item_type_in_scope, upn_auth=endpoint.upn_auth),
@@ -131,30 +133,32 @@ def _convert_value_to_path(repository_directory: Path, input_path: str, validati
     Converts the input_path string value to a Path object
     and resolves a relative path as an absolute path, if present.
     """
-    log_func = logger.warning if validation else logger.debug
+    # Set the logger function based on the validation flag
+    logger_func = logger.warning if validation else logger.debug
+
     if not Path(input_path).is_absolute():
         # Strip leading slashes or backslashes
         normalized_path = Path(input_path.lstrip("/\\"))
         # Set the absolute path
         absolute_path = repository_directory / normalized_path
         if absolute_path.exists():
-            log_func(f"Relative path '{input_path}' resolved as '{absolute_path}'")
+            logger_func(f"Relative path '{input_path}' resolved as '{absolute_path}'")
         else:
-            log_func(f"Relative path '{input_path}' does not exist, provide a valid path")
+            logger_func(f"Relative path '{input_path}' does not exist, provide a valid path")
 
         return absolute_path
 
     absolute_path = Path(input_path)
     if not absolute_path.exists():
-        log_func(f"Absolute path '{input_path}' does not exist, provide a valid path")
+        logger_func(f"Absolute path '{input_path}' does not exist, provide a valid path")
 
     return absolute_path
 
 
 def check_replacement(
-    input_type: Union[str, list, None],
-    input_name: Union[str, list, None],
-    input_path: Union[Path, list, None],
+    input_type: Union[str, list[str], None],
+    input_name: Union[str, list[str], None],
+    input_path: Union[Path, list[str], None],
     item_type: str,
     item_name: str,
     file_path: Path,
@@ -190,7 +194,6 @@ def check_replacement(
         "item_name": (item_name_match and not item_type_match and not file_path_match),
         "file_path": (file_path_match and not item_type_match and not item_name_match),
     }
-
     logger.debug("Optional parameters were provided. Checking for matches.")
     for param, replace_condition in matches_dict.items():
         if replace_condition:

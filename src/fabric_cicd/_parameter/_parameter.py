@@ -181,8 +181,9 @@ class Parameter:
         ]
 
         for param_num, parameter_dict in enumerate(self.environment_parameter[param_name], start=1):
+            param_num_str = param_num if multiple_param else ""
             for step, validation_func in validation_steps:
-                logger.debug(PARAMETER_MSGS["validating"].format(f"{param_name} {param_num} {step}"))
+                logger.debug(PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
                 if not is_valid:
                     return False, msg
