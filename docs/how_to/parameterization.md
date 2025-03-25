@@ -22,7 +22,7 @@ C:/dev/workspace
     /parameter.yml
 ```
 
-**Important Notice:** The `parameter.yml` file structure has been recently updated. Please refer to the documentation below for important changes. There is a grace period from March 24, 2025, to April 24, 2025, to allow users to migrate from the old structure to the new one.
+**Important Notice:** The `parameter.yml` file structure has been recently updated. Please refer to the documentation below for important changes. There is a grace period from **March 24, 2025** to **April 24, 2025**, to allow users to migrate from the old structure to the new one.
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
 
@@ -49,7 +49,7 @@ find_replace:
 
 ### `spark_pool`
 
-Environments attached to custom spark pools need to be parameterized because the `instance_pool_id` in the `Sparkcompute.yml` file isn't supported in the create/update environment APIs. Provide the `instance_pool_id` value, and the pool type and name values as the `replace_value` for each environment (e.g., PPE, PROD). An optional field, `item_name`, can be used to filter the specific environment item where the replacement will occur.
+Environments attached to custom spark pools need to be parameterized because the `instance_pool_id` in the `Sparkcompute.yml` file isn't supported in the create/update environment APIs. Provide the `instance_pool_id` value, and the pool `type` and `name` values as the `replace_value` for each environment (e.g., PPE, PROD). An optional field, `item_name`, can be used to filter the specific environment item where the replacement will occur.
 
 ```yaml
 spark_pool:
@@ -68,23 +68,22 @@ spark_pool:
 
 ### Optional Fields
 
-Notes:
-
--   Functionality is unaffected when these fields are omitted entirely or left empty
--   Optional input values are **case sensitive**
--   Accepted input values: string or array (enables one or many values to filter on)
--   YAML supports array inputs using [] or -
--   Strings should be wrapped in quotes and make sure to escape characters, such as \ in path inputs
--   Item types must be valid; see valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype)
--   Relative paths MUST be relative to the repository directory
+-   Parameterization functionality is unaffected when an optional field is omitted or left empty.
+-   If none of the optional fields or values are provided, any repository file is subject to a find and replace.
+-   Optional input values are **case sensitive**.
+-   Accepted input values must be **string** or **array** (enables one or many values to filter on).
+-   YAML supports array inputs using **[]** or **-** notation.
+-   String values should be wrapped in quotes, and make sure to escape characters, such as **\\** in `file_path` inputs.
+-   Item types must be valid; see valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype).
+-   Relative paths must be relative to the _repository directory_.
 
 ### Parameter File Validation
 
-Validation of the `parameter.yml` file is now a built-in functionality of fabric-cicd. It is leveraged in the following areas:
+Validation of the `parameter.yml` file is a built-in functionality of `fabric-cicd`. It is leveraged in the following cases:
 
-_Debuggability_: Users can debug and validate their parameter file to ensure it meets the requirements before running a deployment. Simply run the `debug_parameterization.py` script located in the `devtools` directory.
+_Debuggability_: users can debug and validate their parameter file to ensure it meets the acceptable structure and value requirements before running a deployment. Simply run the `debug_parameterization.py` script located in the `devtools` directory.
 
-_Deployment_: A validation step occurs at the start of a deployment to check the validity of the `parameter.yml` file, if present. This step ensures that the deployment runs smoothly and the configurations are applied correctly. An invalid parameter file will disrupt the deployment run.
+_Deployment_: an automated validation occurs at the start of a deployment to check the validity of the `parameter.yml` file, if present. This step ensures that the deployment runs smoothly and the parameterized configurations will be applied correctly. An invalid parameter file will prevent the deployment run from proceeding.
 
 ## Sample File
 
@@ -96,14 +95,14 @@ find_replace:
       replace_value:
           PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE lakehouse GUID
           PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID
-      item_type: "Notebook"
-      item_name: ["Hello World", "Goodbye World"]
+      item_type: "Notebook" # filter on notebook files
+      item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
       file_path:
     - find_value: "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c" # workspace ID to be replaced
       replace_value:
           PPE: "d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a" # PPE workspace ID
           PROD: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" # PROD workspace ID
-      file_path:
+      file_path: # filter on files with these paths
           - "/Hello World.Notebook/notebook-content.py"
           - "\\Goodbye World.Notebook\\notebook-content.py"
 
@@ -116,13 +115,13 @@ spark_pool:
           PROD:
               type: "Capacity" # target spark pool type, only supports Capacity or Workspace
               name: "CapacityPool_Large" # target spark pool name
-          item_name: "World"
+      item_name: "World" # filter on file with this environment name
     - instance_pool_id: "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d" # spark_pool_instance_id to be replaced
       replace_value:
           PPE:
               type: "Workspace" # target spark pool type, only supports Capacity or Workspace
               name: "WorkspacePool_Medium" # target spark pool name
-          item_name: ["World", "World_1", "World_2"]
+      item_name: ["World_1", "World_2", "World_3"] # filter on files with these environment names
 ```
 
 ## Examples
@@ -143,14 +142,14 @@ find_replace:
       replace_value:
           PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE lakehouse GUID
           PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID
-      item_type: "Notebook" # filter on files with "Notebook" type
-      item_name: ["Hello World", "Goodbye World"] # filter on notebook files with these names
+      item_type: "Notebook" # filter on notebook files
+      item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
       file_path:
     - find_value: "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c" # workspace ID to be replaced
       replace_value:
           PPE: "d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a" # PPE workspace ID
           PROD: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" # PROD workspace ID
-      file_path: # filter on files with these file paths
+      file_path: # filter on files with these paths
           - "/Hello World.Notebook/notebook-content.py"
           - "\\Goodbye World.Notebook\\notebook-content.py"
 ```
@@ -212,7 +211,7 @@ spark_pool:
           PROD:
               type: "Capacity" # target spark pool type, only supports Capacity or Workspace
               name: "CapacityPool_Large" # target spark pool name
-      item_name: "World" # filter on an environment file with this name
+      item_name: "World" # filter on file with this environment name
 ```
 
 <span class="md-h4-nonanchor">Sparkcompute.yml</span>
