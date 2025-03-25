@@ -21,7 +21,6 @@ ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10}
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse"]
 
-
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r'"(default_lakehouse_workspace_id|workspaceId)": "(.*?)"'
