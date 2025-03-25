@@ -69,17 +69,17 @@ spark_pool:
 ### Optional Fields
 
 -   Parameterization functionality is unaffected when an optional field is omitted or left empty.
--   If none of the optional fields or values are provided, values found in _any_ repository file is subject to replacement.
+-   If none of the optional fields or values are provided, the `find_value` found in _any_ repository file is subject to replacement.
 -   Optional input values are **case sensitive**.
 -   Accepted input values must be **string** or **array** (enables one or many values to filter on).
--   YAML supports array inputs using bracket (**[ ]**) or dash (**-**) notation.
+-   YAML supports array inputs using bracket ( **[ ]** ) or dash ( **-** ) notation.
 -   String values should be wrapped in quotes (make sure to escape characters, such as **\\** in `file_path` inputs).
 -   Item types must be valid; see valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype).
 -   Relative paths must be relative to the _repository directory_.
 
 ### Parameter File Validation
 
-Validation of the `parameter.yml` file is a built-in functionality of `fabric-cicd`. It is leveraged in the following cases:
+Validation of the `parameter.yml` file is a built-in functionality of fabric-cicd. It is leveraged in the following cases:
 
 _Debuggability_: users can debug and validate their parameter file to ensure it meets the acceptable structure and input value requirements before running a deployment. Simply run the `debug_parameterization.py` script located in the `devtools` directory.
 
@@ -195,9 +195,9 @@ display(df)
 
 An Environment is attached to a Capacity level Custom Pool. Source control for Environments does not output the right fields necessary to deploy, so the Spark Pool needs to be parameterized. **Note:** Defining different names per environment is now supported in the `parameter.yml` file.
 
-In the `Sparkcompute.yaml` file, the referenced instance_pool_id `72c68dbc-0775-4d59-909d-a47896f4573b` points to a capacity custom pool named `CapacityPool_Large` of pool type `Capacity` in the `PROD` environment.
+In the `Sparkcompute.yaml` file, the referenced instance_pool_id `72c68dbc-0775-4d59-909d-a47896f4573b` points to a capacity custom pool named `CapacityPool_Large` of pool type `Capacity` in the deployed environment.
 
-This replacement is managed by the `spark_pool` input in the `parameter.yml` file where fabric-cicd finds every instance of the `instance_pool_id` and replaces it with the pool type and pool name for the _specified_ environment (filtered by `item_name`).
+This replacement is managed by the `spark_pool` input in the `parameter.yml` file where fabric-cicd finds every instance of the `instance_pool_id` and replaces it with the pool type and pool name for the _specified_ environment file.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
