@@ -14,10 +14,19 @@ import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
+import fabric_cicd.constants  # required for overwriting constant
 from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd.constants import PARAMETER_FILE_NAME
+from fabric_cicd.constants import (
+    DEFAULT_API_ROOT_URL,
+    DEFAULT_WORKSPACE_ID,
+    MAX_RETRY_OVERRIDE,
+    PARAMETER_FILE_NAME,
+    SHELL_ONLY_PUBLISH,
+    VALID_GUID_REGEX,
+    WORKSPACE_ID_REFERENCE_REGEX,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +34,14 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
-    ACCEPTED_ITEM_TYPES_UPN = (
-        "DataPipeline",
-        "Environment",
-        "Notebook",
-        "Report",
-        "SemanticModel",
-        "Lakehouse",
-        "MirroredDatabase",
-    )
-    ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
-
     def __init__(
         self,
         workspace_id: str,
         repository_directory: str,
         item_type_in_scope: list[str],
-        base_api_url: str = "https://api.fabric.microsoft.com/",
         environment: str = "N/A",
         token_credential: TokenCredential = None,
+        **kwargs,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
@@ -52,9 +50,9 @@ class FabricWorkspace:
             workspace_id: The ID of the workspace to interact with.
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace.
-            base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
+            kwargs: Additional keyword arguments.
 
         Examples:
             Basic usage
@@ -71,7 +69,6 @@ class FabricWorkspace:
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-            ...     base_api_url="https://orgapi.fabric.microsoft.com",
             ...     environment="your-target-environment"
             ... )
 
@@ -92,7 +89,6 @@ class FabricWorkspace:
             ... )
         """
         from fabric_cicd._common._validate_input import (
-            validate_base_api_url,
             validate_environment,
             validate_item_type_in_scope,
             validate_repository_directory,
@@ -112,8 +108,17 @@ class FabricWorkspace:
         self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
-        self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
         self.environment = validate_environment(environment)
+
+        # temporarily support base_api_url until deprecated
+        if "base_api_url" in kwargs:
+            logger.warning(
+                """Setting base_api_url will be deprecated in a future version, please use the below moving forward:
+                >>> import fabric_cicd.constants
+                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
+            )
+            fabric_cicd.constants.DEFAULT_API_ROOT_URL = kwargs["base_api_url"]
+        self.base_api_url = f"{DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
@@ -291,11 +296,12 @@ class FabricWorkspace:
         """
         # Replace all instances of default feature branch workspace ID with target workspace ID
         target_workspace_id = self.workspace_id
-        default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-        target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
 
-        if default_workspace_string in raw_file:
-            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+        workspace_id_match = re.search(WORKSPACE_ID_REFERENCE_REGEX, raw_file)
+        if workspace_id_match:
+            workspace_id = workspace_id_match.group(2)
+            if workspace_id == DEFAULT_WORKSPACE_ID:
+                raw_file = raw_file.replace(DEFAULT_WORKSPACE_ID, target_workspace_id)
 
         # For DataPipeline item, additional replacements may be required
         if item_type == "DataPipeline":
@@ -314,7 +320,7 @@ class FabricWorkspace:
         """
         # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+        guid_pattern = re.compile(VALID_GUID_REGEX)
 
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
         activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
@@ -399,12 +405,12 @@ class FabricWorkspace:
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = 10 if item_type == "SemanticModel" else 5
+        max_retries = MAX_RETRY_OVERRIDE.get(item_type, 5)
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in ["Environment", "Lakehouse"]
+        shell_only_publish = item_type in SHELL_ONLY_PUBLISH
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
