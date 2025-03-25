@@ -15,6 +15,7 @@ from fabric_cicd import (
     FabricWorkspace,
     append_feature_flag,
     change_log_level,
+    constants,
     publish_all_items,
     unpublish_all_orphan_items,
 )
@@ -41,14 +42,14 @@ item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel"
 # tenant_id = "your-tenant-id"
 # token_credential = ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
 
+constants.DEFAULT_API_ROOT_URL = "https://msitapi.fabric.microsoft.com"
+
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
     workspace_id=workspace_id,
     environment=environment,
     repository_directory=repository_directory,
     item_type_in_scope=item_type_in_scope,
-    # Override base url in rare cases where it's different
-    base_api_url="https://msitapi.fabric.microsoft.com/",
     # Uncomment to use SPN auth
     # token_credential=token_credential,
 )
