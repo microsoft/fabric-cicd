@@ -1,0 +1,116 @@
+[data-md-color-scheme="fabric"] {
+    --md-primary-fg-color: #117865;
+    --md-primary-fg-color--light: #e3f7ef;
+    --md-primary-fg-color--dark: #012826;
+    --md-typeset-a-color: #012826;
+    --md-accent-fg-color: #012826;
+    --md-default-fg-color--light: #333333;
+    --md-typeset-a-color: #117865;
+    --md-primary-bg-color: #ffffff;
+}
+
+/* Remove opaqueness to top nav */
+.md-tabs__link,
+.md-tabs__link:hover,
+.md-tabs__item--active {
+    opacity: 1;
+}
+
+/* Add line under active top nav item */
+.md-tabs__item--active {
+    opacity: 1;
+    box-shadow: inset 0 -6px 0 0 var(--md-primary-fg-color),
+        inset 0 -8px 0 0 var(--md-primary-bg-color);
+}
+
+/* Add underline to links */
+.md-content a {
+    text-decoration: underline;
+    color: var(--md-primary-fg-color);
+}
+
+/* Keep underline on hover */
+.md-content a:hover {
+    text-decoration: underline;
+    color: var(--md-primary-fg-color--dark);
+}
+
+/*Code inside of tables are of white background*/
+.md-typeset table code {
+    background-color: var(--md-primary-bg-color);
+}
+
+/*Code inside of tables are colored when hovered*/
+.md-typeset table tr:hover code {
+    background-color: inherit;
+}
+
+/*Default header color*/
+.md-content h1,
+.md-content h2,
+.md-content h3 {
+    color: var(--md-accent-fg-color);
+    font-weight: 500; /* Slight bold */
+    margin: 0 0 1em;
+}
+
+/*Add a border line to all H2*/
+.md-content h2 {
+    padding-top: 1em;
+    border-top: 1px solid #ddd;
+}
+
+/*Custom class for subheaders under h2*/
+.md-h2-subheader {
+    font-size: smaller;
+    color: inherit;
+}
+
+/*Custom class for non header h3*/
+.md-h3-nonanchor {
+    color: var(--md-accent-fg-color);
+    font-weight: 500; /* Slight bold */
+    margin: 0 0 1em;
+    font-size: 1.25em;
+}
+
+.md-h4-nonanchor {
+    color: var(--md-accent-fg-color);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 1em 0;
+}
+
+/*Remove all margins from the <p> element containing .md-h2-subheader*/
+p:has(.md-h2-subheader) {
+    margin: 0;
+}
+
+/*Remove bottom margin from h2 so it's closer to subheader*/
+.md-content h2:has(+ p .md-h2-subheader) {
+    margin-bottom: 0;
+}
+
+/* Override default font size for typeset */
+.md-typeset {
+    font-size: 0.64rem;
+}
+
+.md-typeset h1 {
+    font-size: 1.25rem;
+}
+
+.md-typeset h2 {
+    font-size: 1rem;
+}
+
+.md-nav--lifted .md-nav__item {
+    font-size: 0.7rem;
+}
+
+/* Markdown image resizing */
+.md-content .md-typeset img {
+    max-width: 40rem;
+    width: 100%;
+    height: auto; /* Maintain aspect ratio */
+}
