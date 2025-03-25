@@ -79,11 +79,11 @@ spark_pool:
 
 ### Parameter File Validation
 
-Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, managed by the `Parameter` class. The `Parameter` object is utilized in the following scenarios:
+Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, managed by the `Parameter` class. Validation is utilized in the following scenarios:
 
 **Debuggability:** Users can debug and validate their parameter file to ensure it meets the acceptable structure and input value requirements before running a deployment. Simply run the `debug_parameterization.py` script located in the `devtools` directory.
 
-**Deployment:** An automated validation occurs at the start of a deployment to check the validity of the `parameter.yml` file, if present. This step ensures that the deployment runs smoothly and the parameterized configurations are applied correctly. An invalid parameter file will prevent the deployment run from proceeding.
+**Deployment:** At the start of a deployment, an automated validation checks the validity of the `parameter.yml` file, if it is present. This step ensures that valid parameters are loaded, allowing deployment to run smoothly with correctly applied parameterized configurations. If the parameter file is invalid, the deployment will not proceed.
 
 ## Sample File
 
