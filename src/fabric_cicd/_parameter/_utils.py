@@ -109,7 +109,7 @@ def _check_structure(param_value: any) -> str:
 
 
 def process_input_path(
-    repository_directory: Path, input_path: Union[str, list[str], None], validation: bool = False
+    repository_directory: Path, input_path: Union[str, list[str], None]
 ) -> Union[Path, list[Path], None]:
     """
     Processes the input_path value according to its type.
@@ -117,40 +117,36 @@ def process_input_path(
     Args:
         repository_directory: The directory of the repository.
         input_path: The input path value to process (None value, a string value, or list of string values).
-        validation: A flag to specify if the run context is for validation.
     """
     if not input_path:
         return input_path
 
     if isinstance(input_path, list):
-        return [_convert_value_to_path(repository_directory, path, validation) for path in input_path]
+        return [_convert_value_to_path(repository_directory, path) for path in input_path]
 
-    return _convert_value_to_path(repository_directory, input_path, validation)
+    return _convert_value_to_path(repository_directory, input_path)
 
 
-def _convert_value_to_path(repository_directory: Path, input_path: str, validation: bool = False) -> Path:
+def _convert_value_to_path(repository_directory: Path, input_path: str) -> Path:
     """
     Converts the input_path string value to a Path object
     and resolves a relative path as an absolute path, if present.
     """
-    # Set the logger function based on the validation flag
-    logger_func = logger.warning if validation else logger.debug
-
     if not Path(input_path).is_absolute():
         # Strip leading slashes or backslashes
         normalized_path = Path(input_path.lstrip("/\\"))
         # Set the absolute path
         absolute_path = repository_directory / normalized_path
         if absolute_path.exists():
-            logger_func(f"Relative path '{input_path}' resolved as '{absolute_path}'")
+            logger.debug(f"Relative path '{input_path}' resolved as '{absolute_path}'")
         else:
-            logger_func(f"Relative path '{input_path}' does not exist, provide a valid path")
+            logger.debug(f"Relative path '{input_path}' does not exist, provide a valid path")
 
         return absolute_path
 
     absolute_path = Path(input_path)
     if not absolute_path.exists():
-        logger_func(f"Absolute path '{input_path}' does not exist, provide a valid path")
+        logger.debug(f"Absolute path '{input_path}' does not exist, provide a valid path")
 
     return absolute_path
 
