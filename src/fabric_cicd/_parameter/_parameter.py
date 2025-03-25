@@ -163,6 +163,7 @@ class Parameter:
         if param_name not in self.environment_parameter:
             return False, "parameter not found"
 
+        msg_list = []
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
@@ -187,11 +188,14 @@ class Parameter:
                     return False, msg
                 logger.debug(PARAMETER_MSGS["passed"].format(msg))
 
-        # Validate environment keys in replace_value
-        if self.environment != "N/A":
-            is_valid, msg = self._validate_environment(param_name, parameter_dict["replace_value"])
-            if not is_valid:
-                logger.warning(msg)
+            # Validate environment keys in replace_value
+            if self.environment != "N/A":
+                is_valid, msg = self._validate_environment(param_name, parameter_dict["replace_value"])
+                if not is_valid:
+                    msg_list.append(msg)
+
+        if len(msg_list) > 0:
+            logger.warning(msg_list[0])
 
         return True, PARAMETER_MSGS["valid parameter"].format(param_name)
 
