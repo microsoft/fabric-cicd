@@ -7,6 +7,12 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.11
+
+<span class="md-h2-subheader">Release Date: 2025-03-25</span>
+
+-   ✨ Parameterization refactor ([#113](https://github.com/microsoft/fabric-cicd/issues/113))
+
 ## Version 0.1.10
 
 <span class="md-h2-subheader">Release Date: 2025-03-19</span>
