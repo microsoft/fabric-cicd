@@ -2,7 +2,7 @@
 
 To handle environment-specific values committed to git, use a `parameter.yml` file. This file supports programmatically changing values based on the `environment` field passed into the `FabricWorkspace` object. If the environment value is not found in the `parameter.yml` file, any dependent replacements will be skipped. This file should sit in the root of the `repository_directory` folder specified in the FabricWorkspace object.
 
-**Important Notice:** The `parameter.yml` file structure has been recently updated. Please refer to the documentation below for important changes. There is a grace period from **March 24, 2025** to **April 24, 2025**, to allow users to migrate from the old structure to the new one.
+**Important Notice:** The `parameter.yml` file structure has been recently updated. Please refer to the documentation below for important changes. There is a grace period from **March 24, 2025** to **April 24, 2025** during which the old structure will still be supported, allowing users to migrate to the new structure.
 
 Example of parameter.yml location based on provided repository directory:
 
