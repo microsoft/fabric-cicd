@@ -15,6 +15,7 @@ from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
 import fabric_cicd.constants  # required for overwriting constant
+from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
@@ -109,6 +110,7 @@ class FabricWorkspace:
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
+        self.publish_item_name_exclude_regex = None
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -401,6 +403,13 @@ class FabricWorkspace:
             func_process_file: Custom function to process file contents. Defaults to None.
             **kwargs: Additional keyword arguments.
         """
+        # Skip publishing if the item is excluded by the regex
+        if self.publish_item_name_exclude_regex:
+            regex_pattern = check_regex(self.publish_item_name_exclude_regex)
+            if regex_pattern.match(item_name):
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
         item = self.repository_items[item_type][item_name]
         item_guid = item.guid
         item_files = item.item_files
@@ -470,6 +479,7 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info("Published")
+        return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """

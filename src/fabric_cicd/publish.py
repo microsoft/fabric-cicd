@@ -6,9 +6,10 @@
 import base64
 import json
 import logging
-import re
+from typing import Optional
 
 import fabric_cicd._items as items
+from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
@@ -18,12 +19,14 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
+def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
+        item_name_exclude_regex: Regex pattern to exclude specific items from being published.
+
 
     Examples:
         Basic usage
@@ -36,6 +39,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace) -> None:
         >>> publish_all_items(workspace)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+    if item_name_exclude_regex:
+        logger.warning(
+            "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+
     if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
@@ -91,10 +100,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    try:
-        regex_pattern = re.compile(item_name_exclude_regex)
-    except Exception as e:
-        print(f"An error occurred with the regex provided: {e}")
+    regex_pattern = check_regex(item_name_exclude_regex)
 
     fabric_workspace_obj._refresh_deployed_items()
     _print_header("Unpublishing Orphaned Items")

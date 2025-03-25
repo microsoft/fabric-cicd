@@ -109,3 +109,18 @@ def check_file_type(file_path: Path) -> str:
         if kind.mime.startswith("image/"):
             return "image"
     return "text"
+
+
+def check_regex(regex: str) -> re.Pattern:
+    """
+    Check if a regex pattern is valid and returns the pattern.
+
+    Args:
+        regex: The regex pattern to match.
+    """
+    try:
+        regex_pattern = re.compile(regex)
+    except Exception as e:
+        msg = f"An error occurred with the regex provided: {e}"
+        raise ValueError(msg) from e
+    return regex_pattern
