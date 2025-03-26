@@ -3,6 +3,8 @@
 
 """Utility functions for checking file types and versions."""
 
+from __future__ import annotations
+
 import logging
 import re
 from importlib.metadata import version as lib_version
