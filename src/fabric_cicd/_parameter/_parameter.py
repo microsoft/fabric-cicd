@@ -9,6 +9,7 @@ import os
 import re
 from pathlib import Path
 from typing import ClassVar
+from fabric_cicd._parameter._utils import replace_variables_in_parameter_file
 
 import yaml
 
@@ -91,7 +92,7 @@ class Parameter:
                 # Otherwise, return False with error message
                 logger.error(PARAMETER_MSGS["failed"].format(msg))
                 return False
-            logger.debug(PARAMETER_MSGS["passed"].format(msg))
+            logger.info(PARAMETER_MSGS["passed"].format(msg))
 
         # Return True if all validation steps pass
         logger.info("Parameter file validation passed")
@@ -115,7 +116,9 @@ class Parameter:
                     return False, validation_errors
 
                 self.environment_parameter = yaml.full_load(yaml_content)
-                logger.debug(PARAMETER_MSGS["passed"].format("YAML content is valid"))
+                self.environment_parameter = replace_variables_in_parameter_file(self.environment_parameter, self.environment)
+                
+                logger.info(PARAMETER_MSGS["passed"].format("YAML content is valid"))
                 return True, PARAMETER_MSGS["valid load"]
         except yaml.YAMLError as e:
             return False, PARAMETER_MSGS["invalid load"].format(e)
@@ -163,18 +166,19 @@ class Parameter:
         if param_name not in self.environment_parameter:
             return False, "parameter not found"
 
-        msg_list = []
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
-            logger.debug(f"{param_count} {param_name} parameters found")
+            logger.info(f"{param_count} {param_name} parameters found")
 
         validation_steps = [
             ("keys", lambda param_dict: self._validate_parameter_keys(param_name, list(param_dict.keys()))),
             ("required values", lambda param_dict: self._validate_required_values(param_name, param_dict)),
             (
                 "replace_value",
-                lambda param_dict: self._validate_replace_value(param_name, param_dict["replace_value"]),
+                lambda param_dict: self._validate_replace_value(
+                    param_name, param_dict["replace_value"], multiple_param, param_num
+                ),
             ),
             ("optional values", lambda param_dict: self._validate_optional_values(param_name, param_dict)),
         ]
@@ -187,15 +191,6 @@ class Parameter:
                 if not is_valid:
                     return False, msg
                 logger.debug(PARAMETER_MSGS["passed"].format(msg))
-
-            # Validate environment keys in replace_value
-            if self.environment != "N/A":
-                is_valid, msg = self._validate_environment(param_name, parameter_dict["replace_value"])
-                if not is_valid:
-                    msg_list.append(msg)
-
-        if len(msg_list) > 0:
-            logger.warning(msg_list[0])
 
         return True, PARAMETER_MSGS["valid parameter"].format(param_name)
 
@@ -226,8 +221,17 @@ class Parameter:
 
         return True, PARAMETER_MSGS["valid required values"].format(param_name)
 
-    def _validate_replace_value(self, param_name: str, replace_value: dict) -> tuple[bool, str]:
+    def _validate_replace_value(
+        self, param_name: str, replace_value: dict, multiple_param: bool, param_num: int
+    ) -> tuple[bool, str]:
         """Validate the replace_value dictionary."""
+        # Validate environment keys in replace_value
+        if self.environment != "N/A":
+            new_param_name = param_name + " " + str(param_num) if multiple_param else param_name
+            is_valid, msg = self._validate_environment(new_param_name, replace_value)
+            if not is_valid:
+                logger.warning(msg)
+
         # Validate replace_value dictionary values
         if param_name == "find_replace":
             is_valid, msg = self._validate_find_replace_replace_value(replace_value)
@@ -377,7 +381,7 @@ class Parameter:
     def _validate_file_path(self, input_path: str) -> tuple[bool, str]:
         """Validate the file path exists."""
         # Convert input path to Path object
-        input_path_new = process_input_path(self.repository_directory, input_path)
+        input_path_new = process_input_path(self.repository_directory, input_path, validation=True)
 
         # Check if the file path exists
         if not input_path_new.exists():

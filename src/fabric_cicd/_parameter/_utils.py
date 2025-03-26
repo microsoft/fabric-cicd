@@ -8,12 +8,46 @@ parameter dictionary structure, processing parameter values, and handling parame
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Union
 
 from azure.core.credentials import TokenCredential
 
 logger = logging.getLogger(__name__)
+
+
+def replace_variables_in_parameter_file(parameter_obj: dict, environment: str = "N/A") -> dict:
+    """
+    A function to replace tokens in the parameter.yml file with environment variables.
+
+    Args:
+    parameter_obj: The parameters object
+    environment: The environment being deployed
+    """
+    # Import feature_flag here to avoid circular import
+    from fabric_cicd import feature_flag
+
+    if "enable_environment_variable_replacement" in feature_flag:
+        # filter os.environ dict to only allow variables that begin with $ENV:
+        item_filter = "$ENV:"
+        var_dict = {k: v for k, v in os.environ.items() if item_filter in k}
+        # block of code to support both variants of the parameters.yml file
+        if type(parameter_obj["find_replace"]) == dict:
+            for _k, v in parameter_obj["find_replace"].items():
+                try:
+                    v.update({environment: var_dict[v.get(environment)]})
+                except Exception as e:
+                    logger.warning(f"{environment} variable not found.  Raw exception: {e}")
+        else:
+            for find_replace in parameter_obj["find_replace"]:
+                for _k, v in find_replace.items():
+                    try:
+                        v.update({environment: var_dict[v.get(environment)]})
+                    except Exception as e:
+                        logger.warning(f"{environment} variable not found.  Raw exception: {e}")
+        return parameter_obj
+    return parameter_obj
 
 
 def validate_parameter_file(
@@ -109,7 +143,7 @@ def _check_structure(param_value: any) -> str:
 
 
 def process_input_path(
-    repository_directory: Path, input_path: Union[str, list[str], None]
+    repository_directory: Path, input_path: Union[str, list[str], None], validation: bool = False
 ) -> Union[Path, list[Path], None]:
     """
     Processes the input_path value according to its type.
@@ -117,36 +151,40 @@ def process_input_path(
     Args:
         repository_directory: The directory of the repository.
         input_path: The input path value to process (None value, a string value, or list of string values).
+        validation: A flag to specify if the run context is for validation.
     """
     if not input_path:
         return input_path
 
     if isinstance(input_path, list):
-        return [_convert_value_to_path(repository_directory, path) for path in input_path]
+        return [_convert_value_to_path(repository_directory, path, validation) for path in input_path]
 
-    return _convert_value_to_path(repository_directory, input_path)
+    return _convert_value_to_path(repository_directory, input_path, validation)
 
 
-def _convert_value_to_path(repository_directory: Path, input_path: str) -> Path:
+def _convert_value_to_path(repository_directory: Path, input_path: str, validation: bool = False) -> Path:
     """
     Converts the input_path string value to a Path object
     and resolves a relative path as an absolute path, if present.
     """
+    # Set the logger function based on the validation flag
+    logger_func = logger.warning if validation else logger.debug
+
     if not Path(input_path).is_absolute():
         # Strip leading slashes or backslashes
         normalized_path = Path(input_path.lstrip("/\\"))
         # Set the absolute path
         absolute_path = repository_directory / normalized_path
         if absolute_path.exists():
-            logger.debug(f"Relative path '{input_path}' resolved as '{absolute_path}'")
+            logger_func(f"Relative path '{input_path}' resolved as '{absolute_path}'")
         else:
-            logger.debug(f"Relative path '{input_path}' does not exist, provide a valid path")
+            logger_func(f"Relative path '{input_path}' does not exist, provide a valid path")
 
         return absolute_path
 
     absolute_path = Path(input_path)
     if not absolute_path.exists():
-        logger.debug(f"Absolute path '{input_path}' does not exist, provide a valid path")
+        logger_func(f"Absolute path '{input_path}' does not exist, provide a valid path")
 
     return absolute_path
 

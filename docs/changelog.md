@@ -2,20 +2,10 @@
 
 The following contains all major, minor, and patch version release notes.
 
--   💥 Breaking change!
 -   ✨ New Functionality
 -   🔧 Bug Fix
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
-
-## Version 0.1.11
-
-<span class="md-h2-subheader">Release Date: 2025-03-25</span>
-
--   💥 Parameterization refactor introducing a new parameter file structure and parameter file validation functionality ([#113](https://github.com/microsoft/fabric-cicd/issues/113))
--   📝 Update to [parameterization](https://microsoft.github.io/fabric-cicd/latest/how_to/parameterization/) docs
--   ✨ Support regex for publish exclusion ([#121](https://github.com/microsoft/fabric-cicd/issues/121))
--   ✨ Override max retries via constants ([#146](https://github.com/microsoft/fabric-cicd/issues/146))
 
 ## Version 0.1.10
 
