@@ -299,11 +299,16 @@ class FabricWorkspace:
         # Replace all instances of default feature branch workspace ID with target workspace ID
         target_workspace_id = self.workspace_id
 
-        workspace_id_match = re.search(WORKSPACE_ID_REFERENCE_REGEX, raw_file)
-        if workspace_id_match:
-            workspace_id = workspace_id_match.group(2)
-            if workspace_id == DEFAULT_WORKSPACE_ID:
-                raw_file = raw_file.replace(DEFAULT_WORKSPACE_ID, target_workspace_id)
+        # Use re.sub to replace all matches
+        raw_file = re.sub(
+            WORKSPACE_ID_REFERENCE_REGEX,
+            lambda match: (
+                match.group(0).replace(DEFAULT_WORKSPACE_ID, target_workspace_id)
+                if match.group(2) == DEFAULT_WORKSPACE_ID
+                else match.group(0)
+            ),
+            raw_file,
+        )
 
         # For DataPipeline item, additional replacements may be required
         if item_type == "DataPipeline":
