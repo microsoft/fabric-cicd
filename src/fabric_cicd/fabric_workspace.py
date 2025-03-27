@@ -111,7 +111,8 @@ class FabricWorkspace:
                 >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
             )
             self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{workspace_id}"
-        self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
+        else:
+            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
