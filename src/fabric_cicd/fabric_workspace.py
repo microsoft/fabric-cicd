@@ -451,7 +451,7 @@ class FabricWorkspace:
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
 
-        elif is_deployed and not constants.SHELL_ONLY_PUBLISH:
+        elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
             self.endpoint.invoke(
@@ -460,7 +460,7 @@ class FabricWorkspace:
                 body=definition_body,
                 max_retries=max_retries,
             )
-        elif is_deployed and constants.SHELL_ONLY_PUBLISH:
+        elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
             metadata_body.pop("type", None)
 
