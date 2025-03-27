@@ -55,10 +55,10 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
         input_value: The input value to validate.
         upn_auth: Whether UPN authentication is used.
     """
-    constants.ACCEPTED_ITEM_TYPES_UPN = constants.ACCEPTED_ITEM_TYPES_UPN
-    constants.ACCEPTED_ITEM_TYPES_NON_UPN = constants.ACCEPTED_ITEM_TYPES_NON_UPN
+    accepted_item_types_upn = constants.ACCEPTED_ITEM_TYPES_UPN
+    accepted_item_types_non_upn = constants.ACCEPTED_ITEM_TYPES_NON_UPN
 
-    accepted_item_types = constants.ACCEPTED_ITEM_TYPES_UPN if upn_auth else constants.ACCEPTED_ITEM_TYPES_NON_UPN
+    accepted_item_types = accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
 
     validate_data_type("list[string]", "item_type_in_scope", input_value)
 
@@ -66,9 +66,9 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
         if item_type not in accepted_item_types:
             msg = (
                 f"Invalid or unsupported item type: '{item_type}'. "
-                f"For User Identity Authentication, must be one of {', '.join(constants.ACCEPTED_ITEM_TYPES_UPN)}. "
+                f"For User Identity Authentication, must be one of {', '.join(accepted_item_types_upn)}. "
                 f"For Service Principal or Managed Identity Authentication, "
-                f"must be one of {', '.join(constants.ACCEPTED_ITEM_TYPES_NON_UPN)}."
+                f"must be one of {', '.join(accepted_item_types_non_upn)}."
             )
             raise InputError(msg, logger)
 
