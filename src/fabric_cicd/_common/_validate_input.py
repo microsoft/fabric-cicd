@@ -13,8 +13,8 @@ from pathlib import Path
 
 from azure.core.credentials import TokenCredential
 
+import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InputError
-from fabric_cicd.constants import ACCEPTED_ITEM_TYPES_NON_UPN, ACCEPTED_ITEM_TYPES_UPN, VALID_GUID_REGEX
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -55,10 +55,10 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
         input_value: The input value to validate.
         upn_auth: Whether UPN authentication is used.
     """
-    accepted_item_types_upn = ACCEPTED_ITEM_TYPES_UPN
-    accepted_item_types_non_upn = ACCEPTED_ITEM_TYPES_NON_UPN
+    constants.ACCEPTED_ITEM_TYPES_UPN = constants.ACCEPTED_ITEM_TYPES_UPN
+    constants.ACCEPTED_ITEM_TYPES_NON_UPN = constants.ACCEPTED_ITEM_TYPES_NON_UPN
 
-    accepted_item_types = accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
+    accepted_item_types = constants.ACCEPTED_ITEM_TYPES_UPN if upn_auth else constants.ACCEPTED_ITEM_TYPES_NON_UPN
 
     validate_data_type("list[string]", "item_type_in_scope", input_value)
 
@@ -66,9 +66,9 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
         if item_type not in accepted_item_types:
             msg = (
                 f"Invalid or unsupported item type: '{item_type}'. "
-                f"For User Identity Authentication, must be one of {', '.join(accepted_item_types_upn)}. "
+                f"For User Identity Authentication, must be one of {', '.join(constants.ACCEPTED_ITEM_TYPES_UPN)}. "
                 f"For Service Principal or Managed Identity Authentication, "
-                f"must be one of {', '.join(accepted_item_types_non_upn)}."
+                f"must be one of {', '.join(constants.ACCEPTED_ITEM_TYPES_NON_UPN)}."
             )
             raise InputError(msg, logger)
 
@@ -107,7 +107,7 @@ def validate_workspace_id(input_value: str) -> str:
     """
     validate_data_type("string", "workspace_id", input_value)
 
-    if not re.match(VALID_GUID_REGEX, input_value):
+    if not re.match(constants.VALID_GUID_REGEX, input_value):
         msg = "The provided workspace_id is not a valid guid."
         raise InputError(msg, logger)
 

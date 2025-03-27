@@ -14,20 +14,11 @@ import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-import fabric_cicd.constants  # required for overwriting constant
+from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd.constants import (
-    DEFAULT_API_ROOT_URL,
-    DEFAULT_WORKSPACE_ID,
-    MAX_RETRY_OVERRIDE,
-    PARAMETER_FILE_NAME,
-    SHELL_ONLY_PUBLISH,
-    VALID_GUID_REGEX,
-    WORKSPACE_ID_REFERENCE_REGEX,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +110,8 @@ class FabricWorkspace:
                 >>> import fabric_cicd.constants
                 >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
             )
-            fabric_cicd.constants.DEFAULT_API_ROOT_URL = kwargs["base_api_url"]
-        self.base_api_url = f"{DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
+            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{workspace_id}"
+        self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
@@ -137,7 +128,7 @@ class FabricWorkspace:
             repository_directory=self.repository_directory,
             item_type_in_scope=self.item_type_in_scope,
             environment=self.environment,
-            parameter_file_name=PARAMETER_FILE_NAME,
+            parameter_file_name=constants.PARAMETER_FILE_NAME,
         )
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
@@ -301,10 +292,10 @@ class FabricWorkspace:
 
         # Use re.sub to replace all matches
         raw_file = re.sub(
-            WORKSPACE_ID_REFERENCE_REGEX,
+            constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
-                match.group(0).replace(DEFAULT_WORKSPACE_ID, target_workspace_id)
-                if match.group(2) == DEFAULT_WORKSPACE_ID
+                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, target_workspace_id)
+                if match.group(2) == constants.DEFAULT_WORKSPACE_ID
                 else match.group(0)
             ),
             raw_file,
@@ -327,7 +318,7 @@ class FabricWorkspace:
         """
         # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(VALID_GUID_REGEX)
+        guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
         activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
@@ -419,17 +410,17 @@ class FabricWorkspace:
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = MAX_RETRY_OVERRIDE.get(item_type, 5)
+        max_retries = constants.MAX_RETRY_OVERRIDE.get(item_type, 5)
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in SHELL_ONLY_PUBLISH
+        constants.SHELL_ONLY_PUBLISH = item_type in constants.SHELL_ONLY_PUBLISH
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
             combined_body = {**metadata_body, **creation_payload}
-        elif shell_only_publish:
+        elif constants.SHELL_ONLY_PUBLISH:
             combined_body = metadata_body
         else:
             item_payload = []
@@ -459,7 +450,7 @@ class FabricWorkspace:
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
 
-        elif is_deployed and not shell_only_publish:
+        elif is_deployed and not constants.SHELL_ONLY_PUBLISH:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
             self.endpoint.invoke(
@@ -468,7 +459,7 @@ class FabricWorkspace:
                 body=definition_body,
                 max_retries=max_retries,
             )
-        elif is_deployed and shell_only_publish:
+        elif is_deployed and constants.SHELL_ONLY_PUBLISH:
             # Remove the 'type' key as it's not supported in the update-item API
             metadata_body.pop("type", None)
 
