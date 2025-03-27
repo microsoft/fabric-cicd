@@ -11,13 +11,23 @@ from pathlib import Path
 from typing import Optional
 
 import dpath
-import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._exceptions import ParsingError
+import fabric_cicd.constants  # required for overwriting constant
+from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
+from fabric_cicd.constants import (
+    DEFAULT_API_ROOT_URL,
+    DEFAULT_WORKSPACE_ID,
+    MAX_RETRY_OVERRIDE,
+    PARAMETER_FILE_NAME,
+    SHELL_ONLY_PUBLISH,
+    VALID_GUID_REGEX,
+    WORKSPACE_ID_REFERENCE_REGEX,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +35,14 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
-    ACCEPTED_ITEM_TYPES_UPN = (
-        "DataPipeline",
-        "Environment",
-        "Notebook",
-        "Report",
-        "SemanticModel",
-        "Lakehouse",
-        "MirroredDatabase",
-    )
-    ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
-
     def __init__(
         self,
         workspace_id: str,
         repository_directory: str,
         item_type_in_scope: list[str],
-        base_api_url: str = "https://api.fabric.microsoft.com/",
         environment: str = "N/A",
         token_credential: TokenCredential = None,
+        **kwargs,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
@@ -52,9 +51,9 @@ class FabricWorkspace:
             workspace_id: The ID of the workspace to interact with.
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace.
-            base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
+            kwargs: Additional keyword arguments.
 
         Examples:
             Basic usage
@@ -71,7 +70,6 @@ class FabricWorkspace:
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-            ...     base_api_url="https://orgapi.fabric.microsoft.com",
             ...     environment="your-target-environment"
             ... )
 
@@ -92,7 +90,6 @@ class FabricWorkspace:
             ... )
         """
         from fabric_cicd._common._validate_input import (
-            validate_base_api_url,
             validate_environment,
             validate_item_type_in_scope,
             validate_repository_directory,
@@ -112,8 +109,18 @@ class FabricWorkspace:
         self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
-        self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
         self.environment = validate_environment(environment)
+        self.publish_item_name_exclude_regex = None
+
+        # temporarily support base_api_url until deprecated
+        if "base_api_url" in kwargs:
+            logger.warning(
+                """Setting base_api_url will be deprecated in a future version, please use the below moving forward:
+                >>> import fabric_cicd.constants
+                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
+            )
+            fabric_cicd.constants.DEFAULT_API_ROOT_URL = kwargs["base_api_url"]
+        self.base_api_url = f"{DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
@@ -122,13 +129,22 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
-        parameter_file_path = self.repository_directory / "parameter.yml"
-        self.environment_parameter = {}
+        from fabric_cicd._parameter._parameter import Parameter
 
-        if parameter_file_path.is_file():
-            logger.info(f"Found parameter file '{parameter_file_path}'")
-            with parameter_file_path.open(encoding="utf-8") as yaml_file:
-                self.environment_parameter = yaml.safe_load(yaml_file)
+        # Initialize the parameter dict and Parameter object
+        self.environment_parameter = {}
+        parameter_obj = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+            parameter_file_name=PARAMETER_FILE_NAME,
+        )
+        is_valid = parameter_obj._validate_parameter_file()
+        if is_valid:
+            self.environment_parameter = parameter_obj.environment_parameter
+        else:
+            msg = "Deployment terminated due to an invalid parameter file"
+            raise ParameterFileError(msg, logger)
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -165,7 +181,7 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                item_path = Path(directory)
+                item_path = directory
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -220,19 +236,54 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters(self, raw_file: str) -> str:
+    def _replace_parameters(self, file_obj: object, item_obj: object) -> str:
         """
-        Replaces values found in parameter file with the chosen environment value.
+        Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
         Args:
-            raw_file: The raw file content where parameter values need to be replaced.
+            file_obj: The File object instance that provides the file content and file path.
+            item_obj: The Item object instance that provides the item type and item name.
         """
+        from fabric_cicd._parameter._utils import (
+            check_parameter_structure,
+            check_replacement,
+            process_input_path,
+        )
+
+        # Parse the file_obj and item_obj
+        raw_file = file_obj.contents
+        item_type = item_obj.type
+        item_name = item_obj.name
+        file_path = file_obj.file_path
+
         if "find_replace" in self.environment_parameter:
-            for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                if key in raw_file and self.environment in parameter_dict:
-                    # replace any found references with specified environment value
-                    raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                    logger.debug(f"Replaced '{key}' with '{parameter_dict[self.environment]}'")
+            structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
+            msg = "Replacing {} with {} in {}.{}"
+
+            # Handle new parameter file structure
+            if structure_type == "new":
+                for parameter_dict in self.environment_parameter["find_replace"]:
+                    find_value = parameter_dict["find_value"]
+                    replace_value = parameter_dict["replace_value"]
+                    input_type = parameter_dict.get("item_type")
+                    input_name = parameter_dict.get("item_name")
+                    input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+
+                    # Perform replacement if a condition is met and replace any found references with specified environment value
+                    if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                        input_type, input_name, input_path, item_type, item_name, file_path
+                    ):
+                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
+                        logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
+
+            # Handle original parameter file structure
+            # TODO: Deprecate old structure handling by April 24, 2025
+            if structure_type == "old":
+                for key, parameter_dict in self.environment_parameter["find_replace"].items():
+                    if key in raw_file and self.environment in parameter_dict:
+                        # replace any found references with specified environment value
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                        logger.debug(msg.format(key, parameter_dict, item_name, item_type))
 
         return raw_file
 
@@ -247,11 +298,12 @@ class FabricWorkspace:
         """
         # Replace all instances of default feature branch workspace ID with target workspace ID
         target_workspace_id = self.workspace_id
-        default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-        target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
 
-        if default_workspace_string in raw_file:
-            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
+        workspace_id_match = re.search(WORKSPACE_ID_REFERENCE_REGEX, raw_file)
+        if workspace_id_match:
+            workspace_id = workspace_id_match.group(2)
+            if workspace_id == DEFAULT_WORKSPACE_ID:
+                raw_file = raw_file.replace(DEFAULT_WORKSPACE_ID, target_workspace_id)
 
         # For DataPipeline item, additional replacements may be required
         if item_type == "DataPipeline":
@@ -270,7 +322,7 @@ class FabricWorkspace:
         """
         # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+        guid_pattern = re.compile(VALID_GUID_REGEX)
 
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
         activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
@@ -351,16 +403,23 @@ class FabricWorkspace:
             func_process_file: Custom function to process file contents. Defaults to None.
             **kwargs: Additional keyword arguments.
         """
+        # Skip publishing if the item is excluded by the regex
+        if self.publish_item_name_exclude_regex:
+            regex_pattern = check_regex(self.publish_item_name_exclude_regex)
+            if regex_pattern.match(item_name):
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
         item = self.repository_items[item_type][item_name]
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = 10 if item_type == "SemanticModel" else 5
+        max_retries = MAX_RETRY_OVERRIDE.get(item_type, 5)
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in ["Lakehouse"]
+        shell_only_publish = item_type in SHELL_ONLY_PUBLISH
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
@@ -375,7 +434,7 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            file.contents = self._replace_parameters(file.contents)
+                            file.contents = self._replace_parameters(file, item)
 
                     item_payload.append(file.base64_payload)
 
@@ -420,6 +479,7 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info("Published")
+        return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """

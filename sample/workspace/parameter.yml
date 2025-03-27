@@ -1,15 +1,53 @@
 find_replace:
-    # SQL Connection Guid
-    "db52be81-c2b2-4261-84fa-840c67f4bbd0":
+    # Lakehouse Connection Guid
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
         PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
         PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional fields:
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path:
+       - "/Hello World.Notebook/notebook-content.py"
+       - "\\subfolder\\Hello World Subfolder.Notebook/notebook-content.py"
 
 spark_pool:
     # CapacityPool_Large
-    "72c68dbc-0775-4d59-909d-a47896f4573b":
-        type: "Capacity"
-        name: "CapacityPool_Large"
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+        PPE: 
+           type: "Capacity"
+           name: "CapacityPool_Large_PPE"
+        PROD: 
+           type: "Capacity"
+           name: "CapacityPool_Large_PROD"
+      # Optional field:
+      item_name: "World"
     # CapacityPool_Medium
-    "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d":
-        type: "Workspace"
-        name: "WorkspacePool_Medium"
+    - instance_pool_id: "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d"
+      replace_value:
+        PPE:
+           type: "Workspace"
+           name: "WorkspacePool_Medium"
+        PROD:
+           type: "Workspace"
+           name: "WorkspacePool_Medium"
+      # Optional field:
+      item_name:
+
+# Legacy structure
+#find_replace:
+    # SQL Connection Guid
+    #"db52be81-c2b2-4261-84fa-840c67f4bbd0":
+        #PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+        #PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+
+#spark_pool:
+    # CapacityPool_Large
+    #"72c68dbc-0775-4d59-909d-a47896f4573b":
+        #type: "Capacity"
+        #name: "CapacityPool_Large"
+    # CapacityPool_Medium
+    #"e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d":
+        #type: "Workspace"
+        #name: "WorkspacePool_Medium"
