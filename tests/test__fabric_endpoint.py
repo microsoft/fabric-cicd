@@ -171,7 +171,7 @@ def test_refresh_token(setup_mocks, auth_type, expected_msg, expected_upn_auth):
 @pytest.mark.parametrize(
     ("raise_exception", "expected_msg"),
     [
-        (ClientAuthenticationError("Auth failed"), "Failed to aquire AAD token. Auth failed"),
+        (ClientAuthenticationError("Auth failed"), "Failed to acquire AAD token. Auth failed"),
         (Exception("Unexpected error"), "An unexpected error occurred when generating the AAD token. Unexpected error"),
     ],
     ids=["auth_error", "unexpected_exception"],

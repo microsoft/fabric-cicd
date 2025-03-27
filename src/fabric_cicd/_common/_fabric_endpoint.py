@@ -111,7 +111,7 @@ class FabricEndpoint:
             try:
                 self.aad_token = self.token_credential.get_token(resource_url).token
             except ClientAuthenticationError as e:
-                msg = f"Failed to aquire AAD token. {e}"
+                msg = f"Failed to acquire AAD token. {e}"
                 raise TokenError(msg, logger) from e
             except Exception as e:
                 msg = f"An unexpected error occurred when generating the AAD token. {e}"
