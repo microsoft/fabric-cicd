@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Reflex",
+    "displayName": "Activator Hello World"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "334306ab-51a1-a5e5-4f99-d4dc999359d3"
+  }
+}

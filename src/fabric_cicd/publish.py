@@ -72,7 +72,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "Eventhouse" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
-    if "Activator" in fabric_workspace_obj.item_type_in_scope:
+    if "Reflex" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing Activators")
         items.publish_activators(fabric_workspace_obj)
     if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
@@ -121,7 +121,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     unpublish_order = []
     for x in [
         "Eventstream",
-        "Activator",
+        "Reflex",
         "Eventhouse",
         "KQLDatabase",
         "DataPipeline",

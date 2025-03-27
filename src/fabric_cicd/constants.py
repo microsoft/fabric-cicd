@@ -17,6 +17,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "SemanticModel",
     "Lakehouse",
     "MirroredDatabase",
+    "Reflex",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
