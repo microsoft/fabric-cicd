@@ -8,6 +8,15 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.12
+
+<span class="md-h2-subheader">Release Date: 2025-03-27</span>
+
+-   🔧 Fix constant overwrite failures ([#190](https://github.com/microsoft/fabric-cicd/issues/190))
+-   🔧 Fix bug where all workspace ids were not being replaced ([#186](https://github.com/microsoft/fabric-cicd/issues/186))
+-   🔧 Fix type hints for older versions of python ([#156](https://github.com/microsoft/fabric-cicd/issues/156))
+-   🔧 Fix accepted item types constant in pre-build
+
 ## Version 0.1.11
 
 <span class="md-h2-subheader">Release Date: 2025-03-25</span>
