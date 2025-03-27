@@ -14,7 +14,7 @@ The following contains all major, minor, and patch version release notes.
 
 -   🔧 Fix constant overwrite failures ([#190](https://github.com/microsoft/fabric-cicd/issues/190))
 -   🔧 Fix bug where all workspace ids were not being replaced ([#186](https://github.com/microsoft/fabric-cicd/issues/186))
--   🔧 Fix type hints for older versions of python ([#156](https://github.com/microsoft/fabric-cicd/issues/156))
+-   🔧 Fix type hints for older versions of Python ([#156](https://github.com/microsoft/fabric-cicd/issues/156))
 -   🔧 Fix accepted item types constant in pre-build
 
 ## Version 0.1.11
