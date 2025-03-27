@@ -20,8 +20,9 @@
 
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
--   **Shortcuts** are not deployed with Lakehouses.
--   **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`
+-   **Shortcuts** are deployed with Lakehouses.
+-   **Schemas are not deployed** unless the schema has a shortcut present.
+-   **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`.
 
 ## Mirrored Database
 
