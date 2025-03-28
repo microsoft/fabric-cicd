@@ -182,7 +182,7 @@ def _handle_response(
         url = response.headers.get("Location")
         method = "GET"
         body = "{}"
-        response_json = response.json()
+        response_json = response.json() if response.content else None
 
         if long_running:
             status = response_json.get("status")
@@ -204,8 +204,8 @@ def _handle_response(
             else:
                 handle_retry(
                     attempt=iteration_count - 1,
-                    base_delay=0.5,
-                    response_retry_after=retry_after,
+                    base_delay=kwargs.get("base_delay", 0.5),
+                    response_retry_after=kwargs.get("retry_after", retry_after),
                     max_retries=kwargs.get("max_retries", 5),
                     prepend_message="Operation in progress.",
                 )

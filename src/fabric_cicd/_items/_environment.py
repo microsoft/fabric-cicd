@@ -10,7 +10,7 @@ from pathlib import Path
 import dpath
 import yaml
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._parameter._utils import check_parameter_structure
 
@@ -35,7 +35,41 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
             item_type=item_type,
             skip_publish_logging=True,
         )
-        _publish_environment_metadata(fabric_workspace_obj, item_name=item_name)
+
+        if "disable_legacy_environments" in constants.FEATURE_FLAG:
+            item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
+            _publish_environment(fabric_workspace_obj, item_guid=item_guid)
+        else:  # TODO: remove this when legacy environments are deprecated
+            logger.warning(
+                """The legacy Microsoft Fabric environments API is being deprecated, the rollout is incremental across regions and should be completed April 12th 2025. \r
+                Use the temporary feature flag below to force a switch to the new API during the rollout period. \r
+                You will be automatically opted into the new API after the deadline: ref-> https://learn.microsoft.com/en-us/fabric/data-engineering/environment-public-api \n
+                >>> from fabric_cicd import append_feature_flag
+                >>> append_feature_flag("disable_legacy_environments")\n"""
+            )
+            _publish_environment_metadata(fabric_workspace_obj, item_name=item_name)
+
+
+def _publish_environment(fabric_workspace_obj: FabricWorkspace, item_guid: str) -> None:
+    """
+    Publishes compute settings and libraries for a given environment item.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_guid: Guid of the environment item whose compute settings are to be published.
+    """
+    logger.info("Publishing Libraries & Spark Settings")
+    # Publish updated settings
+    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
+    fabric_workspace_obj.endpoint.invoke(
+        method="POST",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish",
+        base_delay=5,
+        retry_after=120,
+        max_retries=20,
+    )
+
+    logger.info("Published")
 
 
 def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
