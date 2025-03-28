@@ -416,7 +416,10 @@ class FabricWorkspace:
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
+        if "disable_legacy_environments" in constants.FEATURE_FLAG:
+            shell_only_publish = item_type in ["Lakehouse"]
+        else:  # TODO: remove this when legacy environments are deprecated
+            shell_only_publish = item_type in ["Environment", "Lakehouse"]
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
