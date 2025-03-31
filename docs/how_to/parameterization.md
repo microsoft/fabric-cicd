@@ -69,7 +69,7 @@ spark_pool:
 ### Optional Fields
 
 -   Parameterization functionality is unaffected when optional fields are omitted or left empty.
--   Optional field values that _are_ provided must match in order for the replacement to occur. If at least one filter value does not match, the replacement will be skipped in all files.
+-   Optional field values that _are_ provided must match the corresponding properties in the repository file in order for the replacement to occur in the given file. If at least one filter value does not match, the replacement will be skipped for that file.
 -   If none of the optional fields or values are provided, the value found in _any_ repository file is subject to replacement.
 -   Input values are **case sensitive**.
 -   Input values must be **string** or **array** (enables one or many values to filter on).
