@@ -16,8 +16,8 @@ from azure.core.exceptions import (
     ClientAuthenticationError,
 )
 
+import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
-from fabric_cicd.constants import FEATURE_FLAG
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ class FabricEndpoint:
 
 
 def _log_executing_identity(msg: str) -> None:
-    if "disable_print_identity" not in FEATURE_FLAG:
+    if "disable_print_identity" not in constants.FEATURE_FLAG:
         logger.info(msg)
 
 

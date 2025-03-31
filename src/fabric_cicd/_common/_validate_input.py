@@ -13,8 +13,8 @@ from pathlib import Path
 
 from azure.core.credentials import TokenCredential
 
+import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InputError
-from fabric_cicd.constants import ACCEPTED_ITEM_TYPES_NON_UPN, ACCEPTED_ITEM_TYPES_UPN, VALID_GUID_REGEX
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -55,8 +55,8 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
         input_value: The input value to validate.
         upn_auth: Whether UPN authentication is used.
     """
-    accepted_item_types_upn = ACCEPTED_ITEM_TYPES_UPN
-    accepted_item_types_non_upn = ACCEPTED_ITEM_TYPES_NON_UPN
+    accepted_item_types_upn = constants.ACCEPTED_ITEM_TYPES_UPN
+    accepted_item_types_non_upn = constants.ACCEPTED_ITEM_TYPES_NON_UPN
 
     accepted_item_types = accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
 
@@ -107,7 +107,7 @@ def validate_workspace_id(input_value: str) -> str:
     """
     validate_data_type("string", "workspace_id", input_value)
 
-    if not re.match(VALID_GUID_REGEX, input_value):
+    if not re.match(constants.VALID_GUID_REGEX, input_value):
         msg = "The provided workspace_id is not a valid guid."
         raise InputError(msg, logger)
 

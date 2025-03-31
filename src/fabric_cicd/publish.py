@@ -9,11 +9,11 @@ import logging
 from typing import Optional
 
 import fabric_cicd._items as items
+from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
-from fabric_cicd.constants import FEATURE_FLAG
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Lakehouse",
     ]:
         if x in fabric_workspace_obj.item_type_in_scope and (
-            x != "Lakehouse" or "enable_lakehouse_unpublish" in FEATURE_FLAG
+            x != "Lakehouse" or "enable_lakehouse_unpublish" in constants.FEATURE_FLAG
         ):
             unpublish_order.append(x)
 

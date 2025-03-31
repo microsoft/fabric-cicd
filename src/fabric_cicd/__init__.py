@@ -6,7 +6,7 @@
 import logging
 import sys
 
-import fabric_cicd.constants  # required for overwriting constant
+import fabric_cicd.constants as constants
 from fabric_cicd._common._check_utils import check_version
 from fabric_cicd._common._logging import configure_logger, exception_handler
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -27,7 +27,7 @@ def append_feature_flag(feature: str) -> None:
         >>> from fabric_cicd import append_feature_flag
         >>> append_feature_flag("enable_lakehouse_unpublish")
     """
-    fabric_cicd.constants.FEATURE_FLAG.add(feature)
+    constants.FEATURE_FLAG.add(feature)
 
 
 def change_log_level(level: str = "DEBUG") -> None:

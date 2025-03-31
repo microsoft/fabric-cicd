@@ -11,11 +11,11 @@ from pathlib import Path
 
 import dpath
 
+import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
-from fabric_cicd.constants import VALID_GUID_REGEX
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +144,7 @@ def _find_referenced_datapipelines(
     """
     item_type = "DataPipeline"
     reference_list = []
-    guid_pattern = re.compile(VALID_GUID_REGEX)
+    guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
     # Use the dpath library to search through the dictionary for all values that match the GUID pattern
     for _, value in dpath.search(item_content_dict, "**", yielded=True):

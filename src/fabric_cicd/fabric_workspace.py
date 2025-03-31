@@ -14,20 +14,11 @@ import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-import fabric_cicd.constants  # required for overwriting constant
+from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd.constants import (
-    DEFAULT_API_ROOT_URL,
-    DEFAULT_WORKSPACE_ID,
-    MAX_RETRY_OVERRIDE,
-    PARAMETER_FILE_NAME,
-    SHELL_ONLY_PUBLISH,
-    VALID_GUID_REGEX,
-    WORKSPACE_ID_REFERENCE_REGEX,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +110,9 @@ class FabricWorkspace:
                 >>> import fabric_cicd.constants
                 >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
             )
-            fabric_cicd.constants.DEFAULT_API_ROOT_URL = kwargs["base_api_url"]
-        self.base_api_url = f"{DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
+            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{workspace_id}"
+        else:
+            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
@@ -137,7 +129,7 @@ class FabricWorkspace:
             repository_directory=self.repository_directory,
             item_type_in_scope=self.item_type_in_scope,
             environment=self.environment,
-            parameter_file_name=PARAMETER_FILE_NAME,
+            parameter_file_name=constants.PARAMETER_FILE_NAME,
         )
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
@@ -299,11 +291,16 @@ class FabricWorkspace:
         # Replace all instances of default feature branch workspace ID with target workspace ID
         target_workspace_id = self.workspace_id
 
-        workspace_id_match = re.search(WORKSPACE_ID_REFERENCE_REGEX, raw_file)
-        if workspace_id_match:
-            workspace_id = workspace_id_match.group(2)
-            if workspace_id == DEFAULT_WORKSPACE_ID:
-                raw_file = raw_file.replace(DEFAULT_WORKSPACE_ID, target_workspace_id)
+        # Use re.sub to replace all matches
+        raw_file = re.sub(
+            constants.WORKSPACE_ID_REFERENCE_REGEX,
+            lambda match: (
+                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, target_workspace_id)
+                if match.group(2) == constants.DEFAULT_WORKSPACE_ID
+                else match.group(0)
+            ),
+            raw_file,
+        )
 
         # For DataPipeline item, additional replacements may be required
         if item_type == "DataPipeline":
@@ -322,7 +319,7 @@ class FabricWorkspace:
         """
         # Create a dictionary from the raw file
         item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(VALID_GUID_REGEX)
+        guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
         # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
         activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
@@ -414,12 +411,12 @@ class FabricWorkspace:
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = MAX_RETRY_OVERRIDE.get(item_type, 5)
+        max_retries = constants.MAX_RETRY_OVERRIDE.get(item_type, 5)
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in SHELL_ONLY_PUBLISH
+        shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
