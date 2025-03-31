@@ -70,7 +70,7 @@ PARAMETER_MSGS = {
     "invalid file path": "Path '{}' not found in the repository directory",
     "valid optional": "Optional values in {} are valid",
     "valid parameter": "{} parameter is valid",
-    "skip": "Replacement of value '{}' will be skipped due to {} in {}",
+    "skip": "The find value '{}' replacement will be skipped due to {} in parameter {}",
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }

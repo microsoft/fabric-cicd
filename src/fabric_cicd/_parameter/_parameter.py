@@ -170,9 +170,13 @@ class Parameter:
             ("keys", lambda param_dict: self._validate_parameter_keys(param_name, list(param_dict.keys()))),
             ("required values", lambda param_dict: self._validate_required_values(param_name, param_dict)),
             ("replace_value", lambda param_dict: self._validate_replace_value(param_name, param_dict["replace_value"])),
+            ("optional values", lambda param_dict: self._validate_optional_values(param_name, param_dict)),
         ]
         for param_num, parameter_dict in enumerate(self.environment_parameter[param_name], start=1):
-            param_num_str = param_num if multiple_param else ""
+            param_num_str = str(param_num) if multiple_param else ""
+            find_value = (
+                parameter_dict["find_value"] if param_name == "find_replace" else parameter_dict["instance_pool_id"]
+            )
             for step, validation_func in validation_steps:
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
@@ -180,24 +184,24 @@ class Parameter:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
 
+            # Check if replacement will be skipped for a given find value
             is_valid_env = self._validate_environment(parameter_dict["replace_value"])
-            is_valid_optional, msg = self._validate_optional_values(param_name, parameter_dict)
+            is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
 
-            find_value = (
-                parameter_dict["find_value"] if param_name == "find_replace" else parameter_dict["instance_pool_id"]
-            )
-            if not is_valid_optional:
-                if msg != "no match":
-                    return False, msg
-                # If no match, log a warning and continue (environment check is skipped)
-                if msg == "no match":
-                    optional_msg = constants.PARAMETER_MSGS["no filter match"].format(param_name)
-                    logger.warning(constants.PARAMETER_MSGS["skip"].format(find_value, optional_msg, param_name))
-                    continue
-
+            # Replacement skipped if target environment is not present
             if self.environment != "N/A" and not is_valid_env:
-                env_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
-                logger.warning(constants.PARAMETER_MSGS["skip"].format(find_value, env_msg, param_name))
+                msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
+                logger.warning(
+                    constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str)
+                )
+                continue
+
+            # Replacement skipped if optional filter values don't match
+            if msg == "no match" and not is_valid_optional_val:
+                msg = constants.PARAMETER_MSGS["no filter match"].format(param_name)
+                logger.warning(
+                    constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str)
+                )
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
@@ -289,8 +293,10 @@ class Parameter:
 
         return True, constants.PARAMETER_MSGS["valid replace value"].format("spark_pool")
 
-    def _validate_optional_values(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
-        """Validate the optional values in the parameter."""
+    def _validate_optional_values(
+        self, param_name: str, param_dict: dict, check_match: bool = False
+    ) -> tuple[bool, str]:
+        """Validate the optional filter values in the parameter."""
         optional_values = {
             "item_type": param_dict.get("item_type"),
             "item_name": param_dict.get("item_name"),
@@ -314,8 +320,8 @@ class Parameter:
                 if not is_valid:
                     return False, msg
 
-                # Validate specific optional values
-                if param in validation_methods:
+                # Validate specific optional values and check for matches
+                if check_match and param in validation_methods:
                     values = value if isinstance(value, list) else [value]
                     for item in values:
                         is_valid, msg = validation_methods[param](item)
