@@ -34,7 +34,13 @@ environment = "dev"
 repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
-item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel", "Report"]
+item_type_in_scope = [
+    "DataPipeline",
+    "Notebook",
+    "Environment",
+    "SemanticModel",
+    "Report",
+]  # "Lakehouse", "Reflex", "Eventhouse", "KQLDatabase", "KQLQueryset", "Eventstream"
 
 # Uncomment to use SPN auth
 # client_id = "your-client-id"

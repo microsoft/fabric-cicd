@@ -19,7 +19,5 @@ def publish_activators(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "Reflex"
 
-    logger.warning("Only empty Activator is supported in deployment")
-
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)

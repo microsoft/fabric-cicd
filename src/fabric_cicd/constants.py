@@ -18,11 +18,15 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Lakehouse",
     "MirroredDatabase",
     "Reflex",
+    "Eventhouse",
+    "Eventstream",
+    "KQLDatabase",
+    "KQLQueryset",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
 # Publish
-MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10}
+MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10, "KQLDatabase": 10, "Eventstream": 10}
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse"]
 
 # REGEX Constants
