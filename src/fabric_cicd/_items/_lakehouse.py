@@ -6,7 +6,7 @@
 import json
 import logging
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,9 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             creation_payload=creation_payload,
             skip_publish_logging=True,
         )
-        publish_shortcuts(fabric_workspace_obj, item)
+
+        if "enable_shortcut_publish" in constants.FEATURE_FLAGS:
+            publish_shortcuts(fabric_workspace_obj, item)
         logger.info("Published")
 
 
