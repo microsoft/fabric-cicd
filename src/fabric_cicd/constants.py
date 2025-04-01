@@ -64,7 +64,6 @@ PARAMETER_MSGS = {
     "valid required values": "Required values in {} are valid",
     "missing replace value": "{} is missing a replace value for '{}' environment'",
     "valid replace value": "Values in 'replace_value' dict in {} are valid",
-    "no target env": "Target environment '{}' is not a key in the 'replace_value' dict in {}",
     "invalid replace value": INVALID_REPLACE_VALUE_SPARK_POOL,
     "no optional": "No optional values provided in {}",
     "invalid item type": "Item type '{}' not in scope",
@@ -72,4 +71,7 @@ PARAMETER_MSGS = {
     "invalid file path": "Path '{}' not found in the repository directory",
     "valid optional": "Optional values in {} are valid",
     "valid parameter": "{} parameter is valid",
+    "skip": "The find value '{}' replacement will be skipped due to {} in parameter {}",
+    "no target env": "target environment '{}' not found",
+    "no filter match": "unmatched optional filters",
 }
