@@ -53,7 +53,7 @@
 ## Variable Libraries
 
 -   **Parameterization:**
-    -   The active value set of the variable library is defined by the the `environment` field passed into the `FabricWorkspace` object. If no `environment` is specified, the active Value Set will not be changed.
+    -   The active value set of the variable library is defined by the `environment` field passed into the `FabricWorkspace` object. If no `environment` is specified, the active Value Set will not be changed.
 -   **Changing Value Sets:**
     -   Variable Libraries do not support programmatically changing the name of value set which is active
     -   After the initial deployment, if an active set is renamed, or removed, the deployment will fail
