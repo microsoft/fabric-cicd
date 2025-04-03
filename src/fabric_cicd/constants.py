@@ -4,9 +4,11 @@
 """Constants for the fabric-cicd package."""
 
 # General
+VERSION = "0.1.13"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FEATURE_FLAG = set()
+USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
 # Item Type
 ACCEPTED_ITEM_TYPES_UPN = (

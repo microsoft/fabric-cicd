@@ -27,12 +27,6 @@ jobs:
                   python -m pip install --upgrade pip
                   python -m pip install uv
 
-            - name: Read version from file
-              id: get_version
-              run: |
-                  VERSION=$(cat VERSION)
-                  echo "VERSION=$VERSION" >> $GITHUB_ENV
-
             - name: Deploy
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,10 +35,11 @@ jobs:
                   git config user.email github-actions[bot]@users.noreply.github.com
                   git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
                   uv sync
+                  VERSION=$(python -c 'from fabric_cicd.constants import VERSION; print(VERSION)')
                   uv run mike deploy \
                     --update-aliases \
                     --branch gh-pages \
                     --push \
-                    ${{ env.VERSION }} \
+                    $VERSION \
                     latest
                   uv run mike set-default --push latest
