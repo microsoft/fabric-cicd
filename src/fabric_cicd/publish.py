@@ -66,6 +66,21 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         _print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
+    if "Reflex" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing Activators")
+        items.publish_activators(fabric_workspace_obj)
+    if "Eventhouse" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing Eventhouses")
+        items.publish_eventhouses(fabric_workspace_obj)
+    if "KQLDatabase" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing KQLDatabases")
+        items.publish_kqldatabases(fabric_workspace_obj)
+    if "KQLQueryset" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing KQLQueryset")
+        items.publish_kqlquerysets(fabric_workspace_obj)
+    if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
+        _print_header("Publishing Eventstreams")
+        items.publish_eventstreams(fabric_workspace_obj)
 
 
 def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
@@ -107,7 +122,20 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
     # Define order to unpublish items
     unpublish_order = []
-    for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment", "MirroredDatabase", "Lakehouse"]:
+    for x in [
+        "Eventstream",
+        "KQLQueryset",
+        "KQLDatabase",
+        "Eventhouse",
+        "Reflex",
+        "DataPipeline",
+        "Report",
+        "SemanticModel",
+        "Notebook",
+        "Environment",
+        "MirroredDatabase",
+        "Lakehouse",
+    ]:
         if x in fabric_workspace_obj.item_type_in_scope and (
             x != "Lakehouse" or "enable_lakehouse_unpublish" in constants.FEATURE_FLAG
         ):

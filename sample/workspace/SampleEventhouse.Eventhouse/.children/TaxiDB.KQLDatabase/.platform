@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLDatabase",
+    "displayName": "TaxiDB"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "ac29cdd2-b905-8202-44b8-201eafd7a8d4"
+  }
+}
