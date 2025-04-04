@@ -44,7 +44,7 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
             active_value_set = fabric_workspace_obj.environment
         else:
             active_value_set = "Default value set"
-            logger.info(
+            logger.warning(
                 f"Provided target environment '{fabric_workspace_obj.environment}' does not match any value sets.  Using '{active_value_set}'"
             )
 
@@ -57,4 +57,4 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
         logger.info(f"Active value set changed to '{active_value_set}'")
 
     else:
-        logger.info(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")
+        logger.warning(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")
