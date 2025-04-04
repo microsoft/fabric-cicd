@@ -1,14 +1,14 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
-  "name": "test",
+  "name": "PROD",
   "variableOverrides": [
     {
       "name": "Environment",
-      "value": "Test"
+      "value": "Prod"
     },
     {
       "name": "SQL_Server",
-      "value": "contoso-test.database.windows.net"
+      "value": "contoso-prod.database.windows.net"
     }
   ]
 }

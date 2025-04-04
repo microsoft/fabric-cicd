@@ -5,13 +5,13 @@
       "name": "Environment",
       "note": "",
       "type": "String",
-      "value": "Dev"
+      "value": "PPE"
     },
     {
       "name": "SQL_Server",
       "note": "",
       "type": "String",
-      "value": "contoso-dev.database.windows.net"
+      "value": "contoso-ppe.database.windows.net"
     }
   ]
 }
