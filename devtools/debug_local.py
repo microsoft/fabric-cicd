@@ -29,7 +29,7 @@ append_feature_flag("enable_shortcut_publish")
 
 # The defined environment values should match the names found in the parameter.yml file
 workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
-environment = "d"
+environment = "PPE"
 
 # In this example, our workspace content sits within the root/sample/workspace directory
 repository_directory = str(root_directory / "sample" / "workspace")
