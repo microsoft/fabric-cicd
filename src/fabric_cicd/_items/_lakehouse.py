@@ -37,13 +37,15 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             creation_payload=creation_payload,
             skip_publish_logging=True,
         )
-
-        if "enable_shortcut_publish" in constants.FEATURE_FLAGS:
-            publish_shortcuts(fabric_workspace_obj, item)
         logger.info("Published")
 
+    # Need all lakehouses published first to protect interrelationships
+    if "enable_shortcut_publish" in constants.FEATURE_FLAG:
+        for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
+            process_shortcuts(fabric_workspace_obj, item_obj)
 
-def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
+
+def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
     """
     Publishes all shortcuts for a lakehouse item.
 
@@ -55,34 +57,62 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
 
     shortcut_file_obj = next((file for file in item_obj.item_files if file.name == "shortcuts.metadata.json"), None)
 
-    if not shortcut_file_obj:
+    if shortcut_file_obj:
+        shortcut_file_obj.contents = fabric_workspace_obj._replace_parameters(shortcut_file_obj, item_obj)
+        shortcut_file_obj.contents = fabric_workspace_obj._replace_logical_ids(shortcut_file_obj.contents)
+        shortcut_file_obj.contents = fabric_workspace_obj._replace_workspace_ids(shortcut_file_obj.contents)
+
+        shortcuts = json.loads(shortcut_file_obj.contents) or []
+    else:
         logger.debug("No shortcuts.metadata.json found")
         shortcuts = []
-    else:
-        shortcut_file_obj.contents = fabric_workspace_obj._replace_parameters(shortcut_file_obj, item_obj)
-        shortcuts = json.loads(shortcut_file_obj.contents)
-        if len(shortcuts) == 0:
-            logger.debug("No shortcuts found in shortcuts.metadata.json")
 
-    logger.info("Publishing Shortcuts")
-    new_deployed_shortcuts = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
+    logger.info(f"Publishing Lakehouse '{item_obj.name}' Shortcuts")
 
-    # Delete shortcuts not in the new list
-    for deployed_shortcut_path in deployed_shortcuts:
-        if deployed_shortcut_path not in new_deployed_shortcuts:
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/delete-shortcut
-            fabric_workspace_obj.endpoint.invoke(
-                method="DELETE",
-                url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts/{deployed_shortcut_path}",
-            )
+    shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
+
+    shortcut_paths_to_unpublish = [path for path in deployed_shortcuts if path not in shortcuts_to_publish]
+
+    unpublish_shortcuts(fabric_workspace_obj, item_obj, shortcut_paths_to_unpublish)
 
     # Deploy and overwrite shortcuts
-    for shortcut in new_deployed_shortcuts.values():
+    publish_shortcuts(fabric_workspace_obj, item_obj, shortcuts_to_publish)
+
+    logger.info("Published")
+
+
+def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_dict: dict) -> None:
+    """
+    Publishes all shortcuts defined in the list.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
+        item_obj: The item object to publish shortcuts for
+        shortcut_dict: The dict of shortcuts to publish
+    """
+    for shortcut in shortcut_dict.values():
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
         fabric_workspace_obj.endpoint.invoke(
             method="POST",
             url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
             body=shortcut,
+        )
+
+
+def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
+    """
+    Unpublishes all shortcuts defined in the list.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
+        item_obj: The item object to publish shortcuts for
+        shortcut_paths: The list of shortcut paths to unpublish
+    """
+    for deployed_shortcut_path in shortcut_paths:
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/delete-shortcut
+        fabric_workspace_obj.endpoint.invoke(
+            method="DELETE",
+            url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts/{deployed_shortcut_path}",
         )
 
 

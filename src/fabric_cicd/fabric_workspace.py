@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 from typing import Optional
 
-import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
@@ -279,76 +278,24 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
+    def _replace_workspace_ids(self, raw_file: str) -> str:
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
         (actual workspace ID guid) values, with target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
-            item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
         """
-        # Replace all instances of default feature branch workspace ID with target workspace ID
-        target_workspace_id = self.workspace_id
-
         # Use re.sub to replace all matches
-        raw_file = re.sub(
+        return re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
-                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, target_workspace_id)
+                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, self.workspace_id)
                 if match.group(2) == constants.DEFAULT_WORKSPACE_ID
                 else match.group(0)
             ),
             raw_file,
         )
-
-        # For DataPipeline item, additional replacements may be required
-        if item_type == "DataPipeline":
-            raw_file = self._replace_activity_workspace_ids(raw_file, target_workspace_id)
-
-        return raw_file
-
-    def _replace_activity_workspace_ids(self, raw_file: str, target_workspace_id: str) -> str:
-        """
-        Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
-        with target workspace ID found in DataPipeline activities.
-
-        Args:
-            raw_file: The raw file content where workspace IDs need to be replaced.
-            target_workspace_id: The target workspace ID to replace with.
-        """
-        # Create a dictionary from the raw file
-        item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(constants.VALID_GUID_REGEX)
-
-        # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-
-        # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
-        for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
-            # Ensure the type value is a string and check if it is found in the activities mapping
-            if type(activity_value) == str and activity_value in activities_mapping:
-                # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
-                path = path.split("/")
-                workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
-                workspace_id = dpath.get(item_content_dict, workspace_id_path)
-
-                # Check if the workspace ID is a valid GUID and is not the target workspace ID
-                if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                    item_type, item_id_name = activities_mapping[activity_value]
-                    # Create a path to the item's ID and get the item ID value
-                    item_id_path = (*path[:-1], "typeProperties", item_id_name)
-                    item_id = dpath.get(item_content_dict, item_id_path)
-                    # Convert the item ID to a name to check if it exists in the repository
-                    item_name = self._convert_id_to_name(
-                        item_type=item_type, generic_id=item_id, lookup_type="Repository"
-                    )
-                    # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
-                    if item_name:
-                        dpath.set(item_content_dict, workspace_id_path, target_workspace_id)
-
-        # Convert the updated dict back to a JSON string
-        return json.dumps(item_content_dict, indent=2)
 
     def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
@@ -432,6 +379,7 @@ class FabricWorkspace:
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file, item)
+                            file.contents = self._replace_workspace_ids(file.contents)
 
                     item_payload.append(file.base64_payload)
 
