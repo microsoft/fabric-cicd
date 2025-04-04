@@ -57,15 +57,13 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
 
     if not shortcut_file_obj:
         logger.debug("No shortcuts.metadata.json found")
-        return
+        shortcuts = []
+    else:
+        shortcut_file_obj.contents = fabric_workspace_obj._replace_parameters(shortcut_file_obj, item_obj)
+        shortcuts = json.loads(shortcut_file_obj.contents)
+        if len(shortcuts) == 0:
+            logger.debug("No shortcuts found in shortcuts.metadata.json")
 
-    shortcut_file_obj.contents = fabric_workspace_obj._replace_parameters(shortcut_file_obj, item_obj)
-    shortcuts = json.loads(shortcut_file_obj.contents)
-
-    if len(shortcuts) == 0:
-        logger.debug("No shortcuts found in shortcuts.metadata.json")
-        return
-        # TODO We can't step out of this function, we need to remove the shortcuts from the deployed list first
     logger.info("Publishing Shortcuts")
     new_deployed_shortcuts = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 
