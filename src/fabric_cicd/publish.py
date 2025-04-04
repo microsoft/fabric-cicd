@@ -177,4 +177,3 @@ def _print_header(message: str) -> None:
     print_with_color(line_separator)
     print_with_color(formatted_message)
     print_with_color(line_separator)
-    print()  # Print a blank line after the header

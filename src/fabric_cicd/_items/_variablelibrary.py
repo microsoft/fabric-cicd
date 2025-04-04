@@ -3,6 +3,7 @@
 
 """Functions to process and deploy Variable Library item."""
 
+import json
 import logging
 
 from fabric_cicd import FabricWorkspace
@@ -35,8 +36,18 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
         fabric_workspace_obj: The FabricWorkspace object.
         item_obj: The item object.
     """
-    if fabric_workspace_obj.environment != "N/A":
-        active_value_set = fabric_workspace_obj.environment
+    settings_file_obj = next((file for file in item_obj.item_files if file.name == "settings.json"), None)
+
+    if settings_file_obj:
+        settings_dict = json.loads(settings_file_obj.contents)
+        if fabric_workspace_obj.environment in settings_dict["valueSetsOrder"]:
+            active_value_set = fabric_workspace_obj.environment
+        else:
+            active_value_set = "Default value set"
+            logger.info(
+                f"Provided target environment '{fabric_workspace_obj.environment}' does not match any value sets.  Using '{active_value_set}'"
+            )
+
         body = {"properties": {"activeValueSetName": active_value_set}}
 
         fabric_workspace_obj.endpoint.invoke(
@@ -44,3 +55,6 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
         )
 
         logger.info(f"Active value set changed to '{active_value_set}'")
+
+    else:
+        logger.info(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")

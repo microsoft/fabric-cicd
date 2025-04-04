@@ -386,6 +386,7 @@ class FabricWorkspace:
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
 
+        print()
         logger.info(f"Publishing {item_type} '{item_name}'")
 
         is_deployed = bool(item_guid)
@@ -436,6 +437,7 @@ class FabricWorkspace:
         """
         item_guid = self.deployed_items[item_type][item_name].guid
 
+        print()
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
         # Delete the item from the workspace

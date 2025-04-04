@@ -67,6 +67,7 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         logger.debug("No shortcuts.metadata.json found")
         shortcuts = []
 
+    print()
     logger.info(f"Publishing Lakehouse '{item_obj.name}' Shortcuts")
 
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
