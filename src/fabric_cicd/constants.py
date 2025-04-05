@@ -19,11 +19,12 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "SemanticModel",
     "Lakehouse",
     "MirroredDatabase",
+    "VariableLibrary",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
 # Publish
-MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10}
+MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10, "VariableLibrary": 7}
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse"]
 
 # REGEX Constants
