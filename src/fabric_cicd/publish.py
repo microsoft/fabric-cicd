@@ -39,6 +39,13 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         >>> publish_all_items(workspace)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
+    fabric_workspace_obj._refresh_deployed_folders()
+    fabric_workspace_obj._refresh_repository_folders()
+    fabric_workspace_obj._publish_folders()
+    fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._refresh_repository_items()
+
     if item_name_exclude_regex:
         logger.warning(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
@@ -106,6 +113,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     regex_pattern = check_regex(item_name_exclude_regex)
 
     fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._refresh_repository_items()
     _print_header("Unpublishing Orphaned Items")
 
     # Define order to unpublish items
@@ -156,6 +164,9 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
         for item_name in to_delete_list:
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
+
+    fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._unpublish_folders()
 
 
 def _print_header(message: str) -> None:
