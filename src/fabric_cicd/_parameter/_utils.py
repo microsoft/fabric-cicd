@@ -8,12 +8,38 @@ parameter dictionary structure, processing parameter values, and handling parame
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Union
 
 from azure.core.credentials import TokenCredential
 
+import fabric_cicd.constants as constants
+
 logger = logging.getLogger(__name__)
+
+
+def replace_variables_in_parameter_file(raw_file: str) -> str:
+    """
+    A function to replace tokens in the parameter.yml file with environment variables.
+
+    Args:
+    raw_file: The parameter.yml file content as a string.
+    """
+    if "enable_environment_variable_replacement" in constants.FEATURE_FLAG:
+        # filter os.environ dict to only allow variables that begin with $ENV:
+        env_vars = {k[len("$ENV:") :]: v for k, v in os.environ.items() if k.startswith("$ENV:")}
+        # block of code to support both variants of the parameters.yml file
+
+        # Perform replacements
+        for var_name, var_value in env_vars.items():
+            placeholder = f"$ENV:{var_name}"
+            if placeholder in raw_file:
+                raw_file = raw_file.replace(placeholder, var_value)
+                logger.debug(f"Replaced {placeholder} with {var_value}")
+
+        return raw_file
+    return raw_file
 
 
 def validate_parameter_file(

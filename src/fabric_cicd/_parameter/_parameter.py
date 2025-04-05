@@ -16,6 +16,7 @@ import fabric_cicd.constants as constants
 from fabric_cicd._parameter._utils import (
     check_parameter_structure,
     process_input_path,
+    replace_variables_in_parameter_file,
 )
 
 # Configure logging to output to the console
@@ -108,6 +109,7 @@ class Parameter:
         try:
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
+                yaml_content = replace_variables_in_parameter_file(yaml_content)
                 validation_errors = self._validate_yaml_content(yaml_content)
                 if validation_errors:
                     return False, validation_errors
