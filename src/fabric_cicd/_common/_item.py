@@ -22,6 +22,7 @@ class Item:
     logical_id: str = field(default="")
     path: Path = field(default_factory=Path)
     item_files: list = field(default_factory=list)
+    folder_id: str = field(default="")
     IMMUTABLE_FIELDS: ClassVar[set] = {"type", "name", "description"}
 
     def __setattr__(self, key: str, value: any) -> None:
@@ -36,6 +37,11 @@ class Item:
             msg = f"item {key} is immutable"
             raise AttributeError(msg)
         super().__setattr__(key, value)
+
+    @property
+    def relative_path(self) -> str:
+        """Return the relative path of the file."""
+        return str(self.file_path.relative_to(self.item_path).as_posix())
 
     def collect_item_files(self) -> None:
         """Collect all files in the item path."""
