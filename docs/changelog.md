@@ -15,7 +15,7 @@ The following contains all major, minor, and patch version release notes.
 -   ✨ Onboard Workspace Folders ([#81](https://github.com/microsoft/fabric-cicd/issues/81))
 -   ✨ Onboard Variable Library item type ([#206](https://github.com/microsoft/fabric-cicd/issues/206))
 -   ✨ Added support for Lakehouse Shortcuts
--   ✨ New `enable_environment_variable_replacement' feature flag ([#160](https://github.com/microsoft/fabric-cicd/issues/160))
+-   ✨ New `enable_environment_variable_replacement` feature flag ([#160](https://github.com/microsoft/fabric-cicd/issues/160))
 -   ⚡ User-agent now available in API headers ([#207](https://github.com/microsoft/fabric-cicd/issues/207))
 -   ⚡ Fixed error log typo in fabric_endpoint
 -   🔧 Fix break with invalid optional parameters ([#192](https://github.com/microsoft/fabric-cicd/issues/192))
