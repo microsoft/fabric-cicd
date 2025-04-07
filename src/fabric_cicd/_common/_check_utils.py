@@ -3,8 +3,6 @@
 
 """Utility functions for checking file types and versions."""
 
-from __future__ import annotations
-
 import logging
 import re
 from pathlib import Path
@@ -20,34 +18,44 @@ from fabric_cicd._common._exceptions import FileTypeError
 logger = logging.getLogger(__name__)
 
 
-def parse_changelog(changelog_path: Path | None = None) -> dict[str, list[str]]:
-    """Parse the changelog file and return a dictionary of versions with their changes.
+def parse_changelog() -> dict[str, list[str]]:
+    """Parse the changelog file and return a dictionary of versions with their changes."""
+    content = None
 
-    Args:
-        changelog_path: Path to the changelog file. If None, uses the default path
-            relative to the module.
-    """
-    if changelog_path is None:
-        changelog_path = Path(__file__).parent.parent.parent.parent / "docs" / "changelog.md"
-
-    if not changelog_path.exists():
+    try:
+        response = requests.get(constants.CHANGELOG_URL)
+        if response.status_code == 200:
+            content = response.text
+        else:
+            logger.debug(f"Failed to fetch online changelog: HTTP {response.status_code}")
+            return {}
+    except Exception as e:
+        logger.debug(f"Error fetching online changelog: {e}")
         return {}
 
-    with Path.open(changelog_path, encoding="utf-8") as f:
-        content = f.read()
-
-    version_pattern = r"## Version (\d+\.\d+\.\d+).*?(?=## Version|\Z)"
     changelog_dict = {}
 
-    for match in re.finditer(version_pattern, content, re.DOTALL):
-        version_num = match.group(1)
-        section_content = match.group(0)
+    version_pattern = r"<h2 id=version-(\d+\d+\d+)[^>]*>Version ([0-9]+\.[0-9]+\.[0-9]+)"
+    section_pattern = r"<h2 id=version-\d+[^>]*>Version [0-9]+\.[0-9]+\.[0-9]+.*?</h2>(.*?)(?=<h2 id=version|<h2 id=changelog|<footer)"
+
+    for match in re.finditer(section_pattern, content, re.DOTALL):
+        section_content = match.group(1)
+
+        version_match = re.search(version_pattern, match.group(0))
+        if not version_match:
+            continue
+
+        version_num = version_match.group(2)
 
         bullet_points = []
-        for line in section_content.split("\n"):
-            line = line.strip()
-            if line.startswith("-"):
-                bullet_points.append(line)
+        li_pattern = r"<li>(.*?)</li>"
+        for li_match in re.finditer(li_pattern, section_content, re.DOTALL):
+            bullet_text = li_match.group(1).strip()
+            link_pattern = r"<a href=([^>]+)>([^<]+)</a>"
+
+            bullet_text = re.sub(link_pattern, r"\2 (\1)", bullet_text)
+            bullet_text = "- " + bullet_text if not bullet_text.startswith("-") else bullet_text
+            bullet_points.append(bullet_text)
 
         changelog_dict[version_num] = bullet_points
 
@@ -82,7 +90,7 @@ def check_version() -> None:
 
             msg += (
                 f"{Fore.BLUE}[notice]{Style.RESET_ALL} View the full changelog at: "
-                f"{Fore.CYAN}https://microsoft.github.io/fabric-cicd/latest/changelog/{Style.RESET_ALL}"
+                f"{Fore.CYAN}{constants.CHANGELOG_URL}{Style.RESET_ALL}"
             )
 
             print(msg)

@@ -9,6 +9,7 @@ DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
+CHANGELOG_URL = "https://microsoft.github.io/fabric-cicd/latest/changelog/"
 
 # Item Type
 ACCEPTED_ITEM_TYPES_UPN = (
