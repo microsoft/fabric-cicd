@@ -72,3 +72,6 @@ PARAMETER_MSGS = {
     "valid optional": "Optional values in {} are valid",
     "valid parameter": "{} parameter is valid",
 }
+
+
+INDENT = "->"

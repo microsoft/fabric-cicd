@@ -10,7 +10,7 @@ from pathlib import Path
 import dpath
 import yaml
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._parameter._utils import check_parameter_structure
 
@@ -81,7 +81,7 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     # Wait for ongoing publish to complete
     _check_environment_publish_state(fabric_workspace_obj, item_guid)
 
-    logger.info("Published")
+    logger.info(f"{constants.INDENT}Published")
 
 
 def _check_environment_publish_state(
@@ -109,7 +109,7 @@ def _check_environment_publish_state(
             fail_values = []
 
         else:
-            prepend_message = "Operation in progress."
+            prepend_message = f"{constants.INDENT}Operation in progress."
             pass_values = ["success"]
             fail_values = ["failed", "cancelled"]
 

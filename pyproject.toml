@@ -10,7 +10,6 @@ urls.Repository = "https://github.com/microsoft/fabric-cicd.git"
 
 dependencies = [
     "azure-identity>=1.19.0",
-    "colorlog>=6.9.0",
     "dpath>=2.2.0",
     "filetype>=1.2.0",
     "packaging>=24.2",

@@ -207,7 +207,7 @@ def _handle_response(
                     base_delay=0.5,
                     response_retry_after=retry_after,
                     max_retries=kwargs.get("max_retries", 5),
-                    prepend_message="Operation in progress.",
+                    prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
             time.sleep(1)
