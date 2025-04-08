@@ -40,6 +40,13 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         >>> publish_all_items(workspace)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
+    fabric_workspace_obj._refresh_deployed_folders()
+    fabric_workspace_obj._refresh_repository_folders()
+    fabric_workspace_obj._publish_folders()
+    fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._refresh_repository_items()
+
     if item_name_exclude_regex:
         logger.warning(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
@@ -112,7 +119,16 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
     # Define order to unpublish items
     unpublish_order = []
-    for x in ["DataPipeline", "Report", "SemanticModel", "Notebook", "Environment", "MirroredDatabase", "Lakehouse"]:
+    for x in [
+        "DataPipeline",
+        "Report",
+        "SemanticModel",
+        "Notebook",
+        "Environment",
+        "MirroredDatabase",
+        "Lakehouse",
+        "VariableLibrary",
+    ]:
         if x in fabric_workspace_obj.item_type_in_scope and (
             x != "Lakehouse" or "enable_lakehouse_unpublish" in constants.FEATURE_FLAG
         ):

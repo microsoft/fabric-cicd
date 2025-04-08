@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 from typing import Optional
 
-import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
@@ -117,8 +116,6 @@ class FabricWorkspace:
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
-        self._refresh_deployed_items()
-        self._refresh_repository_items()
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
@@ -177,6 +174,9 @@ class FabricWorkspace:
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
                 item_path = directory
+                relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
+                relative_parent_path = "/".join(relative_path.split("/")[:-1])
+                item_folder_id = self.repository_folders.get(relative_parent_path, "")
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -186,8 +186,15 @@ class FabricWorkspace:
 
                 # Add the item to the repository_items dictionary
                 self.repository_items[item_type][item_name] = Item(
-                    item_type, item_name, item_description, item_guid, item_logical_id, item_path
+                    type=item_type,
+                    name=item_name,
+                    description=item_description,
+                    guid=item_guid,
+                    logical_id=item_logical_id,
+                    path=item_path,
+                    folder_id=item_folder_id,
                 )
+
                 self.repository_items[item_type][item_name].collect_item_files()
 
     def _refresh_deployed_items(self) -> None:
@@ -203,13 +210,20 @@ class FabricWorkspace:
             item_description = item["description"]
             item_name = item["displayName"]
             item_guid = item["id"]
+            item_folder_id = item.get("folderId", None)
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
                 self.deployed_items[item_type] = {}
 
             # Add item details to the deployed_items dictionary
-            self.deployed_items[item_type][item_name] = Item(item_type, item_name, item_description, item_guid)
+            self.deployed_items[item_type][item_name] = Item(
+                type=item_type,
+                name=item_name,
+                description=item_description,
+                guid=item_guid,
+                folder_id=item_folder_id,
+            )
 
     def _replace_logical_ids(self, raw_file: str) -> str:
         """
@@ -282,76 +296,24 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
+    def _replace_workspace_ids(self, raw_file: str) -> str:
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
         (actual workspace ID guid) values, with target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
-            item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
         """
-        # Replace all instances of default feature branch workspace ID with target workspace ID
-        target_workspace_id = self.workspace_id
-
         # Use re.sub to replace all matches
-        raw_file = re.sub(
+        return re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
-                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, target_workspace_id)
+                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, self.workspace_id)
                 if match.group(2) == constants.DEFAULT_WORKSPACE_ID
                 else match.group(0)
             ),
             raw_file,
         )
-
-        # For DataPipeline item, additional replacements may be required
-        if item_type == "DataPipeline":
-            raw_file = self._replace_activity_workspace_ids(raw_file, target_workspace_id)
-
-        return raw_file
-
-    def _replace_activity_workspace_ids(self, raw_file: str, target_workspace_id: str) -> str:
-        """
-        Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
-        with target workspace ID found in DataPipeline activities.
-
-        Args:
-            raw_file: The raw file content where workspace IDs need to be replaced.
-            target_workspace_id: The target workspace ID to replace with.
-        """
-        # Create a dictionary from the raw file
-        item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(constants.VALID_GUID_REGEX)
-
-        # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-
-        # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
-        for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
-            # Ensure the type value is a string and check if it is found in the activities mapping
-            if type(activity_value) == str and activity_value in activities_mapping:
-                # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
-                path = path.split("/")
-                workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
-                workspace_id = dpath.get(item_content_dict, workspace_id_path)
-
-                # Check if the workspace ID is a valid GUID and is not the target workspace ID
-                if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                    item_type, item_id_name = activities_mapping[activity_value]
-                    # Create a path to the item's ID and get the item ID value
-                    item_id_path = (*path[:-1], "typeProperties", item_id_name)
-                    item_id = dpath.get(item_content_dict, item_id_path)
-                    # Convert the item ID to a name to check if it exists in the repository
-                    item_name = self._convert_id_to_name(
-                        item_type=item_type, generic_id=item_id, lookup_type="Repository"
-                    )
-                    # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
-                    if item_name:
-                        dpath.set(item_content_dict, workspace_id_path, target_workspace_id)
-
-        # Convert the updated dict back to a JSON string
-        return json.dumps(item_content_dict, indent=2)
 
     def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
@@ -435,17 +397,21 @@ class FabricWorkspace:
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file, item)
+                            file.contents = self._replace_workspace_ids(file.contents)
 
                     item_payload.append(file.base64_payload)
 
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
 
+        print()
         logger.info(f"Publishing {item_type} '{item_name}'")
 
         is_deployed = bool(item_guid)
 
         if not is_deployed:
+            combined_body = {**combined_body, **{"folderId": item.folder_id}}
+
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
@@ -476,6 +442,16 @@ class FabricWorkspace:
                 max_retries=max_retries,
             )
 
+        if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+            # Move the item to the correct folder if it has been moved
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+            self.endpoint.invoke(
+                method="POST",
+                url=f"{self.base_api_url}/items/{item_guid}/move",
+                body={"targetFolderId": f"{item.folder_id}"},
+                max_retries=max_retries,
+            )
+
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published")
@@ -491,6 +467,7 @@ class FabricWorkspace:
         """
         item_guid = self.deployed_items[item_type][item_name].guid
 
+        print()
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
         # Delete the item from the workspace

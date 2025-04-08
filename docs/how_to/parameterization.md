@@ -47,6 +47,18 @@ find_replace:
       file_path: <file-path-filter-value>
 ```
 
+If the `enable_environment_variable_replacement` feature flag is set, pipeline/environment variables will be used to replace the values in the parameter.yml file with the corresponding values from the variables dictionary, see example below:
+**Only Environment Variable beginnging with '$ENV:' will be used as replacement values.**
+
+```yaml
+find_replace:
+    # Lakehouse GUID
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+        PPE: "$ENV:ppe_lakehouse"
+        PROD: "$ENV:prod_lakehouse"
+```
+
 ### `spark_pool`
 
 Environments attached to custom spark pools need to be parameterized because the `instance_pool_id` in the `Sparkcompute.yml` file isn't supported in the create/update environment APIs. Provide the `instance_pool_id` value, and the pool `type` and `name` values as the `replace_value` for each environment (e.g., PPE, PROD). An optional field, `item_name`, can be used to filter the specific environment item where the replacement will occur.
@@ -68,7 +80,8 @@ spark_pool:
 
 ### Optional Fields
 
--   Parameterization functionality is unaffected when an optional field is omitted or left empty.
+-   Parameterization functionality is unaffected when optional fields are omitted or left empty.
+-   Optional field values that _are_ provided must match the corresponding properties in the repository file in order for the replacement to occur in the given file. If at least one filter value does not match, the replacement will be skipped for that file.
 -   If none of the optional fields or values are provided, the value found in _any_ repository file is subject to replacement.
 -   Input values are **case sensitive**.
 -   Input values must be **string** or **array** (enables one or many values to filter on).
@@ -105,6 +118,26 @@ find_replace:
       file_path: # filter on notebook files with these paths
           - "/Hello World.Notebook/notebook-content.py"
           - "\\Goodbye World.Notebook\\notebook-content.py"
+
+    # With enable_deployment_variables feature
+    - find_value: "123e4567-e89b-12d3-a456-426614174000" # Lakehouse GUID
+      replace_value:
+          PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE lakehouse GUID
+          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID 
+      item_type: "Notebook"
+      item_name: ["Hello World", "Goodbye World"]
+    - find_value: "replace_lakehouse_id"
+      replace_value:
+          PPE: "$ENV:ppe_lakehouse_guid" # environment variable replace
+          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c"
+      item_type: "Notebook"
+      item_name: ["Hello World", "Goodbye World"]
+    - find_value: "replace_lakehouse_workspace"
+      replace_value:
+          PPE: "$ENV:ppe_workspace_guid" # environment variable replace
+          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c"
+      item_type: "Notebook"
+      item_name: ["Hello World", "Goodbye World"]
 
 spark_pool:
     - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b" # spark_pool_instance_id to be replaced

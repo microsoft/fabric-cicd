@@ -4,9 +4,11 @@
 """Constants for the fabric-cicd package."""
 
 # General
+VERSION = "0.1.13"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FEATURE_FLAG = set()
+USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
 # Item Type
 ACCEPTED_ITEM_TYPES_UPN = (
@@ -17,11 +19,12 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "SemanticModel",
     "Lakehouse",
     "MirroredDatabase",
+    "VariableLibrary",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
 # Publish
-MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10}
+MAX_RETRY_OVERRIDE = {"SemanticModel": 10, "Report": 10, "VariableLibrary": 7}
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse"]
 
 # REGEX Constants
@@ -63,7 +66,6 @@ PARAMETER_MSGS = {
     "valid required values": "Required values in {} are valid",
     "missing replace value": "{} is missing a replace value for '{}' environment'",
     "valid replace value": "Values in 'replace_value' dict in {} are valid",
-    "no target env": "Target environment '{}' is not a key in the 'replace_value' dict in {}",
     "invalid replace value": INVALID_REPLACE_VALUE_SPARK_POOL,
     "no optional": "No optional values provided in {}",
     "invalid item type": "Item type '{}' not in scope",
@@ -71,6 +73,9 @@ PARAMETER_MSGS = {
     "invalid file path": "Path '{}' not found in the repository directory",
     "valid optional": "Optional values in {} are valid",
     "valid parameter": "{} parameter is valid",
+    "skip": "The find value '{}' replacement will be skipped due to {} in parameter {}",
+    "no target env": "target environment '{}' not found",
+    "no filter match": "unmatched optional filters",
 }
 
 

@@ -58,7 +58,10 @@ class FabricEndpoint:
 
         while not exit_loop:
             try:
-                headers = {"Authorization": f"Bearer {self.aad_token}"}
+                headers = {
+                    "Authorization": f"Bearer {self.aad_token}",
+                    "User-Agent": f"{constants.USER_AGENT}",
+                }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
                 response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
@@ -111,7 +114,7 @@ class FabricEndpoint:
             try:
                 self.aad_token = self.token_credential.get_token(resource_url).token
             except ClientAuthenticationError as e:
-                msg = f"Failed to aquire AAD token. {e}"
+                msg = f"Failed to acquire AAD token. {e}"
                 raise TokenError(msg, logger) from e
             except Exception as e:
                 msg = f"An unexpected error occurred when generating the AAD token. {e}"
@@ -275,7 +278,7 @@ def _handle_response(
     # Handle unexpected errors
     else:
         err_msg = (
-            f" Message: {response.json()['message']}"
+            f" Message: {response.json()['message']}.  {response.json().get('moreDetails', '')}"
             if "application/json" in (response.headers.get("Content-Type") or "")
             else ""
         )

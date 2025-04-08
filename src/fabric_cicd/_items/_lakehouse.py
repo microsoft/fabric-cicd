@@ -3,9 +3,11 @@
 
 """Functions to process and deploy Lakehouse item."""
 
+import json
 import logging
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,14 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     item_type = "Lakehouse"
 
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
-        creation_payload = None
+        creation_payload = next(
+            (
+                {"enableSchemas": True}
+                for file in item.item_files
+                if file.name == "lakehouse.metadata.json" and "defaultSchema" in file.contents
+            ),
+            None,
+        )
 
         fabric_workspace_obj._publish_item(
             item_name=item_name,
@@ -28,6 +37,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             creation_payload=creation_payload,
             skip_publish_logging=True,
         )
+
         logger.info(f"{constants.INDENT}Published")
 
     # Need all lakehouses published first to protect interrelationships

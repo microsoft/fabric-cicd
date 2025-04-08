@@ -8,12 +8,38 @@ parameter dictionary structure, processing parameter values, and handling parame
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Union
 
 from azure.core.credentials import TokenCredential
 
+import fabric_cicd.constants as constants
+
 logger = logging.getLogger(__name__)
+
+
+def replace_variables_in_parameter_file(raw_file: str) -> str:
+    """
+    A function to replace tokens in the parameter.yml file with environment variables.
+
+    Args:
+    raw_file: The parameter.yml file content as a string.
+    """
+    if "enable_environment_variable_replacement" in constants.FEATURE_FLAG:
+        # filter os.environ dict to only allow variables that begin with $ENV:
+        env_vars = {k[len("$ENV:") :]: v for k, v in os.environ.items() if k.startswith("$ENV:")}
+        # block of code to support both variants of the parameters.yml file
+
+        # Perform replacements
+        for var_name, var_value in env_vars.items():
+            placeholder = f"$ENV:{var_name}"
+            if placeholder in raw_file:
+                raw_file = raw_file.replace(placeholder, var_value)
+                logger.debug(f"Replaced {placeholder} with {var_value}")
+
+        return raw_file
+    return raw_file
 
 
 def validate_parameter_file(
@@ -160,7 +186,7 @@ def check_replacement(
     file_path: Path,
 ) -> bool:
     """
-    Determines if a replacement should happen based on the provided optional parameter values.
+    Determines whether a find and replace is applied or not based on the provided optional filters.
 
     Args:
         input_type: The input item_type value to check.
@@ -170,36 +196,31 @@ def check_replacement(
         item_name: The item_name value to compare with.
         file_path: The file_path value to compare with.
     """
-    # Condition 1: No optional parameters provided
+    # No optional parameters found
     if not input_type and not input_name and not input_path:
-        logger.debug("No optional parameters were provided. Replacement can happen in any repository file")
+        logger.debug("No optional filters found. Find and replace applied in this repository file")
         return True
 
     # Otherwise, find matches for the optional parameters
+    logger.debug("Optional filters found. Checking for matches")
+
     item_type_match = _find_match(input_type, item_type)
     item_name_match = _find_match(input_name, item_name)
     file_path_match = _find_match(input_path, file_path)
 
-    # Define match conditions for each parameter combination
-    matches_dict = {
-        "item_type, item_name, and file_path": (item_type_match and item_name_match and file_path_match),
-        "item_type and item_name": (item_type_match and item_name_match and not file_path_match),
-        "item_type and file_path": (item_type_match and file_path_match and not item_name_match),
-        "item_name and file_path": (item_name_match and file_path_match and not item_type_match),
-        "item_type": (item_type_match and not item_name_match and not file_path_match),
-        "item_name": (item_name_match and not item_type_match and not file_path_match),
-        "file_path": (file_path_match and not item_type_match and not item_name_match),
-    }
-    logger.debug("Optional parameters were provided. Checking for matches.")
-    for param, replace_condition in matches_dict.items():
-        if replace_condition:
-            logger.debug(
-                f"Match found for {param} parameter(s). Replacement may happen in specified repository file(s)"
-            )
-            return True
-    else:
-        logger.debug("No match found. Replacement will not happen")
-        return False
+    if item_type_match and item_name_match and file_path_match:
+        if input_type:
+            logger.debug(f"Item type match found: {item_type_match}")
+        if input_name:
+            logger.debug(f"Item name match found: {item_name_match}")
+        if input_path:
+            logger.debug(f"File path match found: {file_path_match}")
+
+        logger.debug("Optional filters match found. Find and replace applied in this repository file")
+        return True
+
+    logger.debug("Optional filters match not found. Find and replace skipped for this repository file")
+    return False
 
 
 def _find_match(
@@ -214,6 +235,11 @@ def _find_match(
         param_value: The parameter value to compare (can be a string, list, Path, or None type).
         compare_value: The value to compare with.
     """
+    # If no parameter value, checking for matches is not required
+    if not param_value:
+        return True
+
+    # Otherwise, check for matches based on the parameter value type
     if isinstance(param_value, list):
         match_condition = any(compare_value == value for value in param_value)
     elif isinstance(param_value, (str, Path)):

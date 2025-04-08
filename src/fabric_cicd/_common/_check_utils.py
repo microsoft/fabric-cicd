@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import re
-from importlib.metadata import version as lib_version
 from pathlib import Path
 
 import filetype
@@ -15,6 +14,7 @@ import requests
 from packaging import version
 
 from fabric_cicd._common._color import Fore, Style
+import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import FileTypeError
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def parse_changelog(changelog_path: Path | None = None) -> dict[str, list[str]]:
 def check_version() -> None:
     """Check the current version of the fabric-cicd package and compare it with the latest version."""
     try:
-        current_version = lib_version("fabric-cicd")
+        current_version = constants.VERSION
         response = requests.get("https://pypi.org/pypi/fabric-cicd/json")
         latest_version = response.json()["info"]["version"]
 
