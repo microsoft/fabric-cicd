@@ -38,8 +38,6 @@ item_type_in_scope = [
     "Lakehouse",
     "VariableLibrary",
     "DataPipeline",
-    "Notebook",
-    "Environment",
     "SemanticModel",
     "Report",
 ]
@@ -64,8 +62,8 @@ target_workspace = FabricWorkspace(
 
 # Uncomment to publish
 # Publish all items defined in item_type_in_scope
-# publish_all_items(target_workspace)
+publish_all_items(target_workspace)
 
 # Uncomment to unpublish
 # Unpublish all items defined in scope not found in repository
-# unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r"^DEBUG.*")
+unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r"^DEBUG.*")
