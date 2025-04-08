@@ -168,7 +168,7 @@ def parameter_object(repository_directory, item_type_in_scope, target_environmen
     )
 
 
-def test_parameter_file(parameter_object, mock_constants):
+def test_parameter_file_validation(parameter_object, mock_constants):
     """Test the validation methods for the parameter file"""
     # Test parameter file exists
     assert parameter_object._validate_parameter_file_exists() == (True, mock_constants.PARAMETER_MSGS["found"])
@@ -189,11 +189,48 @@ def test_parameter_file(parameter_object, mock_constants):
     )
 
 
-# def test_parameter(parameter_object, mock_constants):
-#    """Test the validation methods for the specific parameters"""
-#    print(parameter_object.environment_parameter)
-#    print(parameter_object._validate_parameter("find_replace"))
-#    assert parameter_object._validate_parameter("find_replace") == (
-#        True,
-#        mock_constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
-#    )
+@pytest.mark.parametrize(
+    ("parameter_name", "expected"),
+    [
+        ("find_replace", True),
+        ("spark_pool", True),
+    ],
+)
+def test_parameter_validation(parameter_object, mock_constants, parameter_name, expected):
+    """Test the validation methods for the specific parameters"""
+    assert parameter_object._validate_parameter(parameter_name) == (
+        expected,
+        mock_constants.PARAMETER_MSGS["valid parameter"].format(parameter_name),
+    )
+
+
+@pytest.mark.parametrize(
+    ("param_name", "param_value", "expected"),
+    [
+        ("find_replace", ["find_value", "replace_value"], True),
+        ("find_replace", ["find_value", "replace_value", "item_type", "item_name", "file_path"], True),
+        ("find_replace", ["find_value", "replace_value", "item_type"], True),
+    ],
+)
+def test_parameter_keys_validation(parameter_object, mock_constants, param_name, param_value, expected):
+    """Test the validation methods for the find_replace parameter"""
+
+    assert parameter_object._validate_parameter_keys(param_name, param_value) == (
+        expected,
+        mock_constants.PARAMETER_MSGS["valid keys"].format(param_name),
+    )
+
+
+def test_parameter_required_values_validation(parameter_object, mock_constants):
+    """Test the validation methods for the required values"""
+    parameter_dictionary = parameter_object.environment_parameter.get("find_replace")
+    for param_dict in parameter_dictionary:
+        assert parameter_object._validate_required_values("find_replace", param_dict) == (
+            True,
+            mock_constants.PARAMETER_MSGS["valid required values"].format("find_replace"),
+        )
+
+        assert parameter_object._validate_replace_value("find_replace", param_dict["replace_value"]) == (
+            True,
+            mock_constants.PARAMETER_MSGS["valid replace value"].format("find_replace"),
+        )

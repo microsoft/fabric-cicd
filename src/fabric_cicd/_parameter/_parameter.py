@@ -60,9 +60,21 @@ class Parameter:
         self.environment = environment
         self.parameter_file_name = parameter_file_name
 
-        # Initialize the parameter dictionary and parameter file path
-        self.environment_parameter = {}
+        # Initialize the parameter file path and load parameters
         self.parameter_file_path = Path(self.repository_directory, parameter_file_name)
+        self._refresh_parameter_file()
+
+    def _refresh_parameter_file(self) -> None:
+        """Load parameters if file is present."""
+        self.environment_parameter = {}
+
+        if self.parameter_file_path.is_file():
+            with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml_content = replace_variables_in_parameter_file(yaml_content)
+                validation_errors = self._validate_yaml_content(yaml_content)
+                if not validation_errors:
+                    self.environment_parameter = yaml.full_load(yaml_content)
 
     def _validate_parameter_file(self) -> bool:
         """Validate the parameter file."""
