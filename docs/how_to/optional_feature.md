@@ -14,8 +14,6 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_environment_variable_replacement` | Set to enable the use of pipeline variables          |
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders       |
 
-enable_workspace_folder_publish
-
 <span class="md-h3-nonanchor">Example</span>
 
 ```python
