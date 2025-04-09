@@ -102,6 +102,10 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.repository_folders = {}
+        self.repository_items = {}
+        self.deployed_folders = {}
+        self.deployed_items = {}
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -176,7 +180,10 @@ class FabricWorkspace:
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 relative_parent_path = "/".join(relative_path.split("/")[:-1])
-                item_folder_id = self.repository_folders.get(relative_parent_path, "")
+                if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+                    item_folder_id = self.repository_folders.get(relative_parent_path, "")
+                else:
+                    item_folder_id = ""
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -441,15 +448,16 @@ class FabricWorkspace:
                 max_retries=max_retries,
             )
 
-        if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
-            # Move the item to the correct folder if it has been moved
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
-            self.endpoint.invoke(
-                method="POST",
-                url=f"{self.base_api_url}/items/{item_guid}/move",
-                body={"targetFolderId": f"{item.folder_id}"},
-                max_retries=max_retries,
-            )
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
+            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+                # Move the item to the correct folder if it has been moved
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+                self.endpoint.invoke(
+                    method="POST",
+                    url=f"{self.base_api_url}/items/{item_guid}/move",
+                    body={"targetFolderId": f"{item.folder_id}"},
+                    max_retries=max_retries,
+                )
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
@@ -537,37 +545,42 @@ class FabricWorkspace:
         """
         self.repository_folders = {}
 
-        root_path = self.repository_directory
+        root_path = Path(self.repository_directory)
         folder_hierarchy = {}
 
-        def is_empty(folder: Path) -> bool:
-            """Checks if a folder is empty or contains only other empty folders (recursively)."""
-            for item in folder.iterdir():
-                if item.is_file():
-                    return False
-                if item.is_dir() and not is_empty(item):
-                    return False
-            return True
-
         # Walk through the directory structure
-        for folder in root_path.rglob("*"):
-            if folder.is_dir():  # Only process directories
-                # Check if a `.platform` file exists directly beneath the folder
-                if (folder / ".platform").exists():
-                    # Skip this folder and its subfolders
-                    continue
+        for root, dirs, files in os.walk(root_path):
+            folder = Path(root)
+            if not folder.is_dir():
+                continue
 
-                # Check if any parent folder has already been excluded
-                if any((parent / ".platform").exists() for parent in folder.parents if parent != root_path):
-                    continue
+            # Check if a `.platform` file exists directly beneath the folder
+            if ".platform" in files:
+                # Skip this folder and its subfolders
+                dirs.clear()
+                continue
 
-                # Skip empty folders or folders containing only empty subfolders
-                if is_empty(folder):
-                    continue
+            # Check if any parent folder has already been excluded
+            if any((Path(root).parent / ".platform").exists() for root in Path(root).parents if root != root_path):
+                continue
 
-                # Build the relative path from the root and convert it to the desired format
-                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
-                folder_hierarchy[relative_path] = ""
+            # Skip empty folders
+            if not any(Path.iterdir(Path(root))):
+                continue
+
+            # Ensure the folder contains a subfolder, and that subfolder contains a `.platform` file
+            subfolders = [subfolder for subfolder in folder.iterdir() if subfolder.is_dir()]
+            if not any((subfolder / ".platform").exists() for subfolder in subfolders):
+                continue
+
+            # Build the relative path from the root and convert it to the desired format
+            relative_path = f"/{Path(root).relative_to(root_path).as_posix()}"
+
+            # Skip the root directory itself ("/.")
+            if relative_path == "/.":
+                continue
+
+            folder_hierarchy[relative_path] = ""
 
         self.repository_folders = folder_hierarchy
 
