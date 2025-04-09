@@ -13,8 +13,8 @@ import filetype
 import requests
 from packaging import version
 
-from fabric_cicd._common._color import Fore, Style
 import fabric_cicd.constants as constants
+from fabric_cicd._common._color import Fore, Style
 from fabric_cicd._common._exceptions import FileTypeError
 
 logger = logging.getLogger(__name__)

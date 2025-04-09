@@ -72,7 +72,7 @@ class FabricEndpoint:
 
                 # Handle expired authentication token
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
-                    logger.info("AAD token expired. Refreshing token.")
+                    logger.info(f"{constants.INDENT}AAD token expired. Refreshing token.")
                     self._refresh_token()
                 else:
                     exit_loop, method, url, body, long_running = _handle_response(
@@ -311,7 +311,9 @@ def handle_retry(
         second_str = "second" if delay == 1 else "seconds"
         prepend_message += " " if prepend_message else ""
 
-        logger.info(f"{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})...")
+        logger.info(
+            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
+        )
         time.sleep(delay)
     else:
         msg = f"Maximum retry attempts ({max_retries}) exceeded."

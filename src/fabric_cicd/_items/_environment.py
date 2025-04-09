@@ -178,7 +178,7 @@ def _update_compute_settings(
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
             body=yaml_body,
         )
-        logger.info("Updated Spark Settings")
+        logger.info(f"{constants.INDENT}Updated Spark Settings")
 
 
 def _get_repo_libraries(item_path: Path) -> dict:
@@ -218,7 +218,7 @@ def _add_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_l
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries",
             files=library_file,
         )
-        logger.info(f"Updated Library {file_path.name}")
+        logger.info(f"{constants.INDENT}Updated Library {file_path.name}")
 
 
 def _remove_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_library_files: dict) -> None:
@@ -267,7 +267,7 @@ def _remove_library(fabric_workspace_obj: FabricWorkspace, item_guid: str, file_
         url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?libraryToDelete={file_name}",
         body={},
     )
-    logger.info(f"Removed {file_name}")
+    logger.info(f"{constants.INDENT}Removed {file_name}")
 
 
 def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace, input_dict: dict) -> dict:

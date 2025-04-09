@@ -5,6 +5,7 @@
 
 import inspect
 import logging
+import re
 import sys
 import traceback
 from logging import LogRecord
@@ -18,8 +19,8 @@ from fabric_cicd._common._color import Fore, Style
 
 class CustomFormatter(logging.Formatter):
     LEVEL_COLORS: ClassVar[dict[str, str]] = {
-        "DEBUG": Fore.CYAN,
-        "INFO": Fore.GREEN,
+        "DEBUG": Fore.BLACK,
+        "INFO": Fore.WHITE + Style.BRIGHT,
         "WARNING": Fore.YELLOW,
         "ERROR": Fore.RED,
         "CRITICAL": Style.BRIGHT + Fore.RED,
@@ -35,14 +36,26 @@ class CustomFormatter(logging.Formatter):
             "CRITICAL": "crit",
         }.get(record.levelname, "unknown")
 
-        level_name = f"{level_color}[{level_name}]{Style.RESET_ALL}"
+        level_name = f"{level_color}[{level_name}]"
         timestamp = f"{self.formatTime(record, self.datefmt)}"
-        message = f"{record.getMessage()}"
+        message = f"{record.getMessage()}{Style.RESET_ALL}"
 
-        if "->" in message:
+        # indent if the message contains "->"
+        if constants.INDENT in message:
             message = message.replace(constants.INDENT, "")
-            return f"{' ' * 7} {timestamp} - {message}"
-        return f"{level_name:<16} {timestamp} - {message}"
+            full_message = f"{' ' * 8} {timestamp} - {message}"
+        else:
+            # Calculate visual length by removing ANSI escape codes
+
+            ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+            # Get visual length of level_name without ANSI codes
+            visual_level_length = len(ansi_escape.sub("", level_name))
+            # Pad to 16 visual characters
+            padding = " " * max(0, 8 - visual_level_length)
+
+            full_message = f"{level_name}{padding} {timestamp} - {message}"
+        return full_message
 
 
 def configure_logger(level: int = logging.INFO) -> None:
@@ -135,6 +148,7 @@ def print_header(message: str) -> None:
     formatted_message = f"{formatted_message} {line_separator[len(formatted_message) + 1 :]}"
 
     print()  # Print a blank line before the header
-    print(f"{Fore.GREEN}{line_separator}{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}{formatted_message}{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}{line_separator}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}{Style.BRIGHT}{formatted_message}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
+    print()

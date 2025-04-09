@@ -404,7 +404,6 @@ class FabricWorkspace:
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
 
-        print()
         logger.info(f"Publishing {item_type} '{item_name}'")
 
         is_deployed = bool(item_guid)
@@ -467,14 +466,13 @@ class FabricWorkspace:
         """
         item_guid = self.deployed_items[item_type][item_name].guid
 
-        print()
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
-            logger.info("Unpublished")
+            logger.info(f"{constants.INDENT}Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
 
@@ -577,6 +575,7 @@ class FabricWorkspace:
         """Publishes all folders from the repository."""
         # Sort folders by the number of '/' in their paths (ascending order)
         sorted_folders = sorted(self.repository_folders.keys(), key=lambda path: path.count("/"))
+        print_header("Publishing Workspace Folders")
         logger.info("Publishing Workspace Folders")
         for folder_path in sorted_folders:
             if folder_path in self.deployed_folders:
@@ -601,7 +600,7 @@ class FabricWorkspace:
             self.repository_folders[folder_path] = response["body"]["id"]
             logger.debug(f"Published folder: {folder_path}")
 
-        logger.info("Published")
+        logger.info(f"{constants.INDENT}Published")
 
     def _unpublish_folders(self) -> None:
         """Unublishes all empty folders in workspace."""
@@ -636,4 +635,4 @@ class FabricWorkspace:
                 except Exception as e:
                     logger.warning(f"Failed to unpublish folder {folder_id}.  Raw exception: {e}")
 
-        logger.info("Unpublished")
+        logger.info(f"{constants.INDENT}Unpublished")
