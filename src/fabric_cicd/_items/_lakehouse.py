@@ -37,7 +37,8 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             creation_payload=creation_payload,
             skip_publish_logging=True,
         )
-        logger.info("Published")
+
+        logger.info(f"{constants.INDENT}Published")
 
     # Need all lakehouses published first to protect interrelationships
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
@@ -67,7 +68,6 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         logger.debug("No shortcuts.metadata.json found")
         shortcuts = []
 
-    print()
     logger.info(f"Publishing Lakehouse '{item_obj.name}' Shortcuts")
 
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
@@ -79,7 +79,7 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
     # Deploy and overwrite shortcuts
     publish_shortcuts(fabric_workspace_obj, item_obj, shortcuts_to_publish)
 
-    logger.info("Published")
+    logger.info(f"{constants.INDENT}Published")
 
 
 def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_dict: dict) -> None:

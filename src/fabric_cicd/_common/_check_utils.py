@@ -11,10 +11,10 @@ from pathlib import Path
 
 import filetype
 import requests
-from colorama import Fore, Style
 from packaging import version
 
 import fabric_cicd.constants as constants
+from fabric_cicd._common._color import Fore, Style
 from fabric_cicd._common._exceptions import FileTypeError
 
 logger = logging.getLogger(__name__)

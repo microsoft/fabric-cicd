@@ -11,6 +11,7 @@ from typing import Optional
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
@@ -40,9 +41,11 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    fabric_workspace_obj._refresh_deployed_folders()
-    fabric_workspace_obj._refresh_repository_folders()
-    fabric_workspace_obj._publish_folders()
+    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+        fabric_workspace_obj._refresh_deployed_folders()
+        fabric_workspace_obj._refresh_repository_folders()
+        fabric_workspace_obj._publish_folders()
+
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
 
@@ -53,28 +56,28 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing Variable Libraries")
+        print_header("Publishing Variable Libraries")
         items.publish_variablelibraries(fabric_workspace_obj)
     if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing Lakehouses")
+        print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
     if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing MirroredDatabase")
+        print_header("Publishing MirroredDatabase")
         items.publish_mirroreddatabase(fabric_workspace_obj)
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing Environments")
+        print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
     if "Notebook" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing Notebooks")
+        print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
     if "SemanticModel" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing SemanticModels")
+        print_header("Publishing SemanticModels")
         items.publish_semanticmodels(fabric_workspace_obj)
     if "Report" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing Reports")
+        print_header("Publishing Reports")
         items.publish_reports(fabric_workspace_obj)
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
-        _print_header("Publishing DataPipelines")
+        print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
 
 
@@ -114,7 +117,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
-    _print_header("Unpublishing Orphaned Items")
+    print_header("Unpublishing Orphaned Items")
 
     # Define order to unpublish items
     unpublish_order = []
@@ -166,25 +169,5 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
     fabric_workspace_obj._refresh_deployed_items()
-    fabric_workspace_obj._unpublish_folders()
-
-
-def _print_header(message: str) -> None:
-    """
-    Prints a header message with a decorative line above and below it.
-
-    Args:
-        message: The header message to print.
-    """
-
-    def print_with_color(message: str) -> None:
-        print(f"\033[32m{message}\033[0m")
-
-    line_separator = "#" * 100
-    formatted_message = f"########## {message}"
-    formatted_message = f"{formatted_message} {line_separator[len(formatted_message) + 1 :]}"
-
-    print()  # Print a blank line before the header
-    print_with_color(line_separator)
-    print_with_color(formatted_message)
-    print_with_color(line_separator)
+    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+        fabric_workspace_obj._unpublish_folders()

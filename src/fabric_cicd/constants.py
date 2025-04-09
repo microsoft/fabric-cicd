@@ -77,3 +77,6 @@ PARAMETER_MSGS = {
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }
+
+
+INDENT = "->"

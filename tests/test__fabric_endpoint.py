@@ -10,6 +10,7 @@ from unittest.mock import Mock
 import pytest
 from azure.core.exceptions import ClientAuthenticationError
 
+from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _decode_jwt, _format_invoke_log, _handle_response
 
@@ -127,7 +128,7 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
     response = endpoint.invoke("GET", "http://example.com")
 
-    assert "AAD token expired. Refreshing token." in dl.messages
+    assert f"{constants.INDENT}AAD token expired. Refreshing token." in dl.messages
     assert response["status_code"] == 200
 
 
@@ -357,7 +358,7 @@ def test_handle_response_item_display_name_already_in_use(setup_mocks):
     dl, mock_requests = setup_mocks
     response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameAlreadyInUse"})
     _handle_response(response, "GET", "http://example.com", "{}", False, 1)
-    expected = "Item name is reserved. Checking again in 60 seconds (Attempt 1/5)..."
+    expected = f"{constants.INDENT}Item name is reserved. Checking again in 60 seconds (Attempt 1/5)..."
     assert dl.messages == [expected]
 
 
