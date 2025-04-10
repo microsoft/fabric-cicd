@@ -62,8 +62,11 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
     if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing MirroredDatabase")
+        print_header("Publishing MirroredDatabases")
         items.publish_mirroreddatabase(fabric_workspace_obj)
+    if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing CopyJobs")
+        items.publish_copyjob(fabric_workspace_obj)
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
@@ -127,6 +130,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "SemanticModel",
         "Notebook",
         "Environment",
+        "CopyJob",
         "MirroredDatabase",
         "Lakehouse",
         "VariableLibrary",
