@@ -459,7 +459,7 @@ class FabricWorkspace:
                     max_retries=max_retries,
                 )
                 logger.debug(
-                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                    f"Moved {item.id} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
