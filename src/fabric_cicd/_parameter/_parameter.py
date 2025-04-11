@@ -36,6 +36,10 @@ class Parameter:
             "maximum": {"instance_pool_id", "replace_value", "item_name"},
         },
         "spark_pool_replace_value": {"type", "name"},
+        "variable_libraries": {
+            "minimum": {"library_name", "variables"},
+            "maximum": {"library_name", "variables"},
+        },
     }
 
     def __init__(
@@ -151,7 +155,7 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:2]
+        params = list(self.PARAMETER_KEYS.keys())[:4]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
