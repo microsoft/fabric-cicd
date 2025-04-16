@@ -217,7 +217,7 @@ class FabricWorkspace:
             item_description = item["description"]
             item_name = item["displayName"]
             item_guid = item["id"]
-            item_folder_id = item.get("folderId", None)
+            item_folder_id = item.get("folderId", "")
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
@@ -457,6 +457,9 @@ class FabricWorkspace:
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
                     max_retries=max_retries,
+                )
+                logger.debug(
+                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done

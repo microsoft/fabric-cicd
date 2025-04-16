@@ -17,7 +17,6 @@ from fabric_cicd._parameter._utils import check_parameter_structure
 logger = logging.getLogger(__name__)
 
 
-# TODO - binaries and compute.yml are read into files, but not actually needed since we only need the file
 def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all environment items from the repository.
@@ -27,6 +26,9 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
     """
+    # Check for ongoing publish
+    check_environment_publish_state(fabric_workspace_obj, True)
+
     item_type = "Environment"
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         # Only deploy the shell for environments
@@ -57,9 +59,6 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     item_path = fabric_workspace_obj.repository_items[item_type][item_name].path
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
 
-    # Check for ongoing publish
-    _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_check=True)
-
     # Update compute settings
     _update_compute_settings(fabric_workspace_obj, item_path, item_guid, item_name)
 
@@ -71,62 +70,58 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     # Remove libraries from live environment that are not in the repository
     _remove_libraries(fabric_workspace_obj, item_guid, repo_library_files)
 
-    logger.info("Publishing Libraries & Spark Settings")
     # Publish updated settings
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
     fabric_workspace_obj.endpoint.invoke(
         method="POST", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish"
     )
 
-    # Wait for ongoing publish to complete
-    _check_environment_publish_state(fabric_workspace_obj, item_guid)
-
-    logger.info(f"{constants.INDENT}Published")
+    logger.info(f"{constants.INDENT}Publish Submitted")
 
 
-def _check_environment_publish_state(
-    fabric_workspace_obj: FabricWorkspace, item_guid: str, initial_check: bool = False
-) -> None:
+def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
     """
-    Check the state of the environment publish operation.
+    Checks the publish state of environments after deployment
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        item_guid: The GUID of the environment item.
-        initial_check: Whether this is the initial check for ongoing publish.
+        initial_check: Flag to ignore publish failures on initial check.
     """
-    publishing = True
+    ongoing_publish = True
     iteration = 1
-    while publishing:
+
+    environments = fabric_workspace_obj.repository_items.get("Environment", {})
+
+    logger.info(f"Checking Environment Publish State for {[k for k in environments]}")
+
+    while ongoing_publish:
+        ongoing_publish = False
+
         response_state = fabric_workspace_obj.endpoint.invoke(
-            method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/"
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/"
         )
-        current_state = dpath.get(response_state, "body/properties/publishDetails/state", default="").lower()
 
-        if initial_check:
-            prepend_message = "Existing Environment publish is in progess."
-            pass_values = ["success", "failed", "cancelled"]
-            fail_values = []
+        for item in response_state["body"]["value"]:
+            item_name = item["displayName"]
+            item_state = dpath.get(item, "properties/publishDetails/state", default="").lower()
+            if item_name in environments and item_state == "running":
+                ongoing_publish = True
+            elif item_state in ["failed", "cancelled"] and not initial_check:
+                msg = f"Publish {item_state} for {item_name}"
+                raise Exception(msg)
 
-        else:
-            prepend_message = f"{constants.INDENT}Operation in progress."
-            pass_values = ["success"]
-            fail_values = ["failed", "cancelled"]
-
-        if current_state in pass_values:
-            publishing = False
-        elif current_state in fail_values:
-            msg = f"Publish {current_state} for Libraries"
-            raise Exception(msg)
-        else:
+        if ongoing_publish:
             handle_retry(
                 attempt=iteration,
                 base_delay=5,
                 max_retries=20,
                 response_retry_after=120,
-                prepend_message=prepend_message,
+                prepend_message=f"{constants.INDENT}Operation in progress.",
             )
             iteration += 1
+
+    if not initial_check:
+        logger.info(f"{constants.INDENT}Published.")
 
 
 def _update_compute_settings(

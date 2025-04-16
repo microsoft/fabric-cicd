@@ -6,7 +6,7 @@ from fabric_cicd._items._datapipeline import (
     publish_datapipelines,
     sort_datapipelines,
 )
-from fabric_cicd._items._environment import publish_environments
+from fabric_cicd._items._environment import check_environment_publish_state, publish_environments
 from fabric_cicd._items._lakehouse import publish_lakehouses
 from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
 from fabric_cicd._items._notebook import publish_notebooks
@@ -15,6 +15,7 @@ from fabric_cicd._items._semanticmodel import publish_semanticmodels
 from fabric_cicd._items._variablelibrary import publish_variablelibraries
 
 __all__ = [
+    "check_environment_publish_state",
     "publish_copyjob",
     "publish_datapipelines",
     "publish_environments",
