@@ -12,6 +12,7 @@ USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
 # Item Type
 ACCEPTED_ITEM_TYPES_UPN = (
+    "CopyJob",
     "DataPipeline",
     "Environment",
     "Notebook",
