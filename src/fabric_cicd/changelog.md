@@ -6,6 +6,16 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.14
+
+<span class="md-h2-subheader">Release Date: 2025-04-09</span>
+
+-   ✨ Optimized & beautified terminal output
+-   ✨ Added changelog to output of old version check
+-   🔧 Fix workspace folder deployments in root folder ([#221](https://github.com/microsoft/fabric-cicd/issues/221))
+-   🔧 Fix unpublish of workspace folders without publish ([#222](https://github.com/microsoft/fabric-cicd/issues/222))
+-   ⚡ Removed Colorama and Colorlog Dependency
+
 ## Version 0.1.13
 
 <span class="md-h2-subheader">Release Date: 2025-04-07</span>
