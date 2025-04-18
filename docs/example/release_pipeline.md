@@ -131,12 +131,12 @@ This approach is best suited for the Passed Arguments example found in the Deplo
                   scriptSource: 'filePath'
                   scriptPath: '.deploy/fabric_workspace.py'
                   arguments: |
-                    --spn_client_id $(client_id) # from Fabric_Deployment_Group_KeyVault`
-                    --spn_client_secret $(client_secret) # from Fabric_Deployment_Group_KeyVault`
-                    --tenant_id $(tenant_id) # from Fabric_Deployment_Group_KeyVault`
-                    --workspace_id $(workspace_id) # from Fabric_Deployment_Group`
-                    --environment $(environment_name) # from Fabric_Deployment_Group`
-                    --repository_directory $repository_directory # from Fabric_Deployment_Group`
+                    --spn_client_id $(client_id) # from Fabric_Deployment_Group_KeyVault
+                    --spn_client_secret $(client_secret) # from Fabric_Deployment_Group_KeyVault
+                    --tenant_id $(tenant_id) # from Fabric_Deployment_Group_KeyVault
+                    --workspace_id $(workspace_id) # from Fabric_Deployment_Group
+                    --environment $(environment_name) # from Fabric_Deployment_Group
+                    --repository_directory $repository_directory # from Fabric_Deployment_Group
                     --item_types_in_scope ${{ parameters.items_in_scope }}
     ```
 
