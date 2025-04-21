@@ -18,6 +18,7 @@ from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import print_header
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,10 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.repository_folders = {}
+        self.repository_items = {}
+        self.deployed_folders = {}
+        self.deployed_items = {}
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -115,12 +120,12 @@ class FabricWorkspace:
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
-        self._refresh_deployed_items()
-        self._refresh_repository_items()
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
         from fabric_cicd._parameter._parameter import Parameter
+
+        print_header("Validating Parameter File")
 
         # Initialize the parameter dict and Parameter object
         self.environment_parameter = {}
@@ -173,6 +178,12 @@ class FabricWorkspace:
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
                 item_path = directory
+                relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
+                relative_parent_path = "/".join(relative_path.split("/")[:-1])
+                if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+                    item_folder_id = self.repository_folders.get(relative_parent_path, "")
+                else:
+                    item_folder_id = ""
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -182,8 +193,15 @@ class FabricWorkspace:
 
                 # Add the item to the repository_items dictionary
                 self.repository_items[item_type][item_name] = Item(
-                    item_type, item_name, item_description, item_guid, item_logical_id, item_path
+                    type=item_type,
+                    name=item_name,
+                    description=item_description,
+                    guid=item_guid,
+                    logical_id=item_logical_id,
+                    path=item_path,
+                    folder_id=item_folder_id,
                 )
+
                 self.repository_items[item_type][item_name].collect_item_files()
 
     def _refresh_deployed_items(self) -> None:
@@ -199,13 +217,20 @@ class FabricWorkspace:
             item_description = item["description"]
             item_name = item["displayName"]
             item_guid = item["id"]
+            item_folder_id = item.get("folderId", "")
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
                 self.deployed_items[item_type] = {}
 
             # Add item details to the deployed_items dictionary
-            self.deployed_items[item_type][item_name] = Item(item_type, item_name, item_description, item_guid)
+            self.deployed_items[item_type][item_name] = Item(
+                type=item_type,
+                name=item_name,
+                description=item_description,
+                guid=item_guid,
+                folder_id=item_folder_id,
+            )
 
     def _replace_logical_ids(self, raw_file: str) -> str:
         """
@@ -386,12 +411,13 @@ class FabricWorkspace:
             definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
 
-        print()
         logger.info(f"Publishing {item_type} '{item_name}'")
 
         is_deployed = bool(item_guid)
 
         if not is_deployed:
+            combined_body = {**combined_body, **{"folderId": item.folder_id}}
+
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
@@ -422,9 +448,23 @@ class FabricWorkspace:
                 max_retries=max_retries,
             )
 
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
+            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+                # Move the item to the correct folder if it has been moved
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+                self.endpoint.invoke(
+                    method="POST",
+                    url=f"{self.base_api_url}/items/{item_guid}/move",
+                    body={"targetFolderId": f"{item.folder_id}"},
+                    max_retries=max_retries,
+                )
+                logger.debug(
+                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                )
+
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
-            logger.info("Published")
+            logger.info(f"{constants.INDENT}Published")
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
@@ -437,13 +477,178 @@ class FabricWorkspace:
         """
         item_guid = self.deployed_items[item_type][item_name].guid
 
-        print()
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
-            logger.info("Unpublished")
+            logger.info(f"{constants.INDENT}Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+
+    def _refresh_deployed_folders(self) -> None:
+        """
+        Converts the folder list payload into a structure of folder name and their ids
+
+        output should be like this:
+        {
+            "/Pipeline": "323eaa75-d70b-498c-8544-6c4219bf336e",
+            "/Notebook": "f802fd90-c70e-4d77-b079-538f617646d3",
+            "/Notebook/Processing": "36ed1a63-be82-4a7a-9364-2e4ff3a66b31"
+        }
+
+        """
+        self.deployed_folders = {}
+        request_url = f"{self.base_api_url}/folders"
+        folders = []
+
+        while request_url:
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/folders/list-folders
+            response = self.endpoint.invoke(method="GET", url=request_url)
+
+            # Handle cases where the response body is empty
+            folder_response = response["body"].get("value", [])
+            folders.extend(folder for folder in folder_response)
+
+            request_url = response["header"].get("continuationUri", None)
+
+        # Create a lookup table for folders by their ID
+        folder_lookup = {folder["id"]: folder for folder in folders}
+
+        # Build the folder hierarchy
+        folder_hierarchy = {}
+
+        def get_full_path(folder: dict) -> str:
+            """Recursively build the full path for a folder"""
+            parent_id = folder.get("parentFolderId")
+            if parent_id:
+                parent_folder = folder_lookup.get(parent_id)
+                if parent_folder:
+                    return f"{get_full_path(parent_folder)}/{folder['displayName']}"
+            return f"/{folder['displayName']}"
+
+        for folder in folders:
+            full_path = get_full_path(folder)
+            folder_hierarchy[full_path] = folder["id"]
+
+        self.deployed_folders = folder_hierarchy
+
+    def _refresh_repository_folders(self) -> dict:
+        """
+        Converts the folder list payload into a structure of folder name and their ids,
+        skipping empty folders or folders that only contain other empty folders.
+
+        output should be like this:
+        {
+            "/Pipeline": "",
+            "/Notebook": "",
+            "/Notebook/Processing": ""
+        }
+        """
+        self.repository_folders = {}
+
+        root_path = Path(self.repository_directory)
+        folder_hierarchy = {}
+
+        # Walk through the directory structure
+        for root, dirs, files in os.walk(root_path):
+            folder = Path(root)
+            if not folder.is_dir():
+                continue
+
+            # Check if a `.platform` file exists directly beneath the folder
+            if ".platform" in files:
+                # Skip this folder and its subfolders
+                dirs.clear()
+                continue
+
+            # Check if any parent folder has already been excluded
+            if any((Path(root).parent / ".platform").exists() for root in Path(root).parents if root != root_path):
+                continue
+
+            # Skip empty folders
+            if not any(Path.iterdir(Path(root))):
+                continue
+
+            # Ensure the folder contains a subfolder, and that subfolder contains a `.platform` file
+            subfolders = [subfolder for subfolder in folder.iterdir() if subfolder.is_dir()]
+            if not any((subfolder / ".platform").exists() for subfolder in subfolders):
+                continue
+
+            # Build the relative path from the root and convert it to the desired format
+            relative_path = f"/{Path(root).relative_to(root_path).as_posix()}"
+
+            # Skip the root directory itself ("/.")
+            if relative_path == "/.":
+                continue
+
+            folder_hierarchy[relative_path] = ""
+
+        self.repository_folders = folder_hierarchy
+
+    def _publish_folders(self) -> None:
+        """Publishes all folders from the repository."""
+        # Sort folders by the number of '/' in their paths (ascending order)
+        sorted_folders = sorted(self.repository_folders.keys(), key=lambda path: path.count("/"))
+        print_header("Publishing Workspace Folders")
+        logger.info("Publishing Workspace Folders")
+        for folder_path in sorted_folders:
+            if folder_path in self.deployed_folders:
+                # Folder already deployed, update local hierarchy
+                self.repository_folders[folder_path] = self.deployed_folders[folder_path]
+                logger.debug(f"Folder exists: {folder_path}")
+                continue
+
+            # Publish the folder
+            folder_name = folder_path.split("/")[-1]
+            folder_parent_path = "/".join(folder_path.split("/")[:-1])
+            folder_parent_id = self.repository_folders.get(folder_parent_path, None)
+
+            request_body = {"displayName": folder_name}
+            if folder_parent_id:
+                request_body["parentFolderId"] = folder_parent_id
+
+            request_url = f"{self.base_api_url}/folders"
+            response = self.endpoint.invoke(method="POST", url=request_url, body=request_body)
+
+            # Update local hierarchy with the new folder ID
+            self.repository_folders[folder_path] = response["body"]["id"]
+            logger.debug(f"Published folder: {folder_path}")
+
+        logger.info(f"{constants.INDENT}Published")
+
+    def _unpublish_folders(self) -> None:
+        """Unublishes all empty folders in workspace."""
+        # Sort folders by the number of '/' in their paths (descending order)
+        sorted_folder_ids = [
+            self.deployed_folders[key]
+            for key in sorted(self.deployed_folders.keys(), key=lambda path: path.count("/"), reverse=True)
+        ]
+
+        logger.info("Unpublishing Workspace Folders")
+
+        ## any folder that is not in folderid_dict is an orphaned folder
+
+        # Get folders with items
+        deployed_folder_ids_with_items = []
+
+        for items in self.deployed_items.values():
+            for item in items.values():
+                deployed_folder_ids_with_items.append(item.folder_id)
+
+        # Pop all folders
+
+        for folder_id in sorted_folder_ids:
+            if folder_id not in deployed_folder_ids_with_items:
+                # Folder deployed, but not in repository
+
+                # Delete the folder from the workspace
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/folders/delete-folder
+                try:
+                    self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/folders/{folder_id}")
+                    logger.debug(f"Unpublished folder: {folder_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to unpublish folder {folder_id}.  Raw exception: {e}")
+
+        logger.info(f"{constants.INDENT}Unpublished")

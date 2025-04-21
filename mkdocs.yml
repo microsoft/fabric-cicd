@@ -14,7 +14,11 @@ nav:
           - Item Types: how_to/item_types.md
           - Parameterization: how_to/parameterization.md
           - Optional Features: how_to/optional_feature.md
-    - Code Samples: code_sample.md
+    - Examples:
+          - Examples: example/index.md
+          - Authentication: example/authentication.md
+          - Deployment Variables: example/deployment_variable.md
+          - Release Pipelines: example/release_pipeline.md
     - Code Reference: code_reference.md
     - Contribution: contribution.md
     - Changelog: changelog.md
@@ -119,6 +123,9 @@ markdown_extensions:
           pygments_lang_class: true
     - pymdownx.inlinehilite
     - pymdownx.snippets
+    - pymdownx.superfences
+    - pymdownx.tabbed:
+          alternate_style: true
     - pymdownx.superfences
 
 copyright: Copyright © Microsoft Corporation

@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.12"
+VERSION = "0.1.14"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FEATURE_FLAG = set()
@@ -77,3 +77,6 @@ PARAMETER_MSGS = {
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }
+
+
+INDENT = "->"

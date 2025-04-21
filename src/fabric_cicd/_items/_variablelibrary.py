@@ -6,7 +6,7 @@
 import json
 import logging
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
             method="PATCH", url=f"{fabric_workspace_obj.base_api_url}/VariableLibraries/{item_obj.guid}", body=body
         )
 
-        logger.info(f"Active value set changed to '{active_value_set}'")
+        logger.info(f"{constants.INDENT}Active value set changed to '{active_value_set}'")
 
     else:
         logger.warning(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")

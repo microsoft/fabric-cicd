@@ -3,38 +3,37 @@
 
 """Utility functions for checking file types and versions."""
 
-from __future__ import annotations
-
 import logging
 import re
 from pathlib import Path
 
 import filetype
 import requests
-from colorama import Fore, Style
 from packaging import version
 
 import fabric_cicd.constants as constants
+from fabric_cicd._common._color import Fore, Style
 from fabric_cicd._common._exceptions import FileTypeError
 
 logger = logging.getLogger(__name__)
 
 
-def parse_changelog(changelog_path: Path | None = None) -> dict[str, list[str]]:
-    """Parse the changelog file and return a dictionary of versions with their changes.
+def parse_changelog() -> dict[str, list[str]]:
+    """Parse the changelog file and return a dictionary of versions with their changes."""
+    content = None
 
-    Args:
-        changelog_path: Path to the changelog file. If None, uses the default path
-            relative to the module.
-    """
-    if changelog_path is None:
-        changelog_path = Path(__file__).parent.parent.parent.parent / "docs" / "changelog.md"
-
-    if not changelog_path.exists():
+    try:
+        response = requests.get(
+            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/src/fabric_cicd/changelog.md"
+        )
+        if response.status_code == 200:
+            content = response.text
+        else:
+            logger.debug(f"Failed to fetch online changelog: HTTP {response.status_code}")
+            return {}
+    except Exception as e:
+        logger.debug(f"Error fetching online changelog: {e}")
         return {}
-
-    with Path.open(changelog_path, encoding="utf-8") as f:
-        content = f.read()
 
     version_pattern = r"## Version (\d+\.\d+\.\d+).*?(?=## Version|\Z)"
     changelog_dict = {}

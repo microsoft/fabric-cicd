@@ -5,13 +5,57 @@
 
 import inspect
 import logging
+import re
 import sys
 import traceback
+from logging import LogRecord
 from pathlib import Path
+from typing import ClassVar
 
-import colorlog
-
+from fabric_cicd import constants
 from fabric_cicd._common import _exceptions
+from fabric_cicd._common._color import Fore, Style
+
+
+class CustomFormatter(logging.Formatter):
+    LEVEL_COLORS: ClassVar[dict[str, str]] = {
+        "DEBUG": Fore.BLACK,
+        "INFO": Fore.WHITE + Style.BRIGHT,
+        "WARNING": Fore.YELLOW,
+        "ERROR": Fore.RED,
+        "CRITICAL": Style.BRIGHT + Fore.RED,
+    }
+
+    def format(self, record: LogRecord) -> str:
+        level_color = self.LEVEL_COLORS.get(record.levelname, "")
+        level_name = {
+            "WARNING": "warn",
+            "DEBUG": "debug",
+            "INFO": "info",
+            "ERROR": "error",
+            "CRITICAL": "crit",
+        }.get(record.levelname, "unknown")
+
+        level_name = f"{level_color}[{level_name}]"
+        timestamp = f"{self.formatTime(record, self.datefmt)}"
+        message = f"{record.getMessage()}{Style.RESET_ALL}"
+
+        # indent if the message contains "->"
+        if constants.INDENT in message:
+            message = message.replace(constants.INDENT, "")
+            full_message = f"{' ' * 8} {timestamp} - {message}"
+        else:
+            # Calculate visual length by removing ANSI escape codes
+
+            ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+            # Get visual length of level_name without ANSI codes
+            visual_level_length = len(ansi_escape.sub("", level_name))
+            # Pad to 16 visual characters
+            padding = " " * max(0, 8 - visual_level_length)
+
+            full_message = f"{level_name}{padding} {timestamp} - {message}"
+        return full_message
 
 
 def configure_logger(level: int = logging.INFO) -> None:
@@ -36,10 +80,9 @@ def configure_logger(level: int = logging.INFO) -> None:
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
     console_handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s[%(levelname)s] %(asctime)s - %(message)s",
+        CustomFormatter(
+            "[%(levelname)s] %(asctime)s - %(message)s",
             datefmt="%H:%M:%S",
-            log_colors={"DEBUG": "cyan", "INFO": "green", "WARNING": "yellow", "ERROR": "red", "CRITICAL": "bold_red"},
         )
     )
 
@@ -91,3 +134,21 @@ def exception_handler(exception_type: type[BaseException], exception: BaseExcept
     else:
         # If the exception is not from _common._exceptions, use the default exception handler
         sys.__excepthook__(exception_type, exception, traceback)
+
+
+def print_header(message: str) -> None:
+    """
+    Prints a header message with a decorative line above and below it.
+
+    Args:
+        message: The header message to print.
+    """
+    line_separator = "#" * 100
+    formatted_message = f"########## {message}"
+    formatted_message = f"{formatted_message} {line_separator[len(formatted_message) + 1 :]}"
+
+    print()  # Print a blank line before the header
+    print(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}{Style.BRIGHT}{formatted_message}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
+    print()
