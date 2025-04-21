@@ -68,69 +68,39 @@ class Parameter:
         """Load parameters if file is present."""
         self.environment_parameter = {}
 
-        if self.parameter_file_path.is_file():
-            with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
-                yaml_content = yaml_file.read()
-                yaml_content = replace_variables_in_parameter_file(yaml_content)
-                validation_errors = self._validate_yaml_content(yaml_content)
-                if not validation_errors:
-                    self.environment_parameter = yaml.full_load(yaml_content)
+        if self._validate_parameter_file_exists():
+            is_valid, environment_parameter = self._validate_load_parameters_to_dict()
+            if is_valid:
+                self.environment_parameter = environment_parameter
 
-    def _validate_parameter_file(self) -> bool:
-        """Validate the parameter file."""
-        validation_steps = [
-            ("parameter file exists", self._validate_parameter_file_exists),
-            ("parameter file load and YAML content", self._validate_load_parameters_to_dict),
-            ("parameter names", self._validate_parameter_names),
-            ("parameter file structure", self._validate_parameter_structure),
-            ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
-            ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
-        ]
-        for step, validation_func in validation_steps:
-            logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
-            is_valid, msg = validation_func()
-            if not is_valid:
-                # Return True for specific not is_valid cases
-                if step == "parameter file exists" or (step == "parameter file structure" and msg == "old structure"):
-                    logger.warning(constants.PARAMETER_MSGS["terminate"].format(msg))
-                    return True
-                # Throw warning and discontinue validation check for absent parameter
-                if step in ("find_replace parameter", "spark_pool parameter") and msg == "parameter not found":
-                    not_found_msg = constants.PARAMETER_MSGS[msg].format(step.split()[0])
-                    logger.warning(not_found_msg)
-                    continue
-                # Otherwise, return False with error message
-                logger.error(constants.PARAMETER_MSGS["failed"].format(msg))
-                return False
-            logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-
-        # Return True if all validation steps pass
-        logger.info("Parameter file validation passed")
-        return True
-
-    def _validate_parameter_file_exists(self) -> tuple[bool, str]:
+    def _validate_parameter_file_exists(self) -> bool:
         """Validate the parameter file exists."""
         if not self.parameter_file_path.is_file():
             logger.warning(constants.PARAMETER_MSGS["not found"].format(self.parameter_file_path))
-            return False, "not found"
+            return False
 
-        return True, constants.PARAMETER_MSGS["found"]
+        logger.debug(constants.PARAMETER_MSGS["found"])
+        return True
 
-    def _validate_load_parameters_to_dict(self) -> tuple[bool, str]:
+    def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
         """Validate loading the parameter file to a dictionary."""
+        parameter_dict = {}
         try:
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
                 validation_errors = self._validate_yaml_content(yaml_content)
                 if validation_errors:
-                    return False, validation_errors
+                    logger.error(validation_errors)
+                    return False, parameter_dict
 
-                self.environment_parameter = yaml.full_load(yaml_content)
+                parameter_dict = yaml.full_load(yaml_content)
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
-                return True, constants.PARAMETER_MSGS["valid load"]
+                logger.debug(constants.PARAMETER_MSGS["valid load"])
+                return True, parameter_dict
         except yaml.YAMLError as e:
-            return False, constants.PARAMETER_MSGS["invalid load"].format(e)
+            logger.error(constants.PARAMETER_MSGS["invalid load"].format(e))
+            return False, parameter_dict
 
     def _validate_yaml_content(self, content: str) -> list[str]:
         """Validate the yaml content of the parameter file."""
@@ -148,6 +118,36 @@ class Parameter:
                 errors.append(msgs["quote"].format(quote))
 
         return errors
+
+    def _validate_parameter_file(self) -> bool:
+        """Validate the parameter file."""
+        if not self.environment_parameter:
+            logger.warning(constants.PARAMETER_MSGS["terminate"])
+            return True
+
+        validation_steps = [
+            ("parameter names", self._validate_parameter_names),
+            ("parameter file structure", self._validate_parameter_structure),
+            ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
+            ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
+        ]
+        for step, validation_func in validation_steps:
+            logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
+            is_valid, msg = validation_func()
+            if not is_valid:
+                # Throw warning and discontinue validation check for absent parameter
+                if step in ("find_replace parameter", "spark_pool parameter") and msg == "parameter not found":
+                    not_found_msg = constants.PARAMETER_MSGS[msg].format(step.split()[0])
+                    logger.warning(not_found_msg)
+                    continue
+                # Otherwise, return False with error message
+                logger.error(constants.PARAMETER_MSGS["failed"].format(msg))
+                return False
+            logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
+
+        # Return True if all validation steps pass
+        logger.info("Parameter file validation passed")
+        return True
 
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
