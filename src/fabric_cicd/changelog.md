@@ -11,9 +11,9 @@ The following contains all major, minor, and patch version release notes.
 <span class="md-h2-subheader">Release Date: 2025-04-21</span>
 
 -   🔧 Fix folders moving with every publish ([#236](https://github.com/microsoft/fabric-cicd/issues/236))
--   ⚡ Inrtoduce parallel deployments to reduce publish times ([#237](https://github.com/microsoft/fabric-cicd/issues/237))
+-   ⚡ Introduce parallel deployments to reduce publish times ([#237](https://github.com/microsoft/fabric-cicd/issues/237))
 -   ⚡ Improvements to check version logic
--   📝 Updated example section in docs
+-   📝 Updated Examples section in docs
 
 ## Version 0.1.14
 
