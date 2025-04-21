@@ -35,6 +35,15 @@
     color: var(--md-primary-fg-color--dark);
 }
 
+.md-typeset .tabbed-labels > label > [href]:first-child {
+    color: var(--md-typeset-a-color);
+    text-decoration: inherit;
+}
+
+.js .md-typeset .tabbed-labels:before {
+    background: var(--md-typeset-a-color);
+}
+
 /*Code inside of tables are of white background*/
 .md-typeset table code {
     background-color: var(--md-primary-bg-color);

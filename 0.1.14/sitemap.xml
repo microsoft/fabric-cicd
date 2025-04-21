@@ -2,46 +2,58 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/about/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/changelog/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/code_reference/</loc>
-         <lastmod>2025-04-09</lastmod>
-    </url>
-    <url>
-         <loc>https://microsoft.github.io/fabric-cicd/0.1.14/code_sample/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/contribution/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.14/example/</loc>
+         <lastmod>2025-04-21</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.14/example/authentication/</loc>
+         <lastmod>2025-04-21</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.14/example/deployment_variable/</loc>
+         <lastmod>2025-04-21</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/0.1.14/example/release_pipeline/</loc>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/how_to/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/how_to/getting_started/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/how_to/item_types/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/how_to/optional_feature/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/0.1.14/how_to/parameterization/</loc>
-         <lastmod>2025-04-09</lastmod>
+         <lastmod>2025-04-21</lastmod>
     </url>
 </urlset>
