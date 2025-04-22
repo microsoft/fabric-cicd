@@ -38,6 +38,8 @@ class Parameter:
         "spark_pool_replace_value": {"type", "name"},
     }
 
+    LOAD_ERROR_MSG = ""
+
     def __init__(
         self,
         repository_directory: str,
@@ -75,12 +77,7 @@ class Parameter:
 
     def _validate_parameter_file_exists(self) -> bool:
         """Validate the parameter file exists."""
-        if not self.parameter_file_path.is_file():
-            logger.warning(constants.PARAMETER_MSGS["not found"].format(self.parameter_file_path))
-            return False
-
-        logger.debug(constants.PARAMETER_MSGS["found"])
-        return True
+        return self.parameter_file_path.is_file()
 
     def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
         """Validate loading the parameter file to a dictionary."""
@@ -91,15 +88,14 @@ class Parameter:
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
                 validation_errors = self._validate_yaml_content(yaml_content)
                 if validation_errors:
-                    logger.error(validation_errors)
+                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(validation_errors)
                     return False, parameter_dict
 
                 parameter_dict = yaml.full_load(yaml_content)
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
-                logger.debug(constants.PARAMETER_MSGS["valid load"])
                 return True, parameter_dict
         except yaml.YAMLError as e:
-            logger.error(constants.PARAMETER_MSGS["invalid load"].format(e))
+            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
 
     def _validate_yaml_content(self, content: str) -> list[str]:
@@ -107,8 +103,26 @@ class Parameter:
         errors = []
         msgs = constants.PARAMETER_MSGS["invalid content"]
 
+        # Regex patterns to match all valid UTF-8 characters
+        utf8_pattern = r"""
+        (
+        [\x00-\x7F] # Single-byte sequences (ASCII)
+        | [\xC2-\xDF][\x80-\xBF] # Two-byte sequences
+        | [\xE0][\xA0-\xBF][\x80-\xBF] # Three-byte sequences (special case)
+        | [\xE1-\xEC][\x80-\xBF]{2} # Three-byte sequences
+        | [\xED][\x80-\x9F][\x80-\xBF] # Three-byte sequences (special case)
+        | [\xEE-\xEF][\x80-\xBF]{2} # Three-byte sequences
+        | [\xF0][\x90-\xBF][\x80-\xBF]{2} # Four-byte sequences (special case)
+        | [\xF1-\xF3][\x80-\xBF]{3} # Four-byte sequences
+        | [\xF4][\x80-\x8F][\x80-\xBF]{2} # Four-byte sequences (special case)
+        )
+        """
+
+        # Compile the pattern with the re.VERBOSE flag to allow comments and whitespace
+        compiled_utf8_pattern = re.compile(utf8_pattern, re.VERBOSE)
+
         # Check for invalid characters (non-UTF-8)
-        if not re.match(r"^[\u0000-\uFFFF]*$", content):
+        if not re.match(compiled_utf8_pattern, content):
             errors.append(msgs["char"])
 
         # Check for unclosed quotes
@@ -119,13 +133,21 @@ class Parameter:
 
         return errors
 
+    def _validate_parameter_load(self) -> tuple[bool, str]:
+        """Validate the parameter file load."""
+        if not self.environment_parameter:
+            if not self._validate_parameter_file_exists():
+                logger.warning(constants.PARAMETER_MSGS["not found"].format(self.parameter_file_path))
+                return False, "not found"
+            logger.debug(constants.PARAMETER_MSGS["found"])
+            return False, self.LOAD_ERROR_MSG
+
+        return True, constants.PARAMETER_MSGS["valid load"]
+
     def _validate_parameter_file(self) -> bool:
         """Validate the parameter file."""
-        if not self.environment_parameter:
-            logger.warning(constants.PARAMETER_MSGS["terminate"])
-            return True
-
         validation_steps = [
+            ("parameter file load", self._validate_parameter_load),
             ("parameter names", self._validate_parameter_names),
             ("parameter file structure", self._validate_parameter_structure),
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
@@ -135,6 +157,13 @@ class Parameter:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
             is_valid, msg = validation_func()
             if not is_valid:
+                # Return True for specific not is_valid cases
+                if step in ("parameter file load", "parameter file structure") and msg in (
+                    "not found",
+                    "old structure",
+                ):
+                    logger.warning(constants.PARAMETER_MSGS["terminate"].format(msg))
+                    return True
                 # Throw warning and discontinue validation check for absent parameter
                 if step in ("find_replace parameter", "spark_pool parameter") and msg == "parameter not found":
                     not_found_msg = constants.PARAMETER_MSGS[msg].format(step.split()[0])

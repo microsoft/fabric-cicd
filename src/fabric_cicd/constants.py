@@ -45,7 +45,7 @@ PARAMETER_MSGS = {
     "validating": "Validating {}",
     "passed": "Validation passed: {}",
     "failed": "Validation failed with error: {}",
-    "terminate": "Validation terminated due to an empty parameter dictionary",
+    "terminate": "Validation terminated: {}",
     "found": f"Found {PARAMETER_FILE_NAME} file",
     "not found": "Parameter file not found with path: {}",
     "invalid content": INVALID_YAML,

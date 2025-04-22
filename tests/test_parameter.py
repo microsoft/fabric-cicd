@@ -352,25 +352,112 @@ def test_validate_yaml_content(parameter_object, mock_constants):
     ]
 
 
-# @pytest.mark.parametrize(
-#    ("parameter_file_name", "expected_output", "msg"),
-#    [("old_parameter.yml", False, "old structure"), ("invalid_parameter.yml", False, "invalid structure")],
-# )
-# def test_validate_structure(parameter_file_name, expected_output, msg):
-#    """Test the validation of the parameter file structure"""
-# old structure
-#    param_obj = Parameter(
-#        repository_directory=repository_directory,
-#        item_type_in_scope=item_type_in_scope,
-#        environment=target_environment,
-#        parameter_file_name=parameter_file_name,
-#    )
+@pytest.mark.parametrize(
+    ("parameter_file_name", "expected_output", "msg"),
+    [("old_parameter.yml", False, "old structure")],  # , ("invalid_parameter.yml", False, "invalid structure")],
+)
+def test_validate_structure(
+    repository_directory, item_type_in_scope, target_environment, parameter_file_name, expected_output, msg
+):
+    """Test the validation of the parameter file structure"""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name=parameter_file_name,
+    )
 
-#    assert param_obj._validate_parameter_file_structure() == (expected_output, msg)
-# invalid structure
+    assert param_obj._validate_parameter_structure() == (expected_output, msg)
 
 
-# def test_invalid_cases(parameter_object, mock_constants):
+def test_validate_optional_values(parameter_object):
+    """Test the _validate_optional_values method."""
+    param_dict = {
+        "item_type": "Notebook",
+        "item_name": ["Hello World"],
+        "file_path": "/Hello World.Notebook/notebook-content.py",
+    }
+    is_valid, msg = parameter_object._validate_optional_values("find_replace", param_dict)
+    assert is_valid
+    assert msg == "Optional values in find_replace are valid"
+
+
+def test_validate_spark_pool_replace_value(parameter_object):
+    """Test the _validate_spark_pool_replace_value method."""
+    replace_value = {
+        "PPE": {"type": "Capacity", "name": "CapacityPool_Large_PPE"},
+        "PROD": {"type": "Capacity", "name": "CapacityPool_Large_PROD"},
+    }
+    is_valid, msg = parameter_object._validate_spark_pool_replace_value(replace_value)
+    assert is_valid
+    assert msg == "Values in 'replace_value' dict in spark_pool are valid"
+
+
+def test_validate_find_replace_replace_value(parameter_object):
+    """Test the _validate_find_replace_replace_value method."""
+    replace_value = {
+        "PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733",
+        "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0",
+    }
+    is_valid, msg = parameter_object._validate_find_replace_replace_value(replace_value)
+    assert is_valid
+    assert msg == "Values in 'replace_value' dict in find_replace are valid"
+
+
+def test_validate_data_type_copy(parameter_object):
+    """Test the _validate_data_type method."""
+    assert parameter_object._validate_data_type("Notebook", "string", "item_type", "find_replace")[0]
+    assert parameter_object._validate_data_type(["Hello World"], "string or list[string]", "item_name", "find_replace")[
+        0
+    ]
+    assert not parameter_object._validate_data_type(123, "string", "item_type", "find_replace")[0]
+
+
+def test_validate_environment(parameter_object):
+    """Test the _validate_environment method."""
+    replace_value = {
+        "PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733",
+        "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0",
+    }
+    assert parameter_object._validate_environment(replace_value)
+
+
+def test_validate_item_type(parameter_object):
+    """Test the _validate_item_type method."""
+    assert parameter_object._validate_item_type("Notebook")[0]
+    assert not parameter_object._validate_item_type("InvalidType")[0]
+
+
+def test_validate_item_name(parameter_object, repository_directory):
+    """Test the _validate_item_name method."""
+    # Create a mock .platform file
+    platform_file = repository_directory / "Hello World.Notebook" / ".platform"
+    platform_file.parent.mkdir(parents=True, exist_ok=True)
+    platform_file.write_text(
+        """
+        {
+          "metadata": {
+            "type": "Notebook",
+            "displayName": "Hello World"
+          }
+        }
+        """
+    )
+    assert parameter_object._validate_item_name("Hello World")[0]
+    assert not parameter_object._validate_item_name("Invalid Name")[0]
+
+
+def test_validate_file_path(parameter_object, repository_directory):
+    """Test the _validate_file_path method."""
+    # Create a mock file
+    file_path = repository_directory / "Hello World.Notebook" / "notebook-content.py"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text("print('Hello World')")
+    assert parameter_object._validate_file_path("/Hello World.Notebook/notebook-content.py")[0]
+    assert not parameter_object._validate_file_path("/InvalidPath/notebook-content.py")[0]
+
+
+# def test_invalid_cases(parameter_object, mock_constants)
 
 # parameter not present
 # multiple parameter
