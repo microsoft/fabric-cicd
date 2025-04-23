@@ -5,6 +5,7 @@
 
 import json
 import logging
+import time
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
@@ -38,12 +39,37 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             skip_publish_logging=True,
         )
 
+        checkSQLEndpointProvisionStatus(fabric_workspace_obj, item_name, item.guid)
+
         logger.info(f"{constants.INDENT}Published")
 
     # Need all lakehouses published first to protect interrelationships
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
         for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
             process_shortcuts(fabric_workspace_obj, item_obj)
+
+
+def checkSQLEndpointProvisionStatus(fabric_workspace_obj: FabricWorkspace, displayName: str, guid: str):
+    # check the SQL endpoint status of the published lakehouses
+    sql_endpoint_Status = None
+
+    for attempt in range(3):
+        response_state = fabric_workspace_obj.endpoint.invoke(
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{guid}"
+        )
+
+        sql_endpoint_Status = response_state["body"]["properties"]["sqlEndpointProperties"]["provisioningStatus"]
+
+        if sql_endpoint_Status == "Success":
+            print("SQL Endpoint provisioned successfully")
+            break
+
+        if sql_endpoint_Status == "Failed":
+            raise Exception(f"Cannot resolve SQL endpoint for lakehouse {displayName}")
+
+        print("Waiting for SQL Endpoint.....")
+
+        time.sleep(30)
 
 
 def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
