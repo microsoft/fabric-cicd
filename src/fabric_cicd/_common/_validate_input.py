@@ -114,6 +114,29 @@ def validate_workspace_id(input_value: str) -> str:
     return input_value
 
 
+def validate_workspace_name(input_value: str) -> str:
+    """
+    Validate the workspace name.
+
+    Args:
+        input_value: The input value to validate.
+    """
+    validate_data_type("string", "workspace_name", input_value)
+
+    return input_value
+
+def validate_workspace_id_or_name(workspace_name: str, workspace_id: str) -> None:
+    """
+    Validate if either workspace_id or workspace_name has been defined.
+
+    Args:
+        workspace_name: The workspace name to validate.
+        workspace_id: The workspace ID to validate.
+    """
+    if workspace_name == "N/A" and workspace_id == "N/A":
+        msg = "Either workspace_name or workspace_id must be specified."
+        raise InputError(msg, logger)
+
 def validate_environment(input_value: str) -> str:
     """
     Validate the environment.

@@ -28,10 +28,11 @@ class FabricWorkspace:
 
     def __init__(
         self,
-        workspace_id: str,
         repository_directory: str,
         item_type_in_scope: list[str],
         environment: str = "N/A",
+        workspace_id: str = "N/A",
+        workspace_name: str = "N/A",
         token_credential: TokenCredential = None,
         **kwargs,
     ) -> None:
@@ -40,6 +41,7 @@ class FabricWorkspace:
 
         Args:
             workspace_id: The ID of the workspace to interact with.
+            workspace_name: The name of the workspace to interact with.
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
@@ -51,6 +53,14 @@ class FabricWorkspace:
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
+            ...     repository_directory="/path/to/repo",
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ... )
+
+            Basic usage with workspace_name
+            >>> from fabric_cicd import FabricWorkspace
+            >>> workspace = FabricWorkspace(
+            ...     workspace_name="your-workspace-name",
             ...     repository_directory="/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
             ... )
@@ -86,6 +96,8 @@ class FabricWorkspace:
             validate_repository_directory,
             validate_token_credential,
             validate_workspace_id,
+            validate_workspace_id_or_name,
+            validate_workspace_name,
         )
 
         # Initialize endpoint
@@ -95,6 +107,11 @@ class FabricWorkspace:
                 DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
             )
         )
+
+        # Set workspace_id according to workspace_name
+        validate_workspace_id_or_name(workspace_name, workspace_id)
+        if workspace_id == "N/A":
+            workspace_id = self._resolve_workspace_id(validate_workspace_name(workspace_name))
 
         # Validate and set class variables
         self.workspace_id = validate_workspace_id(workspace_id)
@@ -120,6 +137,14 @@ class FabricWorkspace:
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
+
+    def _resolve_workspace_id(self, workspace_name: str) -> str:
+        """Resolve workspace ID based on the workspace name given."""
+        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces")
+        for workspace in response["body"]["value"]:
+            if workspace["displayName"] == workspace_name:
+                return workspace["id"]
+        return None
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
