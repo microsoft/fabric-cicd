@@ -39,7 +39,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             skip_publish_logging=True,
         )
 
-        checkSQLEndpointProvisionStatus(fabric_workspace_obj, item_name, item.guid)
+        check_sqlendpoint_provision_status(fabric_workspace_obj, item_name, item.guid)
 
         logger.info(f"{constants.INDENT}Published")
 
@@ -49,23 +49,32 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             process_shortcuts(fabric_workspace_obj, item_obj)
 
 
-def checkSQLEndpointProvisionStatus(fabric_workspace_obj: FabricWorkspace, displayName: str, guid: str):
-    # check the SQL endpoint status of the published lakehouses
-    sql_endpoint_Status = None
+def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, display_name: str, guid: str) -> None:
+    """
+    Check the SQL endpoint status of the published lakehouses
 
-    for attempt in range(3):
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
+        display_name: The display name of the lakehouse item
+        guid: The GUID of the lakehouse item
+
+    """
+    sql_endpoint_status = None
+
+    for _attempt in range(3):
         response_state = fabric_workspace_obj.endpoint.invoke(
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{guid}"
         )
 
-        sql_endpoint_Status = response_state["body"]["properties"]["sqlEndpointProperties"]["provisioningStatus"]
+        sql_endpoint_status = response_state["body"]["properties"]["sqlEndpointProperties"]["provisioningStatus"]
 
-        if sql_endpoint_Status == "Success":
+        if sql_endpoint_status == "Success":
             print("SQL Endpoint provisioned successfully")
             break
 
-        if sql_endpoint_Status == "Failed":
-            raise Exception(f"Cannot resolve SQL endpoint for lakehouse {displayName}")
+        if sql_endpoint_status == "Failed":
+            msg = f"Cannot resolve SQL endpoint for lakehouse {display_name}"
+            raise Exception(msg)
 
         print("Waiting for SQL Endpoint.....")
 
