@@ -8,6 +8,7 @@ import logging
 import time
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             skip_publish_logging=True,
         )
 
-        check_sqlendpoint_provision_status(fabric_workspace_obj, item_name, item.guid)
+        check_sqlendpoint_provision_status(fabric_workspace_obj, item)
 
         logger.info(f"{constants.INDENT}Published")
 
@@ -49,7 +50,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             process_shortcuts(fabric_workspace_obj, item_obj)
 
 
-def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, display_name: str, guid: str) -> None:
+def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item: Item) -> None:
     """
     Check the SQL endpoint status of the published lakehouses
 
@@ -63,7 +64,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, di
 
     for _attempt in range(3):
         response_state = fabric_workspace_obj.endpoint.invoke(
-            method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{guid}"
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item.guid}"
         )
 
         sql_endpoint_status = response_state["body"]["properties"]["sqlEndpointProperties"]["provisioningStatus"]
@@ -73,8 +74,8 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, di
             break
 
         if sql_endpoint_status == "Failed":
-            msg = f"Cannot resolve SQL endpoint for lakehouse {display_name}"
-            raise Exception(msg)
+            msg = f"Cannot resolve SQL endpoint for lakehouse {item.name}"
+            raise FailedPublishedItemStatusError(msg, logger)
 
         print("Waiting for SQL Endpoint.....")
 
