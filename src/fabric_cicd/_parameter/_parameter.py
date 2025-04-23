@@ -332,7 +332,7 @@ class Parameter:
                     return False, msg
 
             if environment_dict["type"] not in ["Capacity", "Workspace"]:
-                return False, msgs["invalid value"].format(environment, environment_dict["type"])
+                return False, msgs["invalid value"].format(environment)
 
         return True, constants.PARAMETER_MSGS["valid replace value"].format("spark_pool")
 
