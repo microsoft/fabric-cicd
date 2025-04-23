@@ -6,6 +6,8 @@
 import json
 import logging
 
+import dpath.util
+
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
@@ -59,17 +61,18 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         item: The item object to check the SQL endpoint status for
 
     """
-    ongoing_provision_status = "True"
     iteration = 1
 
-    while ongoing_provision_status:
+    while True:
         sql_endpoint_status = None
 
         response_state = fabric_workspace_obj.endpoint.invoke(
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item.guid}"
         )
 
-        sql_endpoint_status = response_state["body"]["properties"]["sqlEndpointProperties"]["provisioningStatus"]
+        sql_endpoint_status = dpath.util.get(
+            response_state, "body/properties/sqlEndpointProperties/provisioningStatus", default=None
+        )
 
         if sql_endpoint_status == "Success":
             print("SQL Endpoint provisioned successfully")
@@ -84,7 +87,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
             base_delay=5,
             max_retries=10,
             response_retry_after=30,
-            prepend_message=f"SQL endpoint for lakehouse {item.name} is still provisioning",
+            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress.",
         )
         iteration += 1
 
