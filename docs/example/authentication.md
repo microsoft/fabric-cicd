@@ -91,47 +91,6 @@ This approach utilizes the default credential flow, meaning no explicit TokenCre
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
     ```
 
-### Release Pipeline Script
-
-=== "Azure DevOps"
-
-    ```yml
-    trigger:
-      branches:
-        include:
-          - dev
-          - main
-    stages:
-      - stage: Build_Release
-        jobs:
-          - job: Build
-            pool:
-              vmImage: windows-latest
-            steps:
-              - checkout: self
-              - task: UsePythonVersion@0
-                inputs:
-                  versionSpec: '3.12'
-                  addToPath: true
-              - script: |
-                  pip install fabric-cicd
-                displayName: 'Install fabric-cicd'
-              - task: AzureCLI@2
-                displayName: "Deploy Fabric Workspace"
-                inputs:
-                  azureSubscription: "HelixData-PROD"
-                  scriptType: "ps"
-                  scriptLocation: "inlineScript"
-                  inlineScript: |
-                    python -u $(System.DefaultWorkingDirectory)/.deploy/fabric_workspace.py
-    ```
-
-=== "GitHub"
-
-    ```python
-    '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
-    ```
-
 ## CLI Credential
 
 This approach utilizes the CLI credential flow, meaning it only refers to the authentication established with az login. This is agnostic of the executing user, it can be UPN, SPN, Managed Identity, etc. Whatever is used to log in will be used.
