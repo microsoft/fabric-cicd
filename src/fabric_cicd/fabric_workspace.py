@@ -562,7 +562,7 @@ class FabricWorkspace:
 
         self.deployed_folders = folder_hierarchy
 
-    def _refresh_repository_folders(self) -> dict:
+    def _refresh_repository_folders(self) -> None:
         """
         Converts the folder list payload into a structure of folder name and their ids,
         skipping empty folders or folders that only contain other empty folders.
@@ -579,39 +579,22 @@ class FabricWorkspace:
         root_path = Path(self.repository_directory)
         folder_hierarchy = {}
 
-        # Walk through the directory structure
-        for root, dirs, files in os.walk(root_path):
-            folder = Path(root)
-            if not folder.is_dir():
+        # Collect all folders that directly contain a .platform file
+        platform_folders = set(p.parent for p in root_path.rglob(".platform"))
+
+        # Now, for every folder, check if any of its subfolders is in platform_folders
+        for folder in root_path.rglob("*"):
+            if not folder.is_dir() or folder == root_path:
                 continue
 
-            # Check if a `.platform` file exists directly beneath the folder
-            if ".platform" in files:
-                # Skip this folder and its subfolders
-                dirs.clear()
+            # Skip folders that directly contain a .platform file
+            if folder in platform_folders:
                 continue
 
-            # Check if any parent folder has already been excluded
-            if any((Path(root).parent / ".platform").exists() for root in Path(root).parents if root != root_path):
-                continue
-
-            # Skip empty folders
-            if not any(Path.iterdir(Path(root))):
-                continue
-
-            # Ensure the folder contains a subfolder, and that subfolder contains a `.platform` file
-            subfolders = [subfolder for subfolder in folder.iterdir() if subfolder.is_dir()]
-            if not any((subfolder / ".platform").exists() for subfolder in subfolders):
-                continue
-
-            # Build the relative path from the root and convert it to the desired format
-            relative_path = f"/{Path(root).relative_to(root_path).as_posix()}"
-
-            # Skip the root directory itself ("/.")
-            if relative_path == "/.":
-                continue
-
-            folder_hierarchy[relative_path] = ""
+            # Check if any subfolder (at any depth) is in platform_folders
+            if any(sub in platform_folders for sub in folder.rglob("*") if sub.is_dir()):
+                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
+                folder_hierarchy[relative_path] = ""
 
         self.repository_folders = folder_hierarchy
 
