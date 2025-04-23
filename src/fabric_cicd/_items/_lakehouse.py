@@ -56,8 +56,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-        display_name: The display name of the lakehouse item
-        guid: The GUID of the lakehouse item
+        item: The item object to check the SQL endpoint status for
 
     """
     sql_endpoint_status = None
