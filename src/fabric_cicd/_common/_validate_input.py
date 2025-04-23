@@ -114,6 +114,18 @@ def validate_workspace_id(input_value: str) -> str:
     return input_value
 
 
+def validate_workspace_name(input_value: str) -> str:
+    """
+    Validate the workspace name.
+
+    Args:
+        input_value: The input value to validate.
+    """
+    validate_data_type("string", "workspace_name", input_value)
+
+    return input_value
+
+
 def validate_environment(input_value: str) -> str:
     """
     Validate the environment.
