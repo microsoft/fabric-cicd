@@ -6,7 +6,11 @@
 import json
 import logging
 
+import dpath.util
+
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
+from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
@@ -38,12 +42,54 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             skip_publish_logging=True,
         )
 
+        check_sqlendpoint_provision_status(fabric_workspace_obj, item)
+
         logger.info(f"{constants.INDENT}Published")
 
     # Need all lakehouses published first to protect interrelationships
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
         for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
             process_shortcuts(fabric_workspace_obj, item_obj)
+
+
+def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item: Item) -> None:
+    """
+    Check the SQL endpoint status of the published lakehouses
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
+        item: The item object to check the SQL endpoint status for
+
+    """
+    iteration = 1
+
+    while True:
+        sql_endpoint_status = None
+
+        response_state = fabric_workspace_obj.endpoint.invoke(
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item.guid}"
+        )
+
+        sql_endpoint_status = dpath.util.get(
+            response_state, "body/properties/sqlEndpointProperties/provisioningStatus", default=None
+        )
+
+        if sql_endpoint_status == "Success":
+            print("SQL Endpoint provisioned successfully")
+            break
+
+        if sql_endpoint_status == "Failed":
+            msg = f"Cannot resolve SQL endpoint for lakehouse {item.name}"
+            raise FailedPublishedItemStatusError(msg, logger)
+
+        handle_retry(
+            attempt=iteration,
+            base_delay=5,
+            max_retries=10,
+            response_retry_after=30,
+            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress.",
+        )
+        iteration += 1
 
 
 def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
