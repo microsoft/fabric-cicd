@@ -15,7 +15,7 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
-from fabric_cicd._common._exceptions import ParameterFileError, ParsingError
+from fabric_cicd._common._exceptions import InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
@@ -28,10 +28,11 @@ class FabricWorkspace:
 
     def __init__(
         self,
-        workspace_id: str,
         repository_directory: str,
         item_type_in_scope: list[str],
         environment: str = "N/A",
+        workspace_id: Optional[str] = None,
+        workspace_name: Optional[str] = None,
         token_credential: TokenCredential = None,
         **kwargs,
     ) -> None:
@@ -39,7 +40,8 @@ class FabricWorkspace:
         Initializes the FabricWorkspace instance.
 
         Args:
-            workspace_id: The ID of the workspace to interact with.
+            workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
+            workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
@@ -51,6 +53,14 @@ class FabricWorkspace:
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
+            ...     repository_directory="/path/to/repo",
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ... )
+
+            Basic usage with workspace_name
+            >>> from fabric_cicd import FabricWorkspace
+            >>> workspace = FabricWorkspace(
+            ...     workspace_name="your-workspace-name",
             ...     repository_directory="/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
             ... )
@@ -86,6 +96,7 @@ class FabricWorkspace:
             validate_repository_directory,
             validate_token_credential,
             validate_workspace_id,
+            validate_workspace_name,
         )
 
         # Initialize endpoint
@@ -96,8 +107,16 @@ class FabricWorkspace:
             )
         )
 
+        # Set workspace_id class variable
+        if workspace_id:
+            self.workspace_id = validate_workspace_id(workspace_id)
+        elif workspace_name:
+            self.workspace_id = self._resolve_workspace_id(validate_workspace_name(workspace_name))
+        else:
+            msg = "Either workspace_name or workspace_id must be specified."
+            raise InputError(msg, logger)
+
         # Validate and set class variables
-        self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
@@ -114,12 +133,21 @@ class FabricWorkspace:
                 >>> import fabric_cicd.constants
                 >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
             )
-            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{workspace_id}"
+            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{self.workspace_id}"
         else:
-            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}"
+            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
+
+    def _resolve_workspace_id(self, workspace_name: str) -> str:
+        """Resolve workspace ID based on the workspace name given."""
+        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces")
+        for workspace in response["body"]["value"]:
+            if workspace["displayName"] == workspace_name:
+                return workspace["id"]
+        msg = f"Workspace ID could not be resolved from workspace name: {workspace_name}."
+        raise InputError(msg, logger)
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
@@ -534,7 +562,7 @@ class FabricWorkspace:
 
         self.deployed_folders = folder_hierarchy
 
-    def _refresh_repository_folders(self) -> dict:
+    def _refresh_repository_folders(self) -> None:
         """
         Converts the folder list payload into a structure of folder name and their ids,
         skipping empty folders or folders that only contain other empty folders.
@@ -551,39 +579,22 @@ class FabricWorkspace:
         root_path = Path(self.repository_directory)
         folder_hierarchy = {}
 
-        # Walk through the directory structure
-        for root, dirs, files in os.walk(root_path):
-            folder = Path(root)
-            if not folder.is_dir():
+        # Collect all folders that directly contain a .platform file
+        platform_folders = set(p.parent for p in root_path.rglob(".platform"))
+
+        # Now, for every folder, check if any of its subfolders is in platform_folders
+        for folder in root_path.rglob("*"):
+            if not folder.is_dir() or folder == root_path:
                 continue
 
-            # Check if a `.platform` file exists directly beneath the folder
-            if ".platform" in files:
-                # Skip this folder and its subfolders
-                dirs.clear()
+            # Skip folders that directly contain a .platform file
+            if folder in platform_folders:
                 continue
 
-            # Check if any parent folder has already been excluded
-            if any((Path(root).parent / ".platform").exists() for root in Path(root).parents if root != root_path):
-                continue
-
-            # Skip empty folders
-            if not any(Path.iterdir(Path(root))):
-                continue
-
-            # Ensure the folder contains a subfolder, and that subfolder contains a `.platform` file
-            subfolders = [subfolder for subfolder in folder.iterdir() if subfolder.is_dir()]
-            if not any((subfolder / ".platform").exists() for subfolder in subfolders):
-                continue
-
-            # Build the relative path from the root and convert it to the desired format
-            relative_path = f"/{Path(root).relative_to(root_path).as_posix()}"
-
-            # Skip the root directory itself ("/.")
-            if relative_path == "/.":
-                continue
-
-            folder_hierarchy[relative_path] = ""
+            # Check if any subfolder (at any depth) is in platform_folders
+            if any(sub in platform_folders for sub in folder.rglob("*") if sub.is_dir()):
+                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
+                folder_hierarchy[relative_path] = ""
 
         self.repository_folders = folder_hierarchy
 

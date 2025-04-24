@@ -48,3 +48,7 @@ class FileTypeError(BaseCustomError):
 
 class ParameterFileError(BaseCustomError):
     pass
+
+
+class FailedPublishedItemStatusError(BaseCustomError):
+    pass
