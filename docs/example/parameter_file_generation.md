@@ -57,6 +57,7 @@ This approach utilizes the default credential flow, meaning no explicit TokenCre
 
     ```python
     '''Log in with Azure CLI (az login) or Azure PowerShell (Connect-AzAccount) prior to execution'''
+
     import sys
     import json
     from pathlib import Path
