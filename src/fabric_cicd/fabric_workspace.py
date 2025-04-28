@@ -651,7 +651,7 @@ class FabricWorkspace:
 
     def _get_isrefreshable(self, item_guid: str) -> str:
         """
-        Perform a ownership takeover on the sematic model.
+        Gets the isRefreshable property of the semantic model.
 
         Args:
             item_guid: GUID of the semantic model
@@ -663,22 +663,21 @@ class FabricWorkspace:
 
     def _update_refreshschedule(self, item_guid: str, metadata_body: str) -> None:
         """
-        Perform a ownership takeover on the sematic model.
+        Performs an update of the refresh schedule of on a semantic model.
 
         Args:
             item_guid: GUID of the semantic model
         """
-        dataset = self.endpoint_powerbi.invoke(method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}")
         # The API to be used depends on the isRefreshable property of the dataset
-        if dataset["body"]["isRefreshable"] == True:
+        if self._get_isrefreshable(item_guid=item_guid):
             self.endpoint_powerbi.invoke(
                 method="PATCH",
                 url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshSchedule",
                 body=metadata_body,
             )
-        else:
             # Remove some elements from json object.
             # These are not valid for the API call directQueryRefreshSchedule
+        else:
             if "enabled" in metadata_body["value"]:
                 del metadata_body["value"]["enabled"]
             if "notifyOption" in metadata_body["value"]:
@@ -692,25 +691,17 @@ class FabricWorkspace:
 
         logger.info("refresh schedule updated")
 
-    def _get_refresh_history(self, item_guid: str) -> None:
-        """
-        Perform a ownership takeover on the sematic model.
-
-        Args:
-            item_guid: GUID of the semantic model
-        """
-        response = self.endpoint_powerbi.invoke(
-            method="GET", url=f"{self.base_api_url_powerbi}/datasets/{item_guid}/refreshes"
-        )
-
-        return response["body"]["value"]
-
     def _invoke_refresh(self, item_guid: str, max_retries: str) -> None:
         """
-        Perform a ownership takeover on the sematic model.
+        Initiates the refresh of a semantic model.
 
         Args:
             item_guid: GUID of the semantic model
+            max_retries: Max number of retries. When reaching the max, the refresh will continue but
+            the procedure will not wait any longer.
+
+            Use the parameter "dataset_refresh_nowait" and "dataset_refresh_norefresh" to skip waiting
+            or skip refreshing the sematic model
         """
         logger.info("Starting Semantic model data refresh")
 

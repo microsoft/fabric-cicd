@@ -81,8 +81,9 @@ def find_datasource_connections(gateways: dict, gatewayconn: dict, datasetconn: 
             returnobject = {}
             returnobject["gatewayObjectId"] = gatewayObjectId
             returnobject["datasourceObjectIds"] = foundconn
-            # return json.dumps(returnobject, indent=2)
+
             return returnobject
+
     logger.error("Not all gateway connections found!")
     return None
 
