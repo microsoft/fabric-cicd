@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+from fabric_cicd._items._copyjob import publish_copyjob
 from fabric_cicd._items._datapipeline import (
     publish_datapipelines,
     sort_datapipelines,
@@ -15,6 +16,7 @@ from fabric_cicd._items._variablelibrary import publish_variablelibraries
 
 __all__ = [
     "check_environment_publish_state",
+    "publish_copyjob",
     "publish_datapipelines",
     "publish_environments",
     "publish_lakehouses",
