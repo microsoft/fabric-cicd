@@ -10,15 +10,16 @@ import re
 from pathlib import Path
 from typing import Optional
 
-import dpath
-import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
-from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd import constants
+from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._exceptions import InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._powerbi_endpoint import PowerBiEndpoint
+from fabric_cicd._common._logging import print_header
 
 logger = logging.getLogger(__name__)
 
@@ -26,30 +27,30 @@ logger = logging.getLogger(__name__)
 class FabricWorkspace:
     """A class to manage and publish workspace items to the Fabric API."""
 
-    ACCEPTED_ITEM_TYPES_UPN = ("DataPipeline", "Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
-    ACCEPTED_ITEM_TYPES_NON_UPN = ("Environment", "Notebook", "Report", "SemanticModel", "Lakehouse")
-
     def __init__(
         self,
-        workspace_id: str,
         repository_directory: str,
         item_type_in_scope: list[str],
         base_api_url: str = "https://api.fabric.microsoft.com/",
         base_api_url_powerbi: str = "https://api.powerbi.com/",
         environment: str = "N/A",
+        workspace_id: Optional[str] = None,
+        workspace_name: Optional[str] = None,
         token_credential: TokenCredential = None,
         token_credential_powerbi: TokenCredential = None,
+        **kwargs,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
 
         Args:
-            workspace_id: The ID of the workspace to interact with.
+            workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
+            workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace.
-            base_api_url: Base URL for the Fabric API. Defaults to the Fabric API endpoint.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
+            kwargs: Additional keyword arguments.
 
         Examples:
             Basic usage
@@ -60,13 +61,20 @@ class FabricWorkspace:
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
             ... )
 
+            Basic usage with workspace_name
+            >>> from fabric_cicd import FabricWorkspace
+            >>> workspace = FabricWorkspace(
+            ...     workspace_name="your-workspace-name",
+            ...     repository_directory="/path/to/repo",
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ... )
+
             With optional parameters
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-            ...     base_api_url="https://orgapi.fabric.microsoft.com",
             ...     environment="your-target-environment"
             ... )
 
@@ -94,6 +102,7 @@ class FabricWorkspace:
             validate_repository_directory,
             validate_token_credential,
             validate_workspace_id,
+            validate_workspace_name,
         )
 
         # duplicate credentails object for Power BI REST API
@@ -107,6 +116,7 @@ class FabricWorkspace:
             )
         )
 
+
         self.endpoint_powerbi = PowerBiEndpoint(
             # if credential is not defined, use DefaultAzureCredential
             token_credential_powerbi=(
@@ -115,9 +125,16 @@ class FabricWorkspace:
                 else validate_token_credential(token_credential_powerbi)
             )
         )
+        # Set workspace_id class variable
+        if workspace_id:
+            self.workspace_id = validate_workspace_id(workspace_id)
+        elif workspace_name:
+            self.workspace_id = self._resolve_workspace_id(validate_workspace_name(workspace_name))
+        else:
+            msg = "Either workspace_name or workspace_id must be specified."
+            raise InputError(msg, logger)
 
         # Validate and set class variables
-        self.workspace_id = validate_workspace_id(workspace_id)
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
@@ -126,21 +143,55 @@ class FabricWorkspace:
         )
 
         self.environment = validate_environment(environment)
+        self.publish_item_name_exclude_regex = None
+        self.repository_folders = {}
+        self.repository_items = {}
+        self.deployed_folders = {}
+        self.deployed_items = {}
+
+        # temporarily support base_api_url until deprecated
+        if "base_api_url" in kwargs:
+            logger.warning(
+                """Setting base_api_url will be deprecated in a future version, please use the below moving forward:
+                >>> import fabric_cicd.constants
+                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
+            )
+            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{self.workspace_id}"
+        else:
+            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
-        self._refresh_deployed_items()
-        self._refresh_repository_items()
+
+    def _resolve_workspace_id(self, workspace_name: str) -> str:
+        """Resolve workspace ID based on the workspace name given."""
+        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces")
+        for workspace in response["body"]["value"]:
+            if workspace["displayName"] == workspace_name:
+                return workspace["id"]
+        msg = f"Workspace ID could not be resolved from workspace name: {workspace_name}."
+        raise InputError(msg, logger)
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
-        parameter_file_path = self.repository_directory / "parameter.yml"
-        self.environment_parameter = {}
+        from fabric_cicd._parameter._parameter import Parameter
 
-        if parameter_file_path.is_file():
-            logger.info(f"Found parameter file '{parameter_file_path}'")
-            with parameter_file_path.open(encoding="utf-8") as yaml_file:
-                self.environment_parameter = yaml.safe_load(yaml_file)
+        print_header("Validating Parameter File")
+
+        # Initialize the parameter dict and Parameter object
+        self.environment_parameter = {}
+        parameter_obj = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+            parameter_file_name=constants.PARAMETER_FILE_NAME,
+        )
+        is_valid = parameter_obj._validate_parameter_file()
+        if is_valid:
+            self.environment_parameter = parameter_obj.environment_parameter
+        else:
+            msg = "Deployment terminated due to an invalid parameter file"
+            raise ParameterFileError(msg, logger)
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
@@ -153,7 +204,7 @@ class FabricWorkspace:
                 item_metadata_path = directory / ".platform"
 
                 # Print a warning and skip directory if empty
-                if not os.listdir(directory):
+                if not any(directory.iterdir()):
                     logger.warning(f"Directory {directory.name} is empty.")
                     continue
 
@@ -177,7 +228,13 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                item_path = Path(directory)
+                item_path = directory
+                relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
+                relative_parent_path = "/".join(relative_path.split("/")[:-1])
+                if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+                    item_folder_id = self.repository_folders.get(relative_parent_path, "")
+                else:
+                    item_folder_id = ""
 
                 # Get the GUID if the item is already deployed
                 item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
@@ -187,8 +244,15 @@ class FabricWorkspace:
 
                 # Add the item to the repository_items dictionary
                 self.repository_items[item_type][item_name] = Item(
-                    item_type, item_name, item_description, item_guid, item_logical_id, item_path
+                    type=item_type,
+                    name=item_name,
+                    description=item_description,
+                    guid=item_guid,
+                    logical_id=item_logical_id,
+                    path=item_path,
+                    folder_id=item_folder_id,
                 )
+
                 self.repository_items[item_type][item_name].collect_item_files()
 
     def _refresh_deployed_items(self) -> None:
@@ -204,13 +268,20 @@ class FabricWorkspace:
             item_description = item["description"]
             item_name = item["displayName"]
             item_guid = item["id"]
+            item_folder_id = item.get("folderId", "")
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
                 self.deployed_items[item_type] = {}
 
             # Add item details to the deployed_items dictionary
-            self.deployed_items[item_type][item_name] = Item(item_type, item_name, item_description, item_guid)
+            self.deployed_items[item_type][item_name] = Item(
+                type=item_type,
+                name=item_name,
+                description=item_description,
+                guid=item_guid,
+                folder_id=item_folder_id,
+            )
 
     def _replace_logical_ids(self, raw_file: str) -> str:
         """
@@ -232,19 +303,54 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_parameters(self, raw_file: str) -> str:
+    def _replace_parameters(self, file_obj: object, item_obj: object) -> str:
         """
-        Replaces values found in parameter file with the chosen environment value.
+        Replaces values found in parameter file with the chosen environment value. Handles two parameter dictionary structures.
 
         Args:
-            raw_file: The raw file content where parameter values need to be replaced.
+            file_obj: The File object instance that provides the file content and file path.
+            item_obj: The Item object instance that provides the item type and item name.
         """
+        from fabric_cicd._parameter._utils import (
+            check_parameter_structure,
+            check_replacement,
+            process_input_path,
+        )
+
+        # Parse the file_obj and item_obj
+        raw_file = file_obj.contents
+        item_type = item_obj.type
+        item_name = item_obj.name
+        file_path = file_obj.file_path
+
         if "find_replace" in self.environment_parameter:
-            for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                if key in raw_file and self.environment in parameter_dict:
-                    # replace any found references with specified environment value
-                    raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                    logger.debug(f"Replaced '{key}' with '{parameter_dict[self.environment]}'")
+            structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
+            msg = "Replacing {} with {} in {}.{}"
+
+            # Handle new parameter file structure
+            if structure_type == "new":
+                for parameter_dict in self.environment_parameter["find_replace"]:
+                    find_value = parameter_dict["find_value"]
+                    replace_value = parameter_dict["replace_value"]
+                    input_type = parameter_dict.get("item_type")
+                    input_name = parameter_dict.get("item_name")
+                    input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+
+                    # Perform replacement if a condition is met and replace any found references with specified environment value
+                    if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                        input_type, input_name, input_path, item_type, item_name, file_path
+                    ):
+                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
+                        logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
+
+            # Handle original parameter file structure
+            # TODO: Deprecate old structure handling by April 24, 2025
+            if structure_type == "old":
+                for key, parameter_dict in self.environment_parameter["find_replace"].items():
+                    if key in raw_file and self.environment in parameter_dict:
+                        # replace any found references with specified environment value
+                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
+                        logger.debug(msg.format(key, parameter_dict, item_name, item_type))
 
         return raw_file
 
@@ -279,69 +385,26 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
+#     def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
+    def _replace_workspace_ids(self, raw_file: str) -> str:
+
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
         (actual workspace ID guid) values, with target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
-            item_type: Type of item where the replacement occurs (e.g., Notebook, DataPipeline).
         """
-        # Replace all instances of default feature branch workspace ID with target workspace ID
-        target_workspace_id = self.workspace_id
-        default_workspace_string = '"workspaceId": "00000000-0000-0000-0000-000000000000"'
-        target_workspace_string = f'"workspaceId": "{target_workspace_id}"'
-
-        if default_workspace_string in raw_file:
-            raw_file = raw_file.replace(default_workspace_string, target_workspace_string)
-
-        # For DataPipeline item, additional replacements may be required
-        if item_type == "DataPipeline":
-            raw_file = self._replace_activity_workspace_ids(raw_file, target_workspace_id)
-
-        return raw_file
-
-    def _replace_activity_workspace_ids(self, raw_file: str, target_workspace_id: str) -> str:
-        """
-        Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
-        with target workspace ID found in DataPipeline activities.
-
-        Args:
-            raw_file: The raw file content where workspace IDs need to be replaced.
-            target_workspace_id: The target workspace ID to replace with.
-        """
-        # Create a dictionary from the raw file
-        item_content_dict = json.loads(raw_file)
-        guid_pattern = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
-
-        # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-        activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-
-        # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
-        for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
-            if activity_value in activities_mapping:
-                # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
-                path = path.split("/")
-                workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
-                workspace_id = dpath.get(item_content_dict, workspace_id_path)
-
-                # Check if the workspace ID is a valid GUID and is not the target workspace ID
-                if guid_pattern.match(workspace_id) and workspace_id != target_workspace_id:
-                    item_type, item_id_name = activities_mapping[activity_value]
-                    # Create a path to the item's ID and get the item ID value
-                    item_id_path = (*path[:-1], "typeProperties", item_id_name)
-                    item_id = dpath.get(item_content_dict, item_id_path)
-                    # Convert the item ID to a name to check if it exists in the repository
-                    item_name = self._convert_id_to_name(
-                        item_type=item_type, generic_id=item_id, lookup_type="Repository"
-                    )
-                    # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
-                    if item_name:
-                        dpath.set(item_content_dict, workspace_id_path, target_workspace_id)
-
-        # Convert the updated dict back to a JSON string
-        return json.dumps(item_content_dict, indent=2)
+        # Use re.sub to replace all matches
+        return re.sub(
+            constants.WORKSPACE_ID_REFERENCE_REGEX,
+            lambda match: (
+                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, self.workspace_id)
+                if match.group(2) == constants.DEFAULT_WORKSPACE_ID
+                else match.group(0)
+            ),
+            raw_file,
+        )
 
     def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
@@ -415,16 +478,23 @@ class FabricWorkspace:
             func_process_file: Custom function to process file contents. Defaults to None.
             **kwargs: Additional keyword arguments.
         """
+        # Skip publishing if the item is excluded by the regex
+        if self.publish_item_name_exclude_regex:
+            regex_pattern = check_regex(self.publish_item_name_exclude_regex)
+            if regex_pattern.match(item_name):
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
         item = self.repository_items[item_type][item_name]
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = 10 if item_type == "SemanticModel" else 5
+        max_retries = constants.MAX_RETRY_OVERRIDE.get(item_type, 5)
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
-        shell_only_publish = item_type in ["Environment", "Lakehouse"]
+        shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
@@ -440,8 +510,11 @@ class FabricWorkspace:
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file.contents)
+                            file.contents = self._replace_workspace_ids(file.contents)
+
                         if str(file.name) == "expressions.tmdl":
                             file.contents = self._replace_semanticmodel_parameters(file.contents)
+                            file.contents = self._replace_parameters(file, item)
 
                     item_payload.append(file.base64_payload)
 
@@ -453,6 +526,8 @@ class FabricWorkspace:
         is_deployed = bool(item_guid)
 
         if not is_deployed:
+            combined_body = {**combined_body, **{"folderId": item.folder_id}}
+
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
@@ -483,9 +558,24 @@ class FabricWorkspace:
                 max_retries=max_retries,
             )
 
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
+            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+                # Move the item to the correct folder if it has been moved
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+                self.endpoint.invoke(
+                    method="POST",
+                    url=f"{self.base_api_url}/items/{item_guid}/move",
+                    body={"targetFolderId": f"{item.folder_id}"},
+                    max_retries=max_retries,
+                )
+                logger.debug(
+                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                )
+
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
-            logger.info("Published")
+            logger.info(f"{constants.INDENT}Published")
+        return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """
@@ -503,9 +593,10 @@ class FabricWorkspace:
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
-            logger.info("Unpublished")
+            logger.info(f"{constants.INDENT}Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+
 
     def _takeover_semanticmodel(self, item_guid: str) -> None:
         """
@@ -722,3 +813,153 @@ class FabricWorkspace:
             body=metadata_body,
             max_retries=max_retries,
         )
+        
+    def _refresh_deployed_folders(self) -> None:
+        """
+        Converts the folder list payload into a structure of folder name and their ids
+
+        output should be like this:
+        {
+            "/Pipeline": "323eaa75-d70b-498c-8544-6c4219bf336e",
+            "/Notebook": "f802fd90-c70e-4d77-b079-538f617646d3",
+            "/Notebook/Processing": "36ed1a63-be82-4a7a-9364-2e4ff3a66b31"
+        }
+
+        """
+        self.deployed_folders = {}
+        request_url = f"{self.base_api_url}/folders"
+        folders = []
+
+        while request_url:
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/folders/list-folders
+            response = self.endpoint.invoke(method="GET", url=request_url)
+
+            # Handle cases where the response body is empty
+            folder_response = response["body"].get("value", [])
+            folders.extend(folder for folder in folder_response)
+
+            request_url = response["header"].get("continuationUri", None)
+
+        # Create a lookup table for folders by their ID
+        folder_lookup = {folder["id"]: folder for folder in folders}
+
+        # Build the folder hierarchy
+        folder_hierarchy = {}
+
+        def get_full_path(folder: dict) -> str:
+            """Recursively build the full path for a folder"""
+            parent_id = folder.get("parentFolderId")
+            if parent_id:
+                parent_folder = folder_lookup.get(parent_id)
+                if parent_folder:
+                    return f"{get_full_path(parent_folder)}/{folder['displayName']}"
+            return f"/{folder['displayName']}"
+
+        for folder in folders:
+            full_path = get_full_path(folder)
+            folder_hierarchy[full_path] = folder["id"]
+
+        self.deployed_folders = folder_hierarchy
+
+    def _refresh_repository_folders(self) -> None:
+        """
+        Converts the folder list payload into a structure of folder name and their ids,
+        skipping empty folders or folders that only contain other empty folders.
+
+        output should be like this:
+        {
+            "/Pipeline": "",
+            "/Notebook": "",
+            "/Notebook/Processing": ""
+        }
+        """
+        self.repository_folders = {}
+
+        root_path = Path(self.repository_directory)
+        folder_hierarchy = {}
+
+        # Collect all folders that directly contain a .platform file
+        platform_folders = set(p.parent for p in root_path.rglob(".platform"))
+
+        # Now, for every folder, check if any of its subfolders is in platform_folders
+        for folder in root_path.rglob("*"):
+            if not folder.is_dir() or folder == root_path:
+                continue
+
+            # Skip folders that directly contain a .platform file
+            if folder in platform_folders:
+                continue
+
+            # Check if any subfolder (at any depth) is in platform_folders
+            if any(sub in platform_folders for sub in folder.rglob("*") if sub.is_dir()):
+                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
+                folder_hierarchy[relative_path] = ""
+
+        self.repository_folders = folder_hierarchy
+
+    def _publish_folders(self) -> None:
+        """Publishes all folders from the repository."""
+        # Sort folders by the number of '/' in their paths (ascending order)
+        sorted_folders = sorted(self.repository_folders.keys(), key=lambda path: path.count("/"))
+        print_header("Publishing Workspace Folders")
+        logger.info("Publishing Workspace Folders")
+        for folder_path in sorted_folders:
+            if folder_path in self.deployed_folders:
+                # Folder already deployed, update local hierarchy
+                self.repository_folders[folder_path] = self.deployed_folders[folder_path]
+                logger.debug(f"Folder exists: {folder_path}")
+                continue
+
+            # Publish the folder
+            folder_name = folder_path.split("/")[-1]
+            folder_parent_path = "/".join(folder_path.split("/")[:-1])
+            folder_parent_id = self.repository_folders.get(folder_parent_path, None)
+
+            request_body = {"displayName": folder_name}
+            if folder_parent_id:
+                request_body["parentFolderId"] = folder_parent_id
+
+            request_url = f"{self.base_api_url}/folders"
+            response = self.endpoint.invoke(method="POST", url=request_url, body=request_body)
+
+            # Update local hierarchy with the new folder ID
+            self.repository_folders[folder_path] = response["body"]["id"]
+            logger.debug(f"Published folder: {folder_path}")
+
+        logger.info(f"{constants.INDENT}Published")
+
+    def _unpublish_folders(self) -> None:
+        """Unublishes all empty folders in workspace."""
+        # Sort folders by the number of '/' in their paths (descending order)
+        sorted_folder_ids = [
+            self.deployed_folders[key]
+            for key in sorted(self.deployed_folders.keys(), key=lambda path: path.count("/"), reverse=True)
+        ]
+
+        logger.info("Unpublishing Workspace Folders")
+
+        ## any folder that is not in folderid_dict is an orphaned folder
+
+        # Get folders with items
+        deployed_folder_ids_with_items = []
+
+        for items in self.deployed_items.values():
+            for item in items.values():
+                deployed_folder_ids_with_items.append(item.folder_id)
+
+        # Pop all folders
+
+        for folder_id in sorted_folder_ids:
+            if folder_id not in deployed_folder_ids_with_items:
+                # Folder deployed, but not in repository
+
+                # Delete the folder from the workspace
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/folders/delete-folder
+                try:
+                    self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/folders/{folder_id}")
+                    logger.debug(f"Unpublished folder: {folder_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to unpublish folder {folder_id}.  Raw exception: {e}")
+
+        logger.info(f"{constants.INDENT}Unpublished")
+

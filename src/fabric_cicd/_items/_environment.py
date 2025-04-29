@@ -10,13 +10,13 @@ from pathlib import Path
 import dpath
 import yaml
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._fabric_endpoint import handle_retry
+from fabric_cicd._parameter._utils import check_parameter_structure
 
 logger = logging.getLogger(__name__)
 
 
-# TODO - binaries and compute.yml are read into files, but not actually needed since we only need the file
 def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all environment items from the repository.
@@ -26,6 +26,9 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
     """
+    # Check for ongoing publish
+    check_environment_publish_state(fabric_workspace_obj, True)
+
     item_type = "Environment"
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         # Only deploy the shell for environments
@@ -56,11 +59,8 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     item_path = fabric_workspace_obj.repository_items[item_type][item_name].path
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
 
-    # Check for ongoing publish
-    _check_environment_publish_state(fabric_workspace_obj, item_guid, initial_check=True)
-
     # Update compute settings
-    _update_compute_settings(fabric_workspace_obj, item_path, item_guid)
+    _update_compute_settings(fabric_workspace_obj, item_path, item_guid, item_name)
 
     repo_library_files = _get_repo_libraries(item_path)
 
@@ -70,65 +70,63 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     # Remove libraries from live environment that are not in the repository
     _remove_libraries(fabric_workspace_obj, item_guid, repo_library_files)
 
-    logger.info("Publishing Libraries & Spark Settings")
     # Publish updated settings
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
     fabric_workspace_obj.endpoint.invoke(
         method="POST", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish"
     )
 
-    # Wait for ongoing publish to complete
-    _check_environment_publish_state(fabric_workspace_obj, item_guid)
-
-    logger.info("Published")
+    logger.info(f"{constants.INDENT}Publish Submitted")
 
 
-def _check_environment_publish_state(
-    fabric_workspace_obj: FabricWorkspace, item_guid: str, initial_check: bool = False
-) -> None:
+def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
     """
-    Check the state of the environment publish operation.
+    Checks the publish state of environments after deployment
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        item_guid: The GUID of the environment item.
-        initial_check: Whether this is the initial check for ongoing publish.
+        initial_check: Flag to ignore publish failures on initial check.
     """
-    publishing = True
+    ongoing_publish = True
     iteration = 1
-    while publishing:
+
+    environments = fabric_workspace_obj.repository_items.get("Environment", {})
+
+    logger.info(f"Checking Environment Publish State for {[k for k in environments]}")
+
+    while ongoing_publish:
+        ongoing_publish = False
+
         response_state = fabric_workspace_obj.endpoint.invoke(
-            method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/"
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/"
         )
-        current_state = dpath.get(response_state, "body/properties/publishDetails/state", default="").lower()
 
-        if initial_check:
-            prepend_message = "Existing Environment publish is in progess."
-            pass_values = ["success", "failed", "cancelled"]
-            fail_values = []
+        for item in response_state["body"]["value"]:
+            item_name = item["displayName"]
+            item_state = dpath.get(item, "properties/publishDetails/state", default="").lower()
+            if item_name in environments and item_state == "running":
+                ongoing_publish = True
+            elif item_state in ["failed", "cancelled"] and not initial_check:
+                msg = f"Publish {item_state} for {item_name}"
+                raise Exception(msg)
 
-        else:
-            prepend_message = "Operation in progress."
-            pass_values = ["success"]
-            fail_values = ["failed", "cancelled"]
-
-        if current_state in pass_values:
-            publishing = False
-        elif current_state in fail_values:
-            msg = f"Publish {current_state} for Libraries"
-            raise Exception(msg)
-        else:
+        if ongoing_publish:
             handle_retry(
                 attempt=iteration,
                 base_delay=5,
                 max_retries=20,
                 response_retry_after=120,
-                prepend_message=prepend_message,
+                prepend_message=f"{constants.INDENT}Operation in progress.",
             )
             iteration += 1
 
+    if not initial_check:
+        logger.info(f"{constants.INDENT}Published.")
 
-def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: Path, item_guid: str) -> None:
+
+def _update_compute_settings(
+    fabric_workspace_obj: FabricWorkspace, item_path: Path, item_guid: str, item_name: str
+) -> None:
     """
     Update spark compute settings.
 
@@ -136,6 +134,7 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: P
         fabric_workspace_obj: The FabricWorkspace object.
         item_path: The path to the environment item.
         item_guid: The GUID of the environment item.
+        item_name: Name of the environment item.
     """
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
@@ -145,8 +144,22 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: P
         if "instance_pool_id" in yaml_body:
             pool_id = yaml_body["instance_pool_id"]
             if "spark_pool" in fabric_workspace_obj.environment_parameter:
+                structure_type = check_parameter_structure(fabric_workspace_obj.environment_parameter, "spark_pool")
                 parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
-                if pool_id in parameter_dict:
+                # Handle new parameter file format
+                if structure_type == "new":
+                    for key in parameter_dict:
+                        instance_pool_id = key["instance_pool_id"]
+                        replace_value = key["replace_value"]
+                        input_name = key.get("item_name")
+                        if instance_pool_id == pool_id and (input_name == item_name or not input_name):
+                            # replace any found references with specified environment value
+                            yaml_body["instancePool"] = replace_value[fabric_workspace_obj.environment]
+                            del yaml_body["instance_pool_id"]
+
+                # Handle original parameter file format
+                # TODO: Deprecate old structure handling by April 24, 2025
+                if structure_type == "old" and pool_id in parameter_dict:
                     # replace any found references with specified environment value
                     yaml_body["instancePool"] = parameter_dict[pool_id]
                     del yaml_body["instance_pool_id"]
@@ -160,7 +173,7 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_path: P
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
             body=yaml_body,
         )
-        logger.info("Updated Spark Settings")
+        logger.info(f"{constants.INDENT}Updated Spark Settings")
 
 
 def _get_repo_libraries(item_path: Path) -> dict:
@@ -200,7 +213,7 @@ def _add_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_l
             url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries",
             files=library_file,
         )
-        logger.info(f"Updated Library {file_path.name}")
+        logger.info(f"{constants.INDENT}Updated Library {file_path.name}")
 
 
 def _remove_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_library_files: dict) -> None:
@@ -249,7 +262,7 @@ def _remove_library(fabric_workspace_obj: FabricWorkspace, item_guid: str, file_
         url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?libraryToDelete={file_name}",
         body={},
     )
-    logger.info(f"Removed {file_name}")
+    logger.info(f"{constants.INDENT}Removed {file_name}")
 
 
 def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace, input_dict: dict) -> dict:

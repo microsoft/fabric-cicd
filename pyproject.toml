@@ -10,14 +10,12 @@ urls.Repository = "https://github.com/microsoft/fabric-cicd.git"
 
 dependencies = [
     "azure-identity>=1.19.0",
-    "colorlog>=6.9.0",
     "dpath>=2.2.0",
     "filetype>=1.2.0",
     "packaging>=24.2",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
 ]
-
 
 [dependency-groups]
 dev = [
@@ -33,19 +31,18 @@ dev = [
     "ruff>=0.9.5",
 ]
 
-
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-dynamic.version = { file = "VERSION" }
+dynamic.version = { attr = "fabric_cicd.constants.VERSION" }
 packages.find.where = ["src"]
+package-data = { "fabric_cicd" = ["changelog.md"] }
 
 [tool.uv]
 package = true
 python-preference = "only-managed"
-
 
 [tool.pytest.ini_options]
 addopts = "-v --tb=short"

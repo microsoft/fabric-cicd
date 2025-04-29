@@ -90,14 +90,24 @@ def patched_fabric_workspace(mock_endpoint):
         refresh_items_patch = patch.object(
             FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
         )
+        refresh_folders_patch = patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        )
 
-        with fabric_endpoint_patch, refresh_items_patch:
-            return FabricWorkspace(
+        with fabric_endpoint_patch, refresh_items_patch, refresh_folders_patch:
+            workspace = FabricWorkspace(
                 workspace_id=workspace_id,
                 repository_directory=repository_directory,
                 item_type_in_scope=item_type_in_scope,
                 **kwargs,
             )
+            # Call refresh methods to populate workspace data
+            workspace._refresh_deployed_folders()
+            workspace._refresh_repository_folders()
+            workspace._refresh_deployed_items()
+            workspace._refresh_repository_items()
+
+            return workspace
 
     return _create_workspace
 

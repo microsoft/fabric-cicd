@@ -44,3 +44,11 @@ class ItemDependencyError(BaseCustomError):
 
 class FileTypeError(BaseCustomError):
     pass
+
+
+class ParameterFileError(BaseCustomError):
+    pass
+
+
+class FailedPublishedItemStatusError(BaseCustomError):
+    pass

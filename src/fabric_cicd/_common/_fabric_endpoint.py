@@ -16,6 +16,7 @@ from azure.core.exceptions import (
     ClientAuthenticationError,
 )
 
+import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,10 @@ class FabricEndpoint:
 
         while not exit_loop:
             try:
-                headers = {"Authorization": f"Bearer {self.aad_token}"}
+                headers = {
+                    "Authorization": f"Bearer {self.aad_token}",
+                    "User-Agent": f"{constants.USER_AGENT}",
+                }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
                 response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
@@ -68,7 +72,7 @@ class FabricEndpoint:
 
                 # Handle expired authentication token
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
-                    logger.info("AAD token expired. Refreshing token.")
+                    logger.info(f"{constants.INDENT}AAD token expired. Refreshing token.")
                     self._refresh_token()
                 else:
                     exit_loop, method, url, body, long_running = _handle_response(
@@ -110,7 +114,7 @@ class FabricEndpoint:
             try:
                 self.aad_token = self.token_credential.get_token(resource_url).token
             except ClientAuthenticationError as e:
-                msg = f"Failed to aquire AAD token. {e}"
+                msg = f"Failed to acquire AAD token. {e}"
                 raise TokenError(msg, logger) from e
             except Exception as e:
                 msg = f"An unexpected error occurred when generating the AAD token. {e}"
@@ -145,10 +149,7 @@ class FabricEndpoint:
 
 
 def _log_executing_identity(msg: str) -> None:
-    # Import feature_flag here to avoid circular import
-    from fabric_cicd import feature_flag
-
-    if "disable_print_identity" not in feature_flag:
+    if "disable_print_identity" not in constants.FEATURE_FLAG:
         logger.info(msg)
 
 
@@ -209,7 +210,7 @@ def _handle_response(
                     base_delay=0.5,
                     response_retry_after=retry_after,
                     max_retries=kwargs.get("max_retries", 5),
-                    prepend_message="Operation in progress.",
+                    prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
             time.sleep(1)
@@ -245,8 +246,9 @@ def _handle_response(
     ):
         handle_retry(
             attempt=iteration_count,
-            base_delay=2.5,
+            base_delay=30,
             max_retries=5,
+            response_retry_after=300,
             prepend_message="Item name is reserved.",
         )
 
@@ -276,7 +278,7 @@ def _handle_response(
     # Handle unexpected errors
     else:
         err_msg = (
-            f" Message: {response.json()['message']}"
+            f" Message: {response.json()['message']}.  {response.json().get('moreDetails', '')}"
             if "application/json" in (response.headers.get("Content-Type") or "")
             else ""
         )
@@ -309,7 +311,9 @@ def handle_retry(
         second_str = "second" if delay == 1 else "seconds"
         prepend_message += " " if prepend_message else ""
 
-        logger.info(f"{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})...")
+        logger.info(
+            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
+        )
         time.sleep(delay)
     else:
         msg = f"Maximum retry attempts ({max_retries}) exceeded."

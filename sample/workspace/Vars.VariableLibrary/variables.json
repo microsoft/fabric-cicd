@@ -1,0 +1,17 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "Environment",
+      "note": "",
+      "type": "String",
+      "value": "PPE"
+    },
+    {
+      "name": "SQL_Server",
+      "note": "",
+      "type": "String",
+      "value": "contoso-ppe.database.windows.net"
+    }
+  ]
+}

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from azure.core.credentials import TokenCredential
 
+import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -54,8 +55,8 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
         input_value: The input value to validate.
         upn_auth: Whether UPN authentication is used.
     """
-    accepted_item_types_upn = FabricWorkspace.ACCEPTED_ITEM_TYPES_UPN
-    accepted_item_types_non_upn = FabricWorkspace.ACCEPTED_ITEM_TYPES_NON_UPN
+    accepted_item_types_upn = constants.ACCEPTED_ITEM_TYPES_UPN
+    accepted_item_types_non_upn = constants.ACCEPTED_ITEM_TYPES_NON_UPN
 
     accepted_item_types = accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
 
@@ -97,24 +98,21 @@ def validate_repository_directory(input_value: str) -> Path:
     return directory
 
 
-def validate_base_api_url(input_value: str) -> str:
+def validate_workspace_id(input_value: str) -> str:
     """
-    Validate the base API URL.
+    Validate the workspace ID.
 
     Args:
         input_value: The input value to validate.
     """
-    validate_data_type("string", "base_api_url", input_value)
+    validate_data_type("string", "workspace_id", input_value)
 
-    if not re.match(r"^https:\/\/([a-zA-Z0-9]+)\.fabric\.microsoft\.com\/$", input_value):
-        msg = (
-            "The provided base_api_url does not follow the 'https://<word>.fabric.microsoft.com/' syntax. "
-            "Ensure the URL has a single word in between 'https://' and '.fabric.microsoft.com/', "
-            "and only contains alphanumeric characters."
-        )
+    if not re.match(constants.VALID_GUID_REGEX, input_value):
+        msg = "The provided workspace_id is not a valid guid."
         raise InputError(msg, logger)
 
     return input_value
+
 
 
 def validate_base_api_url_powerbi(input_value: str) -> str:
@@ -137,18 +135,17 @@ def validate_base_api_url_powerbi(input_value: str) -> str:
     return input_value
 
 
-def validate_workspace_id(input_value: str) -> str:
+# def validate_workspace_id(input_value: str) -> str:
+
+def validate_workspace_name(input_value: str) -> str:
+
     """
-    Validate the workspace ID.
+    Validate the workspace name.
 
     Args:
         input_value: The input value to validate.
     """
-    validate_data_type("string", "workspace_id", input_value)
-
-    if not re.match(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$", input_value):
-        msg = "The provided workspace_id is not a valid guid."
-        raise InputError(msg, logger)
+    validate_data_type("string", "workspace_name", input_value)
 
     return input_value
 
