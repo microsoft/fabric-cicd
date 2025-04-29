@@ -10,7 +10,7 @@ from fabric_cicd import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_copyjob(fabric_workspace_obj: FabricWorkspace) -> None:
+def publish_copyjobs(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all copyjob items from the repository.
 
