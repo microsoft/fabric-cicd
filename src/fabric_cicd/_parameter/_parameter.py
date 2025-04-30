@@ -122,7 +122,7 @@ class Parameter:
         compiled_utf8_pattern = re.compile(utf8_pattern, re.VERBOSE)
 
         # Check for invalid characters (non-UTF-8)
-        if not re.fullmatch(compiled_utf8_pattern, content):
+        if not re.match(compiled_utf8_pattern, content):
             errors.append(msgs["char"])
 
         # Check for unclosed quotes
