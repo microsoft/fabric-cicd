@@ -5,6 +5,7 @@
 
 import logging
 
+import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -88,18 +89,14 @@ def find_datasource_connections(gateways: dict, gatewayconn: dict, datasetconn: 
 
 
 def refresh_dataset(fabric_workspace_obj: FabricWorkspace, item_guid: str):
-    # Import feature_flag here to avoid circular import
-
-    from fabric_cicd import feature_flag
-
-    if "dataset_refresh_norefresh" in feature_flag:
+    if "dataset_refresh_norefresh" in constants.FEATURE_FLAG:
         logger.info("Skipping Semantic model data refresh")
         return
     # refresh the dataset.
     # First get a list of refreshes and check if there is no refresh running
 
     max_retries = 10
-    if "dataset_refresh_nowait" in feature_flag:
+    if "dataset_refresh_nowait" in constants.FEATURE_FLAG:
         max_retries = 1
 
     fabric_workspace_obj._invoke_refresh(

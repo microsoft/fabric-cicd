@@ -18,8 +18,8 @@ from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._exceptions import InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._powerbi_endpoint import PowerBiEndpoint
 from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._powerbi_endpoint import PowerBiEndpoint
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +95,6 @@ class FabricWorkspace:
             ... )
         """
         from fabric_cicd._common._validate_input import (
-            validate_base_api_url,
-            validate_base_api_url_powerbi,
             validate_environment,
             validate_item_type_in_scope,
             validate_repository_directory,
@@ -115,7 +113,6 @@ class FabricWorkspace:
                 DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
             )
         )
-
 
         self.endpoint_powerbi = PowerBiEndpoint(
             # if credential is not defined, use DefaultAzureCredential
@@ -137,11 +134,6 @@ class FabricWorkspace:
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
-        self.base_api_url = f"{validate_base_api_url(base_api_url)}/v1/workspaces/{workspace_id}"
-        self.base_api_url_powerbi = (
-            f"{validate_base_api_url_powerbi(base_api_url_powerbi)}v1.0/myorg/groups/{workspace_id}"
-        )
-
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.repository_folders = {}
@@ -159,6 +151,8 @@ class FabricWorkspace:
             self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{self.workspace_id}"
         else:
             self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
+
+        self.base_api_url_powerbi = f"{constants.DEFAULT_API_ROOT_URL_POWERBI}/v1.0/myorg/groups/{self.workspace_id}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
@@ -385,9 +379,8 @@ class FabricWorkspace:
 
         return raw_file
 
-#     def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
+    #     def _replace_workspace_ids(self, raw_file: str, item_type: str) -> str:
     def _replace_workspace_ids(self, raw_file: str) -> str:
-
         """
         Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
         (actual workspace ID guid) values, with target workspace ID in the raw file content.
@@ -509,7 +502,7 @@ class FabricWorkspace:
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                         if not str(file.file_path).endswith(".platform"):
                             file.contents = self._replace_logical_ids(file.contents)
-                            file.contents = self._replace_parameters(file.contents)
+                            file.contents = self._replace_parameters(file, item)
                             file.contents = self._replace_workspace_ids(file.contents)
 
                         if str(file.name) == "expressions.tmdl":
@@ -596,7 +589,6 @@ class FabricWorkspace:
             logger.info(f"{constants.INDENT}Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
-
 
     def _takeover_semanticmodel(self, item_guid: str) -> None:
         """
@@ -813,7 +805,7 @@ class FabricWorkspace:
             body=metadata_body,
             max_retries=max_retries,
         )
-        
+
     def _refresh_deployed_folders(self) -> None:
         """
         Converts the folder list payload into a structure of folder name and their ids
@@ -962,4 +954,3 @@ class FabricWorkspace:
                     logger.warning(f"Failed to unpublish folder {folder_id}.  Raw exception: {e}")
 
         logger.info(f"{constants.INDENT}Unpublished")
-
