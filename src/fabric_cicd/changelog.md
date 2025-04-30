@@ -6,6 +6,15 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.16
+
+<span class="md-h2-subheader">Release Date: 2025-04-25</span>
+
+-   🔧 Fix bug with folder deployment to root ([#255](https://github.com/microsoft/fabric-cicd/issues/255))
+-   ⚡ Add Workspace Name in FabricWorkspaceObject ([#200](https://github.com/microsoft/fabric-cicd/issues/200))
+-   ⚡ New function to check SQL endpoint provision status ([#226](https://github.com/microsoft/fabric-cicd/issues/226))
+-   📝 Updated Authentication docs + menu sort order
+
 ## Version 0.1.15
 
 <span class="md-h2-subheader">Release Date: 2025-04-21</span>

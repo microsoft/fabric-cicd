@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.15"
+VERSION = "0.1.16"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FEATURE_FLAG = set()
@@ -20,6 +20,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Lakehouse",
     "MirroredDatabase",
     "VariableLibrary",
+    "CopyJob",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
