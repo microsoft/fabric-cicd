@@ -584,7 +584,7 @@ class FabricWorkspace:
 
         # Now, for every folder, check if any of its subfolders is in platform_folders
         for folder in root_path.rglob("*"):
-            if not folder.is_dir() or folder == root_path:
+            if not folder.is_dir() or folder == root_path or folder.name == ".children":
                 continue
 
             # Skip folders that directly contain a .platform file
@@ -615,6 +615,10 @@ class FabricWorkspace:
             folder_name = folder_path.split("/")[-1]
             folder_parent_path = "/".join(folder_path.split("/")[:-1])
             folder_parent_id = self.repository_folders.get(folder_parent_path, None)
+
+            if re.search(constants.INVALID_FOLDER_CHAR_REGEX, folder_name):
+                msg = f"Folder name '{folder_name}' contains invalid characters."
+                raise InputError(msg, logger)
 
             request_body = {"displayName": folder_name}
             if folder_parent_id:

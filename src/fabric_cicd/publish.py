@@ -82,6 +82,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing CopyJobs")
         items.publish_copyjobs(fabric_workspace_obj)
+    if "Eventhouse" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Eventhouses")
+        items.publish_eventhouses(fabric_workspace_obj)
+    if "KQLDatabase" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing KQL Databases")
+        items.publish_kqldatabases(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
@@ -130,6 +136,8 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     # Define order to unpublish items
     unpublish_order = []
     for x in [
+        "KQLDatabase",
+        "Eventhouse",
         "DataPipeline",
         "Report",
         "SemanticModel",
