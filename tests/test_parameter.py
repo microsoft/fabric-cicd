@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import fabric_cicd.constants as constants
 from fabric_cicd._parameter._parameter import Parameter
 
 SAMPLE_PARAMETER_FILE = """ 
@@ -53,23 +54,6 @@ find_replace:
       item_type: "Notebook"
       item_name: ["Hello World"] 
       file_path: "/Hello World.Notebook/notebook-content.py"
-"""
-
-SAMPLE_OLD_PARAMETER_FILE = """
-find_replace:
-    # SQL Connection Guid
-    "db52be81-c2b2-4261-84fa-840c67f4bbd0":
-        PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
-        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
-spark_pool:
-    # CapacityPool_Large
-    "72c68dbc-0775-4d59-909d-a47896f4573b":
-        type: "Capacity"
-        name: "CapacityPool_Large"
-    # CapacityPool_Medium
-    "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d":
-        type: "Workspace"
-        name: "WorkspacePool_Medium"
 """
 
 SAMPLE_INVALID_PARAMETER_FILE = """
@@ -215,75 +199,14 @@ def target_environment():
 
 
 @pytest.fixture
-def mock_constants():
-    class MockConstants:
-        # Parameter file configs
-        PARAMETER_FILE_NAME = "parameter.yml"
-
-        # Parameter file validation messages
-        from typing import ClassVar
-
-        INVALID_YAML: ClassVar[dict] = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
-
-        INVALID_REPLACE_VALUE_SPARK_POOL: ClassVar[dict] = {
-            "missing key": "The '{}' environment dict in spark_pool must contain a 'type' and a 'name' key",
-            "missing value": "The '{}' environment in spark_pool is missing a value for '{}' key",
-            "invalid value": "The '{}' environment in spark_pool must contain 'Capacity' or 'Workspace' as a value for 'type'",
-        }
-
-        PARAMETER_MSGS: ClassVar[dict] = {
-            "validating": "Validating {}",
-            "passed": "Validation passed: {}",
-            "failed": "Validation failed with error: {}",
-            "terminate": "Validation terminated: {}",
-            "found": f"Found {PARAMETER_FILE_NAME} file",
-            "not found": "Parameter file not found with path: {}",
-            "invalid content": INVALID_YAML,
-            "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
-            "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "{}",
-            "old structure": "The parameter file structure used will no longer be supported after April 24, 2025. Please migrate to the new structure",
-            "raise issue": "Raise a GitHub issue here: https://github.com/microsoft/fabric-cicd/issues for migration timeline issues",
-            "invalid structure": "Invalid parameter file structure",
-            "valid structure": "Parameter file structure is valid",
-            "invalid name": "Invalid parameter name '{}' found in the parameter file",
-            "valid name": "Parameter names are valid",
-            "parameter not found": "{} parameter is not present",
-            "invalid data type": "The provided '{}' is not of type {} in {}",
-            "missing key": "{} is missing keys",
-            "invalid key": "{} contains invalid keys",
-            "valid keys": "{} contains valid keys",
-            "missing required value": "Missing value for '{}' key in {}",
-            "valid required values": "Required values in {} are valid",
-            "missing replace value": "{} is missing a replace value for '{}' environment'",
-            "valid replace value": "Values in 'replace_value' dict in {} are valid",
-            "invalid replace value": INVALID_REPLACE_VALUE_SPARK_POOL,
-            "no optional": "No optional values provided in {}",
-            "invalid item type": "Item type '{}' not in scope",
-            "invalid item name": "Item name '{}' not found in the repository directory",
-            "invalid file path": "Path '{}' not found in the repository directory",
-            "valid optional": "Optional values in {} are valid",
-            "valid parameter": "{} parameter is valid",
-            "skip": "The find value '{}' replacement will be skipped due to {} in parameter {}",
-            "no target env": "target environment '{}' not found",
-            "no filter match": "unmatched optional filters",
-        }
-
-    return MockConstants()
-
-
-@pytest.fixture
-def repository_directory(tmp_path, mock_constants):
+def repository_directory(tmp_path):
     # Create the sample workspace structure
     workspace_dir = tmp_path / "sample" / "workspace"
     workspace_dir.mkdir(parents=True, exist_ok=True)
 
     # Create the sample parameter file
-    parameter_file_path = workspace_dir / mock_constants.PARAMETER_FILE_NAME
+    parameter_file_path = workspace_dir / constants.PARAMETER_FILE_NAME
     parameter_file_path.write_text(SAMPLE_PARAMETER_FILE)
-
-    # Create the sample old parameter file
-    old_parameter_file_path = workspace_dir / "old_parameter.yml"
-    old_parameter_file_path.write_text(SAMPLE_OLD_PARAMETER_FILE)
 
     # Create sample invalid parameter files
     invalid_parameter_file_path = workspace_dir / "invalid_parameter.yml"
@@ -328,21 +251,19 @@ def repository_directory(tmp_path, mock_constants):
 
 
 @pytest.fixture
-def parameter_object(repository_directory, item_type_in_scope, target_environment, mock_constants):
+def parameter_object(repository_directory, item_type_in_scope, target_environment):
     """Fixture to create a Parameter object."""
     return Parameter(
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
         environment=target_environment,
-        parameter_file_name=mock_constants.PARAMETER_FILE_NAME,
+        parameter_file_name=constants.PARAMETER_FILE_NAME,
     )
 
 
-def test_parameter_class_initialization(
-    parameter_object, repository_directory, item_type_in_scope, target_environment, mock_constants
-):
+def test_parameter_class_initialization(parameter_object, repository_directory, item_type_in_scope, target_environment):
     """Test the Parameter class initialization."""
-    parameter_file_name = mock_constants.PARAMETER_FILE_NAME
+    parameter_file_name = constants.PARAMETER_FILE_NAME
 
     # Check if the object is initialized correctly
     assert parameter_object.repository_directory == repository_directory
@@ -352,25 +273,25 @@ def test_parameter_class_initialization(
     assert parameter_object.parameter_file_path == repository_directory / parameter_file_name
 
 
-def test_parameter_file_validation(parameter_object, mock_constants):
+def test_parameter_file_validation(parameter_object):
     """Test the validation methods for the parameter file"""
     assert parameter_object._validate_parameter_file_exists() == True
     assert parameter_object._validate_load_parameters_to_dict() == (True, parameter_object.environment_parameter)
-    assert parameter_object._validate_parameter_load() == (True, mock_constants.PARAMETER_MSGS["valid load"])
-    assert parameter_object._validate_parameter_names() == (True, mock_constants.PARAMETER_MSGS["valid name"])
-    assert parameter_object._validate_parameter_structure() == (True, mock_constants.PARAMETER_MSGS["valid structure"])
+    assert parameter_object._validate_parameter_load() == (True, constants.PARAMETER_MSGS["valid load"])
+    assert parameter_object._validate_parameter_names() == (True, constants.PARAMETER_MSGS["valid name"])
+    assert parameter_object._validate_parameter_structure() == (True, constants.PARAMETER_MSGS["valid structure"])
     assert parameter_object._validate_parameter("find_replace") == (
         True,
-        mock_constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
+        constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
     )
     assert parameter_object._validate_parameter("spark_pool") == (
         True,
-        mock_constants.PARAMETER_MSGS["valid parameter"].format("spark_pool"),
+        constants.PARAMETER_MSGS["valid parameter"].format("spark_pool"),
     )
     assert parameter_object._validate_parameter_file() == True
 
 
-def test_multiple_parameter_validation(repository_directory, item_type_in_scope, target_environment, mock_constants):
+def test_multiple_parameter_validation(repository_directory, item_type_in_scope, target_environment):
     """Test the validation methods for multiple parameters case"""
     multi_param_obj = Parameter(
         repository_directory=repository_directory,
@@ -380,7 +301,7 @@ def test_multiple_parameter_validation(repository_directory, item_type_in_scope,
     )
     assert multi_param_obj._validate_parameter("find_replace") == (
         True,
-        mock_constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
+        constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
     )
     assert multi_param_obj._validate_parameter_file() == True
 
@@ -395,27 +316,27 @@ def test_multiple_parameter_validation(repository_directory, item_type_in_scope,
         ("spark_pool", ["instance_pool_id", "replace_value", "item_name", "file_path"], False, "invalid key"),
     ],
 )
-def test_validate_parameter_keys(parameter_object, mock_constants, param_name, param_value, result, msg):
+def test_validate_parameter_keys(parameter_object, param_name, param_value, result, msg):
     """Test the validation methods for the find_replace parameter"""
 
     assert parameter_object._validate_parameter_keys(param_name, param_value) == (
         result,
-        mock_constants.PARAMETER_MSGS[msg].format(param_name),
+        constants.PARAMETER_MSGS[msg].format(param_name),
     )
 
 
 @pytest.mark.parametrize(("param_name"), [("find_replace"), ("spark_pool")])
-def test_validate_parameter(parameter_object, mock_constants, param_name):
+def test_validate_parameter(parameter_object, param_name):
     """Test the validation methods for a specific parameter"""
     param_dict = parameter_object.environment_parameter.get(param_name)
     for param in param_dict:
         assert parameter_object._validate_required_values(param_name, param) == (
             True,
-            mock_constants.PARAMETER_MSGS["valid required values"].format(param_name),
+            constants.PARAMETER_MSGS["valid required values"].format(param_name),
         )
         assert parameter_object._validate_replace_value(param_name, param["replace_value"]) == (
             True,
-            mock_constants.PARAMETER_MSGS["valid replace value"].format(param_name),
+            constants.PARAMETER_MSGS["valid replace value"].format(param_name),
         )
 
 
@@ -434,13 +355,13 @@ def test_validate_parameter(parameter_object, mock_constants, param_name):
         ),
     ],
 )
-def test_validate_find_replace_replace_value(parameter_object, mock_constants, replace_value, result, msg):
+def test_validate_find_replace_replace_value(parameter_object, replace_value, result, msg):
     """Test the _validate_find_replace_replace_value method."""
     assert parameter_object._validate_find_replace_replace_value(replace_value) == (
         result,
-        mock_constants.PARAMETER_MSGS[msg].format("find_replace", "PROD")
+        constants.PARAMETER_MSGS[msg].format("find_replace", "PROD")
         if msg == "missing replace value"
-        else mock_constants.PARAMETER_MSGS[msg].format("find_replace"),
+        else constants.PARAMETER_MSGS[msg].format("find_replace"),
     )
 
 
@@ -494,18 +415,18 @@ def test_validate_find_replace_replace_value(parameter_object, mock_constants, r
         ),
     ],
 )
-def test_validate_spark_pool_replace_value(parameter_object, mock_constants, replace_value, result, msg, desc):
+def test_validate_spark_pool_replace_value(parameter_object, replace_value, result, msg, desc):
     """Test the _validate_spark_pool_replace_value method."""
     if msg == "valid replace value":
-        msg = mock_constants.PARAMETER_MSGS[msg].format("spark_pool")
+        msg = constants.PARAMETER_MSGS[msg].format("spark_pool")
     if msg == "missing replace value":
-        msg = mock_constants.PARAMETER_MSGS[msg].format("spark_pool", "PPE")
+        msg = constants.PARAMETER_MSGS[msg].format("spark_pool", "PPE")
     if msg == "invalid replace value" and desc == "missing key":
-        msg = mock_constants.PARAMETER_MSGS[msg][desc].format("PPE")
+        msg = constants.PARAMETER_MSGS[msg][desc].format("PPE")
     if msg == "invalid replace value" and desc == "missing value":
-        msg = mock_constants.PARAMETER_MSGS[msg][desc].format("PROD", "name")
+        msg = constants.PARAMETER_MSGS[msg][desc].format("PROD", "name")
     if msg == "invalid replace value" and desc == "invalid value":
-        msg = mock_constants.PARAMETER_MSGS[msg][desc].format("PROD")
+        msg = constants.PARAMETER_MSGS[msg][desc].format("PROD")
 
     assert parameter_object._validate_spark_pool_replace_value(replace_value) == (result, msg)
     assert parameter_object._validate_replace_value(
@@ -514,15 +435,15 @@ def test_validate_spark_pool_replace_value(parameter_object, mock_constants, rep
             "PPE": {},
             "PROD": {"type": "Capacity", "name": "CapacityPool_Large_PROD"},
         },
-    ) == (False, mock_constants.PARAMETER_MSGS["missing replace value"].format("spark_pool", "PPE"))
+    ) == (False, constants.PARAMETER_MSGS["missing replace value"].format("spark_pool", "PPE"))
 
 
-def test_validate_data_type(parameter_object, mock_constants):
+def test_validate_data_type(parameter_object):
     """Test data type validation"""
     # General data type validation
     assert parameter_object._validate_data_type([1, 2, 3], "string or list[string]", "key", "param_name") == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid data type"].format("key", "string or list[string]", "param_name"),
+        constants.PARAMETER_MSGS["invalid data type"].format("key", "string or list[string]", "param_name"),
     )
 
     required_values = {
@@ -535,7 +456,7 @@ def test_validate_data_type(parameter_object, mock_constants):
     # Data type error in required values
     assert parameter_object._validate_required_values("find_replace", required_values) == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid data type"].format("find_value", "string", "find_replace"),
+        constants.PARAMETER_MSGS["invalid data type"].format("find_value", "string", "find_replace"),
     )
 
     find_replace_value = {
@@ -545,7 +466,7 @@ def test_validate_data_type(parameter_object, mock_constants):
     # Data type error in find_replace replace value dict
     assert parameter_object._validate_find_replace_replace_value(find_replace_value) == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid data type"].format("PROD replace_value", "string", "find_replace"),
+        constants.PARAMETER_MSGS["invalid data type"].format("PROD replace_value", "string", "find_replace"),
     )
 
     spark_pool_replace_value_1 = {
@@ -555,7 +476,7 @@ def test_validate_data_type(parameter_object, mock_constants):
     # Data type error in spark_pool replace value dict
     assert parameter_object._validate_spark_pool_replace_value(spark_pool_replace_value_1) == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid data type"].format("PPE key", "dictionary", "spark_pool"),
+        constants.PARAMETER_MSGS["invalid data type"].format("PPE key", "dictionary", "spark_pool"),
     )
 
     spark_pool_replace_value_2 = {
@@ -565,7 +486,7 @@ def test_validate_data_type(parameter_object, mock_constants):
     # Data type error in spark_pool replace value environment dict
     assert parameter_object._validate_spark_pool_replace_value(spark_pool_replace_value_2) == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid data type"].format("type", "string", "spark_pool"),
+        constants.PARAMETER_MSGS["invalid data type"].format("type", "string", "spark_pool"),
     )
 
     param_dict = {
@@ -576,50 +497,35 @@ def test_validate_data_type(parameter_object, mock_constants):
     # Data type error in optional values
     assert parameter_object._validate_optional_values("find_replace", param_dict) == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid data type"].format(
-            "item_name", "string or list[string]", "find_replace"
-        ),
+        constants.PARAMETER_MSGS["invalid data type"].format("item_name", "string or list[string]", "find_replace"),
     )
 
 
-def test_validate_yaml_content(parameter_object, mock_constants):
+def test_validate_yaml_content(parameter_object):
     """Test the validation of the YAML content"""
     quoted_content = "'Hello World"
     assert parameter_object._validate_yaml_content(quoted_content) == [
-        mock_constants.PARAMETER_MSGS["invalid content"]["quote"].format("'")
+        constants.PARAMETER_MSGS["invalid content"]["quote"].format("'")
     ]
 
     invalid_content = "\U0001f600"
     assert parameter_object._validate_yaml_content(invalid_content) == [
-        mock_constants.PARAMETER_MSGS["invalid content"]["char"]
+        constants.PARAMETER_MSGS["invalid content"]["char"]
     ]
 
 
-@pytest.mark.parametrize(
-    ("parameter_file_name", "result", "msg"),
-    [("old_parameter.yml", False, "old structure"), ("invalid_parameter.yml", False, "invalid structure")],
-)
-def test_validate_parameter_file_structure(
-    repository_directory,
-    item_type_in_scope,
-    target_environment,
-    parameter_file_name,
-    mock_constants,
-    result,
-    msg,
-):
+def test_validate_parameter_file_structure(repository_directory, item_type_in_scope, target_environment):
     """Test the validation of the parameter file structure"""
     param_obj = Parameter(
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
         environment=target_environment,
-        parameter_file_name=parameter_file_name,
+        parameter_file_name="invalid_parameter.yml",
     )
-    msg = mock_constants.PARAMETER_MSGS[msg] if msg == "invalid structure" else msg
-    assert param_obj._validate_parameter_structure() == (result, msg)
+    assert param_obj._validate_parameter_structure() == (False, constants.PARAMETER_MSGS["invalid structure"])
 
 
-def test_validate_optional_values(parameter_object, mock_constants):
+def test_validate_optional_values(parameter_object):
     """Test the _validate_optional_values method."""
     param_dict_1 = {
         "item_type": "Notebook",
@@ -628,7 +534,7 @@ def test_validate_optional_values(parameter_object, mock_constants):
     }
     assert parameter_object._validate_optional_values("find_replace", param_dict_1) == (
         True,
-        mock_constants.PARAMETER_MSGS["valid optional"].format("find_replace"),
+        constants.PARAMETER_MSGS["valid optional"].format("find_replace"),
     )
 
     param_dict_2 = {
@@ -644,7 +550,7 @@ def test_validate_optional_values(parameter_object, mock_constants):
     param_dict_3 = {"item_name": "Hello World"}
     assert parameter_object._validate_optional_values("spark_pool", param_dict_3, check_match=True) == (
         True,
-        mock_constants.PARAMETER_MSGS["valid optional"].format("spark_pool"),
+        constants.PARAMETER_MSGS["valid optional"].format("spark_pool"),
     )
 
 
@@ -652,7 +558,7 @@ def test_validate_optional_values(parameter_object, mock_constants):
     ("param_name"),
     ["find_replace", "spark_pool"],
 )
-def test_validate_parameter_environment_and_filters(parameter_object, mock_constants, param_name):
+def test_validate_parameter_environment_and_filters(parameter_object, param_name):
     """Test the validation methods for environment and filters"""
     for param_dict in parameter_object.environment_parameter.get(param_name):
         # Environment validation
@@ -661,15 +567,15 @@ def test_validate_parameter_environment_and_filters(parameter_object, mock_const
     # Optional filters validation
     assert parameter_object._validate_item_type("Pipeline") == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid item type"].format("Pipeline"),
+        constants.PARAMETER_MSGS["invalid item type"].format("Pipeline"),
     )
     assert parameter_object._validate_item_name("Hello World 2") == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid item name"].format("Hello World 2"),
+        constants.PARAMETER_MSGS["invalid item name"].format("Hello World 2"),
     )
     assert parameter_object._validate_file_path("Hello World 2.Notebook/notebook-content.py") == (
         False,
-        mock_constants.PARAMETER_MSGS["invalid file path"].format("Hello World 2.Notebook/notebook-content.py"),
+        constants.PARAMETER_MSGS["invalid file path"].format("Hello World 2.Notebook/notebook-content.py"),
     )
 
 
@@ -686,7 +592,7 @@ def test_validate_parameter_environment_and_filters(parameter_object, mock_const
     ],
 )
 def test_validate_invalid_parameters(
-    repository_directory, item_type_in_scope, target_environment, mock_constants, param_file_name, result, msg
+    repository_directory, item_type_in_scope, target_environment, param_file_name, result, msg
 ):
     """Test the validation of invalid or error-prone parameter files"""
     param_obj = Parameter(
@@ -700,7 +606,7 @@ def test_validate_invalid_parameters(
     if param_file_name == "no_target_env_parameter.yml":
         assert param_obj._validate_parameter("find_replace") == (
             result,
-            mock_constants.PARAMETER_MSGS[msg].format("find_replace"),
+            constants.PARAMETER_MSGS[msg].format("find_replace"),
         )
 
     # Missing required value in find_replace parameter
@@ -708,7 +614,7 @@ def test_validate_invalid_parameters(
         for param_dict in param_obj.environment_parameter.get("find_replace"):
             assert param_obj._validate_required_values("find_replace", param_dict) == (
                 result,
-                mock_constants.PARAMETER_MSGS[msg].format("find_value", "find_replace"),
+                constants.PARAMETER_MSGS[msg].format("find_value", "find_replace"),
             )
         assert param_obj._validate_parameter_file() == result
 
@@ -716,21 +622,21 @@ def test_validate_invalid_parameters(
     if param_file_name == "mismatch_filter_parameter.yml":
         assert param_obj._validate_parameter("find_replace") == (
             result,
-            mock_constants.PARAMETER_MSGS[msg].format("find_replace"),
+            constants.PARAMETER_MSGS[msg].format("find_replace"),
         )
 
     # Missing required value in spark_pool parameter
     if param_file_name == "missing_replace_val_parameter.yml":
         assert param_obj._validate_parameter("spark_pool") == (
             result,
-            mock_constants.PARAMETER_MSGS[msg].format("replace_value", "spark_pool"),
+            constants.PARAMETER_MSGS[msg].format("replace_value", "spark_pool"),
         )
 
     # Invalid parameter name
     if param_file_name == "invalid_name_parameter.yml":
         assert param_obj._validate_parameter_names() == (
             result,
-            mock_constants.PARAMETER_MSGS[msg].format("spark_pool_param"),
+            constants.PARAMETER_MSGS[msg].format("spark_pool_param"),
         )
 
     # Errors in YAML content structure
@@ -744,8 +650,8 @@ def test_validate_invalid_parameters(
             error_message = str(e)
 
         assert is_valid == result
-        assert msg == mock_constants.PARAMETER_MSGS["invalid load"].format(error_message)
+        assert msg == constants.PARAMETER_MSGS["invalid load"].format(error_message)
 
     # Mismatched quotes in YAML content
     if param_file_name == "invalid_yaml_char_parameter.yml":
-        assert mock_constants.PARAMETER_MSGS["invalid load"].format(["Unclosed quote: '"]) == param_obj.LOAD_ERROR_MSG
+        assert constants.PARAMETER_MSGS["invalid load"].format(["Unclosed quote: '"]) == param_obj.LOAD_ERROR_MSG
