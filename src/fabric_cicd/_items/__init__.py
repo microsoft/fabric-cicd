@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+from fabric_cicd._items._activator import publish_activators
 from fabric_cicd._items._copyjob import publish_copyjobs
 from fabric_cicd._items._datapipeline import (
     publish_datapipelines,
@@ -8,6 +9,7 @@ from fabric_cicd._items._datapipeline import (
 )
 from fabric_cicd._items._environment import check_environment_publish_state, publish_environments
 from fabric_cicd._items._eventhouse import publish_eventhouses
+from fabric_cicd._items._eventstream import publish_eventstreams
 from fabric_cicd._items._kqldatabase import publish_kqldatabases
 from fabric_cicd._items._lakehouse import publish_lakehouses
 from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
@@ -18,10 +20,12 @@ from fabric_cicd._items._variablelibrary import publish_variablelibraries
 
 __all__ = [
     "check_environment_publish_state",
+    "publish_activators",
     "publish_copyjobs",
     "publish_datapipelines",
     "publish_environments",
     "publish_eventhouses",
+    "publish_eventstreams",
     "publish_kqldatabases",
     "publish_lakehouses",
     "publish_mirroreddatabase",
