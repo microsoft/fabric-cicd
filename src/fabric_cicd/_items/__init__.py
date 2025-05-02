@@ -11,6 +11,7 @@ from fabric_cicd._items._environment import check_environment_publish_state, pub
 from fabric_cicd._items._eventhouse import publish_eventhouses
 from fabric_cicd._items._eventstream import publish_eventstreams
 from fabric_cicd._items._kqldatabase import publish_kqldatabases
+from fabric_cicd._items._kqlqueryset import publish_kqlquerysets
 from fabric_cicd._items._lakehouse import publish_lakehouses
 from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
 from fabric_cicd._items._notebook import publish_notebooks
@@ -27,6 +28,7 @@ __all__ = [
     "publish_eventhouses",
     "publish_eventstreams",
     "publish_kqldatabases",
+    "publish_kqlquerysets",
     "publish_lakehouses",
     "publish_mirroreddatabase",
     "publish_notebooks",

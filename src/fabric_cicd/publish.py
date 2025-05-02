@@ -88,6 +88,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "KQLDatabase" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing KQL Databases")
         items.publish_kqldatabases(fabric_workspace_obj)
+    if "KQLQueryset" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing KQL Querysets")
+        items.publish_kqlquerysets(fabric_workspace_obj)
     if "Reflex" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Activators")
         items.publish_activators(fabric_workspace_obj)
@@ -144,6 +147,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     for x in [
         "Eventstream",
         "Reflex",
+        "KQLQueryset",
         "KQLDatabase",
         "Eventhouse",
         "DataPipeline",

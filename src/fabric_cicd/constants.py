@@ -23,6 +23,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "CopyJob",
     "Eventhouse",
     "KQLDatabase",
+    "KQLQueryset",
     "Reflex",
     "Eventstream",
 )
