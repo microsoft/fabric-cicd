@@ -20,6 +20,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Lakehouse",
     "MirroredDatabase",
     "VariableLibrary",
+    "CopyJob",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 

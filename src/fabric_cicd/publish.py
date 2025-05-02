@@ -79,6 +79,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
+    if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing CopyJobs")
+        items.publish_copyjobs(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:

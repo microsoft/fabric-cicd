@@ -1,0 +1,8 @@
+name: SDL
+description: Requires one reviewer for merges into main branch
+resource: repository
+where:
+configuration:
+    branchProtectionRules:
+        - branchNamePattern: "main"
+          requiredApprovingReviewsCount: 1

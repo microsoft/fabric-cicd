@@ -38,6 +38,8 @@ class Parameter:
         "spark_pool_replace_value": {"type", "name"},
     }
 
+    LOAD_ERROR_MSG = ""
+
     def __init__(
         self,
         repository_directory: str,
@@ -60,15 +62,92 @@ class Parameter:
         self.environment = environment
         self.parameter_file_name = parameter_file_name
 
-        # Initialize the parameter dictionary and parameter file path
-        self.environment_parameter = {}
+        # Initialize the parameter file path and load parameters
         self.parameter_file_path = Path(self.repository_directory, parameter_file_name)
+        self._refresh_parameter_file()
+
+    def _refresh_parameter_file(self) -> None:
+        """Load parameters if file is present."""
+        self.environment_parameter = {}
+
+        if self._validate_parameter_file_exists():
+            is_valid, environment_parameter = self._validate_load_parameters_to_dict()
+            if is_valid:
+                self.environment_parameter = environment_parameter
+
+    def _validate_parameter_file_exists(self) -> bool:
+        """Validate the parameter file exists."""
+        return self.parameter_file_path.is_file()
+
+    def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
+        """Validate loading the parameter file to a dictionary."""
+        parameter_dict = {}
+        try:
+            with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml_content = replace_variables_in_parameter_file(yaml_content)
+                validation_errors = self._validate_yaml_content(yaml_content)
+                if validation_errors:
+                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(validation_errors)
+                    return False, parameter_dict
+
+                parameter_dict = yaml.full_load(yaml_content)
+                logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
+                return True, parameter_dict
+        except yaml.YAMLError as e:
+            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
+            return False, parameter_dict
+
+    def _validate_yaml_content(self, content: str) -> list[str]:
+        """Validate the yaml content of the parameter file."""
+        errors = []
+        msgs = constants.PARAMETER_MSGS["invalid content"]
+
+        # Regex patterns to match all valid UTF-8 characters
+        utf8_pattern = r"""
+        (
+        [\x00-\x7F] # Single-byte sequences (ASCII)
+        | [\xC2-\xDF][\x80-\xBF] # Two-byte sequences
+        | [\xE0][\xA0-\xBF][\x80-\xBF] # Three-byte sequences (special case)
+        | [\xE1-\xEC][\x80-\xBF]{2} # Three-byte sequences
+        | [\xED][\x80-\x9F][\x80-\xBF] # Three-byte sequences (special case)
+        | [\xEE-\xEF][\x80-\xBF]{2} # Three-byte sequences
+        | [\xF0][\x90-\xBF][\x80-\xBF]{2} # Four-byte sequences (special case)
+        | [\xF1-\xF3][\x80-\xBF]{3} # Four-byte sequences
+        | [\xF4][\x80-\x8F][\x80-\xBF]{2} # Four-byte sequences (special case)
+        )
+        """
+
+        # Compile the pattern with the re.VERBOSE flag to allow comments and whitespace
+        compiled_utf8_pattern = re.compile(utf8_pattern, re.VERBOSE)
+
+        # Check for invalid characters (non-UTF-8)
+        if not re.match(compiled_utf8_pattern, content):
+            errors.append(msgs["char"])
+
+        # Check for unclosed quotes
+        quotes = ['"', "'"]
+        for quote in quotes:
+            if content.count(quote) % 2 != 0:
+                errors.append(msgs["quote"].format(quote))
+
+        return errors
+
+    def _validate_parameter_load(self) -> tuple[bool, str]:
+        """Validate the parameter file load."""
+        if not self.environment_parameter:
+            if not self._validate_parameter_file_exists():
+                logger.warning(constants.PARAMETER_MSGS["not found"].format(self.parameter_file_path))
+                return False, "not found"
+            logger.debug(constants.PARAMETER_MSGS["found"])
+            return False, self.LOAD_ERROR_MSG
+
+        return True, constants.PARAMETER_MSGS["valid load"]
 
     def _validate_parameter_file(self) -> bool:
         """Validate the parameter file."""
         validation_steps = [
-            ("parameter file exists", self._validate_parameter_file_exists),
-            ("parameter file load and YAML content", self._validate_load_parameters_to_dict),
+            ("parameter file load", self._validate_parameter_load),
             ("parameter names", self._validate_parameter_names),
             ("parameter file structure", self._validate_parameter_structure),
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
@@ -79,7 +158,10 @@ class Parameter:
             is_valid, msg = validation_func()
             if not is_valid:
                 # Return True for specific not is_valid cases
-                if step == "parameter file exists" or (step == "parameter file structure" and msg == "old structure"):
+                if step in ("parameter file load", "parameter file structure") and msg in (
+                    "not found",
+                    "old structure",
+                ):
                     logger.warning(constants.PARAMETER_MSGS["terminate"].format(msg))
                     return True
                 # Throw warning and discontinue validation check for absent parameter
@@ -95,47 +177,6 @@ class Parameter:
         # Return True if all validation steps pass
         logger.info("Parameter file validation passed")
         return True
-
-    def _validate_parameter_file_exists(self) -> tuple[bool, str]:
-        """Validate the parameter file exists."""
-        if not self.parameter_file_path.is_file():
-            logger.warning(constants.PARAMETER_MSGS["not found"].format(self.parameter_file_path))
-            return False, "not found"
-
-        return True, constants.PARAMETER_MSGS["found"]
-
-    def _validate_load_parameters_to_dict(self) -> tuple[bool, str]:
-        """Validate loading the parameter file to a dictionary."""
-        try:
-            with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
-                yaml_content = yaml_file.read()
-                yaml_content = replace_variables_in_parameter_file(yaml_content)
-                validation_errors = self._validate_yaml_content(yaml_content)
-                if validation_errors:
-                    return False, validation_errors
-
-                self.environment_parameter = yaml.full_load(yaml_content)
-                logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
-                return True, constants.PARAMETER_MSGS["valid load"]
-        except yaml.YAMLError as e:
-            return False, constants.PARAMETER_MSGS["invalid load"].format(e)
-
-    def _validate_yaml_content(self, content: str) -> list[str]:
-        """Validate the yaml content of the parameter file."""
-        errors = []
-        msgs = constants.PARAMETER_MSGS["invalid content"]
-
-        # Check for invalid characters (non-UTF-8)
-        if not re.match(r"^[\u0000-\uFFFF]*$", content):
-            errors.append(msgs["char"])
-
-        # Check for unclosed quotes
-        quotes = ['"', "'"]
-        for quote in quotes:
-            if content.count(quote) % 2 != 0:
-                errors.append(msgs["quote"].format(quote))
-
-        return errors
 
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
@@ -291,7 +332,7 @@ class Parameter:
                     return False, msg
 
             if environment_dict["type"] not in ["Capacity", "Workspace"]:
-                return False, msgs["invalid value"].format(environment, environment_dict["type"])
+                return False, msgs["invalid value"].format(environment)
 
         return True, constants.PARAMETER_MSGS["valid replace value"].format("spark_pool")
 

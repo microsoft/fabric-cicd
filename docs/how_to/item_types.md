@@ -6,6 +6,7 @@
     -   Activities connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     -   Activities connected to items within the same workspace are re-pointed to the new item in the target workspace.
 -   **Connections** are not source controlled and must be created manually.
+-   If you are using connections and expect them to change between different environments, then those need to be parameterized in the parameter.yml file.
 -   The **executing identity** of the deployment must have access to the connections, or the deployment will fail.
 
 ## Environments
@@ -58,3 +59,9 @@
     -   Variable Libraries do not support programmatically changing the name of value set which is active
     -   After the initial deployment, if an active set is renamed, or removed, the deployment will fail
     -   Manual intervention will be required to make the necessary changes in the Fabric UI and then restart the deployment
+
+## Copy Job
+
+-   **Parameterization:**
+    -   Connections will always point to the original data source unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   **Initial deployment** requires manual configuration of the connection after deployment.
