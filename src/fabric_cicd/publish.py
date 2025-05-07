@@ -40,7 +40,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         >>> publish_all_items(workspace)
 
         With regex name exclusion
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
