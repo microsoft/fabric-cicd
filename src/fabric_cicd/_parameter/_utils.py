@@ -90,10 +90,10 @@ def validate_parameter_file(
     return parameter_obj._validate_parameter_file()
 
 
-def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None) -> str:
+def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bool:
     """
     Checks the parameter dictionary structure and determines if it
-    contains the new structure (i.e. a list of values when indexed by the key).
+    contains the valid structure (i.e. a list of values when indexed by the key).
 
     Args:
         param_dict: The parameter dictionary to check.
@@ -101,11 +101,13 @@ def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None
     """
     # Check the structure of the specified parameter
     if param_name:
-        return _check_structure(param_dict.get(param_name))
+        return _check_parameter_structure(param_dict.get(param_name))
 
     # Otherwise, check the structure of the entire parameter dictionary
     param_structure = [
-        _check_structure(param_dict.get(name)) for name in ["find_replace", "spark_pool"] if param_dict.get(name)
+        _check_parameter_structure(param_dict.get(name))
+        for name in ["find_replace", "spark_pool"]
+        if param_dict.get(name)
     ]
     # Check structure if only one parameter is found
     if len(param_structure) == 1:
@@ -114,12 +116,12 @@ def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None
     if len(param_structure) == 2 and param_structure[0] == param_structure[1]:
         return param_structure[0]
 
-    return "invalid"
+    return False
 
 
-def _check_structure(param_value: any) -> str:
+def _check_parameter_structure(param_value: any) -> bool:
     """Checks the structure of a parameter value"""
-    return "new" if isinstance(param_value, list) else "invalid"
+    return isinstance(param_value, list)
 
 
 def process_input_path(

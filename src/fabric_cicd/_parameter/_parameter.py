@@ -14,7 +14,7 @@ import yaml
 
 import fabric_cicd.constants as constants
 from fabric_cicd._parameter._utils import (
-    check_parameter_structure,
+    is_valid_structure,
     process_input_path,
     replace_variables_in_parameter_file,
 )
@@ -177,7 +177,7 @@ class Parameter:
 
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
-        if check_parameter_structure(self.environment_parameter) == "invalid":
+        if not is_valid_structure(self.environment_parameter):
             return False, constants.PARAMETER_MSGS["invalid structure"]
 
         return True, constants.PARAMETER_MSGS["valid structure"]
