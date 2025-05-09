@@ -103,7 +103,8 @@ class FabricWorkspace:
         self.endpoint = FabricEndpoint(
             # if credential is not defined, use DefaultAzureCredential
             token_credential=(
-                DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential) # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token.  Not internal Azure product. 
+                # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token.  Not internal Azure product.
+                DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
             )
         )
 
