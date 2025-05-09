@@ -44,12 +44,15 @@ def create_parameter_file(dir_path, utf8_chars):
     """Create a parameter file with UTF-8 characters."""
     parameter_file_path = dir_path / "parameter.yml"
     parameter_content = {
-        "find_replace": {
-            f"Production {utf8_chars['mixed']}": {
-                utf8_chars["nordic"]: "12345678-1234-5678-abcd-1234567890ab",
-                utf8_chars["asian"]: "21345678-1234-5678-abcd-1234567890ab",
+        "find_replace": [
+            {
+                "find_value": f"Production {utf8_chars['mixed']}",
+                "replace_value": {
+                    utf8_chars["nordic"]: "12345678-1234-5678-abcd-1234567890ab",
+                    utf8_chars["asian"]: "21345678-1234-5678-abcd-1234567890ab",
+                },
             }
-        }
+        ]
     }
 
     with parameter_file_path.open("w", encoding="utf-8") as f:
@@ -128,9 +131,10 @@ def test_parameter_file_with_utf8_chars(
     key2 = utf8_test_chars["nordic"]
     key3 = utf8_test_chars["asian"]
 
-    assert key1 in workspace.environment_parameter["find_replace"]
-    assert key2 in workspace.environment_parameter["find_replace"][key1]
-    assert key3 in workspace.environment_parameter["find_replace"][key1]
+    for param_dict in workspace.environment_parameter.get("find_replace"):
+        assert key1 == param_dict["find_value"]
+        assert key2 in param_dict["replace_value"]
+        assert key3 in param_dict["replace_value"]
 
 
 def test_platform_metadata_with_utf8_chars(

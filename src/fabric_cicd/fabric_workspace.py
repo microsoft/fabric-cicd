@@ -289,7 +289,6 @@ class FabricWorkspace:
             item_obj: The Item object instance that provides the item type and item name.
         """
         from fabric_cicd._parameter._utils import (
-            check_parameter_structure,
             check_replacement,
             process_input_path,
         )
@@ -301,33 +300,21 @@ class FabricWorkspace:
         file_path = file_obj.file_path
 
         if "find_replace" in self.environment_parameter:
-            structure_type = check_parameter_structure(self.environment_parameter, param_name="find_replace")
             msg = "Replacing {} with {} in {}.{}"
 
-            # Handle new parameter file structure
-            if structure_type == "new":
-                for parameter_dict in self.environment_parameter["find_replace"]:
-                    find_value = parameter_dict["find_value"]
-                    replace_value = parameter_dict["replace_value"]
-                    input_type = parameter_dict.get("item_type")
-                    input_name = parameter_dict.get("item_name")
-                    input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+            for parameter_dict in self.environment_parameter["find_replace"]:
+                find_value = parameter_dict["find_value"]
+                replace_value = parameter_dict["replace_value"]
+                input_type = parameter_dict.get("item_type")
+                input_name = parameter_dict.get("item_name")
+                input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
 
-                    # Perform replacement if a condition is met and replace any found references with specified environment value
-                    if (find_value in raw_file and self.environment in replace_value) and check_replacement(
-                        input_type, input_name, input_path, item_type, item_name, file_path
-                    ):
-                        raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                        logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
-
-            # Handle original parameter file structure
-            # TODO: Deprecate old structure handling by April 24, 2025
-            if structure_type == "old":
-                for key, parameter_dict in self.environment_parameter["find_replace"].items():
-                    if key in raw_file and self.environment in parameter_dict:
-                        # replace any found references with specified environment value
-                        raw_file = raw_file.replace(key, parameter_dict[self.environment])
-                        logger.debug(msg.format(key, parameter_dict, item_name, item_type))
+                # Perform replacement if a condition is met and replace any found references with specified environment value
+                if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                    input_type, input_name, input_path, item_type, item_name, file_path
+                ):
+                    raw_file = raw_file.replace(find_value, replace_value[self.environment])
+                    logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
 
         return raw_file
 

@@ -58,8 +58,6 @@ PARAMETER_MSGS = {
     "invalid content": INVALID_YAML,
     "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
     "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "{}",
-    "old structure": "The parameter file structure used will no longer be supported after April 24, 2025. Please migrate to the new structure",
-    "raise issue": "Raise a GitHub issue here: https://github.com/microsoft/fabric-cicd/issues for migration timeline issues",
     "invalid structure": "Invalid parameter file structure",
     "valid structure": "Parameter file structure is valid",
     "invalid name": "Invalid parameter name '{}' found in the parameter file",

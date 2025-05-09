@@ -38,6 +38,16 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> publish_all_items(workspace)
+
+        With regex name exclusion
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> exclude_regex = ".*_do_not_publish"
+        >>> publish_all_items(workspace, exclude_regex)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 

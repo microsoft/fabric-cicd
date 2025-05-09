@@ -90,10 +90,10 @@ def validate_parameter_file(
     return parameter_obj._validate_parameter_file()
 
 
-def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None) -> str:
+def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bool:
     """
     Checks the parameter dictionary structure and determines if it
-    contains the new structure (i.e. a list of values when indexed by the key).
+    contains the valid structure (i.e. a list of values when indexed by the key).
 
     Args:
         param_dict: The parameter dictionary to check.
@@ -101,37 +101,27 @@ def check_parameter_structure(param_dict: dict, param_name: Optional[str] = None
     """
     # Check the structure of the specified parameter
     if param_name:
-        return _check_structure(param_dict.get(param_name))
+        return _check_parameter_structure(param_dict.get(param_name))
 
     # Otherwise, check the structure of the entire parameter dictionary
-    find_replace_parameter = param_dict.get("find_replace")
-    spark_pool_parameter = param_dict.get("spark_pool")
+    param_structure = [
+        _check_parameter_structure(param_dict.get(name))
+        for name in ["find_replace", "spark_pool"]
+        if param_dict.get(name)
+    ]
+    # Check structure if only one parameter is found
+    if len(param_structure) == 1:
+        return param_structure[0]
+    # Check structure if both parameters are found
+    if len(param_structure) == 2 and param_structure[0] == param_structure[1]:
+        return param_structure[0]
 
-    # If both parameters are present, check their structures
-    if find_replace_parameter and spark_pool_parameter:
-        find_replace_structure = _check_structure(find_replace_parameter)
-        spark_pool_structure = _check_structure(spark_pool_parameter)
-        # If both structures are the same, return the structure
-        if find_replace_structure == spark_pool_structure:
-            return find_replace_structure
-        return "invalid"
-
-    # If only one parameter is present, return its structure
-    if find_replace_parameter:
-        return _check_structure(find_replace_parameter)
-    if spark_pool_parameter:
-        return _check_structure(spark_pool_parameter)
-    return "invalid"
+    return False
 
 
-def _check_structure(param_value: any) -> str:
+def _check_parameter_structure(param_value: any) -> bool:
     """Checks the structure of a parameter value"""
-    if isinstance(param_value, list):
-        return "new"
-    # TODO: Remove this condition after deprecation (April 24, 2025)
-    if isinstance(param_value, dict):
-        return "old"
-    return "invalid"
+    return isinstance(param_value, list)
 
 
 def process_input_path(
