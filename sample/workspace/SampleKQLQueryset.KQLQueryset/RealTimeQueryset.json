@@ -1,0 +1,22 @@
+{
+  "queryset": {
+    "version": "1.0.0",
+    "dataSources": [
+      {
+        "id": "50c1256c-4b67-4f03-a048-9aeadd277887",
+        "clusterUri": "",
+        "type": "Fabric",
+        "databaseItemId": "a51e98dd-5993-8e1c-443f-02aa53d4db74",
+        "databaseItemName": "TaxiDB"
+      }
+    ],
+    "tabs": [
+      {
+        "id": "472f60f7-4cdb-4cb2-a2fb-a7fce8377aa0",
+        "content": "//***********************************************************************************************************\n// Here are two articles to help you get started with KQL:\n// KQL reference guide - https://aka.ms/KQLguide\n// SQL - KQL conversions - https://aka.ms/sqlcheatsheet\n//***********************************************************************************************************\n\n// Use \"take\" to view a sample number of records in the table and check the data.\nYOUR_TABLE_HERE\n| take 100\n\n// See how many records are in the table.\nYOUR_TABLE_HERE\n| count\n\n// This query returns the number of ingestions per hour in the given table.\nYOUR_TABLE_HERE\n| summarize IngestionCount = count() by bin(ingestion_time(), 1h)\n\n",
+        "title": "",
+        "dataSourceId": "50c1256c-4b67-4f03-a048-9aeadd277887"
+      }
+    ]
+  }
+}
