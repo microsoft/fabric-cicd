@@ -19,6 +19,35 @@ import fabric_cicd.constants as constants
 logger = logging.getLogger(__name__)
 
 
+def replace_key_value(
+    file_content: Union[str, dict, list], replacements: dict, key_check: str = "name", keys_to_update: list = None
+) -> Union[str, dict, list]:
+    """
+    Recursively replaces keys or values in a file's content based on the replacements dictionary.
+
+    Args:
+        file_content: The content of the file as a string, dict, or list.
+        replacements: A dictionary where keys are the values to find and values are the replacements.
+        key_check: The key to check in the replacements dictionary.
+        keys_to_update: A list of keys to update in the file content.
+
+    Returns:
+        Updated file content with replacements applied.
+    """
+    if keys_to_update is None:
+        keys_to_update = []
+    if isinstance(file_content, dict):
+        for content_variables in replacements:
+            if file_content.get(key_check) == content_variables[key_check]:
+                for update_key in keys_to_update:
+                    file_content[update_key] = content_variables.get(update_key)
+        return file_content
+    if isinstance(file_content, list):
+        return [replace_key_value(item, replacements, key_check, keys_to_update) for item in file_content]
+    # If the content is not a string, dict, or list, return it as is
+    return file_content
+
+
 def replace_variables_in_parameter_file(raw_file: str) -> str:
     """
     A function to replace tokens in the parameter.yml file with environment variables.

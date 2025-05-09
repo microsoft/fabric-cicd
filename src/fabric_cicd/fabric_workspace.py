@@ -291,6 +291,7 @@ class FabricWorkspace:
         from fabric_cicd._parameter._utils import (
             check_replacement,
             process_input_path,
+            replace_key_value,
         )
 
         # Parse the file_obj and item_obj
@@ -298,6 +299,39 @@ class FabricWorkspace:
         item_type = item_obj.type
         item_name = item_obj.name
         file_path = file_obj.file_path
+
+        if "variable_libraries" in self.environment_parameter and item_type == "VariableLibrary":
+            for parameter_dict_list in [
+                d for d in self.environment_parameter.get("variable_libraries") if d.get(self.environment) is not None
+            ]:
+                if "variables.json" in file_path.name:
+                    for parameter_dict in parameter_dict_list.get(self.environment):
+                        if item_name == parameter_dict.get("library_name"):
+                            json_content = json.loads(raw_file)
+                            replace_key_value(
+                                json_content.get("variables"),
+                                parameter_dict.get("variables"),
+                                "name",
+                                ["value", "note"],
+                            )
+                            raw_file = json.dumps(json_content)
+                elif "valueSets" in file_path.parts:
+                    for parameter_dict in parameter_dict_list.get(self.environment):
+                        for val_sets in parameter_dict.get("alternate_sets"):
+                            if val_sets.get("set_name") in file_path.name:
+                                json_content = json.loads(raw_file)
+                                replace_key_value(
+                                    json_content.get("variableOverrides"),
+                                    val_sets.get("variables"),
+                                    "name",
+                                    ["value"],
+                                )
+                                # for json_vars in json_content.get("variableOverrides"):
+                                #     for content_variables in val_sets.get("variables"):
+                                #         if json_vars.get("name") in content_variables.get("name"):
+                                #             print(json_vars.get("name"))
+                                #             json_vars["value"] = content_variables.get("value")
+                                raw_file = json.dumps(json_content)
 
         if "find_replace" in self.environment_parameter:
             msg = "Replacing {} with {} in {}.{}"
