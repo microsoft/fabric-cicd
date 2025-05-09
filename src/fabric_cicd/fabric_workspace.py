@@ -292,6 +292,7 @@ class FabricWorkspace:
         from fabric_cicd._parameter._utils import (
             check_replacement,
             process_input_path,
+            replace_key_value,
         )
 
         # Parse the file_obj and item_obj
@@ -299,6 +300,17 @@ class FabricWorkspace:
         item_type = item_obj.type
         item_name = item_obj.name
         file_path = file_obj.file_path
+
+        if "key_value_replace" in self.environment_parameter:
+            for parameter_dict in self.environment_parameter.get("key_value_replace"):
+                input_type = parameter_dict.get("item_type")
+                input_name = parameter_dict.get("item_name")
+                input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+                if (
+                    check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
+                    and ".json" in file_path.suffix
+                ):
+                    raw_file = replace_key_value(parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
             msg = "Replacing {} with {} in {}.{}"
