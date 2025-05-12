@@ -388,14 +388,16 @@ class FabricWorkspace:
             func_process_file: Custom function to process file contents. Defaults to None.
             **kwargs: Additional keyword arguments.
         """
+        item = self.repository_items[item_type][item_name]
+
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
             regex_pattern = check_regex(self.publish_item_name_exclude_regex)
             if regex_pattern.match(item_name):
+                item.publish_status = "skipped"
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
                 return
 
-        item = self.repository_items[item_type][item_name]
         item_guid = item.guid
         item_files = item.item_files
 
