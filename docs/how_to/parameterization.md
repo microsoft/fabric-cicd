@@ -32,7 +32,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs.
 
-Note: A common use case for this function is to replace connection strings, e.g., find and replace a connection GUID referenced in a data pipeline.
+Note: A common use case for this function is to replace values in text based file types like notebooks.
 
 ```yaml
 find_replace:
@@ -57,6 +57,25 @@ find_replace:
       replace_value:
           PPE: "$ENV:ppe_lakehouse"
           PROD: "$ENV:prod_lakehouse"
+```
+
+### `key_value_replace`
+
+Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs.  Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.  
+
+Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, etc.  e.g., find and replace a connection GUID referenced in a data pipeline.
+
+```yaml
+key_value_replace:
+    # Required fields: key must be JSONPath
+    - find_key: <find-this-key>
+      replace_value:
+          <environment-1-key>: <replace-with-this-value>
+          <environment-2-key>: <replace-with-this-value>
+      # Optional fields: value must be a string or array of strings
+      item_type: <item-type-filter-value>
+      item_name: <item-name-filter-value>
+      file_path: <file-path-filter-value>
 ```
 
 ### `spark_pool`
@@ -110,34 +129,20 @@ find_replace:
           PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
-      file_path:
     - find_value: "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c" # workspace ID to be replaced
       replace_value:
-          PPE: "d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a" # PPE workspace ID
-          PROD: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" # PROD workspace ID
+          PPE: "$ENV:ppe_workspace_id" # enable_environment_variable_replacement feature flag
+          PROD: "$ENV:prod_workspace_id" # enable_environment_variable_replacement feature flag
       file_path: # filter on notebook files with these paths
           - "/Hello World.Notebook/notebook-content.py"
           - "\\Goodbye World.Notebook\\notebook-content.py"
 
-    # With enable_deployment_variables feature
-    - find_value: "123e4567-e89b-12d3-a456-426614174000" # Lakehouse GUID
+key_value_replace:
+    - find_key: $.properties.activities[?(@.name=="Load_Intake")].typeProperties.source.datasetSettings.externalReferences.connection # SQL Server Connection to be replaced
       replace_value:
-          PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE lakehouse GUID
-          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID
-      item_type: "Notebook"
-      item_name: ["Hello World", "Goodbye World"]
-    - find_value: "replace_lakehouse_id"
-      replace_value:
-          PPE: "$ENV:ppe_lakehouse_guid" # environment variable replace
-          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c"
-      item_type: "Notebook"
-      item_name: ["Hello World", "Goodbye World"]
-    - find_value: "replace_lakehouse_workspace"
-      replace_value:
-          PPE: "$ENV:ppe_workspace_guid" # environment variable replace
-          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c"
-      item_type: "Notebook"
-      item_name: ["Hello World", "Goodbye World"]
+          PPE: "6c517159-d27a-41d5-b71e-ca1ecff6542b" # PPE SQL Server Connection
+          PROD: "6c517159-d27a-41d5-b71e-ca1ecff6542b" # PROD SQL Server Connection
+      item_type: "DataPipeline" # filter on data pipeline files
 
 spark_pool:
     - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b" # spark_pool_instance_id to be replaced
@@ -223,6 +228,104 @@ display(df)
 # META   "language_group": "synapse_pyspark"
 # META }
 ```
+
+### Data Pipelines
+
+A Data Pipeline is attached to data sources via the Connection Id.  Connections are not deployed with fabric-cicd and therefore need to be parameterized.  
+
+In the `pipeline-content.json` file, the SQL Server Connection Id `c517e095-ed87-4665-95fa-8cdb1e751fba`, must be replaced with the corresponding GUIDs of the SQL Server in the target environment (PPE/PROD/etc).
+
+This replacement is managed by the `find_key` input in the `parameter.yml` file where fabric-cicd finds every instance of the key within the _specified_ repository files and replaces it with the string for the deployed environment.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
+      replace_value:
+          PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE SQL Connection GUID
+          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PPE SQL Connection GUID
+      item_type: "Data Pipeline" # filter on Data Pipelines files
+      item_name: "Example Pipeline" # filter on specific Data Pipelines files
+```
+
+<span class="md-h4-nonanchor">pipeline-content.json file</span>
+
+```json
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "Copy Data",
+        "type": "Copy",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None",
+            "datasetSettings": {
+              "annotations": [],
+              "type": "AzureSqlTable",
+              "schema": [],
+              "typeProperties": {
+                "schema": "Dataprod",
+                "table": "DIM_Calendar",
+                "database": "unified"
+              },
+              "externalReferences": {
+                "connection": "c517e095-ed87-4665-95fa-8cdb1e751fba"
+              }
+            }
+          },
+          "sink": {
+            "type": "LakehouseTableSink",
+            "tableActionOption": "Append",
+            "datasetSettings": {
+              "annotations": [],
+              "linkedService": {
+                "name": "Unified",
+                "properties": {
+                  "annotations": [],
+                  "type": "Lakehouse",
+                  "typeProperties": {
+                    "workspaceId": "2d2e0ae2-9505-4f0c-ab42-e76cc11fb07d",
+                    "artifactId": "31dd665e-95f3-4575-9f46-70ea5903d89b",
+                    "rootFolder": "Tables"
+                  }
+                }
+              },
+              "type": "LakehouseTable",
+              "schema": [],
+              "typeProperties": {
+                "schema": "Dataprod",
+                "table": "DIM_Calendar"
+              }
+            }
+          },
+          "enableStaging": false,
+          "translator": {
+            "type": "TabularTranslator",
+            "typeConversion": true,
+            "typeConversionSettings": {
+              "allowDataTruncation": true,
+              "treatBooleanAsNumber": false
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
 
 ### Environments
 
