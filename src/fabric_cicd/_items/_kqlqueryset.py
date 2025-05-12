@@ -29,7 +29,7 @@ def publish_kqlquerysets(fabric_workspace_obj: FabricWorkspace) -> None:
         )
 
 
-def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
+def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:  # noqa: ARG001
     """
     Custom file processing for kql queryset items.
 
