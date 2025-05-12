@@ -76,6 +76,7 @@ def validate_parameter_file(
     endpoint = FabricEndpoint(
         # if credential is not defined, use DefaultAzureCredential
         token_credential=(
+            # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token.  Not internal Azure product.
             DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
         )
     )
