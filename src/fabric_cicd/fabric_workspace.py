@@ -415,12 +415,11 @@ class FabricWorkspace:
             item_payload = []
             for file in item_files:
                 if not re.match(exclude_path, file.relative_path):
-                    if file.type == "text":
+                    if file.type == "text" and not str(file.file_path).endswith(".platform"):
                         file.contents = func_process_file(self, item, file) if func_process_file else file.contents
-                        if not str(file.file_path).endswith(".platform"):
-                            file.contents = self._replace_logical_ids(file.contents)
-                            file.contents = self._replace_parameters(file, item)
-                            file.contents = self._replace_workspace_ids(file.contents)
+                        file.contents = self._replace_logical_ids(file.contents)
+                        file.contents = self._replace_parameters(file, item)
+                        file.contents = self._replace_workspace_ids(file.contents)
 
                     item_payload.append(file.base64_payload)
 
