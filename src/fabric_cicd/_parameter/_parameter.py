@@ -36,6 +36,10 @@ class Parameter:
             "maximum": {"instance_pool_id", "replace_value", "item_name"},
         },
         "spark_pool_replace_value": {"type", "name"},
+        "key_value_replace": {
+            "minimum": {"find_key", "replace_value"},
+            "maximum": {"find_key", "replace_value", "item_type", "item_name", "file_path"},
+        },
     }
 
     LOAD_ERROR_MSG = ""
@@ -184,7 +188,7 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:2]
+        params = list(self.PARAMETER_KEYS.keys())[:4]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
