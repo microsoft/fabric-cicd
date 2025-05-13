@@ -6,6 +6,20 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.17
+
+<span class="md-h2-subheader">Release Date: 2025-05-13</span>
+
+-   💥 Deprecate old parameter file structure ([#283](https://github.com/microsoft/fabric-cicd/issues/283))
+-   ✨ Onboard CopyJob item type ([#122](https://github.com/microsoft/fabric-cicd/issues/122))
+-   ✨ Onboard Eventstream item type ([#170](https://github.com/microsoft/fabric-cicd/issues/170))
+-   ✨ Onboard Eventhouse/KQL Database item type ([#169](https://github.com/microsoft/fabric-cicd/issues/169))
+-   ✨ Onboard Data Activator item type ([#291](https://github.com/microsoft/fabric-cicd/issues/291))
+-   ✨ Onboard KQL Queryset item type ([#292](https://github.com/microsoft/fabric-cicd/issues/292))
+-   🔧 Fix post publish operations for skipped items ([#277](https://github.com/microsoft/fabric-cicd/issues/277))
+-   ⚡ New function `key_value_replace` for key-based replacement operations in JSON and YAML
+-   📝 Add publish regex example to demonstrate how to use the `publish_all_items` with regex for excluding item names
+
 ## Version 0.1.16
 
 <span class="md-h2-subheader">Release Date: 2025-04-25</span>
