@@ -35,7 +35,7 @@ def replace_key_value(param_dict: dict, json_content: str, env: str) -> Union[di
     except json.JSONDecodeError as jde:
         raise ValueError(jde) from jde
 
-    # Extract the jsonpath expression from the find_key attribute of the param_dict 
+    # Extract the jsonpath expression from the find_key attribute of the param_dict
     jsonpath_expr = parse(param_dict["find_key"])
     for match in jsonpath_expr.find(data):
         # If the env is present in the replace_value array perform the replacement
@@ -105,7 +105,6 @@ def validate_parameter_file(
     endpoint = FabricEndpoint(
         # if credential is not defined, use DefaultAzureCredential
         token_credential=(
-            # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token.  Not internal Azure product.
             DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
         )
     )
