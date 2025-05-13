@@ -78,7 +78,7 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   The `exlcude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
--   Streaming data in an eventhouse between the source and deployed environments may be subject to signficant _differences_.
+-   There may be signficant _differences_ in the streaming data between the source eventhouse and the deployed eventhouse.
 
 ## Eventstream
 
