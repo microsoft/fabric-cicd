@@ -85,7 +85,6 @@
 -   **Parameterization:**
     -   Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     -   Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
--   **Activator**, **Eventhouse**, and **Lakehouse** destinations are supported in source control.
 -   **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
 
 ## KQL Database
