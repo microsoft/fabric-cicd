@@ -71,7 +71,7 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   **Initial deployment** may not reflect streaming data immediately.
--   **Reflex** is the item name in source control. Source control may not be supported fo every activator/reflex source.
+-   **Reflex** is the item name in source control. Source control may not work for every activator/reflex as not all sources are supported.
 
 ## Eventhouse
 
