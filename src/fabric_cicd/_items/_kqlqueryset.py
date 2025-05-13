@@ -57,19 +57,24 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
     for data_source in json_content_dict.get("queryset").get("dataSources"):
         # Check if the cluster URI value is empty
         if data_source.get("clusterUri") == "":
-            # Extract the associated database name, if it's deployed get the cluster URI
+            # Extract the associated kql database name
             database_item_name = data_source.get("databaseItemName")
-            database_item = fabric_workspace_obj.deployed_items.get("KQLDatabase").get(database_item_name)
+            # Retrieve the database guid
+            fabric_workspace_obj._refresh_deployed_items()
+            database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase")
+            database_item = database_items.get(database_item_name) if database_items else None
             if not database_item:
-                msg = f"Cannot find KQL Database source with name {database_item_name} as it is not yet deployed."
+                msg = f"Cannot find the KQL Database source with name {database_item_name} as it is not yet deployed."
                 raise ParsingError(msg, logger)
+
             database_item_guid = database_item.guid
+            # Get the cluster URI of the KQL database
             kqldatabase_data = fabric_workspace_obj.endpoint.invoke(
                 method="GET",
                 url=f"{fabric_workspace_obj.base_api_url}/kqlDatabases/{database_item_guid}",
             )
             kqldatabase_cluster_uri = kqldatabase_data["body"]["properties"]["queryServiceUri"]
-            # Replace the empty cluster URI with the actual cluster URI
+            # Replace the empty cluster URI with the cluster URI value
             data_source["clusterUri"] = kqldatabase_cluster_uri
 
     return json.dumps(json_content_dict, indent=2)

@@ -65,3 +65,40 @@
 -   **Parameterization:**
     -   Connections will always point to the original data source unless parameterized in the `find_replace` section of the `parameter.yml` file.
 -   **Initial deployment** requires manual configuration of the connection after deployment.
+
+## Activator
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   **Initial deployment** may not reflect streaming data immediately.
+-   **Reflex** is the item name used in source control.
+-   Activator source control does not support every source.
+
+## Eventhouse
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   The `exlcude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database**.
+-   Streaming data reflected in an eventhouse may be subject to significant differences between the source and deployed environments.
+
+## Eventstream
+
+-   **Parameterization:**
+    -   Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    -   Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
+-   The following eventstream destinations are supported in source control: **Activator**, **Eventhouse**, and **Lakehouse**.
+-   **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
+
+## KQL Database
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   In Fabric, a KQL database is not a standalone item. However, during deployment, it is treated as such. Its source control files are located within a `.children` folder under the directory of the attached eventhouse.
+-   Table data in the KQL database are not source controlled and therefore, do not consistently show data in the UI when deployed. A table that is present can be empty post-deployment.
+
+## KQL Queryset
+
+-   **Parameterization:**
+    -   KQL querysets attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   The cluster/query URI of the KQL database is required in the KQL queryset JSON for rebinding.
+-   KQL querysets can still exist after the KQL database source has been deleted. However, errors will reflect in the KQL queryset.
