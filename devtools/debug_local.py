@@ -42,11 +42,11 @@ item_type_in_scope = [
     "Environment",
     "SemanticModel",
     "Report",
-    "Eventstream",
     "Eventhouse",
     "KQLDatabase",
     "KQLQueryset",
     "Reflex",
+    "Eventstream",
 ]
 
 # Uncomment to use SPN auth

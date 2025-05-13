@@ -154,6 +154,151 @@
       ]
     },
     {
+      "id": "124fb4cb-6c67-4c0a-ab0a-8a99bfefcdca",
+      "name": "Lakehouse",
+      "type": "Lakehouse",
+      "properties": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "c916eeb0-dd6a-ae32-4f4f-966d2414b239",
+        "schema": "",
+        "deltaTable": "Taxi",
+        "inputSerialization": {
+          "type": "Json",
+          "properties": {
+            "encoding": "UTF8"
+          }
+        }
+      },
+      "inputNodes": [
+        {
+          "name": "ManageFields"
+        }
+      ],
+      "inputSchemas": [
+        {
+          "name": "ManageFields",
+          "schema": {
+            "columns": [
+              {
+                "name": "VendorID",
+                "type": "Nvarchar(max)",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "tpep_pickup_datetime",
+                "type": "DateTime",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "tpep_dropoff_datetime",
+                "type": "DateTime",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "passenger_count",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "trip_distance",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "RatecodeID",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "store_and_fwd_flag",
+                "type": "Nvarchar(max)",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "PULocationID",
+                "type": "Nvarchar(max)",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "DOLocationID",
+                "type": "Nvarchar(max)",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "payment_type",
+                "type": "BigInt",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "fare_amount",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "extra",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "mta_tax",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "tip_amount",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "tolls_amount",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "improvement_surcharge",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "total_amount",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "congestion_surcharge",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              },
+              {
+                "name": "airport_fee",
+                "type": "Float",
+                "fields": null,
+                "items": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cecf7a31-bfba-437a-b878-ac6ddb3d50a2",
       "name": "Eventhouse",
       "type": "Eventhouse",
