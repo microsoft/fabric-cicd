@@ -78,7 +78,7 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   The `exlcude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
--   Streaming data in an eventhouse may be subject to signficant data _differences_ between the source and deployed environments.
+-   Streaming data in an eventhouse between the source and deployed environments may be subject to signficant _differences_.
 
 ## Eventstream
 
@@ -93,11 +93,11 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   In Fabric, a KQL database is not a standalone item. However, during deployment, it is treated as such. Its source control files are located within a `.children` folder under the directory of the attached eventhouse.
--   Data in KQL database tables is not source controlled and may not consistently appear in the UI after deployment. Tables may be empty post-deployment.
+-   Data in KQL database tables is not source controlled and may not consistently appear in the database UI after deployment. Some tables may be empty post-deployment.
 
 ## KQL Queryset
 
 -   **Parameterization:**
     -   KQL querysets attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
--   The **cluster/query URI** of the KQL database is required in the KQL queryset JSON for rebinding.
+-   The **cluster/query URI** of the KQL database must be present in the KQL queryset JSON for rebinding. If the KQL queryset is attached to a KQL database within the same workspace, the cluser URI value is empty and needs to be re-added. `fabric ci-cd` handles this automatically.
 -   KQL querysets can still exist after the KQL database source has been deleted. However, errors will reflect in the KQL queryset.
