@@ -25,6 +25,8 @@ def publish_variablelibraries(fabric_workspace_obj: FabricWorkspace) -> None:
 
     for item_name in var_libraries:
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
+        if var_libraries[item_name].skip_publish:
+            continue
         activate_value_set(fabric_workspace_obj, var_libraries[item_name])
 
 

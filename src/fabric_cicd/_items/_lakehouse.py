@@ -42,6 +42,10 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             skip_publish_logging=True,
         )
 
+        # Check if the item is published to avoid any post publish actions
+        if item.skip_publish:
+            continue
+
         check_sqlendpoint_provision_status(fabric_workspace_obj, item)
 
         logger.info(f"{constants.INDENT}Published")
@@ -49,16 +53,19 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     # Need all lakehouses published first to protect interrelationships
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
         for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
+            # Check if the item is published to avoid any post publish actions
+            if item.skip_publish:
+                continue
             process_shortcuts(fabric_workspace_obj, item_obj)
 
 
-def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item: Item) -> None:
+def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
     """
     Check the SQL endpoint status of the published lakehouses
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-        item: The item object to check the SQL endpoint status for
+        item_obj: The item object to check the SQL endpoint status for
 
     """
     iteration = 1
@@ -67,7 +74,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         sql_endpoint_status = None
 
         response_state = fabric_workspace_obj.endpoint.invoke(
-            method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item.guid}"
+            method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item_obj.guid}"
         )
 
         sql_endpoint_status = dpath.util.get(
@@ -79,7 +86,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
             break
 
         if sql_endpoint_status == "Failed":
-            msg = f"Cannot resolve SQL endpoint for lakehouse {item.name}"
+            msg = f"Cannot resolve SQL endpoint for lakehouse {item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger)
 
         handle_retry(

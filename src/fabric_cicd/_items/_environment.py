@@ -5,6 +5,7 @@
 
 import logging
 import os
+import re
 from pathlib import Path
 
 import dpath
@@ -29,13 +30,15 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     check_environment_publish_state(fabric_workspace_obj, True)
 
     item_type = "Environment"
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
+    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
         # Only deploy the shell for environments
         fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=item_type,
             skip_publish_logging=True,
         )
+        if item.skip_publish:
+            continue
         _publish_environment_metadata(fabric_workspace_obj, item_name=item_name)
 
 
@@ -91,7 +94,9 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
 
     environments = fabric_workspace_obj.repository_items.get("Environment", {})
 
-    logger.info(f"Checking Environment Publish State for {[k for k in environments]}")
+    logger.info(
+        f"Checking Environment Publish State for {[k for k in environments if not re.search(fabric_workspace_obj.publish_item_name_exclude_regex, k)]}"
+    )
 
     while ongoing_publish:
         ongoing_publish = False
