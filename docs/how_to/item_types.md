@@ -71,15 +71,14 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   **Initial deployment** may not reflect streaming data immediately.
--   **Reflex** is the item name used in source control.
--   Activator source control does not support every source.
+-   **Reflex** is the item name in source control. Source control may not be supported fo every activator/reflex source.
 
 ## Eventhouse
 
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
--   The `exlcude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database**.
--   Streaming data reflected in an eventhouse may be subject to significant differences between the source and deployed environments.
+-   The `exlcude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
+-   Streaming data in an eventhouse may be subject to signficant _differences_ between the source and deployed environments.
 
 ## Eventstream
 
@@ -94,11 +93,11 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   In Fabric, a KQL database is not a standalone item. However, during deployment, it is treated as such. Its source control files are located within a `.children` folder under the directory of the attached eventhouse.
--   Table data in the KQL database are not source controlled and therefore, do not consistently show data in the UI when deployed. A table that is present can be empty post-deployment.
+-   Data in KQL database tables is not source controlled and may not consistently appear in the UI after deployment. Tables may be empty post-deployment.
 
 ## KQL Queryset
 
 -   **Parameterization:**
     -   KQL querysets attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
--   The cluster/query URI of the KQL database is required in the KQL queryset JSON for rebinding.
+-   The **cluster/query URI** of the KQL database is required in the KQL queryset JSON for rebinding.
 -   KQL querysets can still exist after the KQL database source has been deleted. However, errors will reflect in the KQL queryset.
