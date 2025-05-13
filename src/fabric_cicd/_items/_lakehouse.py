@@ -42,6 +42,10 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             skip_publish_logging=True,
         )
 
+        # Check if the item is published to avoid any post publish actions
+        if item.skip_publish:
+            continue
+
         check_sqlendpoint_provision_status(fabric_workspace_obj, item)
 
         logger.info(f"{constants.INDENT}Published")
@@ -49,6 +53,9 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     # Need all lakehouses published first to protect interrelationships
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
         for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
+            # Check if the item is published to avoid any post publish actions
+            if item.skip_publish:
+                continue
             process_shortcuts(fabric_workspace_obj, item_obj)
 
 
@@ -61,10 +68,6 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         item_obj: The item object to check the SQL endpoint status for
 
     """
-    # check if the item is published before checking SQL endpoint status
-    if item_obj.publish_status != "published":
-        return
-
     iteration = 1
 
     while True:
@@ -104,10 +107,6 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
         item_obj: The item object to publish shortcuts for
     """
-    # check if the item is published before processing shortcuts
-    if item_obj.publish_status != "published":
-        return
-
     deployed_shortcuts = list_deployed_shortcuts(fabric_workspace_obj, item_obj)
 
     shortcut_file_obj = next((file for file in item_obj.item_files if file.name == "shortcuts.metadata.json"), None)

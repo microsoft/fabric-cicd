@@ -24,7 +24,7 @@ class Item:
     item_files: list = field(default_factory=list)
     folder_id: str = field(default="")
     IMMUTABLE_FIELDS: ClassVar[set] = {"type", "name", "description"}
-    publish_status: str = field(default="published")
+    skip_publish: bool = field(default=False)
 
     def __setattr__(self, key: str, value: any) -> None:
         """
