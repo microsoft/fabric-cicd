@@ -71,14 +71,14 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   **Initial deployment** may not reflect streaming data immediately.
--   **Reflex** is the item name in source control. Source control may not work for every activator/reflex as not all sources are supported.
+-   **Reflex** is the item name in source control. Source control may not support all activators/reflexes, as not all sources are compatible.
 
 ## Eventhouse
 
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
--   The `exlcude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
--   There may be signficant _differences_ in the streaming data between the source eventhouse and the deployed eventhouse.
+-   The `exclude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
+-   There may be significant _differences_ in the streaming data between the source eventhouse and the deployed eventhouse.
 
 ## Eventstream
 
@@ -98,5 +98,5 @@
 
 -   **Parameterization:**
     -   KQL querysets attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
--   The **cluster/query URI** of the KQL database must be present in the KQL queryset JSON for rebinding. If the KQL queryset is attached to a KQL database within the same workspace, the cluser URI value is empty and needs to be re-added. `fabric ci-cd` handles this automatically.
+-   The **cluster/query URI** of the KQL database must be present in the KQL queryset JSON for rebinding. If the KQL queryset is attached to a KQL database within the same workspace, the cluster URI value is empty and needs to be re-added. `fabric ci-cd` handles this automatically.
 -   KQL querysets can still exist after the KQL database source has been deleted. However, errors will reflect in the KQL queryset.
