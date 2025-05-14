@@ -10,7 +10,7 @@ The following contains all major, minor, and patch version release notes.
 
 <span class="md-h2-subheader">Release Date: 2025-05-14</span>
 
--   🔧 Fix bug with check environment publish state when `publish_item_name_exclude_regex` is `None` ([#295](https://github.com/microsoft/fabric-cicd/issues/295))
+-   🔧 Fix bug with checking environment publish state ([#295](https://github.com/microsoft/fabric-cicd/issues/295))
 
 ## Version 0.1.17
 
