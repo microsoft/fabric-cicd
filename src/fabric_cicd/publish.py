@@ -156,7 +156,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
 
     # Define order to unpublish items
     unpublish_order = []
-    for x in [
+    for item_type in [
         "Eventstream",
         "Reflex",
         "KQLQueryset",
@@ -169,12 +169,19 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Environment",
         "MirroredDatabase",
         "Lakehouse",
+        "Warehouse",
         "VariableLibrary",
     ]:
-        if x in fabric_workspace_obj.item_type_in_scope and (
-            x != "Lakehouse" or "enable_lakehouse_unpublish" in constants.FEATURE_FLAG
-        ):
-            unpublish_order.append(x)
+        # Lakehouses and Warehouses can only be unpublished if their feature flags are set
+        if item_type in fabric_workspace_obj.item_type_in_scope:
+            if item_type == "Lakehouse":
+                if "enable_lakehouse_unpublish" in constants.FEATURE_FLAG:
+                    unpublish_order.append(item_type)
+            elif item_type == "Warehouse":
+                if "enable_warehouse_unpublish" in constants.FEATURE_FLAG:
+                    unpublish_order.append(item_type)
+            else:
+                unpublish_order.append(item_type)
 
     for item_type in unpublish_order:
         deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
