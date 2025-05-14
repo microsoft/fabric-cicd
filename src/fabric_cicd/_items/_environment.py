@@ -94,9 +94,14 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
 
     environments = fabric_workspace_obj.repository_items.get("Environment", {})
 
-    logger.info(
-        f"Checking Environment Publish State for {[k for k in environments if not re.search(fabric_workspace_obj.publish_item_name_exclude_regex, k)]}"
-    )
+    filtered_environments = [
+        k
+        for k in environments
+        if not fabric_workspace_obj.publish_item_name_exclude_regex
+        or not re.search(fabric_workspace_obj.publish_item_name_exclude_regex, k)
+    ]
+
+    logger.info(f"Checking Environment Publish State for {filtered_environments}")
 
     while ongoing_publish:
         ongoing_publish = False
