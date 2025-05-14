@@ -26,6 +26,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "KQLQueryset",
     "Reflex",
     "Eventstream",
+    "Warehouse",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 

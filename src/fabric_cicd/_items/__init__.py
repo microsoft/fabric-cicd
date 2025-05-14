@@ -18,6 +18,7 @@ from fabric_cicd._items._notebook import publish_notebooks
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
 from fabric_cicd._items._variablelibrary import publish_variablelibraries
+from fabric_cicd._items._warehouse import publish_warehouses
 
 __all__ = [
     "check_environment_publish_state",
@@ -35,5 +36,6 @@ __all__ = [
     "publish_reports",
     "publish_semanticmodels",
     "publish_variablelibraries",
+    "publish_warehouses",
     "sort_datapipelines",
 ]
