@@ -1,0 +1,14 @@
+{
+  "formatVersion": "202502",
+  "computeEngineSettings": {},
+  "name": "Hello World Dataflow",
+  "queryGroups": [],
+  "documentLocale": "en-US",
+  "queriesMetadata": {
+    "Table": {
+      "queryId": "22926074-01b8-4abf-b5ed-5511a86c82ef",
+      "queryName": "Table"
+    }
+  },
+  "connections": []
+}
