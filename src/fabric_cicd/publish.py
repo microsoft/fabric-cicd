@@ -108,7 +108,11 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         print_header("Publishing Eventstreams")
         items.publish_eventstreams(fabric_workspace_obj)
     if "Warehouse" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Warehouses")
         items.publish_warehouses(fabric_workspace_obj)
+    if "Dataflow" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Dataflows")
+        items.publish_dataflows(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
@@ -157,6 +161,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "Dataflow",
         "Eventstream",
         "Reflex",
         "KQLQueryset",

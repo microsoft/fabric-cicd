@@ -1,0 +1,20 @@
+{
+  "formatVersion": "202502",
+  "computeEngineSettings": {},
+  "name": "Sample Lakehouse Dataflow",
+  "queryGroups": [],
+  "documentLocale": "en-US",
+  "queriesMetadata": {
+    "Dataprod DIM_Calendar": {
+      "queryId": "9e8eb43b-960f-4931-99ea-4b449608afdb",
+      "queryName": "Dataprod DIM_Calendar"
+    }
+  },
+  "connections": [
+    {
+      "path": "Lakehouse",
+      "kind": "Lakehouse",
+      "connectionId": "{\"ClusterId\":\"f92b0d60-6145-4224-8ca1-45c117a6d302\",\"DatasourceId\":\"ef3abe7d-3d90-4b90-99e3-48c9d668816a\"}"
+    }
+  ]
+}
