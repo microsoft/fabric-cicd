@@ -2,7 +2,7 @@
 <Project DefaultTargets="Build">
   <Sdk Name="Microsoft.Build.Sql" Version="1.0.0-rc1" />
   <PropertyGroup>
-    <Name>example db</Name>
+    <Name>Hello db</Name>
     <ProjectGuid>{00000000-0000-0000-0000-000000000000}</ProjectGuid>
     <DSP>Microsoft.Data.Tools.Schema.Sql.SqlDbFabricDatabaseSchemaProvider</DSP>
     <ModelCollation>1033, CI</ModelCollation>

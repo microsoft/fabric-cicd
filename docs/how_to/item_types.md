@@ -34,12 +34,19 @@
     ](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation) for more details.
 -   **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.
 
-## Mirrored Database
+## Mirrored Databases
 
 -   **Parameterization:**
     -   Connections will always point to the original source database unless parameterized in the `find_replace` section of the `parameter.yml` file.
 -   **Initial deployment** for Azure SQL Database or Azure SQL Managed Instance requires manual granting of System Assigned Managed Identity (SAMI) Read and Write permission to the mirrored database for replication to be successful after deployment. ref -> ([Prerequisites](https://learn.microsoft.com/en-us/fabric/database/mirrored-database/mirrored-database-rest-api#create-mirrored-database))
 -   **Unpublish** - a warning is shown for any default Semantic Models created by the Mirror Database. This is a current limitation of the Fabric API and can be ignored.
+
+## SQL Databases
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   **SQL Database content is not deployed** deployment is of the shell only, SQL database DDL must be deployed separately via dacpac or other tools such as dbt.
+-   **Unpublish** is disabled by default, enable with feature flag `enable_sqldatabase_unpublish`.
 
 ## Notebooks
 
@@ -69,41 +76,41 @@
     -   After the initial deployment, if an active set is renamed, or removed, the deployment will fail
     -   Manual intervention will be required to make the necessary changes in the Fabric UI and then restart the deployment
 
-## Copy Job
+## Copy Jobs
 
 -   **Parameterization:**
     -   Connections will always point to the original data source unless parameterized in the `find_replace` section of the `parameter.yml` file.
 -   **Initial deployment** requires manual configuration of the connection after deployment.
 
-## Activator
+## Activators
 
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   **Initial deployment** may not reflect streaming data immediately.
 -   **Reflex** is the item name in source control. Source control may not support all activators/reflexes, as not all sources are compatible.
 
-## Eventhouse
+## Eventhouses
 
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   The `exclude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
 -   There may be significant _differences_ in the streaming data between the source eventhouse and the deployed eventhouse.
 
-## Eventstream
+## Eventstreams
 
 -   **Parameterization:**
     -   Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     -   Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
 -   **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
 
-## KQL Database
+## KQL Databases
 
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   In Fabric, a KQL database is not a standalone item. However, during deployment, it is treated as such. Its source control files are located within a `.children` folder under the directory of the attached eventhouse.
 -   Data in KQL database tables is not source controlled and may not consistently appear in the database UI after deployment. Some tables may be empty post-deployment.
 
-## KQL Queryset
+## KQL Querysets
 
 -   **Parameterization:**
     -   KQL querysets attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.

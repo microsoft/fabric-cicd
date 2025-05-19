@@ -2,10 +2,10 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
     "type": "SQLDatabase",
-    "displayName": "Sample SQL DB"
+    "displayName": "Hello db"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "164d5b82-ef7c-aa80-464b-b833a359873f"
+    "logicalId": "fab68254-2c13-9624-451f-7ef2912347a6"
   }
 }

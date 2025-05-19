@@ -177,10 +177,13 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Warehouse",
         "VariableLibrary",
     ]:
-        # Lakehouses and Warehouses can only be unpublished if their feature flags are set
+        # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
         if item_type in fabric_workspace_obj.item_type_in_scope:
             if item_type == "Lakehouse":
                 if "enable_lakehouse_unpublish" in constants.FEATURE_FLAG:
+                    unpublish_order.append(item_type)
+            elif item_type == "SQLDatabase":
+                if "enable_sqldatabase_unpublish" in constants.FEATURE_FLAG:
                     unpublish_order.append(item_type)
             elif item_type == "Warehouse":
                 if "enable_warehouse_unpublish" in constants.FEATURE_FLAG:
