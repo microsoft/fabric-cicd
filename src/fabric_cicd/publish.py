@@ -68,9 +68,15 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Variable Libraries")
         items.publish_variablelibraries(fabric_workspace_obj)
+    if "Warehouse" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Warehouses")
+        items.publish_warehouses(fabric_workspace_obj)
     if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
+    if "SQLDatabase" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing SQL Databases")
+        items.publish_sqldatabases(fabric_workspace_obj)
     if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing MirroredDatabase")
         items.publish_mirroreddatabase(fabric_workspace_obj)
@@ -107,8 +113,6 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Eventstreams")
         items.publish_eventstreams(fabric_workspace_obj)
-    if "Warehouse" in fabric_workspace_obj.item_type_in_scope:
-        items.publish_warehouses(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
@@ -168,6 +172,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Notebook",
         "Environment",
         "MirroredDatabase",
+        "SQLDatabase",
         "Lakehouse",
         "Warehouse",
         "VariableLibrary",
