@@ -113,6 +113,5 @@
 -   **Parameterization:**
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   **Warehouse content is not deployed.** Only the item shell is deployed. Warehouse DDL must be deployed separately using a DACPAC or other tools such as dbt.
--   **Case insensitive collation is supported** custom collation must be manually edited in the `.platform` file creation payload. See [How to: Create a warehouse with case-insensitive (CI) collation
-    ](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation) for more details.
+-   **Case insensitive collation is supported** custom collation must be manually edited in the `.platform` file creation payload. See [How to: Create a warehouse with case-insensitive (CI) collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation) for more details.
 -   **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.
