@@ -640,8 +640,8 @@ class FabricWorkspace:
         sorted_folder_ids = [self.deployed_folders[folder_path] for folder_path in sorted_folders]
         logger.info("Unpublishing Workspace Folders")
 
-        ## Any folder that does not contain an item or does not parent folders
-        ## containing an item in its hierarchy is an orphaned folder
+        ## Any folder that neither contains items nor is an ancestor of a folder
+        ## containing items is considered orphaned.
 
         # Create a set of folders that contain items, and therefore can't be deleted
         deployed_folder_ids_with_items = {
