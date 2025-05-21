@@ -634,34 +634,57 @@ class FabricWorkspace:
         logger.info(f"{constants.INDENT}Published")
 
     def _unpublish_folders(self) -> None:
-        """Unublishes all empty folders in workspace."""
+        """Unpublishes all empty folders in workspace."""
         # Sort folders by the number of '/' in their paths (descending order)
-        sorted_folders = sorted(self.deployed_folders.keys(), key=lambda path: path.count("/"), reverse=True)
-        sorted_folder_ids = [self.deployed_folders[folder_path] for folder_path in sorted_folders]
-        logger.info("Unpublishing Workspace Folders")
+        sorted_folder_ids = [
+            self.deployed_folders[key]
+            for key in sorted(self.deployed_folders.keys(), key=lambda path: path.count("/"), reverse=True)
+        ]
 
         ## Any folder that neither contains items nor is an ancestor of a folder
-        ## containing items is considered orphaned.
+        ## containing items is considered orphaned
 
-        # Create a set of folders that contain items, and therefore can't be deleted
-        deployed_folder_ids_with_items = {
-            item.folder_id for items in self.deployed_items.values() for item in items.values()
+        # Create a set of folders that contain items
+        unorphaned_folders = {
+            item.folder_id for items in self.deployed_items.values() for item in items.values() if item.folder_id
         }
-        # Add parent folders of folders with items to the set
-        for folder_path in sorted_folders:
-            folder_id = self.deployed_folders[folder_path]
-            if folder_id in deployed_folder_ids_with_items:
-                path_parts = folder_path.split("/")
-                for i in range(1, len(path_parts)):
-                    parent_path = "/".join(path_parts[:i])
-                    parent_folder_id = self.deployed_folders.get(parent_path)
-                    if parent_folder_id:
-                        deployed_folder_ids_with_items.add(parent_folder_id)
+        # Skip deletion if all deployed folders are unorphaned
+        if unorphaned_folders == set(sorted_folder_ids):
+            return
+
+        # Create a reversed mapping for folder_id to folder_path lookups
+        folder_id_to_path_mapping = {folder_id: folder_path for folder_path, folder_id in self.deployed_folders.items()}
+
+        # Create a copy of the unorphaned_folders set to safely iterate while modifying the original set
+        folder_lookup = unorphaned_folders.copy()
+
+        # For each folder containing items, identify and protect all its ancestor folders from deletion
+        for folder_id in folder_lookup:
+            if folder_id in folder_id_to_path_mapping:
+                # Get the folder path
+                folder_path = folder_id_to_path_mapping[folder_id]
+
+            # Move up the folder hierarchy and add all ancestor folders
+            current_folder_path = folder_path
+            while current_folder_path != "/":
+                # Get the parent folder path
+                current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
+
+                # Get the folder_id for this path and add to the unorphaned_folder set
+                parent_folder_id = self.deployed_folders.get(current_folder_path)
+                if parent_folder_id:
+                    unorphaned_folders.add(parent_folder_id)
+
+        # Check if deletion can be skipped after update to unorphaned_folder set
+        if unorphaned_folders == set(sorted_folder_ids):
+            return
+
+        logger.info("Unpublishing Workspace Folders")
 
         # Pop all folders
 
         for folder_id in sorted_folder_ids:
-            if folder_id not in deployed_folder_ids_with_items:
+            if folder_id not in unorphaned_folders:
                 # Folder deployed, but not in repository
 
                 # Delete the folder from the workspace
