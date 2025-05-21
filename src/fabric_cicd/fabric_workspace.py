@@ -636,21 +636,27 @@ class FabricWorkspace:
     def _unpublish_folders(self) -> None:
         """Unublishes all empty folders in workspace."""
         # Sort folders by the number of '/' in their paths (descending order)
-        sorted_folder_ids = [
-            self.deployed_folders[key]
-            for key in sorted(self.deployed_folders.keys(), key=lambda path: path.count("/"), reverse=True)
-        ]
-
+        sorted_folders = sorted(self.deployed_folders.keys(), key=lambda path: path.count("/"), reverse=True)
+        sorted_folder_ids = [self.deployed_folders[folder_path] for folder_path in sorted_folders]
         logger.info("Unpublishing Workspace Folders")
 
-        ## any folder that is not in folderid_dict is an orphaned folder
+        ## Any folder that does not contain an item or does not parent folders
+        ## containing an item in its hierarchy is an orphaned folder
 
-        # Get folders with items
-        deployed_folder_ids_with_items = []
-
-        for items in self.deployed_items.values():
-            for item in items.values():
-                deployed_folder_ids_with_items.append(item.folder_id)
+        # Create a set of folders that contain items, and therefore can't be deleted
+        deployed_folder_ids_with_items = {
+            item.folder_id for items in self.deployed_items.values() for item in items.values()
+        }
+        # Add parent folders of folders with items to the set
+        for folder_path in sorted_folders:
+            folder_id = self.deployed_folders[folder_path]
+            if folder_id in deployed_folder_ids_with_items:
+                path_parts = folder_path.split("/")
+                for i in range(1, len(path_parts)):
+                    parent_path = "/".join(path_parts[:i])
+                    parent_folder_id = self.deployed_folders.get(parent_path)
+                    if parent_folder_id:
+                        deployed_folder_ids_with_items.add(parent_folder_id)
 
         # Pop all folders
 

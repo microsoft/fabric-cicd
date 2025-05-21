@@ -223,5 +223,6 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
     fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._refresh_deployed_folders()
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._unpublish_folders()
