@@ -6,6 +6,14 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.19
+
+<span class="md-h2-subheader">Release Date: 2025-05-21</span>
+
+-   ✨ Onboard SQL Database item type (shell-only deployment) ([#301](https://github.com/microsoft/fabric-cicd/issues/301))
+-   ✨ Onboard Warehouse item type (shell-only deployment) ([#204](https://github.com/microsoft/fabric-cicd/issues/204))
+-   🔧 Fix bug with unpublish workspace folders ([#273](https://github.com/microsoft/fabric-cicd/issues/273))
+
 ## Version 0.1.18
 
 <span class="md-h2-subheader">Release Date: 2025-05-14</span>
