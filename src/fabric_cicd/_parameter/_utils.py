@@ -10,6 +10,7 @@ parameter dictionary structure, processing parameter values, and handling parame
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Optional, Union
 
@@ -19,6 +20,22 @@ from jsonpath_ng.ext import parse
 import fabric_cicd.constants as constants
 
 logger = logging.getLogger(__name__)
+
+
+def find_regex_value(find_regex: str, file_content: str) -> str:
+    """A function to find a value in a file using a regex pattern."""
+    # Check if the find_pattern is a valid regex
+    try:
+        regex = re.compile(find_regex)
+        match = re.search(regex, file_content)
+        if match:
+            return match.group(1)
+
+    except re.error as e:
+        msg = f"Invalid regex pattern: {find_regex}"
+        raise ValueError(msg) from e
+
+    return find_regex
 
 
 def replace_key_value(param_dict: dict, json_content: str, env: str) -> Union[dict]:

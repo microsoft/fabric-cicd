@@ -246,10 +246,27 @@ class FabricWorkspace:
             item_name = item["displayName"]
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
+            sql_endpoint = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
                 self.deployed_items[item_type] = {}
+
+            # Get additional properties based on item type
+            if item_type == "Lakehouse":
+                try:
+                    lakehouse_response = self.endpoint.invoke(
+                        method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
+                    )
+                    # Use dict.get for safe nested property access
+                    sql_endpoint = (
+                        lakehouse_response.get("body", {})
+                        .get("properties", {})
+                        .get("sqlEndpointProperties", {})
+                        .get("connectionString", "")
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to fetch SQL endpoint for Lakehouse '{item_name}': {e}")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -258,6 +275,7 @@ class FabricWorkspace:
                 description=item_description,
                 guid=item_guid,
                 folder_id=item_folder_id,
+                sql_endpoint=sql_endpoint,
             )
 
     def _replace_logical_ids(self, raw_file: str) -> str:
@@ -290,6 +308,7 @@ class FabricWorkspace:
         """
         from fabric_cicd._parameter._utils import (
             check_replacement,
+            find_regex_value,
             process_input_path,
             replace_key_value,
         )
@@ -315,7 +334,11 @@ class FabricWorkspace:
             msg = "Replacing {} with {} in {}.{}"
 
             for parameter_dict in self.environment_parameter["find_replace"]:
-                find_value = parameter_dict["find_value"]
+                find_value = parameter_dict.get("find_value")
+                find_value = (
+                    find_regex_value(find_value, raw_file) if bool(parameter_dict.get("is_regex")) else find_value
+                )
+
                 replace_value = parameter_dict["replace_value"]
                 input_type = parameter_dict.get("item_type")
                 input_name = parameter_dict.get("item_name")

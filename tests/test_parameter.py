@@ -16,6 +16,7 @@ find_replace:
       replace_value:
           PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      is_regex: "false"
       # Optional Fields
       item_type: "Notebook"
       item_name: ["Hello World"] 
@@ -41,6 +42,7 @@ find_replace:
       replace_value:
           PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      is_regex: "false"
       # Optional Fields
       item_type: "Notebook"
       item_name: ["Hello World"] 
@@ -50,6 +52,7 @@ find_replace:
       replace_value:
           PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      is_regex: "false"
       # Optional Fields
       item_type: "Notebook"
       item_name: ["Hello World"] 
@@ -85,6 +88,7 @@ find_replace:
       replace_value:
           DEV: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      is_regex: "false"
       # Optional Fields
       item_type: "Notebook"
       item_name: ["Hello World"] 
@@ -98,6 +102,7 @@ find_replace:
       replace_value:
           PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      is_regex: "false"
       # Optional Fields
       item_type: "Notebook"
       item_name: ["Hello World"] 
@@ -111,6 +116,7 @@ find_replace:
       replace_value:
           PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      is_regex: "false"
       # Optional Fields
       item_type: "Notebook"
       item_name: ["Hello World", 'Hello World Subfolder'] 
@@ -309,9 +315,9 @@ def test_multiple_parameter_validation(repository_directory, item_type_in_scope,
 @pytest.mark.parametrize(
     ("param_name", "param_value", "result", "msg"),
     [
-        ("find_replace", ["find_value", "replace_value"], True, "valid keys"),
+        ("find_replace", ["find_value", "replace_value", "is_regex"], True, "valid keys"),
         ("find_replace", ["find_value", "item_type", "item_name", "file_path"], False, "missing key"),
-        ("find_replace", ["find_value", "replace_value", "item_type"], True, "valid keys"),
+        ("find_replace", ["find_value", "replace_value", "is_regex", "item_type"], True, "valid keys"),
         ("spark_pool", ["instance_pool_id", "replace_value", "item_name"], True, "valid keys"),
         ("spark_pool", ["instance_pool_id", "replace_value", "item_name", "file_path"], False, "invalid key"),
     ],
@@ -452,6 +458,7 @@ def test_validate_data_type(parameter_object):
             "PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733",
             "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0",
         },
+        "is_regex": "false",
     }
     # Data type error in required values
     assert parameter_object._validate_required_values("find_replace", required_values) == (
