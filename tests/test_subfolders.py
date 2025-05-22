@@ -328,9 +328,9 @@ def test_invalid_folder_name(repository_with_subfolders, patched_fabric_workspac
     assert has_invalid_chars, "Invalid folder name should match the invalid character regex"
     
     # Test the exception raised by the validation code
+    error_msg = f"Folder name '{folder_name}' contains invalid characters."
     with pytest.raises(InputError) as excinfo:
-        msg = f"Folder name '{folder_name}' contains invalid characters."
-        raise InputError(msg, None)
+        raise InputError(error_msg, None)
     
     # Verify the error message
     assert "Folder name 'Invalid*Folder' contains invalid characters" in str(excinfo.value)
