@@ -23,6 +23,7 @@ class Item:
     path: Path = field(default_factory=Path)
     item_files: list = field(default_factory=list)
     folder_id: str = field(default="")
+    sql_endpoint: str = field(default="")
     IMMUTABLE_FIELDS: ClassVar[set] = {"type", "name", "description"}
     skip_publish: bool = field(default=False)
 

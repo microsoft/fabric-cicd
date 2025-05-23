@@ -246,10 +246,27 @@ class FabricWorkspace:
             item_name = item["displayName"]
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
+            sql_endpoint = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
                 self.deployed_items[item_type] = {}
+
+            # Get additional properties based on item type
+            if item_type == "Lakehouse":
+                try:
+                    lakehouse_response = self.endpoint.invoke(
+                        method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
+                    )
+                    # Use dict.get for safe nested property access
+                    sql_endpoint = (
+                        lakehouse_response.get("body", {})
+                        .get("properties", {})
+                        .get("sqlEndpointProperties", {})
+                        .get("connectionString", "")
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to fetch SQL endpoint for Lakehouse '{item_name}': {e}")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -258,6 +275,7 @@ class FabricWorkspace:
                 description=item_description,
                 guid=item_guid,
                 folder_id=item_folder_id,
+                sql_endpoint=sql_endpoint,
             )
 
     def _replace_logical_ids(self, raw_file: str) -> str:
@@ -290,7 +308,9 @@ class FabricWorkspace:
         """
         from fabric_cicd._parameter._utils import (
             check_replacement,
-            process_input_path,
+            extract_find_value,
+            extract_parameter_filters,
+            extract_replace_value,
             replace_key_value,
         )
 
@@ -302,9 +322,7 @@ class FabricWorkspace:
 
         if "key_value_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("key_value_replace"):
-                input_type = parameter_dict.get("item_type")
-                input_name = parameter_dict.get("item_name")
-                input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+                input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
                 if (
                     check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
                     and ".json" in file_path.suffix
@@ -312,21 +330,19 @@ class FabricWorkspace:
                     raw_file = replace_key_value(parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
-            msg = "Replacing {} with {} in {}.{}"
-
             for parameter_dict in self.environment_parameter["find_replace"]:
-                find_value = parameter_dict["find_value"]
-                replace_value = parameter_dict["replace_value"]
-                input_type = parameter_dict.get("item_type")
-                input_name = parameter_dict.get("item_name")
-                input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+                # Get the find_value, replace_value_dict, and file filter values
+                find_value = extract_find_value(parameter_dict, raw_file)
+                replace_value_dict = parameter_dict.get("replace_value", {})
+                input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
 
                 # Perform replacement if a condition is met and replace any found references with specified environment value
-                if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                if (find_value in raw_file and self.environment in replace_value_dict) and check_replacement(
                     input_type, input_name, input_path, item_type, item_name, file_path
                 ):
-                    raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                    logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
+                    replace_value = extract_replace_value(self, replace_value_dict[self.environment])
+                    raw_file = raw_file.replace(find_value, replace_value)
+                    logger.info(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
 

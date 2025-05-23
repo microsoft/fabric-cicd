@@ -51,6 +51,7 @@ def create_parameter_file(dir_path, utf8_chars):
                     utf8_chars["nordic"]: "12345678-1234-5678-abcd-1234567890ab",
                     utf8_chars["asian"]: "21345678-1234-5678-abcd-1234567890ab",
                 },
+                "is_regex": "False",
             }
         ]
     }
