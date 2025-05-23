@@ -15,16 +15,16 @@ find_replace:
     # Lakehouse Connection Guid regex
     - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-        PPE: "3ea7b69a-ca98-4e70-a9b8-5cd1c43887fe"
-        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+        PPE: "$items['Lakehouse']['Sample_LH'].guid"
+        PROD: "$items['Lakehouse']['Sample_LH'].guid"
       is_regex: "true"
       # Optional fields:
       item_type: "Notebook"
     # Lakehouse Connection Guid regex
     - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-        PPE: "24a801cd-fad0-431a-a450-a5d5667fd697"
-        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+        PPE: "$workspace.id"
+        PROD: "$workspace.id"
       is_regex: "true"
       # Optional fields:
       item_type: "Notebook"

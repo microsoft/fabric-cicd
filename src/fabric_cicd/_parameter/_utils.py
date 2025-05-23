@@ -18,24 +18,110 @@ from azure.core.credentials import TokenCredential
 from jsonpath_ng.ext import parse
 
 import fabric_cicd.constants as constants
+from fabric_cicd import FabricWorkspace
 
 logger = logging.getLogger(__name__)
 
 
-def find_regex_value(find_regex: str, file_content: str) -> str:
-    """A function to find a value in a file using a regex pattern."""
-    # Check if the find_pattern is a valid regex
+def extract_find_value(param_dict: dict, file_content: str) -> str:
+    """Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided."""
+    find_value = param_dict.get("find_value")
+    is_regex = bool(param_dict.get("is_regex"))
+
+    # A regex pattern has been provided
+    if is_regex:
+        # Check if it's valid and return the matched value as the find_value, if found
+        try:
+            regex = re.compile(find_value)
+            match = re.search(regex, file_content)
+            if match:
+                return match.group(1)
+
+        except re.error as e:
+            msg = f"Invalid regex pattern: {find_value}"
+            raise ValueError(msg) from e
+
+    # Otherwise, return the find_value as is
+    return find_value
+
+
+def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str) -> str:
+    """Extracts the replace_value and sets the value. Processes the replace_value if a valid variable is provided."""
+    # If $workspace variable, return the workspace ID value
+    if replace_value == "$workspace.id":
+        return workspace_obj.workspace_id
+
+    # If $items variable, return the item attribute value, if found
+    # Expected format: $items['type']['name'].attribute
+    # Support any fabric ci-cd Item object string attributes, such as type, name, guid
+    if replace_value.startswith("$items"):
+        return _extract_item_attribute(workspace_obj, replace_value)
+
+    # Otherwise, return the replace_value as is
+    return replace_value
+
+
+def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> str:
+    """Extracts the item attribute value from the replace_value $items variable."""
     try:
-        regex = re.compile(find_regex)
-        match = re.search(regex, file_content)
-        if match:
-            return match.group(1)
+        # Split the variable into parts (item and attribute)
+        var_parts = variable[6:].split(".", 1)
+        if len(var_parts) < 2:
+            logger.warning(f"Invalid $items syntax (missing attribute part): {variable}")
+            return variable
 
-    except re.error as e:
-        msg = f"Invalid regex pattern: {find_regex}"
-        raise ValueError(msg) from e
+        item = var_parts[0].strip()
+        attribute = var_parts[1].strip()
 
-    return find_regex
+        # Extract the item type and name strings using a regex pattern
+        match = re.search(constants.ITEM_VARIABLE_REGEX, item)
+        if not match or len(match.groups()) != 2:
+            logger.warning(f"Invalid $items syntax (invalid pattern): {item}")
+            return variable
+
+        item_type, item_name = match.groups()
+
+        # Validate items exist in the workspace
+        if item_type not in workspace_obj.deployed_items:
+            logger.warning(f"Item type '{item_type}' not found in deployed items")
+            return variable
+
+        if item_name not in workspace_obj.deployed_items[item_type]:
+            logger.warning(f"Item '{item_name}' not found in type '{item_type}'")
+            return variable
+
+        # Get the item object and look for the provided attribute
+        item_obj = workspace_obj.deployed_items[item_type][item_name]
+        attr_lookup = {name.lower(): name for name in dir(item_obj)}
+        attr_key = attribute.lower()
+
+        if attr_key not in attr_lookup:
+            logger.warning(f"Attribute '{attribute}' not found in {item_type}/{item_name}")
+            return variable
+
+        # Get the attribute value using the case-insensitive lookup
+        real_attr_name = attr_lookup[attr_key]
+        attr_value = getattr(item_obj, real_attr_name)
+
+        if not attr_value:
+            logger.warning(f"Attribute '{real_attr_name}' is None for {item_type}/{item_name}")
+            return variable
+
+        logger.debug(f"Found attribute '{real_attr_name}' with value '{attr_value}'")
+        return attr_value
+
+    except Exception as e:
+        logger.warning(f"Error processing $items syntax: {e!s}")
+        return variable
+
+
+def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) -> tuple[str, str, Path]:
+    """Extracts the item type, name, and path filters from the parameter dictionary, if present."""
+    item_type = param_dict.get("item_type")
+    item_name = param_dict.get("item_name")
+    file_path = process_input_path(workspace_obj.repository_directory, param_dict.get("file_path"))
+
+    return item_type, item_name, file_path
 
 
 def replace_key_value(param_dict: dict, json_content: str, env: str) -> Union[dict]:

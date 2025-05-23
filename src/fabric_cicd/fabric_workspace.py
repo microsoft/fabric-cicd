@@ -308,8 +308,9 @@ class FabricWorkspace:
         """
         from fabric_cicd._parameter._utils import (
             check_replacement,
-            find_regex_value,
-            process_input_path,
+            extract_find_value,
+            extract_parameter_filters,
+            extract_replace_value,
             replace_key_value,
         )
 
@@ -321,9 +322,7 @@ class FabricWorkspace:
 
         if "key_value_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("key_value_replace"):
-                input_type = parameter_dict.get("item_type")
-                input_name = parameter_dict.get("item_name")
-                input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+                input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
                 if (
                     check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
                     and ".json" in file_path.suffix
@@ -331,25 +330,19 @@ class FabricWorkspace:
                     raw_file = replace_key_value(parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
-            msg = "Replacing {} with {} in {}.{}"
-
             for parameter_dict in self.environment_parameter["find_replace"]:
-                find_value = parameter_dict.get("find_value")
-                find_value = (
-                    find_regex_value(find_value, raw_file) if bool(parameter_dict.get("is_regex")) else find_value
-                )
-
-                replace_value = parameter_dict["replace_value"]
-                input_type = parameter_dict.get("item_type")
-                input_name = parameter_dict.get("item_name")
-                input_path = process_input_path(self.repository_directory, parameter_dict.get("file_path"))
+                # Get the find_value, replace_value_dict, and file filter values
+                find_value = extract_find_value(parameter_dict, raw_file)
+                replace_value_dict = parameter_dict.get("replace_value", {})
+                input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
 
                 # Perform replacement if a condition is met and replace any found references with specified environment value
-                if (find_value in raw_file and self.environment in replace_value) and check_replacement(
+                if (find_value in raw_file and self.environment in replace_value_dict) and check_replacement(
                     input_type, input_name, input_path, item_type, item_name, file_path
                 ):
-                    raw_file = raw_file.replace(find_value, replace_value[self.environment])
-                    logger.debug(msg.format(find_value, replace_value[self.environment], item_name, item_type))
+                    replace_value = extract_replace_value(self, replace_value_dict[self.environment])
+                    raw_file = raw_file.replace(find_value, replace_value)
+                    logger.info(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
 
