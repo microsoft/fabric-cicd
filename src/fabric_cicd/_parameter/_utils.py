@@ -30,22 +30,23 @@ def extract_find_value(param_dict: dict, file_content: str) -> str:
     is_regex = param_dict.get("is_regex")
 
     # A regex pattern has been provided
-    if is_regex.lower() == "true":
+    if is_regex and is_regex.lower() == "true":
         # Verify it's a valid regex and has a capture group
         try:
             regex = re.compile(find_value)
             match = re.search(regex, file_content)
             if match:
-                try:
-                    # Return the first capture group value as the find_value
-                    return match.group(1)
-                except IndexError:
-                    msg = f"Invalid regex pattern '{find_value}.' No capture group 1 found (add parentheses to create a group)."
-                    InputError(msg, logger)
+                if len(match.groups()) >= 1:
+                    matched_value = match.group(1)
+                    # Check if the captured value is meaningful
+                    if matched_value:
+                        return matched_value
+                msg = f"Regex pattern '{find_value}' did not match any content or did not capture a meaningful value."
+                raise InputError(msg, logger)
 
         except re.error as e:
             msg = f"Invalid regex pattern: {find_value} with error {e}"
-            InputError(msg, logger)
+            raise InputError(msg, logger) from e
 
     # Otherwise, return the find_value as is
     return find_value

@@ -14,7 +14,8 @@ find_replace:
     # Lakehouse Connection Guid regex
     - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-        # $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; attribute value should be all lowercase)
+        # $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE
+        # Supported attributes: item id -> id and sql endpoint -> sqlendpoint
         PPE: "$items.Lakehouse.Sample_LH.id"   
         PROD: "$items.Lakehouse.Sample_LH.id" 
       # Optional fields:
