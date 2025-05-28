@@ -4,7 +4,6 @@ find_replace:
       replace_value:
         PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
         PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
-      is_regex: "false"
       # Optional fields:
       item_type: "Notebook"
       item_name: ["Hello World", "Hello World Subfolder"]
@@ -15,18 +14,20 @@ find_replace:
     # Lakehouse Connection Guid regex
     - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-        PPE: "$items['Lakehouse']['Sample_LH'].guid"
-        PROD: "$items['Lakehouse']['Sample_LH'].guid"
-      is_regex: "true"
+        # $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; attribute value should be all lowercase)
+        PPE: "$items.Lakehouse.Sample_LH.id"   
+        PROD: "$items.Lakehouse.Sample_LH.id" 
       # Optional fields:
+      is_regex: "true"
       item_type: "Notebook"
+    
     # Lakehouse Connection Guid regex
     - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
         PPE: "$workspace.id"
         PROD: "$workspace.id"
-      is_regex: "true"
       # Optional fields:
+      is_regex: "true"
       item_type: "Notebook"
 
 key_value_replace:

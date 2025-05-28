@@ -46,10 +46,10 @@ SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r'"(default_lakehouse_workspace_id|workspaceId)": "(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
-ITEM_VARIABLE_REGEX = r"\[\s*['\"]([^'\"]+)['\"]\s*\]\s*\[\s*['\"]([^'\"]+)['\"]\s*\]"
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}

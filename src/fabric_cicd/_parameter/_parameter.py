@@ -28,7 +28,7 @@ class Parameter:
 
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
-            "minimum": {"find_value", "replace_value", "is_regex"},
+            "minimum": {"find_value", "replace_value"},
             "maximum": {"find_value", "replace_value", "is_regex", "item_type", "item_name", "file_path"},
         },
         "spark_pool": {
@@ -241,6 +241,16 @@ class Parameter:
                 logger.warning(
                     constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str)
                 )
+
+            # Validate is_regex for find_replace parameter
+            if param_name == "find_replace" and parameter_dict.get("is_regex"):
+                is_valid, msg = self._validate_data_type(
+                    parameter_dict.get("is_regex"), "string", "is_regex", param_name
+                )
+                if not is_valid:
+                    return False, msg
+                if parameter_dict["is_regex"].lower() != "true":
+                    logger.warning("The provided is_regex value is not set to 'true', regex matching will be ignored.")
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 

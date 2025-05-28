@@ -19,6 +19,7 @@ from jsonpath_ng.ext import parse
 
 import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
+from fabric_cicd._common._exceptions import InputError, ParsingError
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +27,25 @@ logger = logging.getLogger(__name__)
 def extract_find_value(param_dict: dict, file_content: str) -> str:
     """Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided."""
     find_value = param_dict.get("find_value")
-    is_regex = bool(param_dict.get("is_regex"))
+    is_regex = param_dict.get("is_regex")
 
     # A regex pattern has been provided
-    if is_regex:
-        # Check if it's valid and return the matched value as the find_value, if found
+    if is_regex.lower() == "true":
+        # Verify it's a valid regex and has a capture group
         try:
             regex = re.compile(find_value)
             match = re.search(regex, file_content)
             if match:
-                return match.group(1)
+                try:
+                    # Return the first capture group value as the find_value
+                    return match.group(1)
+                except IndexError:
+                    msg = f"Invalid regex pattern '{find_value}.' No capture group 1 found (add parentheses to create a group)."
+                    InputError(msg, logger)
 
         except re.error as e:
-            msg = f"Invalid regex pattern: {find_value}"
-            raise ValueError(msg) from e
+            msg = f"Invalid regex pattern: {find_value} with error {e}"
+            InputError(msg, logger)
 
     # Otherwise, return the find_value as is
     return find_value
@@ -51,9 +57,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str) ->
     if replace_value == "$workspace.id":
         return workspace_obj.workspace_id
 
-    # If $items variable, return the item attribute value, if found
-    # Expected format: $items['type']['name'].attribute
-    # Support any fabric ci-cd Item object string attributes, such as type, name, guid
+    # If $items variable, return the item attribute value if found
     if replace_value.startswith("$items"):
         return _extract_item_attribute(workspace_obj, replace_value)
 
@@ -62,57 +66,53 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str) ->
 
 
 def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> str:
-    """Extracts the item attribute value from the replace_value $items variable."""
+    """Extracts the item attribute value from the $items variable to set as the replace_value.
+
+    Args:
+        workspace_obj: The FabricWorkspace object containing the workspace items dictionary used to access item metadata.
+        variable: The $items variable string to be parsed and processed, format: $items.type.name.attribute (supported attributes: id and sqlendpoint).
+    """
     try:
-        # Split the variable into parts (item and attribute)
-        var_parts = variable[6:].split(".", 1)
-        if len(var_parts) < 2:
-            logger.warning(f"Invalid $items syntax (missing attribute part): {variable}")
-            return variable
+        # Split the variable into 3 parts (item type, name, and attribute)
+        var_parts = variable.removeprefix("$items.").split(".")
+        if len(var_parts) != 3:
+            msg = f"Invalid $items variable syntax: {variable}"
+            raise InputError(msg, logger)
 
-        item = var_parts[0].strip()
-        attribute = var_parts[1].strip()
-
-        # Extract the item type and name strings using a regex pattern
-        match = re.search(constants.ITEM_VARIABLE_REGEX, item)
-        if not match or len(match.groups()) != 2:
-            logger.warning(f"Invalid $items syntax (invalid pattern): {item}")
-            return variable
-
-        item_type, item_name = match.groups()
+        item_type = var_parts[0].strip()
+        item_name = var_parts[1].strip()
+        attribute = var_parts[2].strip()
 
         # Validate items exist in the workspace
-        if item_type not in workspace_obj.deployed_items:
-            logger.warning(f"Item type '{item_type}' not found in deployed items")
-            return variable
+        if item_type not in workspace_obj.workspace_items:
+            msg = f"Item type '{item_type}' not found in deployed items"
+            raise InputError(msg, logger)
 
-        if item_name not in workspace_obj.deployed_items[item_type]:
-            logger.warning(f"Item '{item_name}' not found in type '{item_type}'")
-            return variable
+        if item_name not in workspace_obj.workspace_items[item_type]:
+            msg = f"Item '{item_name}' not found as a deployed '{item_type}'"
+            raise InputError(msg, logger)
 
-        # Get the item object and look for the provided attribute
-        item_obj = workspace_obj.deployed_items[item_type][item_name]
-        attr_lookup = {name.lower(): name for name in dir(item_obj)}
-        attr_key = attribute.lower()
+        # Get the item's attributes and look for the provided attribute
+        item_attr = workspace_obj.workspace_items[item_type][item_name]
+        attr_name = attribute.lower()
 
-        if attr_key not in attr_lookup:
-            logger.warning(f"Attribute '{attribute}' not found in {item_type}/{item_name}")
-            return variable
+        # Validate the attribute is supported
+        if attr_name not in constants.ITEM_ATTR_LOOKUP:
+            msg = f"Attribute '{attribute}' is an invalid item attribute"
+            raise InputError(msg, logger)
 
-        # Get the attribute value using the case-insensitive lookup
-        real_attr_name = attr_lookup[attr_key]
-        attr_value = getattr(item_obj, real_attr_name)
-
+        # Get the attribute value and check if it exists
+        attr_value = item_attr.get(attr_name)
         if not attr_value:
-            logger.warning(f"Attribute '{real_attr_name}' is None for {item_type}/{item_name}")
-            return variable
+            msg = f"Value does not exist for attribute '{attribute}' in the {item_type} item '{item_name}'"
+            raise InputError(msg, logger)
 
-        logger.debug(f"Found attribute '{real_attr_name}' with value '{attr_value}'")
+        logger.debug(f"Found attribute '{attr_name}' with value '{attr_value}'")
         return attr_value
 
     except Exception as e:
-        logger.warning(f"Error processing $items syntax: {e!s}")
-        return variable
+        msg = f"Error parsing $items variable: {e!s}"
+        raise ParsingError(msg, logger) from e
 
 
 def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) -> tuple[str, str, Path]:
