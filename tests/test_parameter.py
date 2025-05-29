@@ -550,10 +550,8 @@ def test_validate_data_type(parameter_object):
 
 def test_validate_yaml_content(parameter_object):
     """Test the validation of the YAML content"""
-    quoted_content = "'Hello World"
-    assert parameter_object._validate_yaml_content(quoted_content) == [
-        constants.PARAMETER_MSGS["invalid content"]["quote"].format("'")
-    ]
+    invalid_content = "\n\n\n\t"
+    assert parameter_object._validate_yaml_content(invalid_content) == ["YAML content is empty"]
 
     invalid_content = "\U0001f600"
     assert parameter_object._validate_yaml_content(invalid_content) == [
@@ -702,7 +700,16 @@ def test_validate_invalid_parameters(
 
     # Mismatched quotes in YAML content
     if param_file_name == "invalid_yaml_char_parameter.yml":
-        assert constants.PARAMETER_MSGS["invalid load"].format(["Unclosed quote: '"]) == param_obj.LOAD_ERROR_MSG
+        is_valid, msg = param_obj._validate_parameter_load()
+        try:
+            with Path.open(repository_directory / param_file_name, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml.full_load(yaml_content)
+        except yaml.YAMLError as e:
+            error_message = str(e)
+
+        assert is_valid == result
+        assert msg == constants.PARAMETER_MSGS["invalid load"].format(error_message)
 
     # Invalid is_regex value in find_replace parameter
     if param_file_name == "invalid_is_regex_parameter.yml":
