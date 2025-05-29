@@ -24,13 +24,20 @@ from fabric_cicd._common._exceptions import InputError, ParsingError
 logger = logging.getLogger(__name__)
 
 
-def extract_find_value(param_dict: dict, file_content: str) -> str:
-    """Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided."""
+def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> str:
+    """
+    Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided.
+
+    Args:
+        param_dict: The parameter dictionary containing the find_value and is_regex keys.
+        file_content: The content of the file where the find_value will be searched.
+        filter_match: A boolean to check for a regex match in filtered files only.
+    """
     find_value = param_dict.get("find_value")
     is_regex = param_dict.get("is_regex")
 
-    # A regex pattern has been provided
-    if is_regex and is_regex.lower() == "true":
+    # A regex pattern has been provided and the current file matches the file filter criteria
+    if is_regex and is_regex.lower() == "true" and filter_match:
         # Verify it's a valid regex and has a capture group
         try:
             regex = re.compile(find_value)
@@ -326,8 +333,6 @@ def check_replacement(
         return True
 
     # Otherwise, find matches for the optional parameters
-    logger.debug("Optional filters found. Checking for matches")
-
     item_type_match = _find_match(input_type, item_type)
     item_name_match = _find_match(input_name, item_name)
     file_path_match = _find_match(input_path, file_path)
@@ -340,10 +345,10 @@ def check_replacement(
         if input_path:
             logger.debug(f"File path match found: {file_path_match}")
 
-        logger.debug("Optional filters match found. Find and replace applied in this repository file")
+        # Optional filters match found. Find and replace applied in this repository file
         return True
 
-    logger.debug("Optional filters match not found. Find and replace skipped for this repository file")
+    # Optional filters match not found. Find and replace skipped for this repository file
     return False
 
 

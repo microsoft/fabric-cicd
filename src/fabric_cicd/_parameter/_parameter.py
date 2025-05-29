@@ -134,12 +134,6 @@ class Parameter:
         if not re.match(compiled_utf8_pattern, content):
             errors.append(msgs["char"])
 
-        # Check for unclosed quotes
-        quotes = ['"', "'"]
-        for quote in quotes:
-            if content.count(quote) % 2 != 0:
-                errors.append(msgs["quote"].format(quote))
-
         return errors
 
     def _validate_parameter_load(self) -> tuple[bool, str]:
@@ -241,7 +235,7 @@ class Parameter:
             # Check if replacement will be skipped for a given find value
             is_valid_env = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
-            log_func = logger.debug if param_name == "key_value_replace" else logger.info
+            log_func = logger.debug if param_name == "key_value_replace" else logger.warning
 
             # Replacement skipped if target environment is not present
             if self.environment != "N/A" and not is_valid_env:
@@ -249,20 +243,14 @@ class Parameter:
                 log_func(constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str))
                 continue
 
-            # Replacement skipped if optional filter values don't match
-            if msg == "no match" and not is_valid_optional_val:
+            # Replacement skipped if optional filter values don't match, only show warning for non-regex find values
+            if (
+                msg == "no match"
+                and not is_valid_optional_val
+                and (not parameter_dict.get("is_regex") or parameter_dict["is_regex"].lower() != "true")
+            ):
                 msg = constants.PARAMETER_MSGS["no filter match"].format(param_name)
                 log_func(constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str))
-
-            # Validate is_regex for find_replace parameter
-            if param_name == "find_replace" and parameter_dict.get("is_regex"):
-                is_valid, msg = self._validate_data_type(
-                    parameter_dict.get("is_regex"), "string", "is_regex", param_name
-                )
-                if not is_valid:
-                    return False, msg
-                if parameter_dict["is_regex"].lower() != "true":
-                    log_func("The provided is_regex value is not set to 'true', regex matching will be ignored.")
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
@@ -291,7 +279,36 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
+        # Validate find_value is a valid regex if is_regex is set to true
+        if param_name == "find_replace":
+            is_valid, msg = self._validate_find_regex(param_name, param_dict)
+            if not is_valid:
+                return False, msg
+
         return True, constants.PARAMETER_MSGS["valid required values"].format(param_name)
+
+    def _validate_find_regex(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
+        """Validate the find_value is a valid regex if is_regex is set to true."""
+        # Return True if is_regex is not present or set
+        if not param_dict.get("is_regex"):
+            return True, "No regex present"
+
+        # First validate is_regex value
+        is_valid, msg = self._validate_data_type(param_dict.get("is_regex"), "string", "is_regex", param_name)
+        if not is_valid:
+            return False, msg
+
+        # Skip regex validation if is_regex is not set to true
+        if param_dict["is_regex"].lower() != "true":
+            logger.warning("The provided is_regex value is not set to 'true', regex matching will be ignored.")
+            return True, "Skip regex validation"
+
+        # Validate the find_value is a valid regex
+        try:
+            re.compile(param_dict["find_value"])
+            return True, "Valid regex"
+        except re.error as e:
+            return False, f"Invalid regex: {e}"
 
     def _validate_replace_value(self, param_name: str, replace_value: dict) -> tuple[bool, str]:
         """Validate the replace_value dictionary."""
