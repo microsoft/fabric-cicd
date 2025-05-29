@@ -236,20 +236,21 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
     if param_name:
         return _check_parameter_structure(param_dict.get(param_name))
 
-    # Otherwise, check the structure of the entire parameter dictionary
-    param_structure = [
-        _check_parameter_structure(param_dict.get(name))
-        for name in ["find_replace", "spark_pool"]
-        if param_dict.get(name)
-    ]
-    # Check structure if only one parameter is found
-    if len(param_structure) == 1:
-        return param_structure[0]
-    # Check structure if both parameters are found
-    if len(param_structure) == 2 and param_structure[0] == param_structure[1]:
-        return param_structure[0]
+    # Parameters to validate
+    param_names = ["find_replace", "key_value_replace", "spark_pool"]
 
-    return False
+    # Get only parameters that exist in param_dict
+    existing_params = [name for name in param_names if name in param_dict]
+
+    # If no parameters found, return False
+    if not existing_params:
+        return False
+
+    # Check all existing parameters have the same structure and are valid
+    structures = [_check_parameter_structure(param_dict.get(name)) for name in existing_params]
+    print(structures)
+    # All structures must be True and identical
+    return all(structures) and len(set(structures)) == 1
 
 
 def _check_parameter_structure(param_value: any) -> bool:

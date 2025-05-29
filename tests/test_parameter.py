@@ -54,6 +54,35 @@ find_replace:
       item_type: "Notebook"
       item_name: ["Hello World"] 
       file_path: "/Hello World.Notebook/notebook-content.py"
+key_value_replace:
+    - find_key: $.variables[?(@.name=="SQL_Server")].value
+      replace_value:
+        PPE: "contoso-ppe.database.windows.net"
+        PROD: "contoso-prod.database.windows.net"
+        UAT: "contoso-uat.database.windows.net"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+        UAT: "UAT"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value
+      replace_value:
+        PROD: "contoso-production-override.database.windows.net"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="Environment")].value
+      replace_value:
+        PROD: "PROD_ENV"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
 """
 
 SAMPLE_INVALID_PARAMETER_FILE = """
@@ -316,6 +345,10 @@ def test_multiple_parameter_validation(repository_directory, item_type_in_scope,
     assert multi_param_obj._validate_parameter("find_replace") == (
         True,
         constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
+    )
+    assert multi_param_obj._validate_parameter("key_value_replace") == (
+        True,
+        constants.PARAMETER_MSGS["valid parameter"].format("key_value_replace"),
     )
     assert multi_param_obj._validate_parameter_file() == True
 
