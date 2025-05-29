@@ -248,7 +248,7 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
 
     # Check all existing parameters have the same structure and are valid
     structures = [_check_parameter_structure(param_dict.get(name)) for name in existing_params]
-    print(structures)
+
     # All structures must be True and identical
     return all(structures) and len(set(structures)) == 1
 
