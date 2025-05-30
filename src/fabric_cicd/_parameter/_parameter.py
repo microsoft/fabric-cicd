@@ -237,20 +237,31 @@ class Parameter:
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
             log_func = logger.debug if param_name == "key_value_replace" else logger.warning
 
+            # Set value_type based on regex flag once
+            value_type = (
+                "find value regex"
+                if (parameter_dict.get("is_regex") and parameter_dict["is_regex"].lower() == "true")
+                else "find value"
+            )
+
             # Replacement skipped if target environment is not present
             if self.environment != "N/A" and not is_valid_env:
-                msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
-                log_func(constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str))
+                skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
+                log_func(
+                    constants.PARAMETER_MSGS["skip"].format(
+                        value_type, find_value, skip_msg, param_name + " " + param_num_str
+                    )
+                )
                 continue
 
-            # Replacement skipped if optional filter values don't match, only show warning for non-regex find values
-            if (
-                msg == "no match"
-                and not is_valid_optional_val
-                and (not parameter_dict.get("is_regex") or parameter_dict["is_regex"].lower() != "true")
-            ):
-                msg = constants.PARAMETER_MSGS["no filter match"].format(param_name)
-                log_func(constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str))
+            # Replacement skipped if optional filter values don't match
+            if msg == "no match" and not is_valid_optional_val:
+                skip_msg = constants.PARAMETER_MSGS["no filter match"]
+                log_func(
+                    constants.PARAMETER_MSGS["skip"].format(
+                        value_type, find_value, skip_msg, param_name + " " + param_num_str
+                    )
+                )
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 

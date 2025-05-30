@@ -72,7 +72,6 @@ PARAMETER_MSGS = {
     "valid structure": "Parameter file structure is valid",
     "invalid name": "Invalid parameter name '{}' found in the parameter file",
     "valid name": "Parameter names are valid",
-    "parameter not found": "{} parameter is not present",
     "invalid data type": "The provided '{}' is not of type {} in {}",
     "missing key": "{} is missing keys",
     "invalid key": "{} contains invalid keys",
@@ -88,7 +87,7 @@ PARAMETER_MSGS = {
     "invalid file path": "Path '{}' not found in the repository directory",
     "valid optional": "Optional values in {} are valid",
     "valid parameter": "{} parameter is valid",
-    "skip": "The find value '{}' replacement will be skipped due to {} in parameter {}",
+    "skip": "The {} '{}' replacement will be skipped due to {} in parameter {}",
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }
