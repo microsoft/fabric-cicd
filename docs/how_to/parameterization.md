@@ -198,7 +198,8 @@ find_replace:
           - "\\Goodbye World.Notebook\\notebook-content.py"
 
 key_value_replace:
-    - find_key: $.properties.activities[?(@.name=="Load_Intake")].typeProperties.source.datasetSettings.externalReferences.connection # SQL Server Connection to be replaced
+    # SQL Server Connection to be replaced
+    - find_key: $.properties.activities[?(@.name=="Load_Intake")].typeProperties.source.datasetSettings.externalReferences.connection
       replace_value:
           PPE: "6c517159-d27a-41d5-b71e-ca1ecff6542b" # PPE SQL Server Connection
           PROD: "6c517159-d27a-41d5-b71e-ca1ecff6542b" # PROD SQL Server Connection
@@ -292,7 +293,7 @@ display(df)
 
 This approach uses a regex pattern and dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value that matches the provided regex pattern within the _specified_ repository files.
 
-The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be replaced with the string for the deployed environment dynamically derived from the variable.
+The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be replaced with the string dynamically derived from the variable for the deployed environment.
 
 This approach is especially useful when replacing values that are not known until deployment time, such as item ids.
 
