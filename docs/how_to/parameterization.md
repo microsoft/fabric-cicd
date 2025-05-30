@@ -50,16 +50,16 @@ find_replace:
       file_path: <file-path-filter-value>
 ```
 
-<span class="md-h4-nonanchor">Dynamic replace_value</span>
+<span class="md-h4-nonanchor">Dynamic Replacement</span>
 
-The `replace_value` field supports dynamic variables that reference workspace or deployed item metadata:
+The `replace_value` field supports variables that reference workspace or deployed item metadata:
 
 -   **`$workspace.id`**: Replace value is the workspace ID of the target environment.
 -   **`$items.type.name.attribute`**: Replace value is an attribute of a deployed item.
 -   **Format**: Item type and name are **case-sensitive**. Enter the item name exactly as it appears, including spaces. For example: `$items.Notebook.Hello World.id`
 -   **Supported attributes**: `id` (item ID) and `sqlendpoint`. Attributes must be lowercase.
--   If the specified item type or name does not exist in the deployed workspace, or if an invalid attribute is provided, or if the attribute exists but its value is missing, the deployment will fail.
--   For in-depth example, see the notebook example alternate approach.
+-   **Important**: If the specified item type or name does not exist in the deployed workspace, or if an invalid attribute is provided, or if the attribute exists but its value is missing, the deployment will fail.
+-   For in-depth example, see the **notebook example** alternate approach.
 
 ```yaml
 find_replace:
@@ -140,7 +140,7 @@ spark_pool:
 -   When `is_regex` is present and properly set, the `find_value` will be interpreted as a regex pattern. Otherwise, it's interpreted as a literal string.
 -   Ensure that all special characters in the regex pattern are properly **escaped**.
 -   If the regex pattern is invalid or no matches are found in the targeted files, the deployment will fail.
--   **Important**: only wrap the exact value intended to be replaced in a capture group using parentheses `( )`. The first capture group (**group 1**) must always be used as the replacement target and must be preceded by the expected context. For example, if you're using a regex `find_value` to match a lakehouse ID attached to a notebook, avoid writing a pattern that matches only the GUID format. Doing so would risk replacing any GUID in the file, not just the intended one. Instead, include the surrounding context in your pattern—such as `# META "default_lakehouse":`—and capture only the GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
+-   **Important**: only wrap the exact value intended to be replaced in a capture group using parentheses `( )`. The first capture group (**group 1**) must always be used as the replacement target and must be preceded by the expected context. **For example**, if you're using a regex `find_value` to match a lakehouse ID attached to a notebook, avoid writing a pattern that matches only the GUID format. Doing so would risk replacing any GUID in the file, not just the intended one. Instead, include the surrounding context in your pattern—such as `# META "default_lakehouse":`—and capture only the GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
 
 <span class="md-h4-nonanchor">File Filters</span>
 
@@ -179,14 +179,16 @@ find_replace:
       file_path: # filter on notebook files with these paths
           - "/Hello World.Notebook/notebook-content.py"
           - "\\Goodbye World.Notebook\\notebook-content.py"
-    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})" # lakehouse GUID to be replaced (regex pattern)
+    # lakehouse GUID to be replaced (using regex pattern)
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
           PPE: "$items.Lakehouse.Example_LH.id" # PPE lakehouse GUID (dynamic)
           PROD: "$items.Lakehouse.Example_LH.id" # PROD lakehouse GUID (dynamic)
       is_regex: "true"
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
-    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})" # lakehouse workspace ID to be replaced (regex pattern)
+    # lakehouse workspace ID to be replaced (using regex pattern)
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
           PPE: "$workspace.id" # PPE workspace ID (dynamic)
           PROD: "$workspace.id" # PROD workspace ID (dynamic)
@@ -288,9 +290,11 @@ display(df)
 
 <span class="md-h4-nonanchor">Alternate approach</span>
 
-This approach uses a regex pattern with dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value that matches the provided regex pattern within the _specified_ repository files.
+This approach uses a regex pattern and dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value that matches the provided regex pattern within the _specified_ repository files.
 
 The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be replaced with the string for the deployed environment dynamically derived from the variable.
+
+This approach is especially useful when replacing values that are not known until deployment time, such as item ids.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
