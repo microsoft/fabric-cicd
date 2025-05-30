@@ -30,7 +30,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 ### `find_replace`
 
-For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs.
+For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. To treat `find_value` as a regex pattern, set the `is_regex` field to `"true"`. If `is_regex` is omitted or set to any other value, the `find_value` will be treated as a literal string.
 
 Note: A common use case for this function is to replace values in text based file types like notebooks.
 
@@ -41,14 +41,31 @@ find_replace:
       replace_value:
           <environment-1-key>: <replace-with-this-value>
           <environment-2-key>: <replace-with-this-value>
-      # Optional fields: value must be a string or array of strings
+      # Optional fields
+      # The "true" string treats the find_value as a regex pattern
+      is_regex: <true-string-value-to-find-value-with-regex>
+      # Filter value must be a string or array of strings
       item_type: <item-type-filter-value>
       item_name: <item-name-filter-value>
       file_path: <file-path-filter-value>
 ```
 
+<span class="md-h4-nonanchor">Dynamic replace_value</span>
+
+The `replace_value` field supports dynamic variables that reference workspace or deployed item metadata:
+
+-   **`$workspace.id`**: Replace value is the workspace ID of the target environment.
+-   **`$items.type.name.attribute`**: Replace value is an attribute of a deployed item.
+-   **Format**: Item type and name are **case-sensitive**.
+-   **Supported attributes**: `id` (item ID) and `sqlendpoint` (attributes must be lowercase).
+-   If the attribute is not found for a given item, deployment will fail.
+-   **Examples**:
+-   `$items.Notebook.Hello World.id`: replace value is the item ID of the deployed "Hello World" Notebook.
+-   `$items.Lakehouse.Sample_LH.sqlendpoint`: replace value is the sql endpoint of the deployed "Sample_LH" Lakehouse.
+-   See the notebook example alternate approach.
+
 If the `enable_environment_variable_replacement` feature flag is set, pipeline/environment variables will be used to replace the values in the parameter.yml file with the corresponding values from the variables dictionary, see example below:
-**Only Environment Variable beginnging with '$ENV:' will be used as replacement values.**
+**Only Environment Variable beginning with '$ENV:' will be used as replacement values.**
 
 ```yaml
 find_replace:
@@ -61,9 +78,9 @@ find_replace:
 
 ### `key_value_replace`
 
-Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs.  Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.  
+Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
-Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, etc.  e.g., find and replace a connection GUID referenced in a data pipeline.
+Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, etc. e.g., find and replace a connection GUID referenced in a data pipeline.
 
 ```yaml
 key_value_replace:
@@ -99,13 +116,27 @@ spark_pool:
 
 ### Optional Fields
 
--   Parameterization functionality is unaffected when optional fields are omitted or left empty.
--   Optional field values that _are_ provided must match the corresponding properties in the repository file in order for the replacement to occur in the given file. If at least one filter value does not match, the replacement will be skipped for that file.
--   If none of the optional fields or values are provided, the value found in _any_ repository file is subject to replacement.
+-   General parameterization functionality is unaffected when optional fields are omitted or left empty.
+-   String values should be wrapped in quotes (make sure to escape characters, such as **\\** in `file_path` inputs).
+
+<span class="md-h4-nonanchor">is_regex</span>
+
+-   The `is_regex` field must be set to the **string** `"true"` to enable regex pattern matching (not case-sensitive- `"True"` is also accepted).
+-   When properly set, fabric ci-cd will interpret `find_value` as a regex pattern.
+-   When `is_regex` is omitted or set to any string value other than `"true"`, `find_value` is interpreted as a literal string.
+-   Ensure that all special characters in the regex pattern are properly escaped.
+-   If the regex pattern is invalid or no matches are found in the targeted files, the deployment will fail.
+-   **Important**: only wrap the exact value intended to be replaced in a capture group using parentheses `( )`. The first capture group (**group 1**) must always be used as the replacement target and must be preceeded by the expected context.
+
+For example, if you're using a regex `find_value` to match a lakehouse ID attached to a notebook, avoid writing a pattern that matches only the GUID format. Doing so would risk replacing any GUID in the file, not just the intended one. Instead, include the surrounding context in your pattern—such as `# META "default_lakehouse":`—and capture only the GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
+
+<span class="md-h4-nonanchor">File Filters</span>
+
+-   Optional filter values that _are_ provided must match the corresponding properties in the repository file in order for the replacement to occur in the given file. If at least one filter value does not match, the replacement will be skipped for that file.
+-   If none of the optional filter fields or values are provided, the value found in _any_ repository file is subject to replacement.
 -   Input values are **case sensitive**.
 -   Input values must be **string** or **array** (enables one or many values to filter on).
 -   YAML supports array inputs using bracket ( **[ ]** ) or dash ( **-** ) notation.
--   String values should be wrapped in quotes (make sure to escape characters, such as **\\** in `file_path` inputs).
 -   Item types must be valid; see valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype).
 -   `file_path` accepts absolute or relative paths. Relative paths must be relative to the _repository directory_.
 
@@ -182,7 +213,6 @@ find_replace:
           PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
-      file_path:
     - find_value: "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c" # workspace ID to be replaced
       replace_value:
           PPE: "d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a" # PPE workspace ID
@@ -229,9 +259,36 @@ display(df)
 # META }
 ```
 
+<span class="md-h4-nonanchor">Alternate approach</span>
+
+This approach uses regex patterns with dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value that matches the provided regex pattern within the _specified_ repository files.
+
+The regex pattern must include a capture group (in parentheses), and the `find_value` must always match group 1. The matched value will be replaced with the string for the deployed environment that is derived from the variable.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})" # lakehouse GUID matching group 1 of regex pattern to be replaced
+      replace_value:
+          PPE: "$items.Lakehouse.Example_LH.id" # PPE lakehouse GUID
+          PROD: "$items.Lakehouse.Example_LH.id" # PROD lakehouse GUID
+      is_regex: "true"
+      item_type: "Notebook" # filter on notebook files
+      item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})" # workspace ID matching group 1 of regex pattern to be replaced
+      replace_value:
+          PPE: "$workspace.id" # PPE workspace ID
+          PROD: "$workspace.id" # PROD workspace ID
+      is_regex: "true"
+      file_path: # filter on notebook files with these paths
+          - "/Hello World.Notebook/notebook-content.py"
+          - "\\Goodbye World.Notebook\\notebook-content.py"
+```
+
 ### Data Pipelines
 
-A Data Pipeline is attached to data sources via the Connection Id.  Connections are not deployed with fabric-cicd and therefore need to be parameterized.  
+A Data Pipeline is attached to data sources via the Connection Id. Connections are not deployed with fabric-cicd and therefore need to be parameterized.
 
 In the `pipeline-content.json` file, the SQL Server Connection Id `c517e095-ed87-4665-95fa-8cdb1e751fba`, must be replaced with the corresponding GUIDs of the SQL Server in the target environment (PPE/PROD/etc).
 
@@ -244,7 +301,7 @@ find_replace:
     - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
       replace_value:
           PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE SQL Connection GUID
-          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PPE SQL Connection GUID
+          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD SQL Connection GUID
       item_type: "Data Pipeline" # filter on Data Pipelines files
       item_name: "Example Pipeline" # filter on specific Data Pipelines files
 ```
@@ -253,79 +310,78 @@ find_replace:
 
 ```json
 {
-  "properties": {
-    "activities": [
-      {
-        "name": "Copy Data",
-        "type": "Copy",
-        "dependsOn": [],
-        "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 0,
-          "retryIntervalInSeconds": 30,
-          "secureOutput": false,
-          "secureInput": false
-        },
-        "typeProperties": {
-          "source": {
-            "type": "AzureSqlSource",
-            "queryTimeout": "02:00:00",
-            "partitionOption": "None",
-            "datasetSettings": {
-              "annotations": [],
-              "type": "AzureSqlTable",
-              "schema": [],
-              "typeProperties": {
-                "schema": "Dataprod",
-                "table": "DIM_Calendar",
-                "database": "unified"
-              },
-              "externalReferences": {
-                "connection": "c517e095-ed87-4665-95fa-8cdb1e751fba"
-              }
-            }
-          },
-          "sink": {
-            "type": "LakehouseTableSink",
-            "tableActionOption": "Append",
-            "datasetSettings": {
-              "annotations": [],
-              "linkedService": {
-                "name": "Unified",
-                "properties": {
-                  "annotations": [],
-                  "type": "Lakehouse",
-                  "typeProperties": {
-                    "workspaceId": "2d2e0ae2-9505-4f0c-ab42-e76cc11fb07d",
-                    "artifactId": "31dd665e-95f3-4575-9f46-70ea5903d89b",
-                    "rootFolder": "Tables"
-                  }
+    "properties": {
+        "activities": [
+            {
+                "name": "Copy Data",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None",
+                        "datasetSettings": {
+                            "annotations": [],
+                            "type": "AzureSqlTable",
+                            "schema": [],
+                            "typeProperties": {
+                                "schema": "Dataprod",
+                                "table": "DIM_Calendar",
+                                "database": "unified"
+                            },
+                            "externalReferences": {
+                                "connection": "c517e095-ed87-4665-95fa-8cdb1e751fba"
+                            }
+                        }
+                    },
+                    "sink": {
+                        "type": "LakehouseTableSink",
+                        "tableActionOption": "Append",
+                        "datasetSettings": {
+                            "annotations": [],
+                            "linkedService": {
+                                "name": "Unified",
+                                "properties": {
+                                    "annotations": [],
+                                    "type": "Lakehouse",
+                                    "typeProperties": {
+                                        "workspaceId": "2d2e0ae2-9505-4f0c-ab42-e76cc11fb07d",
+                                        "artifactId": "31dd665e-95f3-4575-9f46-70ea5903d89b",
+                                        "rootFolder": "Tables"
+                                    }
+                                }
+                            },
+                            "type": "LakehouseTable",
+                            "schema": [],
+                            "typeProperties": {
+                                "schema": "Dataprod",
+                                "table": "DIM_Calendar"
+                            }
+                        }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
                 }
-              },
-              "type": "LakehouseTable",
-              "schema": [],
-              "typeProperties": {
-                "schema": "Dataprod",
-                "table": "DIM_Calendar"
-              }
             }
-          },
-          "enableStaging": false,
-          "translator": {
-            "type": "TabularTranslator",
-            "typeConversion": true,
-            "typeConversionSettings": {
-              "allowDataTruncation": true,
-              "treatBooleanAsNumber": false
-            }
-          }
-        }
-      }
-    ]
-  }
+        ]
+    }
 }
 ```
-
 
 ### Environments
 
