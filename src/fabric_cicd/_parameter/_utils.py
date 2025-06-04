@@ -91,6 +91,9 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> st
         item_name = var_parts[1].strip()
         attribute = var_parts[2].strip()
 
+        # Refresh the workspace items to get the latest deployed items
+        workspace_obj._refresh_deployed_items()
+
         # Validate items exist in the workspace
         if item_type not in workspace_obj.workspace_items:
             msg = f"Item type '{item_type}' is invalid or not found in deployed items"
