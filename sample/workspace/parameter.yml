@@ -10,26 +10,28 @@ find_replace:
       file_path:
        - "/Hello World.Notebook/notebook-content.py"
        - "\\subfolder\\Hello World Subfolder.Notebook/notebook-content.py"
-  
-    # Lakehouse Connection Guid regex
-    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-      replace_value:
-        # $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE
-        # Supported attributes: item id -> id and sql endpoint -> sqlendpoint
-        PPE: "$items.Lakehouse.Sample_LH.id"   
-        PROD: "$items.Lakehouse.Sample_LH.id" 
-      # Optional fields:
-      is_regex: "true"
-      item_type: "Notebook"
     
     # Lakehouse Connection Guid regex
-    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-      replace_value:
-        PPE: "$workspace.id"
-        PROD: "$workspace.id"
-      # Optional fields:
-      is_regex: "true"
-      item_type: "Notebook"
+#    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+#      replace_value:
+#        # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; supported attributes: id (deployed item id), sqlendpoint (SQL connection string))
+#        PPE: "$items.Lakehouse.WithoutSchema.id"   
+#        PROD: "$items.Lakehouse.WithoutSchema.sqlendpoint" 
+#      # Optional fields:
+#      is_regex: "true"
+#      item_type: "Notebook"
+#      item_name: "Example Notebook"
+    
+    # Lakehouse workspace id regex
+#    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+#      replace_value:
+#      # Variable: $workspace.id -> target workspace id
+#        #PPE: "$workspace.id"
+#        PROD: "$workspace.id"
+#      # Optional fields:
+#      is_regex: "true"
+#      item_type: "Notebook"
+#      item_name: "Example Notebook"
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
