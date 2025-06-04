@@ -93,11 +93,11 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> st
 
         # Validate items exist in the workspace
         if item_type not in workspace_obj.workspace_items:
-            msg = f"Item type '{item_type}' not found in deployed items"
+            msg = f"Item type '{item_type}' is invalid or not found in deployed items"
             raise InputError(msg, logger)
 
         if item_name not in workspace_obj.workspace_items[item_type]:
-            msg = f"Item '{item_name}' not found as a deployed '{item_type}'"
+            msg = f"Item '{item_name}' not found as a deployed {item_type}"
             raise InputError(msg, logger)
 
         # Get the item's attributes and look for the provided attribute
@@ -106,7 +106,7 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> st
 
         # Validate the attribute is supported
         if attr_name not in constants.ITEM_ATTR_LOOKUP:
-            msg = f"Attribute '{attribute}' is an invalid item attribute"
+            msg = f"Attribute '{attribute}' is an invalid item attribute, use one of the following: {constants.ITEM_ATTR_LOOKUP}"
             raise InputError(msg, logger)
 
         # Get the attribute value and check if it exists

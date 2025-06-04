@@ -57,9 +57,9 @@ The `replace_value` field supports variables that reference workspace or deploye
 -   **`$workspace.id`**: Replace value is the workspace ID of the target environment.
 -   **`$items.type.name.attribute`**: Replace value is an attribute of a deployed item.
 -   **Format**: Item type and name are **case-sensitive**. Enter the item name exactly as it appears, including spaces. For example: `$items.Notebook.Hello World.id`
--   **Supported attributes**: `id` (item ID) and `sqlendpoint`. Attributes must be lowercase.
--   **Important**: If the specified item type or name does not exist in the deployed workspace, or if an invalid attribute is provided, or if the attribute exists but its value is missing, the deployment will fail.
--   For in-depth example, see the **notebook example** alternate approach.
+-   **Supported attributes**: `id` (item ID) and `sqlendpoint`. Attributes should be lowercase.
+-   **Important**: If the specified item type or name does not exist in the deployed workspace, or if an invalid attribute is provided, or if the attribute value does not exist, the deployment will fail.
+-   For an in-depth example, see the **notebook example** alternate approach.
 
 ```yaml
 find_replace:
@@ -140,7 +140,7 @@ spark_pool:
 -   When `is_regex` is present and properly set, the `find_value` will be interpreted as a regex pattern. Otherwise, it's interpreted as a literal string.
 -   Ensure that all special characters in the regex pattern are properly **escaped**.
 -   If the regex pattern is invalid or no matches are found in the targeted files, the deployment will fail.
--   **Important**: only wrap the exact value intended to be replaced in a capture group using parentheses `( )`. The first capture group (**group 1**) must always be used as the replacement target and must be preceded by the expected context. **For example**, if you're using a regex `find_value` to match a lakehouse ID attached to a notebook, avoid writing a pattern that matches only the GUID format. Doing so would risk replacing any GUID in the file, not just the intended one. Instead, include the surrounding context in your pattern—such as `# META "default_lakehouse":`—and capture only the GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
+-   **Important**: When using a regex `find_value`, enclose only the exact value you want to replace in parentheses `( )`. This creates **capture group 1**, which must always be used as the replacement target. Be sure to include the **surrounding context** such as property names, quotes, etc. in the pattern to ensure it matches the correct value and not a value with a similar format elsewhere in the file. Capture group 1 should isolate values like a GUID, SQL connection string, etc. Once a match is found, the `find_value` is assigned to the matched string and can be used to replace all occurrences of that value in the file. **For example**, if you're using a regex `find_value` to match a lakehouse ID attached to a notebook, avoid writing a pattern that matches only the GUID format. Doing so would risk replacing any matching GUID in the file, not just the intended one. Instead, include the surrounding context in your pattern—such as `# META "default_lakehouse": "123456"`—and capture only the `123456` GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
 
 <span class="md-h4-nonanchor">File Filters</span>
 
@@ -291,7 +291,7 @@ display(df)
 
 <span class="md-h4-nonanchor">Alternate approach</span>
 
-This approach uses a regex pattern and dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value that matches the provided regex pattern within the _specified_ repository files.
+This approach uses a regex pattern and dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
 
 The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be replaced with the string dynamically derived from the variable for the deployed environment.
 
