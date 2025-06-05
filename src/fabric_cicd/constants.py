@@ -28,6 +28,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Eventstream",
     "Warehouse",
     "SQLDatabase",
+    "Dataflow",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
@@ -37,8 +38,8 @@ MAX_RETRY_OVERRIDE = {
     "Report": 10,
     "Eventstream": 10,
     "KQLDatabase": 10,
+    "SQLDatabase": 10,
     "VariableLibrary": 7,
-    "SQLDatabase": 7,
 }
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
