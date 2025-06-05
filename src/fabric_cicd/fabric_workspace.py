@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
+import dpath
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
@@ -259,19 +260,15 @@ class FabricWorkspace:
 
             # Get additional properties based on item type
             if item_type == "Lakehouse":
-                try:
-                    lakehouse_response = self.endpoint.invoke(
-                        method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
-                    )
-                    # Use dict.get for safe nested property access
-                    sql_endpoint = (
-                        lakehouse_response.get("body", {})
-                        .get("properties", {})
-                        .get("sqlEndpointProperties", {})
-                        .get("connectionString", "")
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to fetch SQL endpoint for Lakehouse '{item_name}': {e}")
+                lakehouse_response = self.endpoint.invoke(
+                    method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
+                )
+                # Use dpath.get for safe nested property access
+                sql_endpoint = dpath.get(
+                    lakehouse_response, "body/properties/sqlEndpointProperties/connectionString", default=""
+                )
+                if not sql_endpoint:
+                    logger.debug(f"Failed to get SQL endpoint for Lakehouse '{item_name}'")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(

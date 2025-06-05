@@ -12,26 +12,32 @@ find_replace:
        - "\\subfolder\\Hello World Subfolder.Notebook/notebook-content.py"
     
     # Lakehouse Connection Guid regex
-#    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-#      replace_value:
-#        # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; supported attributes: id (deployed item id), sqlendpoint (SQL connection string))
-#        PPE: "$items.Lakehouse.WithoutSchema.id"   
-#        PROD: "$items.Lakehouse.WithoutSchema.sqlendpoint" 
-#      # Optional fields:
-#      is_regex: "true"
-#      item_type: "Notebook"
-#      item_name: "Example Notebook"
-    
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+        # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; supported attributes: id (deployed item id), sqlendpoint (SQL connection string))
+        PPE: "$items.Lakehouse.WithoutSchema.id"   
+        PROD: "$items.Lakehouse.WithoutSchema.id" 
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+  
     # Lakehouse workspace id regex
-#    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-#      replace_value:
-#      # Variable: $workspace.id -> target workspace id
-#        #PPE: "$workspace.id"
-#        PROD: "$workspace.id"
-#      # Optional fields:
-#      is_regex: "true"
-#      item_type: "Notebook"
-#      item_name: "Example Notebook"
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+      # Variable: $workspace.id -> target workspace id
+        PPE: "$workspace.id"
+        PROD: "$workspace.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+      
+    # SQL connection string
+    - find_value: "sqlserverconnectionstringinoriginlakehouse.com"
+      replace_value:
+        PPE: "$items.Lakehouse.WithoutSchema.sqlendpoint"   
+        PROD: "$items.Lakehouse.WithoutSchema.sqlendpoint" 
+      # Optional fields:
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value

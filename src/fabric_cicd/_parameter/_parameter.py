@@ -315,11 +315,12 @@ class Parameter:
             return True, "Skip regex validation"
 
         # Validate the find_value is a valid regex
+        pattern = param_dict["find_value"]
         try:
-            re.compile(param_dict["find_value"])
+            re.compile(pattern)
             return True, "Valid regex"
         except re.error as e:
-            return False, f"Invalid regex: {e}"
+            return False, f"Invalid regex {pattern}: {e}"
 
     def _validate_replace_value(self, param_name: str, replace_value: dict) -> tuple[bool, str]:
         """Validate the replace_value dictionary."""

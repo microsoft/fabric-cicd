@@ -34,28 +34,29 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
         filter_match: A boolean to check for a regex match in filtered files only.
     """
     find_value = param_dict.get("find_value")
-    is_regex = param_dict.get("is_regex")
+    is_regex = param_dict.get("is_regex", "").lower() == "true"
 
-    # A regex pattern has been provided and the current file matches the file filter criteria
-    if is_regex and is_regex.lower() == "true" and filter_match:
-        # Verify it's a valid regex and has a capture group
-        try:
-            regex = re.compile(find_value)
-            match = re.search(regex, file_content)
-            if match:
-                if len(match.groups()) >= 1:
-                    matched_value = match.group(1)
-                    # Check if the captured value is meaningful
-                    if matched_value:
-                        return matched_value
-                msg = f"Regex pattern '{find_value}' did not match any content or did not capture a meaningful value."
+    # Only process regex if enabled and file meets filter criteria
+    if is_regex and filter_match:
+        # Search for a match with the valid regex (validated in the parameter file validation step)
+        regex = re.compile(find_value)
+        match = re.search(regex, file_content)
+
+        if match:
+            if len(match.groups()) != 1:
+                msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
                 raise InputError(msg, logger)
 
-        except re.error as e:
-            msg = f"Invalid regex pattern: {find_value} with error {e}"
-            raise InputError(msg, logger) from e
+            matched_value = match.group(1)
+            if matched_value:
+                return matched_value
 
-    # Otherwise, return the find_value as is
+            msg = f"Regex pattern '{find_value}' captured an empty value."
+            raise InputError(msg, logger)
+
+        logger.debug(f"No match found for regex '{find_value}' in the file content.")
+
+    # For non-regex or non-matching filters, return the original value
     return find_value
 
 
