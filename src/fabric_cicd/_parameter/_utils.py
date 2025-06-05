@@ -41,7 +41,6 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
         # Search for a match with the valid regex (validated in the parameter file validation step)
         regex = re.compile(find_value)
         match = re.search(regex, file_content)
-
         if match:
             if len(match.groups()) != 1:
                 msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
