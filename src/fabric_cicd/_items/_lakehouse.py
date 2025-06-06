@@ -6,7 +6,7 @@
 import json
 import logging
 
-import dpath.util
+import dpath
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
@@ -77,7 +77,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item_obj.guid}"
         )
 
-        sql_endpoint_status = dpath.util.get(
+        sql_endpoint_status = dpath.get(
             response_state, "body/properties/sqlEndpointProperties/provisioningStatus", default=None
         )
 

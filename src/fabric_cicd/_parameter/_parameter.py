@@ -29,7 +29,7 @@ class Parameter:
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
             "minimum": {"find_value", "replace_value"},
-            "maximum": {"find_value", "replace_value", "item_type", "item_name", "file_path"},
+            "maximum": {"find_value", "replace_value", "is_regex", "item_type", "item_name", "file_path"},
         },
         "spark_pool": {
             "minimum": {"instance_pool_id", "replace_value"},
@@ -107,6 +107,11 @@ class Parameter:
         errors = []
         msgs = constants.PARAMETER_MSGS["invalid content"]
 
+        # Check for empty YAML content
+        if content.strip() == "":
+            errors.append("YAML content is empty")
+            return errors
+
         # Regex patterns to match all valid UTF-8 characters
         utf8_pattern = r"""
         (
@@ -129,12 +134,6 @@ class Parameter:
         if not re.match(compiled_utf8_pattern, content):
             errors.append(msgs["char"])
 
-        # Check for unclosed quotes
-        quotes = ['"', "'"]
-        for quote in quotes:
-            if content.count(quote) % 2 != 0:
-                errors.append(msgs["quote"].format(quote))
-
         return errors
 
     def _validate_parameter_load(self) -> tuple[bool, str]:
@@ -156,6 +155,7 @@ class Parameter:
             ("parameter file structure", self._validate_parameter_structure),
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
+            ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -165,10 +165,11 @@ class Parameter:
                 if step == "parameter file load" and msg == "not found":
                     logger.warning(constants.PARAMETER_MSGS["terminate"].format(msg))
                     return True
-                # Throw warning and discontinue validation check for absent parameter
-                if step in ("find_replace parameter", "spark_pool parameter") and msg == "parameter not found":
-                    not_found_msg = constants.PARAMETER_MSGS[msg].format(step.split()[0])
-                    logger.warning(not_found_msg)
+                # Discontinue validation check for absent parameter
+                if (
+                    step in ("find_replace parameter", "key_value_replace parameter", "spark_pool parameter")
+                    and msg == "parameter not found"
+                ):
                     continue
                 # Otherwise, return False with error message
                 logger.error(constants.PARAMETER_MSGS["failed"].format(msg))
@@ -198,8 +199,10 @@ class Parameter:
     def _validate_parameter(self, param_name: str) -> tuple[bool, str]:
         """Validate the specified parameter."""
         if param_name not in self.environment_parameter:
+            logger.debug(f"The {param_name} parameter was not found")
             return False, "parameter not found"
 
+        logger.debug(f"Found the {param_name} parameter")
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
@@ -211,11 +214,17 @@ class Parameter:
             ("replace_value", lambda param_dict: self._validate_replace_value(param_name, param_dict["replace_value"])),
             ("optional values", lambda param_dict: self._validate_optional_values(param_name, param_dict)),
         ]
+        # Set the proper find_value key name based on the parameter
+        if param_name == "key_value_replace":
+            key_name = "find_key"
+        elif param_name == "spark_pool":
+            key_name = "instance_pool_id"
+        else:
+            key_name = "find_value"
+
         for param_num, parameter_dict in enumerate(self.environment_parameter[param_name], start=1):
             param_num_str = str(param_num) if multiple_param else ""
-            find_value = (
-                parameter_dict["find_value"] if param_name == "find_replace" else parameter_dict["instance_pool_id"]
-            )
+            find_value = parameter_dict[key_name]
             for step, validation_func in validation_steps:
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
@@ -226,20 +235,32 @@ class Parameter:
             # Check if replacement will be skipped for a given find value
             is_valid_env = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
+            log_func = logger.debug if param_name == "key_value_replace" else logger.warning
+
+            # Set value_type based on regex flag once
+            value_type = (
+                "find value regex"
+                if (parameter_dict.get("is_regex") and parameter_dict["is_regex"].lower() == "true")
+                else "find value"
+            )
 
             # Replacement skipped if target environment is not present
             if self.environment != "N/A" and not is_valid_env:
-                msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
-                logger.warning(
-                    constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str)
+                skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
+                log_func(
+                    constants.PARAMETER_MSGS["skip"].format(
+                        value_type, find_value, skip_msg, param_name + " " + param_num_str
+                    )
                 )
                 continue
 
             # Replacement skipped if optional filter values don't match
             if msg == "no match" and not is_valid_optional_val:
-                msg = constants.PARAMETER_MSGS["no filter match"].format(param_name)
-                logger.warning(
-                    constants.PARAMETER_MSGS["skip"].format(find_value, msg, param_name + " " + param_num_str)
+                skip_msg = constants.PARAMETER_MSGS["no filter match"]
+                log_func(
+                    constants.PARAMETER_MSGS["skip"].format(
+                        value_type, find_value, skip_msg, param_name + " " + param_num_str
+                    )
                 )
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
@@ -269,12 +290,45 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
+        # Validate find_value is a valid regex if is_regex is set to true
+        if param_name == "find_replace":
+            is_valid, msg = self._validate_find_regex(param_name, param_dict)
+            if not is_valid:
+                return False, msg
+
         return True, constants.PARAMETER_MSGS["valid required values"].format(param_name)
+
+    def _validate_find_regex(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
+        """Validate the find_value is a valid regex if is_regex is set to true."""
+        # Return True if is_regex is not present or set
+        if not param_dict.get("is_regex"):
+            return True, "No regex present"
+
+        # First validate is_regex value
+        is_valid, msg = self._validate_data_type(param_dict.get("is_regex"), "string", "is_regex", param_name)
+        if not is_valid:
+            return False, msg
+
+        # Skip regex validation if is_regex is not set to true
+        if param_dict["is_regex"].lower() != "true":
+            logger.warning("The provided is_regex value is not set to 'true', regex matching will be ignored.")
+            return True, "Skip regex validation"
+
+        # Validate the find_value is a valid regex
+        pattern = param_dict["find_value"]
+        try:
+            re.compile(pattern)
+            return True, "Valid regex"
+        except re.error as e:
+            return False, f"Invalid regex {pattern}: {e}"
 
     def _validate_replace_value(self, param_name: str, replace_value: dict) -> tuple[bool, str]:
         """Validate the replace_value dictionary."""
         # Validate replace_value dictionary values
         if param_name == "find_replace":
+            is_valid, msg = self._validate_find_replace_replace_value(replace_value)
+
+        if param_name == "key_value_replace":
             is_valid, msg = self._validate_find_replace_replace_value(replace_value)
 
         if param_name == "spark_pool":
@@ -286,7 +340,7 @@ class Parameter:
         return True, msg
 
     def _validate_find_replace_replace_value(self, replace_value: dict) -> tuple[bool, str]:
-        """Validate the replace_value dictionary values in find_replace parameter."""
+        """Validate the replace_value dictionary values in find_replace and key_value_replace parameters."""
         for environment in replace_value:
             if not replace_value[environment]:
                 return False, constants.PARAMETER_MSGS["missing replace value"].format("find_replace", environment)
