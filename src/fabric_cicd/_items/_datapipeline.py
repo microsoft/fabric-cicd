@@ -177,7 +177,10 @@ def replace_activity_workspace_ids(fabric_workspace_obj: FabricWorkspace, file_o
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
     # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-    activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
+    activities_mapping = {
+        "RefreshDataflow": ["Dataflow", "dataflowId"],
+        "TridentNotebook": ["Notebook", "notebookId"]
+    }
 
     # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
     for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
