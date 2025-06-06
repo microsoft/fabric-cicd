@@ -4,12 +4,11 @@
 """Tests for data pipeline notebook activity workspace ID replacement."""
 
 import json
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, patch
-from pathlib import Path
 
 from fabric_cicd._items._datapipeline import replace_activity_workspace_ids
-from fabric_cicd._common._file import File
 
 
 class TestDataPipelineNotebookFix:
@@ -22,10 +21,10 @@ class TestDataPipelineNotebookFix:
         workspace.workspace_id = "12345678-1234-1234-1234-123456789012"
         
         # Mock the _convert_id_to_name method to return the notebook name for valid IDs
-        def mock_convert_id_to_name(item_type, generic_id, lookup_type):
+        def mock_convert_id_to_name(item_type, generic_id, lookup_type):  # noqa: ARG001
             if item_type == "Notebook" and generic_id == "99b570c5-0c79-9dc4-4c9b-fa16c621384c":
                 return "Hello World"
-            elif item_type == "Dataflow" and generic_id == "some-dataflow-id":
+            if item_type == "Dataflow" and generic_id == "some-dataflow-id":
                 return "Test Dataflow"
             return None
         
