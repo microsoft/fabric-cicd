@@ -4,10 +4,8 @@
 from fabric_cicd._items._activator import publish_activators
 from fabric_cicd._items._copyjob import publish_copyjobs
 from fabric_cicd._items._dataflowgen2 import publish_dataflows
-from fabric_cicd._items._datapipeline import (
-    publish_datapipelines,
-    sort_datapipelines,
-)
+from fabric_cicd._items._datapipeline import publish_datapipelines
+from fabric_cicd._items._dependency_utils import sort_items
 from fabric_cicd._items._environment import check_environment_publish_state, publish_environments
 from fabric_cicd._items._eventhouse import publish_eventhouses
 from fabric_cicd._items._eventstream import publish_eventstreams
@@ -41,5 +39,5 @@ __all__ = [
     "publish_sqldatabases",
     "publish_variablelibraries",
     "publish_warehouses",
-    "sort_datapipelines",
+    "sort_items",
 ]

@@ -6,6 +6,8 @@
 import json
 import logging
 
+import dpath
+
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
@@ -69,16 +71,20 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
             database_item = database_items.get(database_item_name) if database_items else None
 
             if not database_item:
-                msg = f"Cannot find the KQL Database source with name {database_item_name} as it is not yet deployed."
+                msg = f"Cannot find the KQL Database source with name '{database_item_name}' as it is not yet deployed."
                 raise ParsingError(msg, logger)
 
             database_item_guid = database_item.guid
-            # Get the cluster URI of the KQL database
+            # Get the cluster URI of the KQL database using dpath.get
             kqldatabase_data = fabric_workspace_obj.endpoint.invoke(
                 method="GET",
                 url=f"{fabric_workspace_obj.base_api_url}/kqlDatabases/{database_item_guid}",
             )
-            kqldatabase_cluster_uri = kqldatabase_data["body"]["properties"]["queryServiceUri"]
+            kqldatabase_cluster_uri = dpath.get(kqldatabase_data, "body/properties/queryServiceUri", default=None)
+            if not kqldatabase_cluster_uri:
+                msg = f"Cannot find the cluster URI for KQL Database '{database_item_name}'."
+                raise ParsingError(msg, logger)
+
             # Replace the cluster URI value
             data_source["clusterUri"] = kqldatabase_cluster_uri
 

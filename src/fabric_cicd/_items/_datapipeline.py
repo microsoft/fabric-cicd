@@ -6,16 +6,14 @@
 import json
 import logging
 import re
-from collections import defaultdict, deque
-from pathlib import Path
 
 import dpath
 
 import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
-from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._dependency_utils import set_publish_order
 
 logger = logging.getLogger(__name__)
 
@@ -29,24 +27,10 @@ def publish_datapipelines(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "DataPipeline"
 
-    # Get all data pipelines from the repository
-    pipelines = fabric_workspace_obj.repository_items.get(item_type, {})
-
-    unsorted_pipeline_dict = {}
-
-    # Construct unsorted_pipeline_dict with dict of pipeline
-    unsorted_pipeline_dict = {}
-    for item_name, item_details in pipelines.items():
-        with Path(item_details.path, "pipeline-content.json").open(
-            encoding="utf-8",
-        ) as f:
-            raw_file = f.read()
-        item_content_dict = json.loads(raw_file)
-
-        unsorted_pipeline_dict[item_name] = item_content_dict
-
-    publish_order = sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, "Repository")
-
+    # Set the order of items to be published based on their dependencies
+    publish_order = set_publish_order(
+        fabric_workspace_obj, item_type, "pipeline-content.json", _find_referenced_datapipelines
+    )
     # Publish
     for item_name in publish_order:
         fabric_workspace_obj._publish_item(
@@ -66,80 +50,13 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
     return replace_activity_workspace_ids(workspace_obj, file_obj)
 
 
-def sort_datapipelines(fabric_workspace_obj: FabricWorkspace, unsorted_pipeline_dict: dict, lookup_type: str) -> list:
-    """
-    Output a sorted list that datapipelines should be published or unpublished with based on item dependencies.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object.
-        unsorted_pipeline_dict: Dict representation of the pipeline-content file.
-        lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
-    """
-    # Step 1: Create a graph to manage dependencies
-    graph = defaultdict(list)
-    in_degree = defaultdict(int)
-    unpublish_items = []
-
-    # Step 2: Build the graph and count the in-degrees
-    for item_name, item_content_dict in unsorted_pipeline_dict.items():
-        # In an unpublish case, keep track of items to get unpublished
-        if lookup_type == "Deployed":
-            unpublish_items.append(item_name)
-
-        referenced_pipelines = _find_referenced_datapipelines(
-            fabric_workspace_obj, item_content_dict=item_content_dict, lookup_type=lookup_type
-        )
-
-        for referenced_name in referenced_pipelines:
-            graph[referenced_name].append(item_name)
-            in_degree[item_name] += 1
-        # Ensure every item has an entry in the in-degree map
-        if item_name not in in_degree:
-            in_degree[item_name] = 0
-
-    # In an unpublish case, adjust in_degree to include entire dependency chain for each pipeline
-    if lookup_type == "Deployed":
-        for item_name in graph:
-            if item_name not in in_degree:
-                in_degree[item_name] = 0
-            for neighbor in graph[item_name]:
-                if neighbor not in in_degree:
-                    in_degree[neighbor] += 1
-
-    # Step 3: Perform a topological sort to determine the correct publish order
-    zero_in_degree_queue = deque([item_name for item_name in in_degree if in_degree[item_name] == 0])
-    sorted_items = []
-
-    while zero_in_degree_queue:
-        item_name = zero_in_degree_queue.popleft()
-        sorted_items.append(item_name)
-
-        for neighbor in graph[item_name]:
-            in_degree[neighbor] -= 1
-            if in_degree[neighbor] == 0:
-                zero_in_degree_queue.append(neighbor)
-
-    if len(sorted_items) != len(in_degree):
-        msg = "There is a cycle in the graph. Cannot determine a valid publish order."
-        raise ParsingError(msg, logger)
-
-    # Remove items not present in unpublish list and invert order for deployed sort
-    if lookup_type == "Deployed":
-        sorted_items = [item_name for item_name in sorted_items if item_name in unpublish_items]
-        sorted_items = sorted_items[::-1]
-
-    return sorted_items
-
-
-def _find_referenced_datapipelines(
-    fabric_workspace_obj: FabricWorkspace, item_content_dict: dict, lookup_type: str
-) -> list:
+def _find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
     """
     Scan through item dictionary and find pipeline references (including nested pipelines).
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        item_content_dict: Dict representation of the pipeline-content file.
+        file_content: Dict representation of the pipeline-content file.
         lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     """
     item_type = "DataPipeline"
@@ -147,7 +64,7 @@ def _find_referenced_datapipelines(
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
     # Use the dpath library to search through the dictionary for all values that match the GUID pattern
-    for _, value in dpath.search(item_content_dict, "**", yielded=True):
+    for _, value in dpath.search(file_content, "**", yielded=True):
         if isinstance(value, str):
             match = guid_pattern.search(value)
             if match:

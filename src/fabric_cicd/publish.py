@@ -222,7 +222,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
                         unsorted_pipeline_dict[item_name] = json.loads(decoded_string)
 
             # Determine order to delete w/o dependencies
-            to_delete_list = items.sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, "Deployed")
+            to_delete_list = items.sort_items(fabric_workspace_obj, unsorted_pipeline_dict, "Deployed")
 
         for item_name in to_delete_list:
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
