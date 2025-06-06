@@ -10,30 +10,7 @@ find_replace:
       file_path:
        - "/Hello World.Notebook/notebook-content.py"
        - "\\subfolder\\Hello World Subfolder.Notebook/notebook-content.py"
-    # Workspace Id
-    - find_value: "82a46da2-618c-4ca4-8d48-96d18da8d685"
-      replace_value:
-        PPE: "24a801cd-fad0-431a-a450-a5d5667fd697"
-        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
-      # Optional fields:
-      item_type: "Dataflow"
-      item_name: ["Dataflow Source", "Dataflow Destination"]
-    - find_value: "5f3aae77-f860-4a23-9b75-5b15f888494b"
-      replace_value:
-        PPE: "2289380b-c109-4a2e-b451-36f1c6b04cc6"
-        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
-      # Optional fields:
-      item_type: "Dataflow"
-      item_name: ["Dataflow Destination"]
-    - find_value: "31dcc456-a6b6-46e2-824b-24f1e44b7297"
-      replace_value:
-        PPE: "b13f9a45-db45-4e3f-8b10-0500ef3cdb19"
-        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
-      # Optional fields:
-      item_type: "Dataflow"
-      item_name: "Dataflow Destination"
-
-
+   
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
       replace_value:
