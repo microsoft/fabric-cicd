@@ -10,7 +10,7 @@ find_replace:
       file_path:
        - "/Hello World.Notebook/notebook-content.py"
        - "\\subfolder\\Hello World Subfolder.Notebook/notebook-content.py"
-   
+
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
       replace_value:
