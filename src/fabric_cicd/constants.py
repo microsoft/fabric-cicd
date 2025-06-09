@@ -49,6 +49,8 @@ WORKSPACE_ID_REFERENCE_REGEX = r'(default_lakehouse_workspace_id|workspaceId)\s*
 DATAFLOW_ID_REFERENCE_REGEX = r'(dataflowId)\s*=\s*"(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 
+# Item Type to File Mapping (to check for item dependencies)
+ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json", "Dataflow": "mashup.pq"}
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"

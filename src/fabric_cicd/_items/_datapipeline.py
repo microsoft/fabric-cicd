@@ -13,7 +13,7 @@ import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
-from fabric_cicd._items._dependency_utils import set_publish_order
+from fabric_cicd._items._manage_dependencies import set_publish_order
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,9 @@ def publish_datapipelines(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "DataPipeline"
 
-    # Set the order of items to be published based on their dependencies
-    publish_order = set_publish_order(
-        fabric_workspace_obj, item_type, "pipeline-content.json", _find_referenced_datapipelines
-    )
+    # Set the order of data pipelines to be published based on their dependencies
+    publish_order = set_publish_order(fabric_workspace_obj, item_type, find_referenced_datapipelines)
+
     # Publish
     for item_name in publish_order:
         fabric_workspace_obj._publish_item(
@@ -50,9 +49,9 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
     return replace_activity_workspace_ids(workspace_obj, file_obj)
 
 
-def _find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
+def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
     """
-    Scan through item dictionary and find pipeline references (including nested pipelines).
+    Scan through pipeline file json dictionary and find pipeline references (including nested pipelines).
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.

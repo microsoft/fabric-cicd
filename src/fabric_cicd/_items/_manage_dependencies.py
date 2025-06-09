@@ -3,35 +3,40 @@
 
 """Functions to process items with dependencies."""
 
+import base64
 import json
 import logging
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Callable
 
-from fabric_cicd import FabricWorkspace
+import dpath
+
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
 
 logger = logging.getLogger(__name__)
 
 
 def set_publish_order(
-    fabric_workspace_obj: FabricWorkspace, item_type: str, file_name: str, find_referenced_items_func: Callable
+    fabric_workspace_obj: FabricWorkspace, item_type: str, find_referenced_items_func: Callable
 ) -> list:
     """
     Creates a publish order list for items of the same type, considering their dependencies.
 
     Args:
-        fabric_workspace_obj: The FabricWorkspace object
-        item_type: Type of item to order (e.g., 'DataPipeline', 'Dataflow')
-        file_name: Name of file containing item references (e.g., 'pipeline-content.json', 'mashup.pq')
-        find_referenced_items_func: Function to find referenced items in content
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_type: Type of item to order (e.g., 'DataPipeline', 'Dataflow').
+        find_referenced_items_func: Function to find referenced items in content.
     """
     # Get all items of the given type from the repository
     items = fabric_workspace_obj.repository_items.get(item_type, {})
 
     # Construct the unsorted_dict with an item and its associated file content
     unsorted_dict = {}
+    # Set the file name based on the item type (e.g., 'pipeline-content.json' for DataPipeline, 'mashup.pq' for Dataflow)
+    file_name = constants.ITEM_TYPE_TO_FILE[item_type]
+
     for item_name, item_details in items.items():
         with Path(item_details.path, file_name).open(encoding="utf-8") as f:
             raw_file = f.read()
@@ -44,6 +49,46 @@ def set_publish_order(
     return sort_items(fabric_workspace_obj, unsorted_dict, "Repository", find_referenced_items_func)
 
 
+def set_unpublish_order(
+    fabric_workspace_obj: FabricWorkspace,
+    item_type: str,
+    unpublish_list: list,
+    find_referenced_items_func: Callable,
+) -> list:
+    """
+    Creates an unpublish order list for items of the same type, considering their dependencies.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        item_type: Type of item to order (e.g., 'DataPipeline', 'Dataflow').
+        unpublish_list: List of items to unpublish.
+        find_referenced_items_func: Function to find referenced items in content.
+    """
+    unsorted_item_dict = {}
+    file_name = constants.ITEM_TYPE_TO_FILE[item_type]
+
+    for item_name in unpublish_list:
+        # Get deployed item definition
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item-definition
+        item_guid = fabric_workspace_obj.deployed_items[item_type][item_name].guid
+        response = fabric_workspace_obj.endpoint.invoke(
+            method="POST", url=f"{fabric_workspace_obj.base_api_url}/items/{item_guid}/getDefinition"
+        )
+        parts = dpath.get(response, "/body/definition/parts", default=[])
+        for part in parts:
+            if part["path"] == file_name:
+                # Decode Base64 string to dictionary
+                decoded_bytes = base64.b64decode(part["payload"])
+                decoded_string = decoded_bytes.decode("utf-8")
+                unsorted_item_dict[item_name] = (
+                    json.loads(decoded_string) if file_name.endswith(".json") else decoded_string
+                )
+                break
+
+    # Determine order to delete w/o dependencies
+    return sort_items(fabric_workspace_obj, unsorted_item_dict, "Deployed", find_referenced_items_func)
+
+
 def sort_items(
     fabric_workspace_obj: FabricWorkspace, unsorted_dict: dict, lookup_type: str, find_referenced_items_func: Callable
 ) -> list:
@@ -51,10 +96,10 @@ def sort_items(
     Performs topological sort on items of a given item type based on their dependencies.
 
     Args:
-        fabric_workspace_obj: The FabricWorkspace object
-        unsorted_dict: Dictionary mapping items to their file content
-        lookup_type: Source of reference resolution ('Repository' or 'Deployed')
-        find_referenced_items_func: Function to find referenced items in content
+        fabric_workspace_obj: The FabricWorkspace object.
+        unsorted_dict: Dictionary mapping items to their file content.
+        lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
+        find_referenced_items_func: Function to find referenced items in content.
     """
     # Step 1: Create a graph to manage dependencies
     graph = defaultdict(list)
@@ -72,7 +117,6 @@ def sort_items(
         for referenced_name in referenced_items:
             graph[referenced_name].append(item_name)
             in_degree[item_name] += 1
-
         # Ensure every item has an entry in the in-degree map
         if item_name not in in_degree:
             in_degree[item_name] = 0
