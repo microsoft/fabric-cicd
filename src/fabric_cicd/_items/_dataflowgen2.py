@@ -6,10 +6,8 @@
 import logging
 import re
 
-import dpath
-
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._items._manage_dependencies import set_publish_order
+from fabric_cicd._items._manage_dependencies import lookup_referenced_item, set_publish_order
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +23,8 @@ def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
 
     # Set the order of dataflows to be published based on their dependencies
     publish_order = set_publish_order(fabric_workspace_obj, item_type, find_referenced_dataflows)
+
+    fabric_workspace_obj._refresh_deployed_items()
 
     # Publish
     for item_name in publish_order:
@@ -52,6 +52,8 @@ def find_referenced_dataflows(fabric_workspace_obj: FabricWorkspace, file_conten
     all_matches = sorted(workspace_matches + dataflow_matches, key=lambda x: x[0])
 
     # Process matches to find dataflow references
+    item_type = "Dataflow"
+    api_item_type = "dataflows"
     current_workspace = None
     processed_dataflows = set()
 
@@ -62,17 +64,15 @@ def find_referenced_dataflows(fabric_workspace_obj: FabricWorkspace, file_conten
         elif id_type == "dataflowId" and current_workspace and (current_workspace, guid) not in processed_dataflows:
             processed_dataflows.add((current_workspace, guid))
             # Get dataflow name
-            response = fabric_workspace_obj.endpoint.invoke(
-                method="GET",
-                url=f"https://msitapi.fabric.microsoft.com/v1/workspaces/{current_workspace}/dataflows/{guid}",
+            dataflow_name = lookup_referenced_item(
+                fabric_workspace_obj, current_workspace, item_type, guid, api_item_type, True
             )
-            dataflow_name = dpath.get(response, "body/displayName", default=None)
-            # Check if it exists in repository or deployed items and add to the reference list if it's not already present
+            # If the dataflow exists in the repo or it's deployed, add it to the reference list if it's not already present
             if (
                 dataflow_name
                 and (
-                    dataflow_name in fabric_workspace_obj.repository_items.get("Dataflow", {})
-                    or dataflow_name in fabric_workspace_obj.deployed_items.get("Dataflow", {})
+                    dataflow_name in fabric_workspace_obj.repository_items.get(item_type, {})
+                    or dataflow_name in fabric_workspace_obj.deployed_items.get(item_type, {})
                 )
                 and dataflow_name not in reference_list
             ):

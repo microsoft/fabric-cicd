@@ -14,6 +14,7 @@ import dpath
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
 
@@ -153,3 +154,37 @@ def sort_items(
         sorted_items = sorted_items[::-1]
 
     return sorted_items
+
+
+def lookup_referenced_item(
+    fabric_workspace_obj: FabricWorkspace,
+    workspace_id: str,
+    item_type: str,
+    item_id: str,
+    api_item_type: str,
+    return_name: bool = False,
+) -> str:
+    """
+    Looks up a referenced item name in the deployed items dict and returns its name or deployed guid.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object.
+        workspace_id: The workspace ID of the item.
+        item_type: Type of the item (e.g., 'DataPipeline', 'Dataflow').
+        item_id: The guid of the item to look up.
+        api_item_type: The API GET item type (e.g., 'dataflows').
+        return_name: If True, return the item name instead of the guid.
+    """
+    # Get the item name using the workspace ID and item ID
+    response = fabric_workspace_obj.endpoint.invoke(
+        method="GET",
+        url=f"https://msitapi.fabric.microsoft.com/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
+    )
+    item_name = dpath.get(response, "body/displayName", default="")
+
+    # Return name if requested, otherwise return guid if found, or empty string
+    return (
+        item_name
+        if return_name
+        else fabric_workspace_obj.deployed_items.get(item_type, {}).get(item_name, Item(guid="")).guid or ""
+    )
