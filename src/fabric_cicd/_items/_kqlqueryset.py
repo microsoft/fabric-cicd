@@ -25,6 +25,8 @@ def publish_kqlquerysets(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "KQLQueryset"
 
+    fabric_workspace_obj._refresh_deployed_items()
+
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         fabric_workspace_obj._publish_item(
             item_name=item_name, item_type=item_type, func_process_file=func_process_file
@@ -61,7 +63,6 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
         return file_obj.contents
 
     # Get the KQL Database items from the deployed items
-    fabric_workspace_obj._refresh_deployed_items()
     database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase")
 
     # If the cluster URI is empty, replace it with the cluster URI of the KQL database

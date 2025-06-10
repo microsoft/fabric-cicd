@@ -68,14 +68,7 @@ def find_referenced_dataflows(fabric_workspace_obj: FabricWorkspace, file_conten
                 fabric_workspace_obj, current_workspace, item_type, guid, api_item_type, True
             )
             # If the dataflow exists in the repo or it's deployed, add it to the reference list if it's not already present
-            if (
-                dataflow_name
-                and (
-                    dataflow_name in fabric_workspace_obj.repository_items.get(item_type, {})
-                    or dataflow_name in fabric_workspace_obj.deployed_items.get(item_type, {})
-                )
-                and dataflow_name not in reference_list
-            ):
+            if dataflow_name and dataflow_name not in reference_list:
                 reference_list.append(dataflow_name)
 
     return reference_list

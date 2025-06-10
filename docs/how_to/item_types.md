@@ -17,7 +17,7 @@
 
 -   **Parameterization:**
     -   Source/destination items (e.g., Dataflow, Lakehouse, Warehouse) will always reference the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
-    -   The recommended approach for re-pointing source/destination items is using `find_value` regex and `replace_value` variables in the `find_replace` parameter (see How To -> Parameterization).
+    -   The recommended approach for re-pointing source/destination items is using `find_value` regex and `replace_value` variables in the `find_replace` parameter (see Parameterization -> Dataflows example).
 -   **Initial deployment** requires a manual refresh of the dataflow. After re-pointing dataflows during deployment, errors may appear temporarily but should resolve after refreshing and allowing time for processing.
 -   `fabric ci-cd` automatically manages ordered deployment of dataflows that source from other dataflows.
 -   **Connections** are not source controlled and require manual creation.
