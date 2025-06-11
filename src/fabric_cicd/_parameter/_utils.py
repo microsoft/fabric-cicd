@@ -10,6 +10,7 @@ parameter dictionary structure, processing parameter values, and handling parame
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Optional, Union
 
@@ -17,8 +18,121 @@ from azure.core.credentials import TokenCredential
 from jsonpath_ng.ext import parse
 
 import fabric_cicd.constants as constants
+from fabric_cicd import FabricWorkspace
+from fabric_cicd._common._exceptions import InputError, ParsingError
 
 logger = logging.getLogger(__name__)
+
+
+def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> str:
+    """
+    Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided.
+
+    Args:
+        param_dict: The parameter dictionary containing the find_value and is_regex keys.
+        file_content: The content of the file where the find_value will be searched.
+        filter_match: A boolean to check for a regex match in filtered files only.
+    """
+    find_value = param_dict.get("find_value")
+    is_regex = param_dict.get("is_regex", "").lower() == "true"
+
+    # Only process regex if enabled and file meets filter criteria
+    if is_regex and filter_match:
+        # Search for a match with the valid regex (validated in the parameter file validation step)
+        regex = re.compile(find_value)
+        match = re.search(regex, file_content)
+        if match:
+            if len(match.groups()) != 1:
+                msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
+                raise InputError(msg, logger)
+
+            matched_value = match.group(1)
+            if matched_value:
+                return matched_value
+
+            msg = f"Regex pattern '{find_value}' captured an empty value."
+            raise InputError(msg, logger)
+
+        logger.debug(f"No match found for regex '{find_value}' in the file content.")
+
+    # For non-regex or non-matching filters, return the original value
+    return find_value
+
+
+def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str) -> str:
+    """Extracts the replace_value and sets the value. Processes the replace_value if a valid variable is provided."""
+    # If $workspace variable, return the workspace ID value
+    if replace_value == "$workspace.id":
+        return workspace_obj.workspace_id
+
+    # If $items variable, return the item attribute value if found
+    if replace_value.startswith("$items"):
+        return _extract_item_attribute(workspace_obj, replace_value)
+
+    # Otherwise, return the replace_value as is
+    return replace_value
+
+
+def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> str:
+    """Extracts the item attribute value from the $items variable to set as the replace_value.
+
+    Args:
+        workspace_obj: The FabricWorkspace object containing the workspace items dictionary used to access item metadata.
+        variable: The $items variable string to be parsed and processed, format: $items.type.name.attribute (supported attributes: id and sqlendpoint).
+    """
+    try:
+        # Split the variable into 3 parts (item type, name, and attribute)
+        var_parts = variable.removeprefix("$items.").split(".")
+        if len(var_parts) != 3:
+            msg = f"Invalid $items variable syntax: {variable}"
+            raise InputError(msg, logger)
+
+        item_type = var_parts[0].strip()
+        item_name = var_parts[1].strip()
+        attribute = var_parts[2].strip()
+
+        # Refresh the workspace items to get the latest deployed items
+        workspace_obj._refresh_deployed_items()
+
+        # Validate items exist in the workspace
+        if item_type not in workspace_obj.workspace_items:
+            msg = f"Item type '{item_type}' is invalid or not found in deployed items"
+            raise InputError(msg, logger)
+
+        if item_name not in workspace_obj.workspace_items[item_type]:
+            msg = f"Item '{item_name}' not found as a deployed {item_type}"
+            raise InputError(msg, logger)
+
+        # Get the item's attributes and look for the provided attribute
+        item_attr = workspace_obj.workspace_items[item_type][item_name]
+        attr_name = attribute.lower()
+
+        # Validate the attribute is supported
+        if attr_name not in constants.ITEM_ATTR_LOOKUP:
+            msg = f"Attribute '{attribute}' is an invalid item attribute, use one of the following: {constants.ITEM_ATTR_LOOKUP}"
+            raise InputError(msg, logger)
+
+        # Get the attribute value and check if it exists
+        attr_value = item_attr.get(attr_name)
+        if not attr_value:
+            msg = f"Value does not exist for attribute '{attribute}' in the {item_type} item '{item_name}'"
+            raise InputError(msg, logger)
+
+        logger.debug(f"Found attribute '{attr_name}' with value '{attr_value}'")
+        return attr_value
+
+    except Exception as e:
+        msg = f"Error parsing $items variable: {e!s}"
+        raise ParsingError(msg, logger) from e
+
+
+def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) -> tuple[str, str, Path]:
+    """Extracts the item type, name, and path filters from the parameter dictionary, if present."""
+    item_type = param_dict.get("item_type")
+    item_name = param_dict.get("item_name")
+    file_path = process_input_path(workspace_obj.repository_directory, param_dict.get("file_path"))
+
+    return item_type, item_name, file_path
 
 
 def replace_key_value(param_dict: dict, json_content: str, env: str) -> Union[dict]:
@@ -105,6 +219,7 @@ def validate_parameter_file(
     endpoint = FabricEndpoint(
         # if credential is not defined, use DefaultAzureCredential
         token_credential=(
+            # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token. Not internal Azure product.
             DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
         )
     )
@@ -132,20 +247,21 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
     if param_name:
         return _check_parameter_structure(param_dict.get(param_name))
 
-    # Otherwise, check the structure of the entire parameter dictionary
-    param_structure = [
-        _check_parameter_structure(param_dict.get(name))
-        for name in ["find_replace", "spark_pool"]
-        if param_dict.get(name)
-    ]
-    # Check structure if only one parameter is found
-    if len(param_structure) == 1:
-        return param_structure[0]
-    # Check structure if both parameters are found
-    if len(param_structure) == 2 and param_structure[0] == param_structure[1]:
-        return param_structure[0]
+    # Parameters to validate
+    param_names = ["find_replace", "key_value_replace", "spark_pool"]
 
-    return False
+    # Get only parameters that exist in param_dict
+    existing_params = [name for name in param_names if name in param_dict]
+
+    # If no parameters found, return False
+    if not existing_params:
+        return False
+
+    # Check all existing parameters have the same structure and are valid
+    structures = [_check_parameter_structure(param_dict.get(name)) for name in existing_params]
+
+    # All structures must be True and identical
+    return all(structures) and len(set(structures)) == 1
 
 
 def _check_parameter_structure(param_value: any) -> bool:
@@ -221,8 +337,6 @@ def check_replacement(
         return True
 
     # Otherwise, find matches for the optional parameters
-    logger.debug("Optional filters found. Checking for matches")
-
     item_type_match = _find_match(input_type, item_type)
     item_name_match = _find_match(input_name, item_name)
     file_path_match = _find_match(input_path, file_path)
@@ -235,10 +349,10 @@ def check_replacement(
         if input_path:
             logger.debug(f"File path match found: {file_path_match}")
 
-        logger.debug("Optional filters match found. Find and replace applied in this repository file")
+        # Optional filters match found. Find and replace applied in this repository file
         return True
 
-    logger.debug("Optional filters match not found. Find and replace skipped for this repository file")
+    # Optional filters match not found. Find and replace skipped for this repository file
     return False
 
 

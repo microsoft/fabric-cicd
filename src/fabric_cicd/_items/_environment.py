@@ -6,6 +6,7 @@
 import logging
 import os
 import re
+import urllib.parse
 from pathlib import Path
 
 import dpath
@@ -256,9 +257,11 @@ def _remove_library(fabric_workspace_obj: FabricWorkspace, item_guid: str, file_
         file_name: The name of the file to be removed.
     """
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/delete-staging-library
+    # encode the URL to escape string to be URL-safe.
+    file_name_encoded = urllib.parse.quote(file_name)
     fabric_workspace_obj.endpoint.invoke(
         method="DELETE",
-        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?libraryToDelete={file_name}",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?libraryToDelete={file_name_encoded}",
         body={},
     )
     logger.info(f"{constants.INDENT}Removed {file_name}")
