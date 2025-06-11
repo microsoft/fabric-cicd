@@ -79,6 +79,12 @@
     -   Notebooks attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
 -   **Resources** are not source controlled and will not be deployed.
 
+## Real-Time Dashboard
+
+-   **Parameterization:**
+    -   Real-Time Dashboard attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   The **cluster/query URI** of the KQL database(s) used in the dashboard must be present in the Real-Time Dashboard JSON for rebinding. If the Real-Time Dashboard is attached to a KQL database within the same workspace, the cluster URI value is empty and needs to be re-added. `fabric ci-cd` handles this automatically.
+
 ## Reports
 
 -   **Parameterization:**
@@ -115,9 +121,3 @@
 -   **Warehouse content is not deployed.** Only the item shell is deployed. Warehouse DDL must be deployed separately using a DACPAC or other tools such as dbt.
 -   **Case insensitive collation is supported** custom collation must be manually edited in the `.platform` file creation payload. See [How to: Create a warehouse with case-insensitive (CI) collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation) for more details.
 -   **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.
-
-## Real-Time Dashboard
-
--   **Parameterization:**
-    -   Real-Time Dashboard attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
--   The **cluster/query URI** of the KQL database(s) used in the dashboard must be present in the Real-Time Dashboard JSON for rebinding. If the Real-Time Dashboard is attached to a KQL database within the same workspace, the cluster URI value is empty and needs to be re-added. `fabric ci-cd` handles this automatically.

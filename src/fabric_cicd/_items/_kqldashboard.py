@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Functions to process and deploy Real-Time Dashbaord item."""
+"""Functions to process and deploy Real-Time Dashboard item."""
 
 import json
 import logging
@@ -22,6 +22,8 @@ def publish_kqldashboard(fabric_workspace_obj: FabricWorkspace) -> None:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
     """
     item_type = "KQLDashboard"
+
+    fabric_workspace_obj._refresh_deployed_items()
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         fabric_workspace_obj._publish_item(
@@ -57,19 +59,18 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
     data_sources = json_content_dict.get("dataSources")
 
     # Get the KQL Database items from the deployed items
-    fabric_workspace_obj._refresh_deployed_items()
-    database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase")
+    database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase", {})
 
     for data_source in data_sources:
-        if data_source is None:
-            print("No data sources found in the KQL Dashboard item.")
-            return file_obj.contents
+        if not data_source:
+            msg = "No data sources found in the KQL Dashboard item."
+            raise ParsingError(msg, logger)
         if data_source.get("clusterUri") == "":
             database_item_name = data_source.get("name")
-            database_item = database_items.get(database_item_name) if database_items else None
+            database_item = database_items.get(database_item_name)
 
             if not database_item:
-                msg = f"Cannot find the KQL Database source with name {database_item_name} as it is not yet deployed."
+                msg = f"Cannot find the KQL Database source with name '{database_item_name}' as it is not yet deployed."
                 raise ParsingError(msg, logger)
 
             database_item_guid = database_item.guid
@@ -81,7 +82,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
             kqldatabase_cluster_uri = kqldatabase_data.get("body", {}).get("properties", {}).get("queryServiceUri")
             # Replace the cluster URI value
             if not kqldatabase_cluster_uri:
-                msg = f"Cluster URI for KQL Database {database_item_name} is not found."
+                msg = f"Cluster URI for KQL Database '{database_item_name}' is not found."
                 raise ParsingError(msg, logger)
 
             data_source["clusterUri"] = kqldatabase_cluster_uri

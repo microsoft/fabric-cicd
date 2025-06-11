@@ -173,6 +173,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     for item_type in [
         "Eventstream",
         "Reflex",
+        "KQLDashboard",
         "KQLQueryset",
         "KQLDatabase",
         "Eventhouse",
@@ -186,7 +187,6 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Lakehouse",
         "Warehouse",
         "VariableLibrary",
-        "KQLDashboard",
         "CopyJob",
     ]:
         if item_type in fabric_workspace_obj.item_type_in_scope:
