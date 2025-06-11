@@ -560,10 +560,6 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
     num_folders = 100
     items_per_folder = 3
     
-    print(f"\nCreating {num_folders} folders with {items_per_folder} items each...")
-    
-    start_creation_time = time.time()
-    
     # Create folders at multiple levels
     for i in range(num_folders):
         if i < 50:
@@ -582,9 +578,6 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
                 item_name=f"Item {j:02d} in Folder {i:03d}"
             )
     
-    creation_time = time.time() - start_creation_time
-    print(f"Created test structure in {creation_time:.2f}s")
-    
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
         repository_directory=str(temp_workspace_dir),
@@ -596,9 +589,6 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
     workspace._refresh_repository_folders()
     folders_time = time.time() - start_time
     
-    print(f"_refresh_repository_folders completed in {folders_time:.2f}s")
-    print(f"Detected {len(workspace.repository_folders)} folders")
-    
     # Verify we detected a reasonable number of folders
     assert len(workspace.repository_folders) >= 50, "Should detect at least 50 folders"
     assert len(workspace.repository_folders) <= 125, "Should not detect more than 125 folders"
@@ -607,9 +597,6 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
     start_time = time.time()
     workspace._refresh_repository_items()
     items_time = time.time() - start_time
-    
-    print(f"_refresh_repository_items completed in {items_time:.2f}s")
-    print(f"Detected {len(workspace.repository_items['Notebook'])} items")
     
     # Verify we detected the expected number of items
     expected_items = num_folders * items_per_folder
@@ -638,6 +625,3 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
         last_level_1_index = max(sorted_folders.index(f) for f in level_1_folders)
         first_level_2_index = min(sorted_folders.index(f) for f in level_2_folders)
         assert last_level_1_index < first_level_2_index, "Folder sorting is incorrect with large numbers"
-    
-    print("Performance test completed successfully!")
-    print(f"Total processing time: {folders_time + items_time:.2f}s")
