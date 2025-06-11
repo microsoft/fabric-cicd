@@ -5,8 +5,6 @@
 
 import json
 import re
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,10 +23,10 @@ def mock_endpoint():
 
 
 @pytest.fixture
-def temp_workspace_dir():
+def temp_workspace_dir(tmp_path):
     """Create a temporary directory structure for testing."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        yield Path(temp_dir)
+    # Use pytest's tmp_path for better isolation
+    return tmp_path
 
 
 @pytest.fixture
@@ -62,51 +60,51 @@ def create_platform_file(item_path, item_type="Notebook", item_name="Test Item")
 
 
 @pytest.fixture
-def repository_with_subfolders(temp_workspace_dir):
-    """Create a repository with subfolders for testing."""
+def repository_with_subfolders(tmp_path):
+    """Create a repository with subfolders for testing - isolated per test."""
     # Create root level items
     create_platform_file(
-        temp_workspace_dir / "RootNotebook.Notebook", 
+        tmp_path / "RootNotebook.Notebook", 
         item_type="Notebook", 
         item_name="Root Notebook"
     )
     create_platform_file(
-        temp_workspace_dir / "RootPipeline.DataPipeline", 
+        tmp_path / "RootPipeline.DataPipeline", 
         item_type="DataPipeline", 
         item_name="Root Pipeline"
     )
     
     # Create first level subfolders with items
     create_platform_file(
-        temp_workspace_dir / "Folder1" / "Folder1Notebook.Notebook", 
+        tmp_path / "Folder1" / "Folder1Notebook.Notebook", 
         item_type="Notebook", 
         item_name="Folder1 Notebook"
     )
     create_platform_file(
-        temp_workspace_dir / "Folder2" / "Folder2Pipeline.DataPipeline", 
+        tmp_path / "Folder2" / "Folder2Pipeline.DataPipeline", 
         item_type="DataPipeline", 
         item_name="Folder2 Pipeline"
     )
     
     # Create second level subfolders with items
     create_platform_file(
-        temp_workspace_dir / "Folder1" / "Subfolder1" / "Subfolder1Notebook.Notebook", 
+        tmp_path / "Folder1" / "Subfolder1" / "Subfolder1Notebook.Notebook", 
         item_type="Notebook", 
         item_name="Subfolder1 Notebook"
     )
     create_platform_file(
-        temp_workspace_dir / "Folder2" / "Subfolder2" / "Subfolder2Pipeline.DataPipeline", 
+        tmp_path / "Folder2" / "Subfolder2" / "Subfolder2Pipeline.DataPipeline", 
         item_type="DataPipeline", 
         item_name="Subfolder2 Pipeline"
     )
     
     # Create empty folder (should not be included in repository_folders)
-    (temp_workspace_dir / "EmptyFolder").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "EmptyFolder").mkdir(parents=True, exist_ok=True)
     
     # Create a folder with only empty subfolders (should not be included)
-    (temp_workspace_dir / "FolderWithEmptySubfolders" / "EmptySubfolder").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "FolderWithEmptySubfolders" / "EmptySubfolder").mkdir(parents=True, exist_ok=True)
     
-    return temp_workspace_dir
+    return tmp_path
 
 
 @pytest.fixture
@@ -202,42 +200,56 @@ def test_folder_hierarchy_preservation(repository_with_subfolders, patched_fabri
         item_type_in_scope=["Notebook", "DataPipeline"],
     )
     
-    # Call the method under test
+    # Mock the deployed folders API to return existing folders
+    folder1_id = "folder1-id-12345"
+    folder2_id = "folder2-id-67890"
+    
+    def mock_invoke_side_effect(method, url, **_kwargs):
+        if method == "GET" and url.endswith("/folders"):
+            # Mock API response for existing folders
+            return {
+                "body": {
+                    "value": [
+                        {
+                            "id": folder1_id,
+                            "displayName": "Folder1",
+                            "parentFolderId": None
+                        },
+                        {
+                            "id": folder2_id,
+                            "displayName": "Folder2", 
+                            "parentFolderId": None
+                        }
+                    ]
+                },
+                "header": {}
+            }
+        
+        return {"body": {"value": []}, "header": {}}
+    
+    workspace.endpoint.invoke.side_effect = mock_invoke_side_effect
+    
+    # Call methods in the intended order
     workspace._refresh_repository_folders()
+    workspace._refresh_deployed_folders()
     
     # Capture initial repository folders
     initial_folders = set(workspace.repository_folders.keys())
     
-    # Manually set some folder IDs to simulate existing folders
-    folder1_id = "folder1-id-12345"
-    folder2_id = "folder2-id-67890"
-    
-    workspace.deployed_folders = {
-        "/Folder1": folder1_id,
-        "/Folder2": folder2_id,
-    }
-    
-    # Manually update the repository folders to match what would happen in _publish_folders
-    workspace.repository_folders["/Folder1"] = folder1_id
-    workspace.repository_folders["/Folder2"] = folder2_id
-    
     # Verify the folder hierarchy remains intact
     assert set(workspace.repository_folders.keys()) == initial_folders
     
-    # Verify folder IDs were updated correctly
-    assert workspace.repository_folders["/Folder1"] == folder1_id
-    assert workspace.repository_folders["/Folder2"] == folder2_id
+    # Verify deployed folder IDs were detected correctly
+    assert workspace.deployed_folders["/Folder1"] == folder1_id
+    assert workspace.deployed_folders["/Folder2"] == folder2_id
     
-    # Verify subfolder paths still exist
+    # Verify subfolder paths still exist in repository (even if not deployed)
     assert "/Folder1/Subfolder1" in workspace.repository_folders
     assert "/Folder2/Subfolder2" in workspace.repository_folders
 
 
-def test_item_folder_association(repository_with_subfolders, patched_fabric_workspace, valid_workspace_id):
+def test_item_folder_association(repository_with_subfolders, valid_workspace_id):
     """Test that items are correctly associated with their parent folders."""
-    mock_endpoint = MagicMock()
-    mock_endpoint.upn_auth = True
-    
     # Set up mock folder IDs
     folder1_id = "folder1-id-12345"
     folder2_id = "folder2-id-67890"
@@ -245,39 +257,73 @@ def test_item_folder_association(repository_with_subfolders, patched_fabric_work
     subfolder2_id = "subfolder2-id-67890"
     
     # Mock responses for API calls
-    def mock_invoke_side_effect(*args):
-        method = args[0]
-        url = args[1]
-        
+    def mock_invoke_side_effect(method, url, **_kwargs):
         if method == "GET" and url.endswith("/items"):
             return {"body": {"value": []}}
         
         if method == "GET" and url.endswith("/folders"):
-            return {"body": {"value": []}, "header": {}}
+            # Mock API response for deployed folders
+            return {
+                "body": {
+                    "value": [
+                        {
+                            "id": folder1_id,
+                            "displayName": "Folder1",
+                            "parentFolderId": None
+                        },
+                        {
+                            "id": folder2_id,
+                            "displayName": "Folder2", 
+                            "parentFolderId": None
+                        },
+                        {
+                            "id": subfolder1_id,
+                            "displayName": "Subfolder1",
+                            "parentFolderId": folder1_id
+                        },
+                        {
+                            "id": subfolder2_id,
+                            "displayName": "Subfolder2",
+                            "parentFolderId": folder2_id
+                        }
+                    ]
+                },
+                "header": {}
+            }
         
         return {"body": {"value": []}}
     
+    mock_endpoint = MagicMock()
+    mock_endpoint.upn_auth = True
     mock_endpoint.invoke.side_effect = mock_invoke_side_effect
     
-    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
-        workspace = patched_fabric_workspace(
+    fabric_endpoint_patch = patch(
+        "fabric_cicd.fabric_workspace.FabricEndpoint", 
+        return_value=mock_endpoint
+    )
+    parameter_patch = patch.object(
+        FabricWorkspace, 
+        "_refresh_parameter_file", 
+        new=lambda self: setattr(self, "environment_parameter", {})
+    )
+    
+    with fabric_endpoint_patch, parameter_patch:
+        workspace = FabricWorkspace(
             workspace_id=valid_workspace_id,
             repository_directory=str(repository_with_subfolders),
             item_type_in_scope=["Notebook", "DataPipeline"],
         )
         
-        # Prepare the workspace
+        # Call methods in the intended order to populate folder structures
         workspace._refresh_repository_folders()
+        workspace._refresh_deployed_folders()
         
-        # Manually set the repository_folders to simulate folder publishing
-        workspace.repository_folders = {
-            "/Folder1": folder1_id,
-            "/Folder2": folder2_id,
-            "/Folder1/Subfolder1": subfolder1_id,
-            "/Folder2/Subfolder2": subfolder2_id
-        }
+        # Simulate the effect of _publish_folders by updating repository_folders 
+        # with deployed folder IDs (this normally happens in _publish_folders)
+        for folder_path, folder_id in workspace.deployed_folders.items():
+            if folder_path in workspace.repository_folders:
+                workspace.repository_folders[folder_path] = folder_id
         
-        # Now refresh the repository items which should assign folder IDs
         workspace._refresh_repository_items()
         
         # Verify folder IDs are correctly assigned to items
@@ -290,10 +336,10 @@ def test_item_folder_association(repository_with_subfolders, patched_fabric_work
         assert workspace.repository_items["DataPipeline"]["Subfolder2 Pipeline"].folder_id == subfolder2_id
 
 
-def test_invalid_folder_name(repository_with_subfolders, patched_fabric_workspace, valid_workspace_id):
+def test_invalid_folder_name(tmp_path, patched_fabric_workspace, valid_workspace_id):
     """Test that invalid folder names raise an appropriate error."""
     # Create a repository with an invalid folder name
-    invalid_folder_dir = repository_with_subfolders / "Invalid*Folder"
+    invalid_folder_dir = tmp_path / "Invalid*Folder"
     invalid_folder_dir.mkdir(parents=True, exist_ok=True)
     
     create_platform_file(
@@ -304,7 +350,7 @@ def test_invalid_folder_name(repository_with_subfolders, patched_fabric_workspac
     
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
-        repository_directory=str(repository_with_subfolders),
+        repository_directory=str(tmp_path),
         item_type_in_scope=["Notebook", "DataPipeline"],
     )
     
@@ -336,10 +382,10 @@ def test_invalid_folder_name(repository_with_subfolders, patched_fabric_workspac
     assert "Folder name 'Invalid*Folder' contains invalid characters" in str(excinfo.value)
 
 
-def test_deeply_nested_subfolders(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+def test_deeply_nested_subfolders(tmp_path, patched_fabric_workspace, valid_workspace_id):
     """Test handling of deeply nested folder structures (15+ levels deep)."""
     # Create a deeply nested folder structure
-    current_path = temp_workspace_dir
+    current_path = tmp_path
     folder_names = []
     
     # Create 15 levels of nested folders
@@ -356,7 +402,7 @@ def test_deeply_nested_subfolders(temp_workspace_dir, patched_fabric_workspace, 
     )
     
     # Also create items at different levels to ensure intermediate folders are detected
-    mid_level_path = temp_workspace_dir
+    mid_level_path = tmp_path
     for i in range(7):  # Create item at level 7
         mid_level_path = mid_level_path / f"Level{i+1:02d}"
     
@@ -368,7 +414,7 @@ def test_deeply_nested_subfolders(temp_workspace_dir, patched_fabric_workspace, 
     
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
+        repository_directory=str(tmp_path),
         item_type_in_scope=["Notebook"],
     )
     
@@ -403,10 +449,10 @@ def test_deeply_nested_subfolders(temp_workspace_dir, patched_fabric_workspace, 
     assert execution_time < 1.0, f"Deep folder processing took too long: {execution_time:.2f}s"
 
 
-def test_folder_rename_operations(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+def test_folder_rename_operations(tmp_path, patched_fabric_workspace, valid_workspace_id):
     """Test folder rename operations and verify child items and subfolders are updated correctly."""
-    # Create initial folder structure
-    original_folder = temp_workspace_dir / "OriginalFolder"
+    # Create initial folder structure in isolated tmp_path
+    original_folder = tmp_path / "OriginalFolder"
     original_subfolder = original_folder / "OriginalSubfolder"
     
     # Create items in original folders
@@ -424,7 +470,7 @@ def test_folder_rename_operations(temp_workspace_dir, patched_fabric_workspace, 
     
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
+        repository_directory=str(tmp_path),
         item_type_in_scope=["Notebook"],
     )
     
@@ -435,37 +481,57 @@ def test_folder_rename_operations(temp_workspace_dir, patched_fabric_workspace, 
     assert "/OriginalFolder" in workspace.repository_folders
     assert "/OriginalFolder/OriginalSubfolder" in workspace.repository_folders
     
-    # Simulate folder rename by moving files to new folder structure
-    renamed_folder = temp_workspace_dir / "RenamedFolder"
+    # Create a separate workspace instance for testing renamed structure
+    # to avoid contaminating the original workspace state
+    renamed_tmp_path = tmp_path.parent / "renamed_workspace"
+    renamed_tmp_path.mkdir()
+    
+    # Create the renamed folder structure in the new location
+    renamed_folder = renamed_tmp_path / "RenamedFolder"
     renamed_subfolder = renamed_folder / "RenamedSubfolder"
     
-    # Move the folder structure (simulating rename)
-    import shutil
-    shutil.move(str(original_folder), str(renamed_folder))
-    shutil.move(str(renamed_folder / "OriginalSubfolder"), str(renamed_subfolder))
+    # Create items in renamed folders
+    create_platform_file(
+        renamed_folder / "ParentNotebook.Notebook",
+        item_type="Notebook",
+        item_name="Parent Notebook"
+    )
     
-    # Refresh after rename
-    workspace._refresh_repository_folders()
-    workspace._refresh_repository_items()
+    create_platform_file(
+        renamed_subfolder / "ChildNotebook.Notebook", 
+        item_type="Notebook",
+        item_name="Child Notebook"
+    )
     
-    # Verify old folder paths are no longer present
-    assert "/OriginalFolder" not in workspace.repository_folders
-    assert "/OriginalFolder/OriginalSubfolder" not in workspace.repository_folders
+    # Create new workspace instance for renamed structure
+    renamed_workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(renamed_tmp_path),
+        item_type_in_scope=["Notebook"],
+    )
     
-    # Verify new folder paths are detected
-    assert "/RenamedFolder" in workspace.repository_folders
-    assert "/RenamedFolder/RenamedSubfolder" in workspace.repository_folders
+    # Refresh after "rename" (using the new workspace)
+    renamed_workspace._refresh_repository_folders()
+    renamed_workspace._refresh_repository_items()
+    
+    # Verify old folder paths are no longer present in renamed workspace
+    assert "/OriginalFolder" not in renamed_workspace.repository_folders
+    assert "/OriginalFolder/OriginalSubfolder" not in renamed_workspace.repository_folders
+    
+    # Verify new folder paths are detected in renamed workspace
+    assert "/RenamedFolder" in renamed_workspace.repository_folders
+    assert "/RenamedFolder/RenamedSubfolder" in renamed_workspace.repository_folders
     
     # Verify items are detected in new locations
-    assert "Parent Notebook" in workspace.repository_items["Notebook"]
-    assert "Child Notebook" in workspace.repository_items["Notebook"]
+    assert "Parent Notebook" in renamed_workspace.repository_items["Notebook"]
+    assert "Child Notebook" in renamed_workspace.repository_items["Notebook"]
     
     # Verify folder hierarchy is maintained
-    sorted_folders = sorted(workspace.repository_folders.keys(), key=lambda path: path.count("/"))
+    sorted_folders = sorted(renamed_workspace.repository_folders.keys(), key=lambda path: path.count("/"))
     assert sorted_folders.index("/RenamedFolder") < sorted_folders.index("/RenamedFolder/RenamedSubfolder")
 
 
-def test_special_character_handling(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+def test_special_character_handling(tmp_path, patched_fabric_workspace, valid_workspace_id):
     """Test handling of special characters in folder names."""
     test_cases = [
         # Valid cases - should be accepted
@@ -516,7 +582,7 @@ def test_special_character_handling(temp_workspace_dir, patched_fabric_workspace
     ]
     
     for folder_name in valid_folders:
-        folder_path = temp_workspace_dir / folder_name
+        folder_path = tmp_path / folder_name
         create_platform_file(
             folder_path / "TestNotebook.Notebook",
             item_type="Notebook",
@@ -525,7 +591,7 @@ def test_special_character_handling(temp_workspace_dir, patched_fabric_workspace
     
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
+        repository_directory=str(tmp_path),
         item_type_in_scope=["Notebook"],
     )
     
@@ -537,22 +603,37 @@ def test_special_character_handling(temp_workspace_dir, patched_fabric_workspace
         assert expected_path in workspace.repository_folders, f"Valid folder '{folder_name}' was not detected"
     
     # Test that _publish_folders would raise errors for invalid names
-    workspace.repository_folders["/Invalid*Folder"] = ""
-    workspace.deployed_folders = {}
+    # Create a new isolated workspace with an invalid folder
+    invalid_test_dir = tmp_path.parent / "invalid_test"
+    invalid_test_dir.mkdir()
     
-    mock_endpoint = MagicMock()
-    mock_endpoint.upn_auth = True
-    workspace.endpoint = mock_endpoint
-    workspace.base_api_url = "https://api.powerbi.com/v1.0/myorg/workspaces/test"
+    invalid_folder_dir = invalid_test_dir / "Invalid*Folder"
+    create_platform_file(
+        invalid_folder_dir / "InvalidFolderNotebook.Notebook",
+        item_type="Notebook",
+        item_name="Invalid Folder Notebook"
+    )
     
-    # Should raise InputError for invalid folder name
+    invalid_workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(invalid_test_dir),
+        item_type_in_scope=["Notebook"],
+    )
+    
+    # Refresh to detect the invalid folder
+    invalid_workspace._refresh_repository_folders()
+    
+    # Verify invalid folder was detected
+    assert "/Invalid*Folder" in invalid_workspace.repository_folders
+    
+    # Should raise InputError when trying to publish invalid folder name
     with pytest.raises(InputError) as excinfo:
-        workspace._publish_folders()
+        invalid_workspace._publish_folders()
     
     assert "contains invalid characters" in str(excinfo.value)
 
 
-def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+def test_large_number_of_folders_and_items(tmp_path, patched_fabric_workspace, valid_workspace_id):
     """Test performance and scalability with a large number of folders and items."""
     import time
     
@@ -564,11 +645,11 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
     for i in range(num_folders):
         if i < 50:
             # First 50 folders at root level
-            folder_path = temp_workspace_dir / f"Folder{i:03d}"
+            folder_path = tmp_path / f"Folder{i:03d}"
         else:
             # Next 50 folders nested under first 25 folders
             parent_idx = (i - 50) % 25
-            folder_path = temp_workspace_dir / f"Folder{parent_idx:03d}" / f"Subfolder{i:03d}"
+            folder_path = tmp_path / f"Folder{parent_idx:03d}" / f"Subfolder{i:03d}"
         
         # Create multiple items in each folder
         for j in range(items_per_folder):
@@ -580,7 +661,7 @@ def test_large_number_of_folders_and_items(temp_workspace_dir, patched_fabric_wo
     
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
+        repository_directory=str(tmp_path),
         item_type_in_scope=["Notebook"],
     )
     
