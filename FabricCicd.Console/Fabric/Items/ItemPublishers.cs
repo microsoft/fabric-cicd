@@ -6,69 +6,35 @@ namespace FabricCicd.Items;
 /// </summary>
 public static class ItemPublishers
 {
-    public static void PublishNotebooks(FabricWorkspace ws)
-    {
-        foreach (var name in ws.ItemTypes)
-        {
-            if (name == "Notebook")
-            {
-                ws.PublishItem("all", "Notebook");
-            }
-        }
-    }
+    public static void PublishNotebooks(FabricWorkspace ws) => Notebook.Publish(ws);
 
-    public static void PublishReports(FabricWorkspace ws)
-    {
-        foreach (var name in ws.ItemTypes)
-        {
-            if (name == "Report")
-            {
-                ws.PublishItem("all", "Report");
-            }
-        }
-    }
+    public static void PublishReports(FabricWorkspace ws) => Report.Publish(ws);
 
-    public static void PublishDataPipelines(FabricWorkspace ws)
-    {
-        foreach (var name in ws.ItemTypes)
-        {
-            if (name == "DataPipeline")
-            {
-                ws.PublishItem("all", "DataPipeline");
-            }
-        }
-    }
+    public static void PublishDataPipelines(FabricWorkspace ws) => DataPipeline.Publish(ws);
 
-    public static void PublishEnvironments(FabricWorkspace ws)
-    {
-        foreach (var name in ws.ItemTypes)
-        {
-            if (name == "Environment")
-            {
-                ws.PublishItem("all", "Environment");
-            }
-        }
-    }
+    public static void PublishEnvironments(FabricWorkspace ws) => Environment.Publish(ws);
 
-    // Additional item types below are implemented as no-op placeholders
-    public static void PublishActivators(FabricWorkspace ws) => PublishGeneric(ws, "Reflex");
-    public static void PublishCopyJobs(FabricWorkspace ws) => PublishGeneric(ws, "CopyJob");
-    public static void PublishEventhouses(FabricWorkspace ws) => PublishGeneric(ws, "Eventhouse");
-    public static void PublishEventstreams(FabricWorkspace ws) => PublishGeneric(ws, "Eventstream");
-    public static void PublishKqlDatabases(FabricWorkspace ws) => PublishGeneric(ws, "KQLDatabase");
-    public static void PublishKqlQuerysets(FabricWorkspace ws) => PublishGeneric(ws, "KQLQueryset");
-    public static void PublishLakehouses(FabricWorkspace ws) => PublishGeneric(ws, "Lakehouse");
-    public static void PublishMirroredDatabase(FabricWorkspace ws) => PublishGeneric(ws, "MirroredDatabase");
-    public static void PublishSemanticModels(FabricWorkspace ws) => PublishGeneric(ws, "SemanticModel");
-    public static void PublishSqlDatabases(FabricWorkspace ws) => PublishGeneric(ws, "SQLDatabase");
-    public static void PublishVariableLibraries(FabricWorkspace ws) => PublishGeneric(ws, "VariableLibrary");
-    public static void PublishWarehouses(FabricWorkspace ws) => PublishGeneric(ws, "Warehouse");
+    public static void PublishActivators(FabricWorkspace ws) => Activator.Publish(ws);
 
-    private static void PublishGeneric(FabricWorkspace ws, string type)
-    {
-        if (ws.ItemTypes.Contains(type))
-        {
-            ws.PublishItem("all", type);
-        }
-    }
+    public static void PublishCopyJobs(FabricWorkspace ws) => CopyJob.Publish(ws);
+
+    public static void PublishEventhouses(FabricWorkspace ws) => Eventhouse.Publish(ws);
+
+    public static void PublishEventstreams(FabricWorkspace ws) => Eventstream.Publish(ws);
+
+    public static void PublishKqlDatabases(FabricWorkspace ws) => KqlDatabase.Publish(ws);
+
+    public static void PublishKqlQuerysets(FabricWorkspace ws) => KqlQueryset.Publish(ws);
+
+    public static void PublishLakehouses(FabricWorkspace ws) => Lakehouse.Publish(ws);
+
+    public static void PublishMirroredDatabase(FabricWorkspace ws) => MirroredDatabase.Publish(ws);
+
+    public static void PublishSemanticModels(FabricWorkspace ws) => SemanticModel.Publish(ws);
+
+    public static void PublishSqlDatabases(FabricWorkspace ws) => SqlDatabase.Publish(ws);
+
+    public static void PublishVariableLibraries(FabricWorkspace ws) => VariableLibrary.Publish(ws);
+
+    public static void PublishWarehouses(FabricWorkspace ws) => Warehouse.Publish(ws);
 }
