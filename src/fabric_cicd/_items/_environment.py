@@ -257,7 +257,6 @@ def _remove_library(fabric_workspace_obj: FabricWorkspace, item_guid: str, file_
         file_name: The name of the file to be removed.
     """
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/delete-staging-library
-    
     # encode the URL to escape string to be URL-safe.
     file_name_encoded = urllib.parse.quote(file_name)
     fabric_workspace_obj.endpoint.invoke(
