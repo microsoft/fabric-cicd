@@ -113,6 +113,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Eventstreams")
         items.publish_eventstreams(fabric_workspace_obj)
+    if "KQLDashboard" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing KQLDashboard")
+        items.publish_kqldashboard(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
@@ -183,6 +186,8 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Lakehouse",
         "Warehouse",
         "VariableLibrary",
+        "KQLDashboard",
+        "CopyJob",
     ]:
         if item_type in fabric_workspace_obj.item_type_in_scope:
             unpublish_flag = unpublish_flag_mapping.get(item_type)

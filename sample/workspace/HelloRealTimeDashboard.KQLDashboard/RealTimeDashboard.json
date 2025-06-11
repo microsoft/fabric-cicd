@@ -1,0 +1,163 @@
+{
+  "schema_version": "60",
+  "tiles": [
+    {
+      "id": "bad34d7e-6462-4811-b17a-5ed946fa0bf1",
+      "title": "New tile",
+      "visualType": "table",
+      "pageId": "48f62f8e-cb94-443b-8a98-9dae1edb6a35",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 15,
+        "height": 8
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "8e1eced0-4d8a-43a8-8932-ec36f799b06f"
+      },
+      "visualOptions": {
+        "table__enableRenderLinks": true,
+        "colorRulesDisabled": true,
+        "colorStyle": "light",
+        "crossFilterDisabled": false,
+        "drillthroughDisabled": false,
+        "crossFilter": [],
+        "drillthrough": [],
+        "table__renderLinks": [],
+        "colorRules": []
+      }
+    },
+    {
+      "id": "197cd6d1-d4fb-48c2-8abd-cb293552caa5",
+      "title": "New tile",
+      "visualType": "table",
+      "pageId": "48f62f8e-cb94-443b-8a98-9dae1edb6a35",
+      "layout": {
+        "x": 15,
+        "y": 0,
+        "width": 9,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "80edd254-bbbe-4d44-af41-a1bf292ee045"
+      },
+      "visualOptions": {
+        "table__enableRenderLinks": true,
+        "colorRulesDisabled": true,
+        "colorStyle": "light",
+        "crossFilter": [],
+        "crossFilterDisabled": false,
+        "drillthroughDisabled": false,
+        "drillthrough": [],
+        "table__renderLinks": [],
+        "colorRules": []
+      }
+    }
+  ],
+  "baseQueries": [
+    {
+      "id": "c6be13e1-fc14-44ef-a4bf-5670ebb67943",
+      "queryId": "6632d0f7-5d1e-47de-9aca-10c04ecd230b",
+      "variableName": "PassengerCount"
+    }
+  ],
+  "parameters": [
+    {
+      "kind": "duration",
+      "id": "b9410c12-493a-455c-bac9-7d2a7eecd110",
+      "displayName": "Time range",
+      "description": "",
+      "beginVariableName": "_startTime",
+      "endVariableName": "_endTime",
+      "defaultValue": {
+        "kind": "dynamic",
+        "count": 1,
+        "unit": "hours"
+      },
+      "showOnPages": {
+        "kind": "all"
+      }
+    },
+    {
+      "kind": "int",
+      "id": "e8acee0e-b0ce-42a9-b340-bd934d434fd3",
+      "displayName": "PassengerCount",
+      "description": "",
+      "variableName": "PassengerCounts",
+      "selectionType": "scalar",
+      "includeAllOption": false,
+      "defaultValue": {
+        "kind": "value",
+        "value": 1
+      },
+      "dataSource": {
+        "kind": "static",
+        "values": [
+          {
+            "value": 1
+          }
+        ]
+      },
+      "showOnPages": {
+        "kind": "all"
+      }
+    }
+  ],
+  "dataSources": [
+    {
+      "kind": "kusto-trident",
+      "scopeId": "kusto-trident",
+      "clusterUri": "",
+      "database": "9ec49357-fad2-8ac5-4295-0dcf7d164fc7",
+      "name": "HelloEventhouse",
+      "id": "13efefa9-c29f-420a-9f53-834aece3eacf",
+      "workspace": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "kind": "kusto-trident",
+      "scopeId": "kusto-trident",
+      "clusterUri": "https://trd-srpupn7qadyes7d72g.z2.kusto.fabric.microsoft.com",
+      "database": "a65d86d8-ba4d-4fbf-b264-b3a504ced0ab",
+      "name": "Test1",
+      "id": "c33c6d70-d6fa-4d50-a8b4-3c44b969c033",
+      "workspace": "90c87160-6b48-4215-994f-710bb0755246"
+    }
+  ],
+  "pages": [
+    {
+      "name": "Passengers",
+      "id": "48f62f8e-cb94-443b-8a98-9dae1edb6a35"
+    }
+  ],
+  "queries": [
+    {
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "13efefa9-c29f-420a-9f53-834aece3eacf"
+      },
+      "text": "// Please enter your KQL query (Example):\n// <table name>\n// | where <datetime column> between (['_startTime'] .. ['_endTime']) // Time range filtering\n// | take 100\nYellowTaxi\n| where passengerCount  > 1\n",
+      "id": "8e1eced0-4d8a-43a8-8932-ec36f799b06f",
+      "usedVariables": []
+    },
+    {
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "c33c6d70-d6fa-4d50-a8b4-3c44b969c033"
+      },
+      "text": "// Please enter your KQL query (Example):\n// <table name>\n// | where <datetime column> between (['_startTime'] .. ['_endTime']) // Time range filtering\n// | where isempty(['PassengerCounts']) or <column name> == ['PassengerCounts'] // Single selection filtering\n// | take 100\nWeather\n| take 100",
+      "id": "80edd254-bbbe-4d44-af41-a1bf292ee045",
+      "usedVariables": []
+    },
+    {
+      "id": "6632d0f7-5d1e-47de-9aca-10c04ecd230b",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "13efefa9-c29f-420a-9f53-834aece3eacf"
+      },
+      "text": "// Please enter your KQL query (Example):\n// <table name>\n// | where <datetime column> between (['_startTime'] .. ['_endTime']) // Time range filtering\n// | take 100\nYellowTaxi\n| where passengerCount > 1",
+      "usedVariables": []
+    }
+  ]
+}
