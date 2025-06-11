@@ -6,8 +6,8 @@
 import logging
 import os
 import re
-from pathlib import Path
 import urllib.parse
+from pathlib import Path
 
 import dpath
 import yaml
