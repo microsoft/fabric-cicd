@@ -119,6 +119,9 @@ def sort_items(
         if item_name not in in_degree:
             in_degree[item_name] = 0
 
+    logger.debug(f"Graph: {graph}")
+    logger.debug(f"In-degree map: {in_degree}")
+
     # In an unpublish case, adjust in_degree to include entire dependency chain
     if lookup_type == "Deployed":
         for item_name in graph:
@@ -131,6 +134,7 @@ def sort_items(
     # Step 3: Perform a topological sort to determine the correct publish order
     zero_in_degree_queue = deque([item_name for item_name in in_degree if in_degree[item_name] == 0])
     sorted_items = []
+    logger.debug(f"Zero_in_degree_queue: {zero_in_degree_queue}")
 
     while zero_in_degree_queue:
         item_name = zero_in_degree_queue.popleft()
@@ -150,6 +154,7 @@ def sort_items(
         sorted_items = [item_name for item_name in sorted_items if item_name in unpublish_items]
         sorted_items = sorted_items[::-1]
 
+    logger.debug(f"Sorted items in {lookup_type}: {sorted_items}")
     return sorted_items
 
 
@@ -181,6 +186,8 @@ def lookup_referenced_item(
         url=f"https://msitapi.fabric.microsoft.com/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
     )
     item_name = response.get("body", {}).get("displayName", "")
+    logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
+
     # Return name if requested, otherwise return guid if found, or empty string
     return (
         item_name
