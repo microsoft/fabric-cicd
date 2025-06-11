@@ -10,8 +10,6 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Callable
 
-import dpath
-
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._item import Item
@@ -75,8 +73,7 @@ def set_unpublish_order(
         response = fabric_workspace_obj.endpoint.invoke(
             method="POST", url=f"{fabric_workspace_obj.base_api_url}/items/{item_guid}/getDefinition"
         )
-        parts = dpath.get(response, "/body/definition/parts", default=[])
-        for part in parts:
+        for part in response["body"]["definition"]["parts"]:
             if part["path"] == file_name:
                 # Decode Base64 string to dictionary
                 decoded_bytes = base64.b64decode(part["payload"])
@@ -183,7 +180,7 @@ def lookup_referenced_item(
         method="GET",
         url=f"https://msitapi.fabric.microsoft.com/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
     )
-    item_name = dpath.get(response, "body/displayName", default="")
+    item_name = response.get("body", {}).get("displayName", "")
     # Return name if requested, otherwise return guid if found, or empty string
     return (
         item_name

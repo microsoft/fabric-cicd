@@ -6,8 +6,6 @@
 import json
 import logging
 
-import dpath
-
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
@@ -76,16 +74,15 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
                 raise ParsingError(msg, logger)
 
             database_item_guid = database_item.guid
-            # Get the cluster URI of the KQL database using dpath.get
+            # Get the cluster URI of the KQL database
             kqldatabase_data = fabric_workspace_obj.endpoint.invoke(
                 method="GET",
                 url=f"{fabric_workspace_obj.base_api_url}/kqlDatabases/{database_item_guid}",
             )
-            kqldatabase_cluster_uri = dpath.get(kqldatabase_data, "body/properties/queryServiceUri", default=None)
+            kqldatabase_cluster_uri = kqldatabase_data.get("body", {}).get("properties", {}).get("queryServiceUri")
             if not kqldatabase_cluster_uri:
                 msg = f"Cannot find the cluster URI for KQL Database '{database_item_name}'."
                 raise ParsingError(msg, logger)
-
             # Replace the cluster URI value
             data_source["clusterUri"] = kqldatabase_cluster_uri
 
