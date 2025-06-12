@@ -6,6 +6,16 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.20
+
+<span class="md-h2-subheader">Release Date: 2025-06-12</span>
+
+-   ✨ Onboard KQL Dashboard item type ([#329](https://github.com/microsoft/fabric-cicd/issues/329))
+-   ✨ Onboard Dataflow Gen2 item type ([#111](https://github.com/microsoft/fabric-cicd/issues/111))
+-   ✨ Parameterization support for find_value regex and replace_value variables ([#326](https://github.com/microsoft/fabric-cicd/issues/326))
+-   🔧 Fix bug with deploying environment libraries with special chars ([#336](https://github.com/microsoft/fabric-cicd/issues/336))
+-   ⚡ Improved test coverage for subfolder creation/modification ([#211](https://github.com/microsoft/fabric-cicd/issues/211))
+
 ## Version 0.1.19
 
 <span class="md-h2-subheader">Release Date: 2025-05-21</span>
