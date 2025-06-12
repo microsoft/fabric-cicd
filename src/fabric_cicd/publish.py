@@ -3,8 +3,6 @@
 
 """Module for publishing and unpublishing Fabric workspace items."""
 
-import base64
-import json
 import logging
 from typing import Optional
 
@@ -92,9 +90,6 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "Report" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Reports")
         items.publish_reports(fabric_workspace_obj)
-    if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing DataPipelines")
-        items.publish_datapipelines(fabric_workspace_obj)
     if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing CopyJobs")
         items.publish_copyjobs(fabric_workspace_obj)
@@ -113,6 +108,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Eventstreams")
         items.publish_eventstreams(fabric_workspace_obj)
+    if "Dataflow" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Dataflows")
+        items.publish_dataflows(fabric_workspace_obj)
+    if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing DataPipelines")
+        items.publish_datapipelines(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
@@ -168,12 +169,14 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "DataPipeline",
+        "Dataflow",
         "Eventstream",
         "Reflex",
         "KQLQueryset",
         "KQLDatabase",
         "Eventhouse",
-        "DataPipeline",
+        "CopyJob",
         "Report",
         "SemanticModel",
         "Notebook",
@@ -197,27 +200,15 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         to_delete_set = deployed_names - repository_names
         to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type == "DataPipeline":
-            # need to first define order of delete
-            unsorted_pipeline_dict = {}
-
-            for item_name in to_delete_list:
-                # Get deployed item definition
-                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item-definition
-                item_guid = fabric_workspace_obj.deployed_items[item_type][item_name].guid
-                response = fabric_workspace_obj.endpoint.invoke(
-                    method="POST", url=f"{fabric_workspace_obj.base_api_url}/items/{item_guid}/getDefinition"
-                )
-
-                for part in response["body"]["definition"]["parts"]:
-                    if part["path"] == "pipeline-content.json":
-                        # Decode Base64 string to dictionary
-                        decoded_bytes = base64.b64decode(part["payload"])
-                        decoded_string = decoded_bytes.decode("utf-8")
-                        unsorted_pipeline_dict[item_name] = json.loads(decoded_string)
-
+        if item_type in ("Dataflow", "DataPipeline"):
+            # Use the find referenced items function specific to the item type
+            find_referenced_items_func = (
+                items.find_referenced_datapipelines if item_type == "DataPipeline" else items.find_referenced_dataflows
+            )
             # Determine order to delete w/o dependencies
-            to_delete_list = items.sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, "Deployed")
+            to_delete_list = items.set_unpublish_order(
+                fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
+            )
 
         for item_name in to_delete_list:
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)

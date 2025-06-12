@@ -37,6 +37,7 @@ repository_directory = str(root_directory / "sample" / "workspace")
 item_type_in_scope = [
     "Lakehouse",
     "VariableLibrary",
+    "Dataflow",
     "DataPipeline",
     "Notebook",
     "Environment",

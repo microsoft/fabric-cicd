@@ -28,6 +28,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Eventstream",
     "Warehouse",
     "SQLDatabase",
+    "Dataflow",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
@@ -37,15 +38,24 @@ MAX_RETRY_OVERRIDE = {
     "Report": 10,
     "Eventstream": 10,
     "KQLDatabase": 10,
+    "SQLDatabase": 10,
     "VariableLibrary": 7,
-    "SQLDatabase": 7,
 }
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-WORKSPACE_ID_REFERENCE_REGEX = r'"(default_lakehouse_workspace_id|workspaceId)": "(.*?)"'
+WORKSPACE_ID_REFERENCE_REGEX = r'(default_lakehouse_workspace_id|workspaceId)\s*[:=]\s*"(.*?)"'
+DATAFLOW_ID_REFERENCE_REGEX = r'(dataflowId)\s*=\s*"(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
+
+# Item Type to File Mapping (to check for item dependencies)
+ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json", "Dataflow": "mashup.pq"}
+# Data Pipeline Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name, api_get_item_lookup]}
+DATA_PIPELINE_ACTIVITY_TYPES = {
+    "RefreshDataflow": ["workspaceId", "Dataflow", "dataflowId", "dataflows"],
+    "PBISemanticModelRefresh": ["groupId", "SemanticModel", "datasetId", "semanticModels"],
+}
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"

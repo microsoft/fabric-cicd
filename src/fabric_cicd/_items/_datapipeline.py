@@ -6,16 +6,13 @@
 import json
 import logging
 import re
-from collections import defaultdict, deque
-from pathlib import Path
 
 import dpath
 
-import fabric_cicd.constants as constants
-from fabric_cicd import FabricWorkspace
-from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._manage_dependencies import lookup_referenced_item, set_publish_order
 
 logger = logging.getLogger(__name__)
 
@@ -29,23 +26,10 @@ def publish_datapipelines(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "DataPipeline"
 
-    # Get all data pipelines from the repository
-    pipelines = fabric_workspace_obj.repository_items.get(item_type, {})
+    # Set the order of data pipelines to be published based on their dependencies
+    publish_order = set_publish_order(fabric_workspace_obj, item_type, find_referenced_datapipelines)
 
-    unsorted_pipeline_dict = {}
-
-    # Construct unsorted_pipeline_dict with dict of pipeline
-    unsorted_pipeline_dict = {}
-    for item_name, item_details in pipelines.items():
-        with Path(item_details.path, "pipeline-content.json").open(
-            encoding="utf-8",
-        ) as f:
-            raw_file = f.read()
-        item_content_dict = json.loads(raw_file)
-
-        unsorted_pipeline_dict[item_name] = item_content_dict
-
-    publish_order = sort_datapipelines(fabric_workspace_obj, unsorted_pipeline_dict, "Repository")
+    fabric_workspace_obj._refresh_deployed_items()
 
     # Publish
     for item_name in publish_order:
@@ -63,83 +47,16 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
         item_obj: The item object.
         file_obj: The file object.
     """
-    return replace_activity_workspace_ids(workspace_obj, file_obj)
+    return update_activity_references(workspace_obj, file_obj)
 
 
-def sort_datapipelines(fabric_workspace_obj: FabricWorkspace, unsorted_pipeline_dict: dict, lookup_type: str) -> list:
+def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
     """
-    Output a sorted list that datapipelines should be published or unpublished with based on item dependencies.
+    Scan through pipeline file json dictionary and find pipeline references (including nested pipelines).
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        unsorted_pipeline_dict: Dict representation of the pipeline-content file.
-        lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
-    """
-    # Step 1: Create a graph to manage dependencies
-    graph = defaultdict(list)
-    in_degree = defaultdict(int)
-    unpublish_items = []
-
-    # Step 2: Build the graph and count the in-degrees
-    for item_name, item_content_dict in unsorted_pipeline_dict.items():
-        # In an unpublish case, keep track of items to get unpublished
-        if lookup_type == "Deployed":
-            unpublish_items.append(item_name)
-
-        referenced_pipelines = _find_referenced_datapipelines(
-            fabric_workspace_obj, item_content_dict=item_content_dict, lookup_type=lookup_type
-        )
-
-        for referenced_name in referenced_pipelines:
-            graph[referenced_name].append(item_name)
-            in_degree[item_name] += 1
-        # Ensure every item has an entry in the in-degree map
-        if item_name not in in_degree:
-            in_degree[item_name] = 0
-
-    # In an unpublish case, adjust in_degree to include entire dependency chain for each pipeline
-    if lookup_type == "Deployed":
-        for item_name in graph:
-            if item_name not in in_degree:
-                in_degree[item_name] = 0
-            for neighbor in graph[item_name]:
-                if neighbor not in in_degree:
-                    in_degree[neighbor] += 1
-
-    # Step 3: Perform a topological sort to determine the correct publish order
-    zero_in_degree_queue = deque([item_name for item_name in in_degree if in_degree[item_name] == 0])
-    sorted_items = []
-
-    while zero_in_degree_queue:
-        item_name = zero_in_degree_queue.popleft()
-        sorted_items.append(item_name)
-
-        for neighbor in graph[item_name]:
-            in_degree[neighbor] -= 1
-            if in_degree[neighbor] == 0:
-                zero_in_degree_queue.append(neighbor)
-
-    if len(sorted_items) != len(in_degree):
-        msg = "There is a cycle in the graph. Cannot determine a valid publish order."
-        raise ParsingError(msg, logger)
-
-    # Remove items not present in unpublish list and invert order for deployed sort
-    if lookup_type == "Deployed":
-        sorted_items = [item_name for item_name in sorted_items if item_name in unpublish_items]
-        sorted_items = sorted_items[::-1]
-
-    return sorted_items
-
-
-def _find_referenced_datapipelines(
-    fabric_workspace_obj: FabricWorkspace, item_content_dict: dict, lookup_type: str
-) -> list:
-    """
-    Scan through item dictionary and find pipeline references (including nested pipelines).
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object.
-        item_content_dict: Dict representation of the pipeline-content file.
+        file_content: Dict representation of the pipeline-content file.
         lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     """
     item_type = "DataPipeline"
@@ -147,7 +64,7 @@ def _find_referenced_datapipelines(
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
     # Use the dpath library to search through the dictionary for all values that match the GUID pattern
-    for _, value in dpath.search(item_content_dict, "**", yielded=True):
+    for _, value in dpath.search(file_content, "**", yielded=True):
         if isinstance(value, str):
             match = guid_pattern.search(value)
             if match:
@@ -163,10 +80,12 @@ def _find_referenced_datapipelines(
     return reference_list
 
 
-def replace_activity_workspace_ids(fabric_workspace_obj: FabricWorkspace, file_obj: File) -> str:
+def update_activity_references(fabric_workspace_obj: FabricWorkspace, file_obj: File) -> str:
     """
-    Replaces all instances of non-default feature branch workspace IDs (actual guid of feature branch workspace)
-    with target workspace ID found in DataPipeline activities.
+    Updates the item connection referenced in a data pipeline activity where the activity points
+    to an item within the same workspace, but the workspace ID is not the default guid (all zeroes)
+    and the item ID is a guid rather than a logical ID. The function replaces the workspace ID with
+    the target workspace and the item ID with the deployed guid.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
@@ -176,31 +95,31 @@ def replace_activity_workspace_ids(fabric_workspace_obj: FabricWorkspace, file_o
     item_content_dict = json.loads(file_obj.contents)
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
-    # Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name]}
-    activities_mapping = {"RefreshDataflow": ["Dataflow", "dataflowId"]}
-
     # dpath library finds and replaces feature branch workspace IDs found in all levels of activities in the dictionary
     for path, activity_value in dpath.search(item_content_dict, "**/type", yielded=True):
         # Ensure the type value is a string and check if it is found in the activities mapping
-        if type(activity_value) == str and activity_value in activities_mapping:
+        if isinstance(activity_value, str) and activity_value in constants.DATA_PIPELINE_ACTIVITY_TYPES:
+            workspace_id_str, item_type, item_id_name, api_item_type = constants.DATA_PIPELINE_ACTIVITY_TYPES[
+                activity_value
+            ]
             # Split the path into components, create a path to 'workspaceId' and get the workspace ID value
             path = path.split("/")
-            workspace_id_path = (*path[:-1], "typeProperties", "workspaceId")
-            workspace_id = dpath.get(item_content_dict, workspace_id_path)
+            workspace_id_path = (*path[:-1], "typeProperties", workspace_id_str)
+            workspace_id = dpath.get(item_content_dict, workspace_id_path, default=None)
 
             # Check if the workspace ID is a valid GUID and is not the target workspace ID
-            if guid_pattern.match(workspace_id) and workspace_id != fabric_workspace_obj.workspace_id:
-                item_type, item_id_name = activities_mapping[activity_value]
+            if workspace_id and guid_pattern.match(workspace_id) and workspace_id != fabric_workspace_obj.workspace_id:
+                # item_type, item_id_name, api_item_type = constants.DATA_PIPELINE_ACTIVITY_TYPES[activity_value]
                 # Create a path to the item's ID and get the item ID value
                 item_id_path = (*path[:-1], "typeProperties", item_id_name)
                 item_id = dpath.get(item_content_dict, item_id_path)
-                # Convert the item ID to a name to check if it exists in the repository
-                item_name = fabric_workspace_obj._convert_id_to_name(
-                    item_type=item_type, generic_id=item_id, lookup_type="Repository"
+                # Retrieve the deployed guid for the item in the target workspace
+                deployed_guid = lookup_referenced_item(
+                    fabric_workspace_obj, workspace_id, item_type, item_id, api_item_type
                 )
-                # If the item exists, the associated workspace ID is a feature branch workspace ID and will get replaced
-                if item_name:
+                if deployed_guid:
                     dpath.set(item_content_dict, workspace_id_path, fabric_workspace_obj.workspace_id)
+                    dpath.set(item_content_dict, item_id_path, deployed_guid)
 
     # Convert the updated dict back to a JSON string
     return json.dumps(item_content_dict, indent=2)
