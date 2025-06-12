@@ -457,3 +457,94 @@ dynamic_executor_allocation:
     max_executors: 31
 runtime_version: 1.3
 ```
+
+### Dataflows
+
+Dataflows connect to source/destination items, such as a Lakehouse through:
+
+1. Connection Id in the `queryMetadata.json` file.
+2. Workspace and item Ids in the `mashup.pq` file.
+
+Connections are not deployed with fabric-cicd and therefore need to be parameterized. Referenced items in the `mashup.pq` file that exist in the same workspace as the Dataflow need to be parameterized to ensure proper deployment across environments.
+
+<span class="md-h4-nonanchor">queryMetadata.json file</span>
+
+```json
+{
+    "formatVersion": "202502",
+    "computeEngineSettings": {},
+    "name": "Sample Dataflow",
+    "queryGroups": [],
+    "documentLocale": "en-US",
+    "queriesMetadata": {
+        "Table": {
+            "queryId": "ba67667b-14c0-4536-a92d-feafc73baa4b",
+            "queryName": "Table",
+            "loadEnabled": false
+        },
+        "Table_DataDestination": {
+            "queryId": "a157a378-b510-4d95-bb82-5a7c80df8b4c",
+            "queryName": "Table_DataDestination",
+            "isHidden": true,
+            "loadEnabled": false
+        }
+    },
+    "connections": [
+        {
+            "path": "Lakehouse",
+            "kind": "Lakehouse",
+            "connectionId": "{\"ClusterId\":\"8e4f92a7-3c18-49d5-b6d0-7f2e591ca4e8\",\"DatasourceId\":\"d12c5f7b-90a3-47e6-8d2c-3fb59e01d47a\"}"
+        }
+    ]
+}
+```
+
+For example, in the `mashup.pq` file, the following GUIDs need to be replaced:
+
+-   The workspaceId `e6a8c59f-4b27-48d1-ae03-7f92b1c6458d` with the target workspace Id.
+-   The lakehouseId `3d72f90e-61b5-42a8-9c7e-b085d4e31fa2` with the corresponding Id of the Lakehouse in the target environment (PPE/PROD/etc).
+
+These replacements are managed using a regex pattern as input for the `find_value` in the `parameter.yml` file, which finds the matching value in the _specified_ repository files and replaces it with the dynamically retrieved workspace or item Id of the target environment.
+
+<span class="md-h4-nonanchor">mashup.pq file</span>
+
+```pq
+[StagingDefinition = [Kind = "FastCopy"]]
+section Section1;
+[DataDestinations = {[Definition = [Kind = "Reference", QueryName = "Table_DataDestination", IsNewTarget = true], Settings = [Kind = "Automatic", TypeSettings = [Kind = "Table"]]]}]
+shared Table = let
+  Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WckksSUzLyS9X0lEyBGKP1JycfKVYHYhEQGZBak5mXipQwgiIw/OLclLAkn75JalJ+fnZQEFjmC4FhHRwam5iXklmsm9+SmoOUN4EiMFsBVTzoRabArGLG0x/LAA=", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [Item = _t, Id = _t, Name = _t]),
+  #"Changed column type" = Table.TransformColumnTypes(Source, {{"Item", type text}, {"Id", Int64.Type}, {"Name", type text}}),
+  #"Added custom" = Table.TransformColumnTypes(Table.AddColumn(#"Changed column type", "IsDataflow", each if [Item] = "Dataflow" then true else false), {{"IsDataflow", type logical}}),
+  #"Added custom 1" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom", "ContainsHello", each if Text.Contains([Name], "Hello") then 1 else 0), {{"ContainsHello", Int64.Type}})
+in
+  #"Added custom 1";
+shared Table_DataDestination = let
+  Pattern = Lakehouse.Contents([CreateNavigationProperties = false, EnableFolding = false]),
+  Navigation_1 = Pattern{[workspaceId = "e6a8c59f-4b27-48d1-ae03-7f92b1c6458d"]}[Data],
+  Navigation_2 = Navigation_1{[lakehouseId = "3d72f90e-61b5-42a8-9c7e-b085d4e31fa2"]}[Data],
+  TableNavigation = Navigation_2{[Id = "Items", ItemKind = "Table"]}?[Data]?
+in
+  TableNavigation;
+```
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    # Lakehouse workspace ID regex - matches the workspaceId GUID
+    - find_value: Navigation_1\s*=\s*Pattern\{\[workspaceId\s*=\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"\]\}
+      replace_value:
+          PPE: "$workspace.id" # PPE workspace ID (dynamic)
+          PROD: "$workspace.id"
+      is_regex: "true" # Activate find_value regex matching
+      file_path: "/Sample Dataflow.Dataflow/mashup.pq"
+
+    # Lakehouse ID regex - matches the lakehouseId GUID
+    - find_value: Navigation_2\s*=\s*Navigation_1\{\[lakehouseId\s*=\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"\]\}
+      replace_value:
+          PPE: "$items.Lakehouse.Sample_LH.id" # Sample_LH Lakehouse ID in PPE (dynamic)
+          PROD: "$items.Lakehouse.Sample_LH.id"
+      is_regex: "true" # Activate find_value regex matching
+      file_path: "/Sample Dataflow.Dataflow/mashup.pq"
+```
