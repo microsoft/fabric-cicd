@@ -633,6 +633,65 @@ def test_special_character_handling(tmp_path, patched_fabric_workspace, valid_wo
     assert "contains invalid characters" in str(excinfo.value)
 
 
+def test_parent_folder_with_only_subfolder_containing_items(tmp_path, patched_fabric_workspace, valid_workspace_id):
+    """Test scenario where parent folder contains only a subfolder with items (no direct items in parent)."""
+    # Create parent folder with NO direct items
+    parent_folder = tmp_path / "ParentWithNoDirectItems"
+    parent_folder.mkdir(parents=True, exist_ok=True)
+    
+    # Create subfolder with items (parent has no direct items)
+    create_platform_file(
+        parent_folder / "SubfolderWithItems" / "SubfolderNotebook.Notebook",
+        item_type="Notebook",
+        item_name="Subfolder Notebook"
+    )
+    
+    # Also create a more complex scenario with nested empty parents
+    deeply_nested_parent = tmp_path / "Level1EmptyParent" / "Level2EmptyParent"
+    deeply_nested_parent.mkdir(parents=True, exist_ok=True)
+    
+    create_platform_file(
+        deeply_nested_parent / "FinalSubfolder" / "DeepNestedNotebook.Notebook",
+        item_type="Notebook", 
+        item_name="Deep Nested Notebook"
+    )
+    
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(tmp_path),
+        item_type_in_scope=["Notebook"],
+    )
+    
+    workspace._refresh_repository_folders()
+    workspace._refresh_repository_items()
+    
+    # Verify parent folders are detected even though they have no direct items
+    assert "/ParentWithNoDirectItems" in workspace.repository_folders
+    assert "/ParentWithNoDirectItems/SubfolderWithItems" in workspace.repository_folders
+    
+    # Verify deeply nested scenario
+    assert "/Level1EmptyParent" in workspace.repository_folders  
+    assert "/Level1EmptyParent/Level2EmptyParent" in workspace.repository_folders
+    assert "/Level1EmptyParent/Level2EmptyParent/FinalSubfolder" in workspace.repository_folders
+    
+    # Verify folder hierarchy is maintained (parents before children)
+    sorted_folders = sorted(workspace.repository_folders.keys(), key=lambda path: path.count("/"))
+    
+    parent_idx = sorted_folders.index("/ParentWithNoDirectItems")
+    subfolder_idx = sorted_folders.index("/ParentWithNoDirectItems/SubfolderWithItems")
+    assert parent_idx < subfolder_idx, "Parent folder should come before subfolder"
+    
+    # Verify items are correctly associated with their folders
+    assert "Subfolder Notebook" in workspace.repository_items["Notebook"]
+    assert "Deep Nested Notebook" in workspace.repository_items["Notebook"]
+    
+    # Verify that parent folders have empty folder IDs (since they have no direct deployment)
+    # but their subfolders would get proper folder IDs when deployed
+    assert workspace.repository_folders["/ParentWithNoDirectItems"] == ""
+    assert workspace.repository_folders["/Level1EmptyParent"] == ""
+    assert workspace.repository_folders["/Level1EmptyParent/Level2EmptyParent"] == ""
+
+
 def test_large_number_of_folders_and_items(tmp_path, patched_fabric_workspace, valid_workspace_id):
     """Test performance and scalability with a large number of folders and items."""
     import time
