@@ -326,7 +326,6 @@ dependencies = [
 dev = [
     { name = "coverage" },
     { name = "gitpython" },
-    { name = "jsonpath-ng" },
     { name = "mike" },
     { name = "mkdocs-include-markdown-plugin" },
     { name = "mkdocs-material" },
@@ -352,7 +351,6 @@ requires-dist = [
 dev = [
     { name = "coverage", specifier = ">=7.6.10" },
     { name = "gitpython", specifier = ">=3.1.44" },
-    { name = "jsonpath-ng", specifier = ">=1.7.0" },
     { name = "mike", specifier = ">=2.1.3" },
     { name = "mkdocs-include-markdown-plugin", specifier = ">=7.1.2" },
     { name = "mkdocs-material", specifier = ">=9.6.5" },

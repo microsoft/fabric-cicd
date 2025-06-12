@@ -190,7 +190,6 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Lakehouse",
         "Warehouse",
         "VariableLibrary",
-        "CopyJob",
     ]:
         if item_type in fabric_workspace_obj.item_type_in_scope:
             unpublish_flag = unpublish_flag_mapping.get(item_type)
