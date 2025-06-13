@@ -8,7 +8,7 @@ body:
           value: |
               Thanks for suggesting a feature! 
               
-              **Quick Start**: Only the Feature Description and Use Case are required to get started. Additional details help us understand and prioritize your request.
+              **Quick Start**: Only the Feature Description is required to get started. Additional details help us understand and prioritize your request.
 
     - type: textarea
       id: feature-description
@@ -34,7 +34,7 @@ body:
     - type: textarea
       id: use-case-description
       attributes:
-          label: Use Case & Business Value
+          label: Use Case & Business Value (Optional)
           description: |
               Describe the specific use case and business value this feature would provide:
               - What problem does this solve?
