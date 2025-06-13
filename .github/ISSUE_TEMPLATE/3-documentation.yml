@@ -5,28 +5,50 @@ labels: ["documentation"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for providing documentation feedback!
+          value: |
+              Thanks for providing documentation feedback! 
+              
+              **Quick Start**: Only the Documentation URL and your feedback are required to get started.
 
     - type: input
       id: documentation-location
       attributes:
-          label: URL to documentation
-          description: Provide a URL to the documentation location.
+          label: Documentation URL
+          description: Provide the specific URL to the documentation page you're referencing.
+          placeholder: "https://microsoft.github.io/fabric-cicd/latest/..."
       validations:
           required: true
 
     - type: textarea
       id: feedback
       attributes:
-          label: Feedback
-          description: What is the feedback?
+          label: Your Feedback
+          description: |
+              What needs to be improved? Be as specific as possible:
+              - What's missing, incorrect, or unclear?
+              - What did you expect to find?
+              - What caused confusion?
+          placeholder: |
+              The documentation is unclear about...
+              I expected to find information about...
+              The example doesn't show how to...
+              There's a typo in section...
       validations:
           required: true
 
     - type: textarea
-      id: additional-context
+      id: additional-details
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Additional Details (Optional)
+          description: |
+              Help us understand your feedback better:
+          placeholder: |
+              Documentation type: API Reference/Tutorial/How-To/etc.
+              Target audience: Beginner/Intermediate/Advanced
+              Issue type: Missing info/Incorrect info/Unclear/Typo/etc.
+              Priority: High/Medium/Low
+              Your context: I was trying to...
+              Suggested improvement: I suggest adding...
+              Examples needed: I need an example showing...
       validations:
           required: false
