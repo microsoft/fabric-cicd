@@ -5,20 +5,206 @@ labels: ["question"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for asking a question!
+          value: |
+              Thanks for asking a question! We're here to help you succeed with fabric-cicd.
+              
+              **Note for GitHub Copilot users**: The more context you provide, the more specific and helpful our guidance can be.
+
+    - type: dropdown
+      id: experience-level
+      attributes:
+          label: Experience Level
+          description: How familiar are you with fabric-cicd and Microsoft Fabric?
+          options:
+              - New to both fabric-cicd and Microsoft Fabric
+              - New to fabric-cicd, familiar with Microsoft Fabric
+              - Familiar with fabric-cicd, new to Microsoft Fabric
+              - Experienced with both
+      validations:
+          required: true
+
+    - type: dropdown
+      id: question-category
+      attributes:
+          label: Question Category
+          description: What area is your question about?
+          options:
+              - Getting Started/Installation
+              - Authentication/Authorization
+              - Deployment/Publishing
+              - Parameterization
+              - Item Types (Notebooks, Lakehouses, etc.)
+              - Error Troubleshooting
+              - Configuration
+              - Best Practices
+              - Performance/Optimization
+              - CI/CD Integration
+              - Microsoft Fabric APIs
+              - Other
+      validations:
+          required: true
+
+    - type: checkboxes
+      id: related-item-types
+      attributes:
+          label: Related Item Types (if applicable)
+          description: If your question relates to specific Microsoft Fabric item types, select all that apply.
+          options:
+              - label: Notebook
+              - label: Lakehouse
+              - label: Data Pipeline
+              - label: Dataflow
+              - label: Environment
+              - label: Semantic Model
+              - label: Report
+              - label: Warehouse
+              - label: KQL Database
+              - label: KQL Queryset
+              - label: Eventhouse
+              - label: Eventstream
+              - label: Activator/Reflex
+              - label: Variable Library
+              - label: Mirrored Database
+              - label: Real-Time Dashboard
+              - label: Copy Job
+              - label: Not applicable
 
     - type: textarea
       id: trying-to-achieve
       attributes:
-          label: What is the question?
-          description: Clearly state the question.
+          label: What are you trying to achieve?
+          description: |
+              Clearly describe what you're trying to accomplish:
+              - Your goal or objective
+              - The business context or use case
+              - Any specific requirements or constraints
+          placeholder: |
+              I'm trying to...
+              The goal is to...
+              I need to accomplish this because...
       validations:
           required: true
 
     - type: textarea
+      id: the-question
+      attributes:
+          label: The Question
+          description: |
+              State your specific question(s) clearly.
+              If you have multiple related questions, number them.
+          placeholder: |
+              1. How do I...?
+              2. What's the best way to...?
+              3. Is it possible to...?
+      validations:
+          required: true
+
+    - type: textarea
+      id: what-tried
+      attributes:
+          label: What have you tried?
+          description: |
+              Describe what you've already attempted:
+              - Code you've written
+              - Documentation you've read
+              - Approaches you've tested
+              - Error messages you've encountered
+          placeholder: |
+              I tried following the documentation at...
+              I wrote this code:
+              ```python
+              # Your code here
+              ```
+              But I got this error: ...
+      validations:
+          required: false
+
+    - type: textarea
+      id: environment-details
+      attributes:
+          label: Environment Details
+          description: |
+              Provide relevant environment information:
+              - Library version
+              - Python version
+              - Operating system
+              - Authentication method
+              - Microsoft Fabric environment details
+          placeholder: |
+              - fabric-cicd version: 
+              - Python version: 
+              - OS: 
+              - Authentication: 
+              - Fabric environment: 
+      validations:
+          required: false
+
+    - type: textarea
+      id: code-sample
+      attributes:
+          label: Code Sample
+          description: |
+              Share relevant code that demonstrates your question or current approach.
+              **Please remove any sensitive information like workspace IDs, secrets, etc.**
+          placeholder: |
+              ```python
+              from fabric_cicd import FabricWorkspace
+              
+              # Your code here
+              ```
+      validations:
+          required: false
+
+    - type: textarea
+      id: expected-behavior
+      attributes:
+          label: Expected Behavior/Outcome
+          description: |
+              What do you expect to happen? What would success look like?
+          placeholder: |
+              I expect that...
+              Success would look like...
+              The ideal outcome is...
+      validations:
+          required: false
+
+    - type: dropdown
+      id: urgency
+      attributes:
+          label: Urgency
+          description: How urgent is this question for your work?
+          options:
+              - Low - Learning/exploring
+              - Medium - Working on implementation
+              - High - Blocking current work
+              - Critical - Production issue
+      validations:
+          required: false
+
+    - type: textarea
+      id: research-done
+      attributes:
+          label: Research Done
+          description: |
+              What documentation, examples, or resources have you already consulted?
+              Include links where relevant.
+          placeholder: |
+              I've read:
+              - Documentation page: ...
+              - Example: ...
+              - GitHub issues: ...
+      validations:
+          required: false
+
+    - type: textarea
       id: additional-context
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Additional Context
+          description: |
+              Add any other information that might be helpful:
+              - Team/organizational context
+              - Deadlines or constraints
+              - Related questions or issues
+              - Screenshots or error logs (sanitized)
       validations:
           required: false

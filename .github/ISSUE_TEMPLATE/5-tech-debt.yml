@@ -5,28 +5,240 @@ labels: ["tech debt"]
 body:
     - type: markdown
       attributes:
-          value: Used internally to raise improvements in code quality, maintainability, and technical debt.
+          value: |
+              Used internally to raise improvements in code quality, maintainability, and technical debt.
+              
+              **Note for GitHub Copilot users**: Detailed technical debt reports help prioritize improvements and guide refactoring efforts.
+
+    - type: dropdown
+      id: debt-category
+      attributes:
+          label: Technical Debt Category
+          description: What type of technical debt is this?
+          options:
+              - Code Quality - Poorly structured/hard to maintain code
+              - Performance - Inefficient algorithms or resource usage
+              - Security - Security vulnerabilities or concerns
+              - Testing - Missing or inadequate test coverage
+              - Documentation - Missing or outdated code documentation
+              - Dependencies - Outdated or problematic dependencies
+              - Architecture - Structural design issues
+              - Error Handling - Poor error handling or logging
+              - Configuration - Hard-coded values or poor config management
+              - API Design - Inconsistent or problematic API design
+              - Other
+      validations:
+          required: true
+
+    - type: dropdown
+      id: impact-level
+      attributes:
+          label: Impact Level
+          description: How does this technical debt affect the project?
+          options:
+              - Critical - Causes production issues or blocks development
+              - High - Significantly impacts maintainability or performance
+              - Medium - Moderate impact on code quality or development speed
+              - Low - Minor improvement opportunity
+      validations:
+          required: true
+
+    - type: dropdown
+      id: complexity-estimate
+      attributes:
+          label: Complexity Estimate
+          description: How complex would it be to address this technical debt?
+          options:
+              - Simple - Few hours of work
+              - Medium - Few days of work
+              - Complex - Weeks of work or multiple people
+              - Major - Requires significant architectural changes
+      validations:
+          required: true
+
+    - type: checkboxes
+      id: affected-components
+      attributes:
+          label: Affected Components
+          description: Which parts of the codebase are affected by this technical debt?
+          options:
+              - label: Core deployment engine
+              - label: Authentication/Authorization
+              - label: Parameterization system
+              - label: Item type handlers
+              - label: API client/communication
+              - label: Configuration management
+              - label: Error handling and logging
+              - label: Testing infrastructure
+              - label: Documentation generation
+              - label: Performance monitoring
+              - label: Build/CI system
+              - label: Public API surface
+              - label: Internal utilities
+              - label: Data validation
+              - label: Other
 
     - type: textarea
       id: problem-description
       attributes:
-          label: What is the problem?
-          description: Describe what the gap is and how to reproduce it.
+          label: Problem Description
+          description: |
+              Describe the technical debt in detail:
+              - Current state and why it's problematic
+              - How it affects development, maintenance, or users
+              - Specific examples of the issues it causes
+          placeholder: |
+              The current implementation of [component] has the following issues:
+              1. [Specific problem 1]
+              2. [Specific problem 2]
+              
+              This affects us by...
+              Examples of problems this causes:...
       validations:
           required: true
 
     - type: textarea
+      id: root-cause-analysis
+      attributes:
+          label: Root Cause Analysis
+          description: |
+              What led to this technical debt? Understanding the root cause helps prevent similar issues.
+          placeholder: |
+              This technical debt was introduced because:
+              - Historical context: ...
+              - Time constraints: ...
+              - Lack of information: ...
+              - Technology evolution: ...
+      validations:
+          required: false
+
+    - type: textarea
+      id: current-workarounds
+      attributes:
+          label: Current Workarounds
+          description: |
+              How are we currently working around this issue?
+              What are the limitations of current workarounds?
+          placeholder: |
+              Current workaround: ...
+              Limitations: ...
+              Manual steps required: ...
+      validations:
+          required: false
+
+    - type: textarea
       id: solution-description
       attributes:
-          label: Is there an ideal solution?
-          description: Describe the ideal solution if there is one.
+          label: Proposed Solution
+          description: |
+              Describe the ideal solution to address this technical debt:
+              - High-level approach
+              - Key changes needed
+              - Benefits of the solution
+          placeholder: |
+              Proposed approach: ...
+              Key changes:
+              1. ...
+              2. ...
+              
+              Benefits:
+              - Improved maintainability
+              - Better performance
+              - Enhanced user experience
+      validations:
+          required: true
+
+    - type: textarea
+      id: implementation-plan
+      attributes:
+          label: Implementation Plan
+          description: |
+              Break down how this could be implemented:
+              - Phase 1: ...
+              - Phase 2: ...
+              - Dependencies or prerequisites
+              - Risks and mitigation strategies
+          placeholder: |
+              Phase 1: ...
+              Phase 2: ...
+              
+              Prerequisites: ...
+              Risks: ...
+              Mitigation: ...
+      validations:
+          required: false
+
+    - type: textarea
+      id: breaking-changes
+      attributes:
+          label: Breaking Changes Assessment
+          description: |
+              Would fixing this technical debt require breaking changes?
+              How could we minimize impact on users?
+          placeholder: |
+              Breaking changes: Yes/No
+              If yes, what changes: ...
+              Migration path: ...
+              Backward compatibility options: ...
+      validations:
+          required: false
+
+    - type: textarea
+      id: testing-strategy
+      attributes:
+          label: Testing Strategy
+          description: |
+              How would we test the solution to ensure it works correctly?
+              What regression testing is needed?
+          placeholder: |
+              Testing approach: ...
+              New tests needed: ...
+              Regression testing: ...
+              Performance testing: ...
+      validations:
+          required: false
+
+    - type: textarea
+      id: success-metrics
+      attributes:
+          label: Success Metrics
+          description: |
+              How would we measure the success of addressing this technical debt?
+          placeholder: |
+              Success would be measured by:
+              - Performance improvement: ...
+              - Code quality metrics: ...
+              - Developer experience: ...
+              - User impact: ...
+      validations:
+          required: false
+
+    - type: textarea
+      id: references
+      attributes:
+          label: References
+          description: |
+              Include any relevant references:
+              - Related GitHub issues
+              - Documentation
+              - External resources
+              - Code examples
+          placeholder: |
+              Related issues: ...
+              Documentation: ...
+              Examples: ...
       validations:
           required: false
 
     - type: textarea
       id: additional-context
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Additional Context
+          description: |
+              Add any other relevant information:
+              - Business justification
+              - Timeline considerations
+              - Resource requirements
+              - Stakeholder input
       validations:
           required: false

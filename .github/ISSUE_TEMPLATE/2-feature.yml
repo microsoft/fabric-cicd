@@ -5,20 +5,205 @@ labels: ["enhancement"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for suggesting a feature!
+          value: |
+              Thanks for suggesting a feature! Your input helps us improve fabric-cicd.
+              
+              **Note for GitHub Copilot users**: Detailed feature requests help us understand your needs and provide better assistance with implementation approaches.
+
+    - type: dropdown
+      id: priority-level
+      attributes:
+          label: Priority Level
+          description: How important is this feature to your workflow?
+          options:
+              - High - Blocking our usage
+              - Medium - Would significantly improve our workflow
+              - Low - Nice to have improvement
+              - Enhancement - Minor improvement
+      validations:
+          required: true
+
+    - type: checkboxes
+      id: affected-components
+      attributes:
+          label: Affected Components
+          description: Which areas of fabric-cicd would this feature impact? Select all that apply.
+          options:
+              - label: Core deployment functionality
+              - label: Parameterization system
+              - label: Authentication/Authorization
+              - label: Item type support (Notebooks, Lakehouses, etc.)
+              - label: Error handling and logging
+              - label: Configuration management
+              - label: API interactions with Microsoft Fabric
+              - label: Documentation
+              - label: Testing/Validation
+              - label: Performance/Optimization
+              - label: Developer experience
+              - label: CI/CD integration
+              - label: Other
+
+    - type: checkboxes
+      id: item-types-affected
+      attributes:
+          label: Item Types Affected (if applicable)
+          description: If this feature relates to specific Microsoft Fabric item types, select all that apply.
+          options:
+              - label: Notebook
+              - label: Lakehouse
+              - label: Data Pipeline
+              - label: Dataflow
+              - label: Environment
+              - label: Semantic Model
+              - label: Report
+              - label: Warehouse
+              - label: KQL Database
+              - label: KQL Queryset
+              - label: Eventhouse
+              - label: Eventstream
+              - label: Activator/Reflex
+              - label: Variable Library
+              - label: Mirrored Database
+              - label: Real-Time Dashboard
+              - label: Copy Job
+              - label: All item types
+              - label: Not applicable
 
     - type: textarea
-      id: problem-description
+      id: use-case-description
       attributes:
-          label: What is the feature?
-          description: Describe what the gap is and the ideal solution.
+          label: Use Case & Business Value
+          description: |
+              Describe the specific use case and business value this feature would provide:
+              - What problem does this solve?
+              - How would this improve your workflow?
+              - What's the business impact?
+          placeholder: |
+              We need this feature because...
+              This would help us by...
+              The business value is...
       validations:
           required: true
 
     - type: textarea
+      id: problem-description
+      attributes:
+          label: Current Gap/Problem
+          description: |
+              Describe the current limitation or gap that this feature would address.
+              Include specific examples of what you cannot do today.
+          placeholder: |
+              Currently, fabric-cicd doesn't support...
+              This means we have to manually...
+              For example, when we try to...
+      validations:
+          required: true
+
+    - type: textarea
+      id: proposed-solution
+      attributes:
+          label: Proposed Solution
+          description: |
+              Describe your ideal solution in detail. Include:
+              - How you envision this working
+              - API changes or new methods needed
+              - Configuration options
+              - Example usage
+          placeholder: |
+              I propose adding a new method/feature that...
+              
+              Example usage:
+              ```python
+              # Your proposed API usage here
+              ```
+              
+              Configuration:
+              ```yaml
+              # Any new configuration options
+              ```
+      validations:
+          required: true
+
+    - type: textarea
+      id: alternative-solutions
+      attributes:
+          label: Alternative Solutions Considered
+          description: |
+              What other approaches have you considered? Why wouldn't they work as well?
+              Include any workarounds you're currently using.
+          placeholder: |
+              Alternative 1: We considered...but this wouldn't work because...
+              Alternative 2: We tried...but it has limitations...
+              Current workaround: We're doing...but it's problematic because...
+      validations:
+          required: false
+
+    - type: dropdown
+      id: breaking-changes
+      attributes:
+          label: Breaking Changes
+          description: Would this feature require breaking changes to the existing API?
+          options:
+              - "No breaking changes required"
+              - "Minor breaking changes acceptable"
+              - "Major breaking changes required"
+              - "Not sure"
+      validations:
+          required: true
+
+    - type: dropdown
+      id: implementation-complexity
+      attributes:
+          label: Implementation Complexity (if known)
+          description: How complex do you think this feature would be to implement?
+          options:
+              - Simple - Small addition to existing functionality
+              - Medium - New functionality but fits existing patterns
+              - Complex - Requires significant architectural changes
+              - Not sure
+      validations:
+          required: false
+
+    - type: textarea
+      id: implementation-suggestions
+      attributes:
+          label: Implementation Suggestions
+          description: |
+              If you have ideas about how this could be implemented, share them here.
+              Include references to relevant Microsoft Fabric APIs, similar features in other tools, etc.
+          placeholder: |
+              This could be implemented by...
+              Similar to how [other tool] does...
+              Would need to use Microsoft Fabric API: ...
+              Could extend the existing [component] to...
+      validations:
+          required: false
+
+    - type: textarea
+      id: success-criteria
+      attributes:
+          label: Success Criteria
+          description: |
+              How would we know this feature is working correctly?
+              What would success look like from your perspective?
+          placeholder: |
+              This feature would be successful if:
+              - I can...
+              - The system supports...
+              - Performance is...
+      validations:
+          required: false
+
+    - type: textarea
       id: additional-context
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Additional Context
+          description: |
+              Add any other relevant information:
+              - Links to Microsoft Fabric documentation
+              - Related GitHub issues or discussions
+              - Screenshots or mockups
+              - Timeline requirements
+              - Team/organization context
       validations:
           required: false
