@@ -10,6 +10,15 @@ body:
               
               **Quick Start**: Only the Problem Description and Steps to Reproduce are required to get started. More detail helps Copilot and maintainers help you faster, but only fill out what you're comfortable with.
 
+    - type: input
+      id: library-version
+      attributes:
+          label: Library Version
+          description: What version of fabric-cicd are you using? (e.g., 1.0.0 or latest)
+          placeholder: "1.0.0"
+      validations:
+          required: false
+
     - type: textarea
       id: problem-description
       attributes:

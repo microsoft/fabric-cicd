@@ -45,7 +45,7 @@ body:
               This would help us by...
               The business value is...
       validations:
-          required: true
+          required: false
 
     - type: textarea
       id: advanced-details
