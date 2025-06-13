@@ -6,9 +6,9 @@ body:
     - type: markdown
       attributes:
           value: |
-              Thanks for providing documentation feedback! Good documentation is crucial for user success.
+              Thanks for providing documentation feedback! 
               
-              **Note for GitHub Copilot users**: Specific feedback helps us improve documentation quality and user experience.
+              **Quick Start**: Only the Documentation URL and your feedback are required to get started.
 
     - type: input
       id: documentation-location
@@ -19,169 +19,36 @@ body:
       validations:
           required: true
 
-    - type: dropdown
-      id: documentation-type
-      attributes:
-          label: Documentation Type
-          description: What type of documentation is this feedback about?
-          options:
-              - API Reference
-              - How-To Guide
-              - Tutorial
-              - Getting Started
-              - Examples
-              - Troubleshooting
-              - Configuration Reference
-              - FAQ
-              - Release Notes/Changelog
-              - Other
-      validations:
-          required: true
-
-    - type: dropdown
-      id: target-audience
-      attributes:
-          label: Target Audience
-          description: Who is the primary audience for this documentation?
-          options:
-              - Beginner users
-              - Intermediate users
-              - Advanced users/developers
-              - DevOps/Infrastructure teams
-              - Data engineers
-              - All users
-      validations:
-          required: true
-
-    - type: dropdown
-      id: feedback-type
-      attributes:
-          label: Type of Feedback
-          description: What kind of documentation issue is this?
-          options:
-              - Missing information
-              - Incorrect/outdated information
-              - Unclear/confusing explanation
-              - Missing examples
-              - Broken links or formatting
-              - Typo or grammar issue
-              - Needs reorganization
-              - Accessibility issue
-              - Other
-      validations:
-          required: true
-
-    - type: dropdown
-      id: priority-level
-      attributes:
-          label: Priority/Impact
-          description: How does this documentation issue impact users?
-          options:
-              - High - Blocks user success
-              - Medium - Causes confusion or delays
-              - Low - Minor improvement
-              - Cosmetic - Typo or formatting issue
-      validations:
-          required: true
-
-    - type: textarea
-      id: current-content
-      attributes:
-          label: Current Content (if applicable)
-          description: |
-              If you're reporting incorrect information, please quote the current content that needs to be changed.
-          placeholder: |
-              Current text says: "..."
-              
-              Or describe what's currently there: "The section about X explains..."
-      validations:
-          required: false
-
     - type: textarea
       id: feedback
       attributes:
-          label: Detailed Feedback
+          label: Your Feedback
           description: |
-              Provide specific feedback about what needs to be improved:
-              - What's missing or incorrect?
-              - What caused confusion?
+              What needs to be improved? Be as specific as possible:
+              - What's missing, incorrect, or unclear?
               - What did you expect to find?
+              - What caused confusion?
           placeholder: |
               The documentation is unclear about...
               I expected to find information about...
               The example doesn't show how to...
+              There's a typo in section...
       validations:
           required: true
 
     - type: textarea
-      id: suggested-improvement
+      id: additional-details
       attributes:
-          label: Suggested Improvement
+          label: Additional Details (Optional)
           description: |
-              How would you improve this documentation? Provide specific suggestions.
-              Include draft text, examples, or structure improvements.
+              Help us understand your feedback better:
           placeholder: |
-              I suggest adding...
-              The explanation could be clearer if...
-              An example showing how to... would be helpful
-              
-              Suggested text:
-              "..."
-      validations:
-          required: false
-
-    - type: textarea
-      id: user-context
-      attributes:
-          label: User Context
-          description: |
-              Help us understand your perspective:
-              - What were you trying to accomplish?
-              - What's your experience level with fabric-cicd?
-              - How did you arrive at this documentation?
-          placeholder: |
-              I was trying to...
-              My experience level: beginner/intermediate/advanced
-              I found this page by...
-      validations:
-          required: false
-
-    - type: textarea
-      id: examples-needed
-      attributes:
-          label: Examples Needed
-          description: |
-              If you need examples, describe what specific examples would help.
-              Include details about your use case.
-          placeholder: |
-              I need an example showing how to...
-              For my use case (describe briefly)...
-              Showing the complete workflow from... to...
-      validations:
-          required: false
-
-    - type: textarea
-      id: related-topics
-      attributes:
-          label: Related Topics
-          description: |
-              Are there other documentation pages or topics that should be linked or updated together?
-          placeholder: |
-              This relates to the documentation on...
-              Should be linked to/from...
-              Similar issue exists on...
-      validations:
-          required: false
-
-    - type: textarea
-      id: additional-context
-      attributes:
-          label: Additional Context
-          description: |
-              Add any other relevant information:
-              - Screenshots highlighting the issue
-              - Links to related GitHub issues
-              - Community discussions or questions
-              - Urgency or timeline considerations
+              Documentation type: API Reference/Tutorial/How-To/etc.
+              Target audience: Beginner/Intermediate/Advanced
+              Issue type: Missing info/Incorrect info/Unclear/Typo/etc.
+              Priority: High/Medium/Low
+              Your context: I was trying to...
+              Suggested improvement: I suggest adding...
+              Examples needed: I need an example showing...
       validations:
           required: false

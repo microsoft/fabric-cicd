@@ -6,99 +6,9 @@ body:
     - type: markdown
       attributes:
           value: |
-              Thanks for reporting a bug! Please provide as much detail as possible to help us understand and reproduce the issue.
+              Thanks for reporting a bug! 
               
-              **Note for GitHub Copilot users**: The more context you provide, the better we can assist you with troubleshooting and solutions.
-
-    - type: input
-      id: library-version
-      attributes:
-          label: Library Version
-          description: What version of fabric-cicd are you using? (e.g., 1.0.0 or latest)
-          placeholder: "1.0.0"
-      validations:
-          required: true
-
-    - type: dropdown
-      id: environment-type
-      attributes:
-          label: Environment Type
-          description: What type of environment are you deploying to?
-          options:
-              - Development
-              - Testing/Staging
-              - Production
-              - Other
-      validations:
-          required: true
-
-    - type: input
-      id: python-version
-      attributes:
-          label: Python Version
-          description: What Python version are you using?
-          placeholder: "3.11.0"
-      validations:
-          required: true
-
-    - type: input
-      id: operating-system
-      attributes:
-          label: Operating System
-          description: What operating system are you running on?
-          placeholder: "Windows 11, macOS 14, Ubuntu 22.04, etc."
-      validations:
-          required: true
-
-    - type: checkboxes
-      id: affected-item-types
-      attributes:
-          label: Affected Item Types
-          description: Which Microsoft Fabric item types are affected by this bug? Select all that apply.
-          options:
-              - label: Notebook
-              - label: Lakehouse
-              - label: Data Pipeline
-              - label: Dataflow
-              - label: Environment
-              - label: Semantic Model
-              - label: Report
-              - label: Warehouse
-              - label: KQL Database
-              - label: KQL Queryset
-              - label: Eventhouse
-              - label: Eventstream
-              - label: Activator/Reflex
-              - label: Variable Library
-              - label: Mirrored Database
-              - label: Real-Time Dashboard
-              - label: Copy Job
-              - label: Other/Unknown
-
-    - type: dropdown
-      id: authentication-method
-      attributes:
-          label: Authentication Method
-          description: How are you authenticating with Microsoft Fabric?
-          options:
-              - Interactive (DefaultAzureCredential)
-              - Service Principal (ClientSecretCredential)
-              - Managed Identity
-              - Other
-      validations:
-          required: true
-
-    - type: dropdown
-      id: using-parameterization
-      attributes:
-          label: Using Parameterization
-          description: Are you using a parameter.yml file for environment-specific configurations?
-          options:
-              - "Yes"
-              - "No"
-              - "Not sure"
-      validations:
-          required: true
+              **Quick Start**: Only the Problem Description and Steps to Reproduce are required to get started. More detail helps Copilot and maintainers help you faster, but only fill out what you're comfortable with.
 
     - type: textarea
       id: problem-description
@@ -139,12 +49,28 @@ body:
           required: true
 
     - type: textarea
+      id: environment-details
+      attributes:
+          label: Environment Details (Optional)
+          description: |
+              Help us understand your environment. You can provide as much or as little detail as you'd like:
+          placeholder: |
+              Library version: 1.2.3
+              Python version: 3.11.0
+              OS: Ubuntu 22.04
+              Authentication: Managed Identity
+              Environment type: Production
+              Using parameterization: Yes
+              Affected item types: Notebooks, Data Pipelines
+      validations:
+          required: false
+
+    - type: textarea
       id: error-output
       attributes:
-          label: Error Output
+          label: Error Output (Optional)
           description: |
-              Please provide the complete error message and stack trace.
-              For long outputs, consider using a GitHub Gist and linking it here.
+              Please provide the complete error message and stack trace if available.
           placeholder: |
               ```
               Traceback (most recent call last):
@@ -156,79 +82,14 @@ body:
           required: false
 
     - type: textarea
-      id: code-sample
-      attributes:
-          label: Code Sample
-          description: |
-              Provide a minimal code sample that reproduces the issue.
-              **Please sanitize any sensitive information before sharing.**
-          placeholder: |
-              ```python
-              # Your code here
-              ```
-      validations:
-          required: false
-
-    - type: textarea
-      id: workspace-config
-      attributes:
-          label: Workspace Configuration
-          description: |
-              Provide relevant details about your Fabric workspace setup (region, capacity type, etc.)
-              **Do not include sensitive information like workspace IDs or connection strings.**
-          placeholder: |
-              - Region: East US
-              - Capacity Type: Premium
-              - Item count: ~50 notebooks
-              - Using custom spark pools: Yes/No
-      validations:
-          required: false
-
-    - type: textarea
-      id: parameter-file-sample
-      attributes:
-          label: Parameter File Sample (if applicable)
-          description: |
-              If you're using parameterization, provide a sanitized sample of your parameter.yml file.
-              **Remove all sensitive values like GUIDs, connection strings, etc.**
-          placeholder: |
-              ```yaml
-              find_replace:
-                - find_value: "original-value"
-                  replace_value:
-                    DEV: "dev-value"
-                    PROD: "prod-value"
-              ```
-      validations:
-          required: false
-
-    - type: textarea
-      id: workaround
-      attributes:
-          label: Workaround
-          description: Have you found any workaround for this issue?
-      validations:
-          required: false
-
-    - type: textarea
-      id: solution-description
-      attributes:
-          label: Ideal Solution
-          description: Describe what you think the ideal solution should be, if you have suggestions.
-      validations:
-          required: false
-
-    - type: textarea
       id: additional-context
       attributes:
-          label: Additional Context
+          label: Additional Context (Optional)
           description: |
-              Add any other relevant details that might help diagnose the issue:
-              - Screenshots
-              - Fabric workspace logs
-              - Related GitHub issues
-              - Timeline/urgency information
-              
-              For large files or logs, please use https://gist.github.com/ and link here.
+              Add any other relevant details such as:
+              - Code samples (please sanitize sensitive information)
+              - Workspace configuration details
+              - Workarounds you've tried
+              - Screenshots or logs (use https://gist.github.com/ for large files)
       validations:
           required: false
