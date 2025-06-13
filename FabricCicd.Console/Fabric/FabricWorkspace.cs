@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Azure.Core;
+using System.Linq;
+using FabricCicd.Common;
 
 namespace FabricCicd;
 
@@ -17,6 +20,7 @@ public class FabricWorkspace
     public IList<string> ItemTypes { get; }
     public FabricEndpoint Endpoint { get; }
     public IDictionary<string, Dictionary<string, string>> DeployedItems { get; } = new Dictionary<string, Dictionary<string, string>>();
+    public IDictionary<string, Dictionary<string, Item>> RepositoryItems { get; } = new Dictionary<string, Dictionary<string, Item>>();
 
     public FabricWorkspace(string workspaceId, string repositoryDirectory, IEnumerable<string> itemTypes, TokenCredential? credential = null)
     {
@@ -28,9 +32,73 @@ public class FabricWorkspace
 
     // TODO: Add full implementation of methods from fabric_workspace.py
     public void RefreshRepositoryItems()
+        => RefreshRepositoryItemsAsync().GetAwaiter().GetResult();
+
+    public async Task RefreshRepositoryItemsAsync()
     {
-        // Placeholder for scanning repo directory
+        RepositoryItems.Clear();
+
+        if (!Directory.Exists(RepositoryDirectory))
+        {
+            return;
+        }
+
+        foreach (var platformFile in Directory.EnumerateFiles(RepositoryDirectory, ".platform", SearchOption.AllDirectories))
+        {
+            var directory = Path.GetDirectoryName(platformFile)!;
+
+            // skip empty directories
+            if (!Directory.EnumerateFileSystemEntries(directory).Any())
+            {
+                Console.WriteLine($"Directory {Path.GetFileName(directory)} is empty.");
+                continue;
+            }
+
+            JsonDocument metadata;
+            try
+            {
+                var json = await File.ReadAllTextAsync(platformFile).ConfigureAwait(false);
+                metadata = JsonDocument.Parse(json);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            if (!metadata.RootElement.TryGetProperty("metadata", out var metaElem) ||
+                !metadata.RootElement.TryGetProperty("config", out var configElem))
+            {
+                continue;
+            }
+
+            if (!metaElem.TryGetProperty("type", out var typeElem) ||
+                !metaElem.TryGetProperty("displayName", out var nameElem))
+            {
+                continue;
+            }
+
+            var itemType = typeElem.GetString() ?? string.Empty;
+            var itemName = nameElem.GetString() ?? string.Empty;
+            var description = metaElem.GetProperty("description").GetString() ?? string.Empty;
+            var logicalId = configElem.GetProperty("logicalId").GetString() ?? string.Empty;
+
+            var id = DeployedItems.ContainsKey(itemType) && DeployedItems[itemType].ContainsKey(itemName)
+                ? DeployedItems[itemType][itemName]
+                : string.Empty;
+
+            if (!RepositoryItems.ContainsKey(itemType))
+            {
+                RepositoryItems[itemType] = new Dictionary<string, Item>();
+            }
+
+            var item = new Item(itemType, itemName, description, id, logicalId, directory);
+            item.CollectItemFiles();
+            RepositoryItems[itemType][itemName] = item;
+        }
     }
+
+    public void RefreshDeployedItems()
+        => RefreshDeployedItemsAsync().GetAwaiter().GetResult();
 
     public async Task RefreshDeployedItemsAsync()
     {
