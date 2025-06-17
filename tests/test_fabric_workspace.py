@@ -171,3 +171,64 @@ def test_environment_param_with_utf8_chars(
         )
 
     assert workspace.environment == utf8_test_chars["nordic"]
+
+
+def test_workspace_id_replacement_in_json(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that workspace IDs are properly replaced in JSON files (like pipeline-content.json)."""
+    # JSON content with workspace ID that should be replaced
+    json_content = '''{
+  "properties": {
+    "activities": [
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    ]
+  }
+}'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["DataPipeline"]
+        )
+    
+    # Test the workspace ID replacement function
+    result = workspace._replace_workspace_ids(json_content)
+    
+    # Verify that the default workspace ID was replaced with the target workspace ID
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert valid_workspace_id in result
+    assert '"workspaceId": "' + valid_workspace_id + '"' in result
+
+
+def test_workspace_id_replacement_in_python(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that workspace IDs are properly replaced in Python files (like notebook-content.py)."""
+    # Python content with workspace ID that should be replaced (as in notebook metadata)
+    python_content = '''# META {
+# META   "dependencies": {
+# META     "environment": {
+# META       "environmentId": "a277ea4a-e87f-8537-4ce0-39db11d4aade",
+# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
+# META     }
+# META   }
+# META }'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
+    
+    # Test the workspace ID replacement function
+    result = workspace._replace_workspace_ids(python_content)
+    
+    # Verify that the default workspace ID was replaced with the target workspace ID
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert valid_workspace_id in result
+    assert 'workspaceId": "' + valid_workspace_id + '"' in result
