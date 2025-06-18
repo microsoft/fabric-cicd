@@ -40,6 +40,8 @@ MAX_RETRY_OVERRIDE = {
     "Eventstream": 10,
     "KQLDatabase": 10,
     "SQLDatabase": 10,
+    "Warehouse": 10,
+    "Dataflow": 10,
     "VariableLibrary": 7,
 }
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
