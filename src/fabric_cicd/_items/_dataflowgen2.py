@@ -7,6 +7,7 @@ import logging
 import re
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._items._manage_dependencies import lookup_referenced_item, set_publish_order
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ def find_referenced_dataflows(fabric_workspace_obj: FabricWorkspace, file_conten
     reference_list = []
     workspace_pattern = re.compile(constants.WORKSPACE_ID_REFERENCE_REGEX)
     dataflow_pattern = re.compile(constants.DATAFLOW_ID_REFERENCE_REGEX)
+    guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
     # Extract all matches with position, id_type, and guid for sorting in order of appearance in the file
     workspace_matches = [(m.start(), m.group(1), m.group(2)) for m in workspace_pattern.finditer(file_content)]
@@ -57,11 +59,18 @@ def find_referenced_dataflows(fabric_workspace_obj: FabricWorkspace, file_conten
     current_workspace = None
     processed_dataflows = set()
 
-    for _, id_type, guid in all_matches:
+    for pos, id_type, guid in all_matches:
+        # Validate that the GUID matches the expected format
+        if not guid_pattern.match(guid):
+            msg = f"Invalid GUID format found at position {pos}: '{guid}' for {id_type}"
+            raise ParsingError(msg, logger)
+
         # Keep track of the current workspace and its associated dataflow using the processed_dataflows set
         if id_type == "workspaceId":
+            logger.debug(f"Found valid workspace ID: {guid}")
             current_workspace = guid
         elif id_type == "dataflowId" and current_workspace and (current_workspace, guid) not in processed_dataflows:
+            logger.debug(f"Found valid dataflow ID: {guid} in workspace: {current_workspace}")
             processed_dataflows.add((current_workspace, guid))
             # Get dataflow name
             dataflow_name = lookup_referenced_item(
