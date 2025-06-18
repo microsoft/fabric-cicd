@@ -6,6 +6,13 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.21
+
+<span class="md-h2-subheader">Release Date: 2025-06-18</span>
+
+-   🔧 Fix bug with workspace ID replacement in JSON files for pipeline deployments ([#345](https://github.com/microsoft/fabric-cicd/issues/345))
+-   ⚡ Increased max retry for Warehouses and Dataflows
+
 ## Version 0.1.20
 
 <span class="md-h2-subheader">Release Date: 2025-06-12</span>
