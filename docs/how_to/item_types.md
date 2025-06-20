@@ -11,6 +11,7 @@
 
 -   **Parameterization:**
     -   The source will always point to the original source unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    -   It is recommended to use the supported variables in `find_replace` for dynamic replacement of the source workspace and item IDs.
 
 ## Copy Jobs
 
