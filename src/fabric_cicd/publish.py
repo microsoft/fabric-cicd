@@ -117,6 +117,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing DataPipelines")
         items.publish_datapipelines(fabric_workspace_obj)
+    if "GraphQLApi" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing GraphQLApi")
+        items.publish_graphqlapis(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
@@ -172,6 +175,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "GraphQLApi",
         "DataPipeline",
         "Dataflow",
         "Eventstream",

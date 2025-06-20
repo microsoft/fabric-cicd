@@ -8,6 +8,7 @@ from fabric_cicd._items._datapipeline import find_referenced_datapipelines, publ
 from fabric_cicd._items._environment import check_environment_publish_state, publish_environments
 from fabric_cicd._items._eventhouse import publish_eventhouses
 from fabric_cicd._items._eventstream import publish_eventstreams
+from fabric_cicd._items._graphqlapi import publish_graphqlapis
 from fabric_cicd._items._kqldashboard import publish_kqldashboard
 from fabric_cicd._items._kqldatabase import publish_kqldatabases
 from fabric_cicd._items._kqlqueryset import publish_kqlquerysets
@@ -32,6 +33,7 @@ __all__ = [
     "publish_environments",
     "publish_eventhouses",
     "publish_eventstreams",
+    "publish_graphqlapis",
     "publish_kqldashboard",
     "publish_kqldatabases",
     "publish_kqlquerysets",
