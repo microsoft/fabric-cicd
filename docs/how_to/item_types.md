@@ -7,6 +7,11 @@
 -   **Initial deployment** may not reflect streaming data immediately.
 -   **Reflex** is the item name in source control. Source control may not support all activators/reflexes, as not all sources are compatible.
 
+## API for GraphQL
+
+-   **Parameterization:**
+    -   The source will always point to the original source unless parameterized in the `find_replace` section of the `parameter.yml` file.
+
 ## Copy Jobs
 
 -   **Parameterization:**
