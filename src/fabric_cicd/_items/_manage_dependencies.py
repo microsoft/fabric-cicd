@@ -180,10 +180,12 @@ def lookup_referenced_item(
         api_item_type: The API GET item type (e.g., 'dataflows').
         get_name: If True, return the item name instead of the guid.
     """
+    fabric_api_url = "https://api.fabric.microsoft.com"
+
     # Get the item name using the workspace ID and item ID
     response = fabric_workspace_obj.endpoint.invoke(
         method="GET",
-        url=f"https://msitapi.fabric.microsoft.com/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
+        url=f"{fabric_api_url}/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
     )
     item_name = response.get("body", {}).get("displayName", "")
     logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
