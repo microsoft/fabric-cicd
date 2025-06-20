@@ -106,6 +106,7 @@ def sort_items(
 
     # Step 2: Build the graph and count the in-degrees
     for item_name, item_content in unsorted_dict.items():
+        logger.debug(f"Processing item: '{item_name}'")
         # In an unpublish case, keep track of items to get unpublished
         if lookup_type == "Deployed":
             unpublish_items.append(item_name)
