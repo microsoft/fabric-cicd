@@ -5,14 +5,14 @@
 
 import logging
 import re
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from fabric_cicd import constants
+from fabric_cicd._common._item import Item
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import publish_all_items, unpublish_all_orphan_items
-from fabric_cicd._common._item import Item
 
 
 @pytest.fixture
@@ -99,9 +99,7 @@ class TestPublishAllItems:
 
     def test_publish_all_items_with_folder_feature_flag(
         self, 
-        mock_fabric_workspace, 
-        mock_validate_fabric_workspace_obj,
-        mock_items_module
+        mock_fabric_workspace
     ):
         """Test publish_all_items when folder publish is disabled."""
         # Setup - add feature flag to disable folder publish
@@ -118,7 +116,9 @@ class TestPublishAllItems:
             mock_fabric_workspace._publish_folders.assert_not_called()
             
             # Verify item operations were still called
-            mock_fabric_workspace._refresh_deployed_items.assert_called_once()
+            # Note: _refresh_deployed_items is called twice because DataPipeline is in scope 
+            # which calls it again for dependency management
+            assert mock_fabric_workspace._refresh_deployed_items.call_count == 2
             mock_fabric_workspace._refresh_repository_items.assert_called_once()
         finally:
             # Cleanup
@@ -127,8 +127,6 @@ class TestPublishAllItems:
     def test_publish_all_items_with_exclude_regex(
         self, 
         mock_fabric_workspace, 
-        mock_validate_fabric_workspace_obj,
-        mock_items_module,
         caplog
     ):
         """Test publish_all_items with item name exclude regex."""
@@ -145,7 +143,7 @@ class TestPublishAllItems:
         # Verify regex was set on workspace
         assert mock_fabric_workspace.publish_item_name_exclude_regex == exclude_regex
 
-    @pytest.mark.parametrize("item_types,expected_calls", [
+    @pytest.mark.parametrize(("item_types", "expected_calls"), [
         (["VariableLibrary"], [("Publishing Variable Libraries", "publish_variablelibraries")]),
         (["Warehouse"], [("Publishing Warehouses", "publish_warehouses")]),
         (["Lakehouse"], [("Publishing Lakehouses", "publish_lakehouses")]),
@@ -173,7 +171,6 @@ class TestPublishAllItems:
         item_types,
         expected_calls,
         mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
         mock_items_module,
         mock_print_header
     ):
@@ -192,7 +189,6 @@ class TestPublishAllItems:
     def test_publish_all_items_environment_special_handling(
         self,
         mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
         mock_items_module,
         mock_print_header
     ):
@@ -214,8 +210,7 @@ class TestPublishAllItems:
         self,
         mock_fabric_workspace,
         mock_validate_fabric_workspace_obj,
-        mock_items_module,
-        mock_print_header
+        mock_items_module
     ):
         """Test publish_all_items when no item types match."""
         # Setup
@@ -303,7 +298,6 @@ class TestUnpublishAllOrphanItems:
     def test_unpublish_all_orphan_items_default_regex(
         self,
         mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
         mock_check_regex
     ):
         """Test unpublish_all_orphan_items with default regex."""
@@ -319,9 +313,7 @@ class TestUnpublishAllOrphanItems:
 
     def test_unpublish_all_orphan_items_with_feature_flags(
         self,
-        mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
-        mock_check_regex
+        mock_fabric_workspace
     ):
         """Test unpublish_all_orphan_items with feature flags for restricted items."""
         # Setup
@@ -377,7 +369,6 @@ class TestUnpublishAllOrphanItems:
     def test_unpublish_all_orphan_items_regex_exclusion(
         self,
         mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
         mock_check_regex
     ):
         """Test unpublish_all_orphan_items with regex exclusion."""
@@ -407,7 +398,7 @@ class TestUnpublishAllOrphanItems:
             item_name="orphan_delete", item_type="Notebook"
         )
 
-    @pytest.mark.parametrize("item_type,has_dependencies", [
+    @pytest.mark.parametrize(("item_type", "has_dependencies"), [
         ("DataPipeline", True),
         ("Dataflow", True),
         ("Notebook", False),
@@ -418,8 +409,6 @@ class TestUnpublishAllOrphanItems:
         item_type,
         has_dependencies,
         mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
-        mock_check_regex,
         mock_items_module
     ):
         """Test unpublish_all_orphan_items handles dependencies correctly."""
@@ -455,9 +444,7 @@ class TestUnpublishAllOrphanItems:
 
     def test_unpublish_all_orphan_items_folder_cleanup(
         self,
-        mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
-        mock_check_regex
+        mock_fabric_workspace
     ):
         """Test unpublish_all_orphan_items cleans up folders."""
         # Setup
@@ -483,9 +470,7 @@ class TestUnpublishAllOrphanItems:
 
     def test_unpublish_all_orphan_items_folder_cleanup_disabled(
         self,
-        mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
-        mock_check_regex
+        mock_fabric_workspace
     ):
         """Test unpublish_all_orphan_items when folder cleanup is disabled."""
         # Setup
@@ -508,9 +493,7 @@ class TestUnpublishAllOrphanItems:
 
     def test_unpublish_order_is_correct(
         self,
-        mock_fabric_workspace,
-        mock_validate_fabric_workspace_obj,
-        mock_check_regex
+        mock_fabric_workspace
     ):
         """Test that unpublish order follows the expected sequence."""
         # Setup all item types
@@ -544,7 +527,7 @@ class TestUnpublishAllOrphanItems:
         
         try:
             # Mock the endpoint response for dependency management
-            def mock_invoke_response(method, url, **kwargs):
+            def mock_invoke_response(method, url, **kwargs):  # noqa: ARG001
                 if "getDefinition" in url:
                     # Determine the item type based on GUID
                     if "guid-0" in url:  # DataPipeline
