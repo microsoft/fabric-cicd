@@ -7,6 +7,7 @@
 VERSION = "0.1.21"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
+FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
