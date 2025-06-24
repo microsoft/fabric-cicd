@@ -14,6 +14,7 @@
     -   It is recommended to use the supported variables in `find_replace` for dynamic replacement of the source workspace and item IDs.
     -   If you are using a connection and expect it to change between different environments, then it needs to be parameterized in the `parameter.yml` file.
 -   When using the **Saved Credential** method to connect to data sources, developers must have access to the Saved Credential information in order to successfully deploy GraphQL item.
+-   Changes made to the original API query are not source controlled. You will need to manually update the query in the GraphQL item's query editor within the target workspace.
 
 ## Copy Jobs
 
