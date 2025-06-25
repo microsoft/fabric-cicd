@@ -7,6 +7,7 @@
 VERSION = "0.1.21"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
+FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
@@ -30,6 +31,7 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "SQLDatabase",
     "KQLDashboard",
     "Dataflow",
+    "GraphQLApi",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
@@ -43,6 +45,7 @@ MAX_RETRY_OVERRIDE = {
     "Warehouse": 10,
     "Dataflow": 10,
     "VariableLibrary": 7,
+    "GraphQLApi": 7,
 }
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 

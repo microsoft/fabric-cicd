@@ -184,7 +184,7 @@ def lookup_referenced_item(
     # Get the item name using the workspace ID and item ID
     response = fabric_workspace_obj.endpoint.invoke(
         method="GET",
-        url=f"https://msitapi.fabric.microsoft.com/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
+        url=f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
     )
     item_name = response.get("body", {}).get("displayName", "")
     logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
