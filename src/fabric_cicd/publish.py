@@ -119,6 +119,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         items.publish_datapipelines(fabric_workspace_obj)
     if "GraphQLApi" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing GraphQL APIs")
+        logger.warning(
+            "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
+        )
         items.publish_graphqlapis(fabric_workspace_obj)
 
     # Check Environment Publish

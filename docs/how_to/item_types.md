@@ -15,6 +15,7 @@
     -   If you are using a connection and expect it to change between different environments, then it needs to be parameterized in the `parameter.yml` file.
 -   When using the **Saved Credential** method to connect to data sources, developers must have access to the Saved Credential information in order to successfully deploy GraphQL item.
 -   Changes made to the original API query are not source controlled. You will need to manually update the query in the GraphQL item's query editor within the target workspace.
+-   Only user authentication is currently supported for GraphQL items that source data from the SQL Analytics Endpoint.
 
 ## Copy Jobs
 
