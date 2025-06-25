@@ -123,6 +123,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
             "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
         )
         items.publish_graphqlapis(fabric_workspace_obj)
+    if "SparkJobDefinition" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Spark Job Definitions")
+        items.publish_sparkjobdefinitions(fabric_workspace_obj)
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:

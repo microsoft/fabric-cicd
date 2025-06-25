@@ -18,6 +18,7 @@ from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
 from fabric_cicd._items._notebook import publish_notebooks
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
+from fabric_cicd._items._sparkjobdefinition import publish_sparkjobdefinitions
 from fabric_cicd._items._sqldatabase import publish_sqldatabases
 from fabric_cicd._items._variablelibrary import publish_variablelibraries
 from fabric_cicd._items._warehouse import publish_warehouses
@@ -42,6 +43,7 @@ __all__ = [
     "publish_notebooks",
     "publish_reports",
     "publish_semanticmodels",
+    "publish_sparkjobdefinitions",
     "publish_sqldatabases",
     "publish_variablelibraries",
     "publish_warehouses",
