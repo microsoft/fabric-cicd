@@ -435,15 +435,17 @@ class FabricWorkspace:
         # Skip publishing if the item is not in the include list
         if self.publish_items_to_include:
             current_item = f"{item_name}.{item_type}"
+
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.publish_items_to_include}
+
             # Check for exact match or case-insensitive match
-            match_found = any(
-                current_item == include_item or current_item.lower() == include_item.lower()
-                for include_item in self.publish_items_to_include
+            match_found = (
+                current_item in self.publish_items_to_include or current_item.lower() in normalized_include_set
             )
             if not match_found:
                 item.skip_publish = True
-                logger.info(f"Publishing {item_type} '{item_name}'")
-                logger.info(f"{constants.INDENT}Skipped")
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
         item_guid = item.guid
