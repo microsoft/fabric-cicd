@@ -231,6 +231,30 @@ class TestPublishAllItems:
                 if hasattr(attr, 'assert_not_called'):
                     attr.assert_not_called()
 
+    def test_publish_all_items_graphql_api_with_warning(
+        self,
+        mock_fabric_workspace,
+        mock_items_module,
+        mock_print_header,
+        caplog
+    ):
+        """Test publish_all_items with GraphQLApi item type and warning message."""
+        # Setup
+        mock_fabric_workspace.item_type_in_scope = ["GraphQLApi"]
+        
+        # Execute
+        with caplog.at_level(logging.WARNING):
+            publish_all_items(mock_fabric_workspace)
+        
+        # Verify header was printed
+        mock_print_header.assert_any_call("Publishing GraphQL APIs")
+        
+        # Verify warning message was logged
+        assert "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint" in caplog.text
+        
+        # Verify publish function was called
+        mock_items_module.publish_graphqlapis.assert_called_once_with(mock_fabric_workspace)
+
 
 class TestUnpublishAllOrphanItems:
     """Test class for unpublish_all_orphan_items function."""
