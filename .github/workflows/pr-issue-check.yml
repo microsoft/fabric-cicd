@@ -27,7 +27,6 @@ jobs:
               pull_number: prNumber
             });
 
-            const prBody = pr.data.body || '';
             const prTitle = pr.data.title || '';
 
             // First, check for issues linked to the PR via GitHub's native linking
@@ -76,8 +75,8 @@ jobs:
 
             let foundIssueNumbers = new Set();
 
-            // Check PR body and title for issue references
-            const textToCheck = prBody + ' ' + prTitle;
+            // Check PR title for issue references
+            const textToCheck = prTitle;
 
             // First, look for keyword-based references (more reliable)
             for (const pattern of keywordPatterns) {
@@ -101,47 +100,11 @@ jobs:
               }
             }
 
-            // Get commits and check commit messages for issue references (if none found yet)
-            if (foundIssueNumbers.size === 0) {
-              const commits = await github.rest.pulls.listCommits({
-                owner: repo.owner,
-                repo: repo.repo,
-                pull_number: prNumber
-              });
-
-              for (const commit of commits.data) {
-                const commitMessage = commit.commit.message || '';
-
-                // Check keyword-based patterns first
-                for (const pattern of keywordPatterns) {
-                  const matches = commitMessage.matchAll(pattern);
-                  for (const match of matches) {
-                    const issueNumber = match[1];
-                    if (issueNumber && !isNaN(issueNumber)) {
-                      foundIssueNumbers.add(parseInt(issueNumber));
-                    }
-                  }
-                }
-
-                // If still no matches, check hash patterns
-                if (foundIssueNumbers.size === 0) {
-                  const matches = commitMessage.matchAll(hashPattern);
-                  for (const match of matches) {
-                    const issueNumber = match[1];
-                    if (issueNumber && !isNaN(issueNumber)) {
-                      foundIssueNumbers.add(parseInt(issueNumber));
-                    }
-                  }
-                }
-              }
-            }
-
             if (foundIssueNumbers.size === 0) {
               core.setFailed(
                 '❌ This pull request must be linked to an issue. Please:\n' +
-                '1. Reference an issue in the PR description using "Fixes #123", "Closes #456", or "Resolves #789"\n' +
-                '2. Or reference an issue in your commit messages\n' +
-                '3. Make sure the referenced issue exists in this repository\n\n' +
+                '1. Reference an issue in the PR title using "Fixes #123", "Closes #456", or "Resolves #789"\n' +
+                '2. Make sure the referenced issue exists in this repository\n\n' +
                 'See our contribution guidelines for more details.'
               );
               return;
@@ -177,7 +140,7 @@ jobs:
                 invalidList +
                 '\n\nPlease:\n' +
                 '1. Create an issue first if one doesn\'t exist\n' +
-                '2. Reference the issue using "Fixes #123", "Closes #456", or "Resolves #789"\n' +
+                '2. Reference the issue in the PR title using "Fixes #123", "Closes #456", or "Resolves #789"\n' +
                 '3. Make sure the issue number is correct\n\n' +
                 'See our contribution guidelines for more details.'
               );
