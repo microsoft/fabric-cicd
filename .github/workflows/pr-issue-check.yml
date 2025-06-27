@@ -30,6 +30,9 @@ jobs:
             const prBody = pr.data.body || '';
             const prTitle = pr.data.title || '';
 
+            // Strip HTML comments from the PR body to avoid false positives from template hints
+            const prBodyWithoutComments = prBody.replace(/<!--[\s\S]*?-->/g, '');
+
             // First, check for issues linked to the PR via GitHub's native linking
             let linkedIssues = [];
             try {
@@ -77,7 +80,7 @@ jobs:
             let foundIssueNumbers = new Set();
 
             // Check PR body and title for issue references
-            const textToCheck = prBody + ' ' + prTitle;
+            const textToCheck = prBodyWithoutComments + ' ' + prTitle;
 
             // First, look for keyword-based references (more reliable)
             for (const pattern of keywordPatterns) {
