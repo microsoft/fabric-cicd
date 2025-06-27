@@ -17,7 +17,7 @@ def mock_endpoint():
     """Mock FabricEndpoint to avoid real API calls."""
     mock = MagicMock()
     # Mock different responses for different URLs
-    def mock_invoke(method=None, url=None, **kwargs):
+    def mock_invoke(_method=None, url=None, **_kwargs):
         if "/folders" in url:
             return {"body": {"value": []}, "header": {}}
         return {"body": {"value": []}}
@@ -78,7 +78,7 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     create_test_item(notebook_dir, "Notebook", "Test Notebook")
     
     # Mock the deployed items response to simulate existing items
-    def mock_invoke_with_items(method=None, url=None, **kwargs):
+    def mock_invoke_with_items(_method=None, url=None, **_kwargs):
         if "/folders" in url:
             return {"body": {"value": []}, "header": {}}
         return {
@@ -181,7 +181,7 @@ def test_publish_all_items_returns_only_items_in_scope(mock_endpoint, temp_works
     create_test_item(report_dir, "Report", "Test Report")
     create_test_item(notebook_dir, "Notebook", "Test Notebook")
     
-    def mock_invoke_with_selective_items(method=None, url=None, **kwargs):
+    def mock_invoke_with_selective_items(_method=None, url=None, **_kwargs):
         if "/folders" in url:
             return {"body": {"value": []}, "header": {}}
         return {
@@ -247,7 +247,7 @@ def test_publish_all_items_deployment_status_differentiation(mock_endpoint, temp
     create_test_item(report_dir, "Report", "Test Report")
     
     # Mock deployed items to simulate that only the semantic model already exists
-    def mock_invoke_existing_items(method=None, url=None, **kwargs):
+    def mock_invoke_existing_items(_method=None, url=None, **_kwargs):
         if "/folders" in url:
             return {"body": {"value": []}, "header": {}}
         return {
