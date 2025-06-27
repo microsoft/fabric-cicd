@@ -9,6 +9,7 @@ from typing import Any, Optional
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
@@ -16,6 +17,29 @@ from fabric_cicd._common._validate_input import (
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
+
+
+def _collect_item_info(item_obj: Item, deployment_status: str) -> dict[str, Any]:
+    """
+    Helper function to convert an Item object to a dictionary representation.
+    
+    Args:
+        item_obj: The Item object to convert
+        deployment_status: Status indicating if item was "newly_published" or "already_existed"
+        
+    Returns:
+        Dictionary containing item information with deployment status
+    """
+    return {
+        "type": item_obj.type,
+        "name": item_obj.name,
+        "description": item_obj.description,
+        "guid": item_obj.guid,
+        "logical_id": item_obj.logical_id,
+        "folder_id": item_obj.folder_id,
+        "path": str(item_obj.path),
+        "deployment_status": deployment_status,
+    }
 
 
 def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> dict[str, dict[str, Any]]:
@@ -37,6 +61,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         - guid: The unique identifier of the published item
         - logical_id: The logical ID from the repository
         - folder_id: The folder ID where the item is located
+        - path: The file path of the item in the repository
+        - deployment_status: Either "newly_published" for items published in this run 
+          or "already_existed" for items that were already in the workspace
 
     Examples:
         Basic usage
@@ -48,7 +75,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         ... )
         >>> published_items = publish_all_items(workspace)
         >>> semantic_models = published_items.get("SemanticModel", {})
-        >>> reports = published_items.get("Report", {})
+        >>> # Check which items were newly published vs already existed
+        >>> for name, item_info in semantic_models.items():
+        ...     if item_info['deployment_status'] == 'newly_published':
+        ...         print(f"Newly published: {name}")
+        ...     else:
+        ...         print(f"Already existed: {name}")
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -70,30 +102,34 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
 
+    # Capture items that already exist in the workspace before publishing
+    pre_existing_items = {}
+    for item_type in fabric_workspace_obj.item_type_in_scope:
+        if item_type in fabric_workspace_obj.deployed_items:
+            pre_existing_items[item_type] = set(fabric_workspace_obj.deployed_items[item_type].keys())
+        else:
+            pre_existing_items[item_type] = set()
+
     if item_name_exclude_regex:
         logger.warning(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
-    # Collect published items information
+    # Collect published items information with deployment status
     published_items = {}
     
-    # Helper function to add items to the published_items dictionary
     def collect_published_items_for_type(item_type: str) -> None:
+        """Helper function to add items to the published_items dictionary with deployment status."""
         if item_type in fabric_workspace_obj.repository_items:
             published_items[item_type] = {}
             for item_name, item_obj in fabric_workspace_obj.repository_items[item_type].items():
-                # Convert Item object to a dictionary representation
-                published_items[item_type][item_name] = {
-                    "type": item_obj.type,
-                    "name": item_obj.name,
-                    "description": item_obj.description,
-                    "guid": item_obj.guid,
-                    "logical_id": item_obj.logical_id,
-                    "folder_id": item_obj.folder_id,
-                    "path": str(item_obj.path),
-                }
+                # Determine if this item was newly published or already existed
+                deployment_status = (
+                    "already_existed" if item_name in pre_existing_items.get(item_type, set())
+                    else "newly_published"
+                )
+                published_items[item_type][item_name] = _collect_item_info(item_obj, deployment_status)
 
     if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Variable Libraries")

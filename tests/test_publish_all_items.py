@@ -140,6 +140,7 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     assert sm_info["description"] == "Test description"
     assert sm_info["guid"] == "semantic-model-guid"
     assert sm_info["logical_id"] == "logical-test-semantic-model"
+    assert sm_info["deployment_status"] == "already_existed"  # Should be marked as already existed
     
     # Verify report information
     reports = result["Report"]
@@ -150,6 +151,7 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     assert report_info["description"] == "Test description"
     assert report_info["guid"] == "report-guid"
     assert report_info["logical_id"] == "logical-test-report"
+    assert report_info["deployment_status"] == "already_existed"  # Should be marked as already existed
 
 
 def test_publish_all_items_returns_empty_dict_for_no_items(mock_endpoint, temp_workspace_dir, valid_workspace_id):
@@ -233,3 +235,61 @@ def test_publish_all_items_returns_only_items_in_scope(mock_endpoint, temp_works
     
     assert len(result["SemanticModel"]) == 1
     assert len(result["Report"]) == 1
+
+
+def test_publish_all_items_deployment_status_differentiation(mock_endpoint, temp_workspace_dir, valid_workspace_id):
+    """Test that publish_all_items correctly differentiates between newly published and existing items."""
+    # Create test items
+    semantic_model_dir = temp_workspace_dir / "TestSemanticModel"
+    report_dir = temp_workspace_dir / "TestReport"
+    
+    create_test_item(semantic_model_dir, "SemanticModel", "Test Semantic Model")
+    create_test_item(report_dir, "Report", "Test Report")
+    
+    # Mock deployed items to simulate that only the semantic model already exists
+    def mock_invoke_existing_items(method=None, url=None, **kwargs):
+        if "/folders" in url:
+            return {"body": {"value": []}, "header": {}}
+        return {
+            "body": {
+                "value": [
+                    # Only semantic model exists in workspace already
+                    {
+                        "type": "SemanticModel",
+                        "displayName": "Test Semantic Model",
+                        "description": "Test description",
+                        "id": "semantic-model-guid",
+                        "folderId": ""
+                    }
+                ]
+            }
+        }
+    
+    mock_endpoint.invoke.side_effect = mock_invoke_existing_items
+    
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = FabricWorkspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["SemanticModel", "Report"]
+        )
+        
+        with patch("fabric_cicd._items.publish_semanticmodels"), \
+             patch("fabric_cicd._items.publish_reports"):
+            
+            result = publish_all_items(workspace)
+    
+    # Verify the deployment status differentiation
+    assert isinstance(result, dict)
+    assert "SemanticModel" in result
+    assert "Report" in result
+    
+    # Semantic model should be marked as already existed
+    semantic_models = result["SemanticModel"]
+    sm_info = semantic_models["Test Semantic Model"]
+    assert sm_info["deployment_status"] == "already_existed"
+    
+    # Report should be marked as newly published (not in deployed items initially)
+    reports = result["Report"]
+    report_info = reports["Test Report"]
+    assert report_info["deployment_status"] == "newly_published"
