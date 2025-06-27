@@ -18,13 +18,18 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> None:
+def publish_all_items(
+    fabric_workspace_obj: FabricWorkspace,
+    item_name_exclude_regex: Optional[str] = None,
+    items_to_include_list: Optional[list[str]] = None,
+) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
+        items_to_include_list: List of items ("item_name.item_type") to include in being published.
 
 
     Examples:
@@ -45,7 +50,17 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> exclude_regex = ".*_do_not_publish"
-        >>> publish_all_items(workspace, exclude_regex)
+        >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+
+        With items to include list
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> items_to_include = ["Hello World.Notebook", "Hello.environment"]
+        >>> publish_all_items(workspace, items_to_include_list=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -62,6 +77,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+
+    if items_to_include_list:
+        logger.warning(
+            "Using items_to_include_list is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.publish_items_to_include = items_to_include_list
 
     if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Variable Libraries")

@@ -123,6 +123,7 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.publish_items_to_include = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -429,6 +430,20 @@ class FabricWorkspace:
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
+        # Skip publishing if the item is not in the include list
+        if self.publish_items_to_include:
+            current_item = f"{item_name}.{item_type}"
+            # Check for exact match or case-insensitive match
+            match_found = any(
+                current_item == include_item or current_item.lower() == include_item.lower()
+                for include_item in self.publish_items_to_include
+            )
+            if not match_found:
+                item.skip_publish = True
+                logger.info(f"Publishing {item_type} '{item_name}'")
+                logger.info(f"{constants.INDENT}Skipped")
                 return
 
         item_guid = item.guid
