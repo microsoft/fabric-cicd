@@ -137,9 +137,7 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     sm_info = semantic_models["Test Semantic Model"]
     assert sm_info["type"] == "SemanticModel"
     assert sm_info["name"] == "Test Semantic Model"
-    assert sm_info["description"] == "Test description"
     assert sm_info["guid"] == "semantic-model-guid"
-    assert sm_info["logical_id"] == "logical-test-semantic-model"
     assert sm_info["deployment_status"] == "already_existed"  # Should be marked as already existed
     
     # Verify report information
@@ -148,9 +146,7 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     report_info = reports["Test Report"]
     assert report_info["type"] == "Report"
     assert report_info["name"] == "Test Report"
-    assert report_info["description"] == "Test description"
     assert report_info["guid"] == "report-guid"
-    assert report_info["logical_id"] == "logical-test-report"
     assert report_info["deployment_status"] == "already_existed"  # Should be marked as already existed
 
 
@@ -246,26 +242,54 @@ def test_publish_all_items_deployment_status_differentiation(mock_endpoint, temp
     create_test_item(semantic_model_dir, "SemanticModel", "Test Semantic Model")
     create_test_item(report_dir, "Report", "Test Report")
     
-    # Mock deployed items to simulate that only the semantic model already exists
-    def mock_invoke_existing_items(_method=None, url=None, **_kwargs):
+    # Mock deployed items to simulate that only the semantic model already exists initially
+    # but after publishing, both should exist
+    call_count = 0
+    def mock_invoke_dynamic_items(_method=None, url=None, **_kwargs):
+        nonlocal call_count
         if "/folders" in url:
             return {"body": {"value": []}, "header": {}}
+        
+        call_count += 1
+        if call_count == 1:  # First call (initial state) - only semantic model exists
+            return {
+                "body": {
+                    "value": [
+                        # Only semantic model exists in workspace initially
+                        {
+                            "type": "SemanticModel",
+                            "displayName": "Test Semantic Model",
+                            "description": "Test description",
+                            "id": "semantic-model-guid",
+                            "folderId": ""
+                        }
+                    ]
+                }
+            }
+        
+        # After first call, both items should exist (after publishing)
         return {
             "body": {
                 "value": [
-                    # Only semantic model exists in workspace already
                     {
                         "type": "SemanticModel",
                         "displayName": "Test Semantic Model",
                         "description": "Test description",
                         "id": "semantic-model-guid",
                         "folderId": ""
+                    },
+                    {
+                        "type": "Report",
+                        "displayName": "Test Report",
+                        "description": "Test description",
+                        "id": "report-guid",
+                        "folderId": ""
                     }
                 ]
             }
         }
     
-    mock_endpoint.invoke.side_effect = mock_invoke_existing_items
+    mock_endpoint.invoke.side_effect = mock_invoke_dynamic_items
     
     with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
         workspace = FabricWorkspace(

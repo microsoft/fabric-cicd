@@ -9,7 +9,6 @@ from typing import Any, Optional
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
-from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
@@ -19,27 +18,7 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def _collect_item_info(item_obj: Item, deployment_status: str) -> dict[str, Any]:
-    """
-    Helper function to convert an Item object to a dictionary representation.
-    
-    Args:
-        item_obj: The Item object to convert
-        deployment_status: Status indicating if item was "newly_published" or "already_existed"
-        
-    Returns:
-        Dictionary containing item information with deployment status
-    """
-    return {
-        "type": item_obj.type,
-        "name": item_obj.name,
-        "description": item_obj.description,
-        "guid": item_obj.guid,
-        "logical_id": item_obj.logical_id,
-        "folder_id": item_obj.folder_id,
-        "path": str(item_obj.path),
-        "deployment_status": deployment_status,
-    }
+
 
 
 def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> dict[str, dict[str, Any]]:
@@ -52,16 +31,12 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
 
     Returns:
         A dictionary containing the published items organized by item type and item name.
-        Structure: {item_type: {item_name: item_object}}
+        Structure: {item_type: {item_name: item_info}}
         
-        Each item_object contains:
+        Each item_info contains:
         - type: The item type (e.g., "SemanticModel", "Report")
         - name: The display name of the item
-        - description: The item description
         - guid: The unique identifier of the published item
-        - logical_id: The logical ID from the repository
-        - folder_id: The folder ID where the item is located
-        - path: The file path of the item in the repository
         - deployment_status: Either "newly_published" for items published in this run 
           or "already_existed" for items that were already in the workspace
 
@@ -116,105 +91,96 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
-    # Collect published items information with deployment status
-    published_items = {}
-    
-    def collect_published_items_for_type(item_type: str) -> None:
-        """Helper function to add items to the published_items dictionary with deployment status."""
-        if item_type in fabric_workspace_obj.repository_items:
-            published_items[item_type] = {}
-            for item_name, item_obj in fabric_workspace_obj.repository_items[item_type].items():
-                # Determine if this item was newly published or already existed
-                deployment_status = (
-                    "already_existed" if item_name in pre_existing_items.get(item_type, set())
-                    else "newly_published"
-                )
-                published_items[item_type][item_name] = _collect_item_info(item_obj, deployment_status)
-
     if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Variable Libraries")
         items.publish_variablelibraries(fabric_workspace_obj)
-        collect_published_items_for_type("VariableLibrary")
     if "Warehouse" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Warehouses")
         items.publish_warehouses(fabric_workspace_obj)
-        collect_published_items_for_type("Warehouse")
     if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
-        collect_published_items_for_type("Lakehouse")
     if "SQLDatabase" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing SQL Databases")
         items.publish_sqldatabases(fabric_workspace_obj)
-        collect_published_items_for_type("SQLDatabase")
     if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Mirrored Databases")
         items.publish_mirroreddatabase(fabric_workspace_obj)
-        collect_published_items_for_type("MirroredDatabase")
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
-        collect_published_items_for_type("Environment")
     if "Notebook" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
-        collect_published_items_for_type("Notebook")
     if "SemanticModel" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Semantic Models")
         items.publish_semanticmodels(fabric_workspace_obj)
-        collect_published_items_for_type("SemanticModel")
     if "Report" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Reports")
         items.publish_reports(fabric_workspace_obj)
-        collect_published_items_for_type("Report")
     if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Copy Jobs")
         items.publish_copyjobs(fabric_workspace_obj)
-        collect_published_items_for_type("CopyJob")
     if "Eventhouse" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
-        collect_published_items_for_type("Eventhouse")
     if "KQLDatabase" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing KQL Databases")
         items.publish_kqldatabases(fabric_workspace_obj)
-        collect_published_items_for_type("KQLDatabase")
     if "KQLQueryset" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing KQL Querysets")
         items.publish_kqlquerysets(fabric_workspace_obj)
-        collect_published_items_for_type("KQLQueryset")
     if "Reflex" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Activators")
         items.publish_activators(fabric_workspace_obj)
-        collect_published_items_for_type("Reflex")
     if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Eventstreams")
         items.publish_eventstreams(fabric_workspace_obj)
-        collect_published_items_for_type("Eventstream")
     if "KQLDashboard" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing KQL Dashboards")
         items.publish_kqldashboard(fabric_workspace_obj)
-        collect_published_items_for_type("KQLDashboard")
     if "Dataflow" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Dataflows")
         items.publish_dataflows(fabric_workspace_obj)
-        collect_published_items_for_type("Dataflow")
     if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Data Pipelines")
         items.publish_datapipelines(fabric_workspace_obj)
-        collect_published_items_for_type("DataPipeline")
     if "GraphQLApi" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing GraphQL APIs")
         logger.warning(
             "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
         )
         items.publish_graphqlapis(fabric_workspace_obj)
-        collect_published_items_for_type("GraphQLApi")
 
     # Check Environment Publish
     if "Environment" in fabric_workspace_obj.item_type_in_scope:
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
+    
+    # Refresh deployed items after publishing to get the updated state
+    fabric_workspace_obj._refresh_deployed_items()
+    
+    # Collect published items information using deployed_items and repository_items
+    published_items = {}
+    for item_type in fabric_workspace_obj.item_type_in_scope:
+        if item_type in fabric_workspace_obj.repository_items:
+            published_items[item_type] = {}
+            for item_name in fabric_workspace_obj.repository_items[item_type]:
+                # Get the deployed item info (contains the actual GUID from workspace)
+                deployed_item = fabric_workspace_obj.deployed_items.get(item_type, {}).get(item_name)
+                if deployed_item:
+                    # Determine deployment status
+                    deployment_status = (
+                        "already_existed" if item_name in pre_existing_items.get(item_type, set())
+                        else "newly_published"
+                    )
+                    
+                    published_items[item_type][item_name] = {
+                        "type": item_type,
+                        "name": item_name,
+                        "guid": deployed_item.guid,
+                        "deployment_status": deployment_status,
+                    }
     
     return published_items
 
