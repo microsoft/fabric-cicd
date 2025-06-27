@@ -37,8 +37,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         - type: The item type (e.g., "SemanticModel", "Report")
         - name: The display name of the item
         - guid: The unique identifier of the published item
-        - deployment_status: Either "newly_published" for items published in this run 
-          or "already_existed" for items that were already in the workspace
+        - sqlendpoint: The SQL endpoint for the item (empty string if not applicable)
+        - status: Either "new" for items published in this run 
+          or "exists" for items that were already in the workspace
 
     Examples:
         Basic usage
@@ -52,7 +53,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         >>> semantic_models = published_items.get("SemanticModel", {})
         >>> # Check which items were newly published vs already existed
         >>> for name, item_info in semantic_models.items():
-        ...     if item_info['deployment_status'] == 'newly_published':
+        ...     if item_info['status'] == 'new':
         ...         print(f"Newly published: {name}")
         ...     else:
         ...         print(f"Already existed: {name}")
@@ -78,12 +79,11 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     fabric_workspace_obj._refresh_repository_items()
 
     # Capture items that already exist in the workspace before publishing
-    pre_existing_items = {}
-    for item_type in fabric_workspace_obj.item_type_in_scope:
-        if item_type in fabric_workspace_obj.deployed_items:
-            pre_existing_items[item_type] = set(fabric_workspace_obj.deployed_items[item_type].keys())
-        else:
-            pre_existing_items[item_type] = set()
+    # Using set comprehension for O(1) average lookup time per item
+    pre_existing_items = {
+        item_type: set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
+        for item_type in fabric_workspace_obj.item_type_in_scope
+    }
 
     if item_name_exclude_regex:
         logger.warning(
@@ -160,26 +160,27 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     # Refresh deployed items after publishing to get the updated state
     fabric_workspace_obj._refresh_deployed_items()
     
-    # Collect published items information using deployed_items and repository_items
+    # Collect published items information using workspace_items for optimization
     published_items = {}
     for item_type in fabric_workspace_obj.item_type_in_scope:
         if item_type in fabric_workspace_obj.repository_items:
             published_items[item_type] = {}
             for item_name in fabric_workspace_obj.repository_items[item_type]:
-                # Get the deployed item info (contains the actual GUID from workspace)
-                deployed_item = fabric_workspace_obj.deployed_items.get(item_type, {}).get(item_name)
-                if deployed_item:
-                    # Determine deployment status
-                    deployment_status = (
-                        "already_existed" if item_name in pre_existing_items.get(item_type, set())
-                        else "newly_published"
+                # Get the workspace item info (contains GUID and sqlendpoint)
+                workspace_item = fabric_workspace_obj.workspace_items.get(item_type, {}).get(item_name)
+                if workspace_item:
+                    # Determine deployment status using O(1) set lookup
+                    status = (
+                        "exists" if item_name in pre_existing_items.get(item_type, set())
+                        else "new"
                     )
                     
                     published_items[item_type][item_name] = {
                         "type": item_type,
                         "name": item_name,
-                        "guid": deployed_item.guid,
-                        "deployment_status": deployment_status,
+                        "guid": workspace_item["id"],
+                        "sqlendpoint": workspace_item.get("sqlendpoint", ""),
+                        "status": status,
                     }
     
     return published_items

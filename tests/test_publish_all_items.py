@@ -138,7 +138,8 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     assert sm_info["type"] == "SemanticModel"
     assert sm_info["name"] == "Test Semantic Model"
     assert sm_info["guid"] == "semantic-model-guid"
-    assert sm_info["deployment_status"] == "already_existed"  # Should be marked as already existed
+    assert sm_info["status"] == "exists"  # Should be marked as already existed
+    assert "sqlendpoint" in sm_info  # Should include sqlendpoint field
     
     # Verify report information
     reports = result["Report"]
@@ -147,7 +148,8 @@ def test_publish_all_items_returns_published_items(mock_endpoint, temp_workspace
     assert report_info["type"] == "Report"
     assert report_info["name"] == "Test Report"
     assert report_info["guid"] == "report-guid"
-    assert report_info["deployment_status"] == "already_existed"  # Should be marked as already existed
+    assert report_info["status"] == "exists"  # Should be marked as already existed
+    assert "sqlendpoint" in report_info  # Should include sqlendpoint field
 
 
 def test_publish_all_items_returns_empty_dict_for_no_items(mock_endpoint, temp_workspace_dir, valid_workspace_id):
@@ -311,9 +313,9 @@ def test_publish_all_items_deployment_status_differentiation(mock_endpoint, temp
     # Semantic model should be marked as already existed
     semantic_models = result["SemanticModel"]
     sm_info = semantic_models["Test Semantic Model"]
-    assert sm_info["deployment_status"] == "already_existed"
+    assert sm_info["status"] == "exists"
     
     # Report should be marked as newly published (not in deployed items initially)
     reports = result["Report"]
     report_info = reports["Test Report"]
-    assert report_info["deployment_status"] == "newly_published"
+    assert report_info["status"] == "new"
