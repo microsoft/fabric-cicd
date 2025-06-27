@@ -148,22 +148,22 @@ class TestPublishAllItems:
         (["Warehouse"], [("Publishing Warehouses", "publish_warehouses")]),
         (["Lakehouse"], [("Publishing Lakehouses", "publish_lakehouses")]),
         (["SQLDatabase"], [("Publishing SQL Databases", "publish_sqldatabases")]),
-        (["MirroredDatabase"], [("Publishing MirroredDatabase", "publish_mirroreddatabase")]),
+        (["MirroredDatabase"], [("Publishing Mirrored Databases", "publish_mirroreddatabase")]),
         (["Notebook"], [("Publishing Notebooks", "publish_notebooks")]),
-        (["SemanticModel"], [("Publishing SemanticModels", "publish_semanticmodels")]),
+        (["SemanticModel"], [("Publishing Semantic Models", "publish_semanticmodels")]),
         (["Report"], [("Publishing Reports", "publish_reports")]),
-        (["CopyJob"], [("Publishing CopyJobs", "publish_copyjobs")]),
+        (["CopyJob"], [("Publishing Copy Jobs", "publish_copyjobs")]),
         (["Eventhouse"], [("Publishing Eventhouses", "publish_eventhouses")]),
         (["KQLDatabase"], [("Publishing KQL Databases", "publish_kqldatabases")]),
         (["KQLQueryset"], [("Publishing KQL Querysets", "publish_kqlquerysets")]),
         (["Reflex"], [("Publishing Activators", "publish_activators")]),
         (["Eventstream"], [("Publishing Eventstreams", "publish_eventstreams")]),
-        (["KQLDashboard"], [("Publishing KQLDashboard", "publish_kqldashboard")]),
+        (["KQLDashboard"], [("Publishing KQL Dashboards", "publish_kqldashboard")]),
         (["Dataflow"], [("Publishing Dataflows", "publish_dataflows")]),
-        (["DataPipeline"], [("Publishing DataPipelines", "publish_datapipelines")]),
+        (["DataPipeline"], [("Publishing Data Pipelines", "publish_datapipelines")]),
         (["Notebook", "DataPipeline"], [
             ("Publishing Notebooks", "publish_notebooks"),
-            ("Publishing DataPipelines", "publish_datapipelines")
+            ("Publishing Data Pipelines", "publish_datapipelines")
         ]),
     ])
     def test_publish_all_items_different_item_types(
