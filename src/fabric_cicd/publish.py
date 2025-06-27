@@ -29,7 +29,7 @@ def publish_all_items(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-        items_to_include_list: List of items ("item_name.item_type") to include in being published.
+        items_to_include_list: List of items in the format "item_name.item_type" that should be published.
 
 
     Examples:
@@ -59,7 +59,7 @@ def publish_all_items(
         ...     repository_directory="/path/to/repo",
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
-        >>> items_to_include = ["Hello World.Notebook", "Hello.environment"]
+        >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
         >>> publish_all_items(workspace, items_to_include_list=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
