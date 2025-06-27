@@ -1,3 +1,5 @@
+---
+# yamllint disable
 name: PR Issue Link Check
 
 on:
@@ -17,59 +19,88 @@ jobs:
           script: |
             const prNumber = context.issue.number;
             const repo = context.repo;
-            
+
             // Get PR details
             const pr = await github.rest.pulls.get({
               owner: repo.owner,
               repo: repo.repo,
               pull_number: prNumber
             });
-            
+
             const prBody = pr.data.body || '';
             const prTitle = pr.data.title || '';
-            
-            // Common issue reference patterns
-            const issuePatterns = [
+
+            // Issue reference patterns - more specific to avoid false positives
+            const keywordPatterns = [
               /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi,
-              /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/(\d+)/gi,
-              /#(\d+)/g
+              /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/(\d+)/gi
             ];
-            
+
+            // Generic hash pattern (less specific, used as fallback)
+            const hashPattern = /#(\d+)(?!\w)/g;
+
             let foundIssueNumbers = new Set();
-            
+
             // Check PR body and title for issue references
             const textToCheck = prBody + ' ' + prTitle;
-            
-            for (const pattern of issuePatterns) {
+
+            // First, look for keyword-based references (more reliable)
+            for (const pattern of keywordPatterns) {
               const matches = textToCheck.matchAll(pattern);
               for (const match of matches) {
-                const issueNumber = match[1] || match[0].replace('#', '');
+                const issueNumber = match[1];
                 if (issueNumber && !isNaN(issueNumber)) {
                   foundIssueNumbers.add(parseInt(issueNumber));
                 }
               }
             }
-            
-            // Get commits and check commit messages for issue references
-            const commits = await github.rest.pulls.listCommits({
-              owner: repo.owner,
-              repo: repo.repo,
-              pull_number: prNumber
-            });
-            
-            for (const commit of commits.data) {
-              const commitMessage = commit.commit.message || '';
-              for (const pattern of issuePatterns) {
-                const matches = commitMessage.matchAll(pattern);
-                for (const match of matches) {
-                  const issueNumber = match[1] || match[0].replace('#', '');
-                  if (issueNumber && !isNaN(issueNumber)) {
-                    foundIssueNumbers.add(parseInt(issueNumber));
+
+            // If no keyword-based references found, look for simple hash references
+            if (foundIssueNumbers.size === 0) {
+              const matches = textToCheck.matchAll(hashPattern);
+              for (const match of matches) {
+                const issueNumber = match[1];
+                if (issueNumber && !isNaN(issueNumber)) {
+                  foundIssueNumbers.add(parseInt(issueNumber));
+                }
+              }
+            }
+
+            // Get commits and check commit messages for issue references (if none found yet)
+            if (foundIssueNumbers.size === 0) {
+              const commits = await github.rest.pulls.listCommits({
+                owner: repo.owner,
+                repo: repo.repo,
+                pull_number: prNumber
+              });
+
+              for (const commit of commits.data) {
+                const commitMessage = commit.commit.message || '';
+
+                // Check keyword-based patterns first
+                for (const pattern of keywordPatterns) {
+                  const matches = commitMessage.matchAll(pattern);
+                  for (const match of matches) {
+                    const issueNumber = match[1];
+                    if (issueNumber && !isNaN(issueNumber)) {
+                      foundIssueNumbers.add(parseInt(issueNumber));
+                    }
+                  }
+                }
+
+                // If still no matches, check hash patterns
+                if (foundIssueNumbers.size === 0) {
+                  const matches = commitMessage.matchAll(hashPattern);
+                  for (const match of matches) {
+                    const issueNumber = match[1];
+                    if (issueNumber && !isNaN(issueNumber)) {
+                      foundIssueNumbers.add(parseInt(issueNumber));
+                    }
                   }
                 }
               }
             }
-            
+
             if (foundIssueNumbers.size === 0) {
               core.setFailed(
                 '❌ This pull request must be linked to an issue. Please:\n' +
@@ -80,11 +111,11 @@ jobs:
               );
               return;
             }
-            
+
             // Verify that the referenced issues actually exist
             let validIssueFound = false;
             const invalidIssues = [];
-            
+
             for (const issueNumber of foundIssueNumbers) {
               try {
                 await github.rest.issues.get({
@@ -101,11 +132,11 @@ jobs:
                 }
               }
             }
-            
+
             if (!validIssueFound) {
-              const invalidList = invalidIssues.length > 0 ? 
+              const invalidList = invalidIssues.length > 0 ?
                 `\n\nInvalid issue references found: ${invalidIssues.map(n => `#${n}`).join(', ')}` : '';
-              
+
               core.setFailed(
                 '❌ This pull request must be linked to a valid issue in this repository.' +
                 invalidList +
@@ -117,5 +148,5 @@ jobs:
               );
               return;
             }
-            
+
             console.log('✅ Pull request is properly linked to an issue.');
