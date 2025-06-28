@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,7 @@ from fabric_cicd._common._exceptions import InputError, ParameterFileError, Pars
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd.publish_log_entry import PublishLogEntry
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +129,7 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+        self.publish_log_entries: list[PublishLogEntry] = []
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -515,6 +518,18 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published")
+
+        self.publish_log_entries.append(
+            PublishLogEntry(
+                name=item_name,
+                item_type=item_type,
+                success=True,
+                error=None,
+                start_time=datetime.now(),
+                end_time=datetime.now(),
+            )
+        )
+
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:

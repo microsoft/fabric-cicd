@@ -56,6 +56,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
+    fabric_workspace_obj.publish_log_entries = []
 
     if item_name_exclude_regex:
         logger.warning(
@@ -63,71 +64,78 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
-    if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Variable Libraries")
-        items.publish_variablelibraries(fabric_workspace_obj)
-    if "Warehouse" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Warehouses")
-        items.publish_warehouses(fabric_workspace_obj)
-    if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Lakehouses")
-        items.publish_lakehouses(fabric_workspace_obj)
-    if "SQLDatabase" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing SQL Databases")
-        items.publish_sqldatabases(fabric_workspace_obj)
-    if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Mirrored Databases")
-        items.publish_mirroreddatabase(fabric_workspace_obj)
-    if "Environment" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Environments")
-        items.publish_environments(fabric_workspace_obj)
-    if "Notebook" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Notebooks")
-        items.publish_notebooks(fabric_workspace_obj)
-    if "SemanticModel" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Semantic Models")
-        items.publish_semanticmodels(fabric_workspace_obj)
-    if "Report" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Reports")
-        items.publish_reports(fabric_workspace_obj)
-    if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Copy Jobs")
-        items.publish_copyjobs(fabric_workspace_obj)
-    if "Eventhouse" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Eventhouses")
-        items.publish_eventhouses(fabric_workspace_obj)
-    if "KQLDatabase" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing KQL Databases")
-        items.publish_kqldatabases(fabric_workspace_obj)
-    if "KQLQueryset" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing KQL Querysets")
-        items.publish_kqlquerysets(fabric_workspace_obj)
-    if "Reflex" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Activators")
-        items.publish_activators(fabric_workspace_obj)
-    if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Eventstreams")
-        items.publish_eventstreams(fabric_workspace_obj)
-    if "KQLDashboard" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing KQL Dashboards")
-        items.publish_kqldashboard(fabric_workspace_obj)
-    if "Dataflow" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Dataflows")
-        items.publish_dataflows(fabric_workspace_obj)
-    if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing Data Pipelines")
-        items.publish_datapipelines(fabric_workspace_obj)
-    if "GraphQLApi" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Publishing GraphQL APIs")
-        logger.warning(
-            "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
-        )
-        items.publish_graphqlapis(fabric_workspace_obj)
+    try:
+        if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Variable Libraries")
+            items.publish_variablelibraries(fabric_workspace_obj)
+        if "Warehouse" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Warehouses")
+            items.publish_warehouses(fabric_workspace_obj)
+        if "Lakehouse" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Lakehouses")
+            items.publish_lakehouses(fabric_workspace_obj)
+        if "SQLDatabase" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing SQL Databases")
+            items.publish_sqldatabases(fabric_workspace_obj)
+        if "MirroredDatabase" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Mirrored Databases")
+            items.publish_mirroreddatabase(fabric_workspace_obj)
+        if "Environment" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Environments")
+            items.publish_environments(fabric_workspace_obj)
+        if "Notebook" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Notebooks")
+            items.publish_notebooks(fabric_workspace_obj)
+        if "SemanticModel" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Semantic Models")
+            items.publish_semanticmodels(fabric_workspace_obj)
+        if "Report" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Reports")
+            items.publish_reports(fabric_workspace_obj)
+        if "CopyJob" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Copy Jobs")
+            items.publish_copyjobs(fabric_workspace_obj)
+        if "Eventhouse" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Eventhouses")
+            items.publish_eventhouses(fabric_workspace_obj)
+        if "KQLDatabase" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing KQL Databases")
+            items.publish_kqldatabases(fabric_workspace_obj)
+        if "KQLQueryset" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing KQL Querysets")
+            items.publish_kqlquerysets(fabric_workspace_obj)
+        if "Reflex" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Activators")
+            items.publish_activators(fabric_workspace_obj)
+        if "Eventstream" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Eventstreams")
+            items.publish_eventstreams(fabric_workspace_obj)
+        if "KQLDashboard" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing KQL Dashboards")
+            items.publish_kqldashboard(fabric_workspace_obj)
+        if "Dataflow" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Dataflows")
+            items.publish_dataflows(fabric_workspace_obj)
+        if "DataPipeline" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing Data Pipelines")
+            items.publish_datapipelines(fabric_workspace_obj)
+        if "GraphQLApi" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Publishing GraphQL APIs")
+            logger.warning(
+                "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
+            )
+            items.publish_graphqlapis(fabric_workspace_obj)
 
-    # Check Environment Publish
-    if "Environment" in fabric_workspace_obj.item_type_in_scope:
-        print_header("Checking Environment Publish State")
-        items.check_environment_publish_state(fabric_workspace_obj)
+        # Check Environment Publish
+        if "Environment" in fabric_workspace_obj.item_type_in_scope:
+            print_header("Checking Environment Publish State")
+            items.check_environment_publish_state(fabric_workspace_obj)
+
+    except Exception as e:
+        logger.error(f"An error occurred during publishing: {e}")
+        return fabric_workspace_obj.publish_log_entries
+
+    return fabric_workspace_obj.publish_log_entries
 
 
 def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
