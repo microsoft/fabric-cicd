@@ -18,13 +18,18 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> None:
+def publish_all_items(
+    fabric_workspace_obj: FabricWorkspace,
+    item_name_exclude_regex: Optional[str] = None,
+    items_to_include: Optional[list[str]] = None,
+) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
+        items_to_include: Optional list of items to include in the publishing process. If None, all item types in scope will be published.
 
 
     Examples:
@@ -63,7 +68,13 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
-
+        
+    if items_to_include:
+        logger.warning(
+            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.items_to_include = items_to_include
+        
     try:
         if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
             print_header("Publishing Variable Libraries")
