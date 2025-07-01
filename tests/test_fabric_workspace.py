@@ -502,3 +502,79 @@ def test_workspace_id_replacement_comprehensive_item_types(patched_fabric_worksp
         # Verify all workspace IDs are replaced regardless of item type context
         assert "00000000-0000-0000-0000-000000000000" not in result, f"Failed for item type: {item_type}"
         assert result.count(valid_workspace_id) == 5, f"Incorrect replacement count for item type: {item_type}"
+
+
+def test_environment_parameter_replacement_issue(patched_fabric_workspace, temp_workspace_dir, valid_workspace_id):
+    """Test that parameter replacement works correctly with different environment values.
+    
+    This test ensures that the issue where parameter replacement doesn't work when
+    environment defaults to 'N/A' is properly handled.
+    """
+    # Create parameter.yml file with environment-specific replacements
+    parameter_content = """
+find_replace:
+    - find_value: "test-guid-to-replace"
+      replace_value:
+        PPE: "ppe-replacement-value"
+        PROD: "prod-replacement-value"
+      item_type: "Notebook"
+      item_name: ["Test Notebook"]
+"""
+    
+    # Create notebook structure
+    notebook_dir = temp_workspace_dir / "Test Notebook.Notebook"
+    notebook_dir.mkdir(parents=True)
+    
+    notebook_content = 'test_value = "test-guid-to-replace"'
+    
+    # Write files
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (notebook_dir / "notebook-content.py").write_text(notebook_content)
+    
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+    
+    # Test 1: Without environment parameter (defaults to 'N/A')
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace_no_env = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+    
+    # Test 2: With environment parameter (PPE)
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace_with_env = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE"
+        )
+    
+    # Create test objects for parameter replacement
+    test_item = Item(
+        type="Notebook",
+        name="Test Notebook", 
+        description="",
+        guid="test-guid",
+        path=notebook_dir
+    )
+    test_file = File(
+        item_path=notebook_dir,
+        file_path=notebook_dir / "notebook-content.py"
+    )
+    
+    # Test parameter replacement with default environment
+    replaced_content_no_env = workspace_no_env._replace_parameters(test_file, test_item)
+    
+    # Test parameter replacement with specific environment
+    replaced_content_with_env = workspace_with_env._replace_parameters(test_file, test_item)
+    
+    # Assertions
+    # With default environment ('N/A'), replacement should NOT occur
+    assert "test-guid-to-replace" in replaced_content_no_env, "Original value should remain when environment is N/A"
+    assert "ppe-replacement-value" not in replaced_content_no_env, "Replacement should not occur with default environment"
+    
+    # With specific environment (PPE), replacement SHOULD occur
+    assert "test-guid-to-replace" not in replaced_content_with_env, "Original value should be replaced when environment matches"
+    assert "ppe-replacement-value" in replaced_content_with_env, "Replacement should occur with matching environment"
