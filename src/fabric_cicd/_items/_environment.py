@@ -121,16 +121,11 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
                 raise Exception(msg)
 
         if ongoing_publish:
-            # Environment publishing - continue polling without retry limits
-            # Rely on the operation to provide proper completion response
-            retry_after_val = 120.0
-            base_delay = 5.0
-            
             handle_retry(
                 attempt=iteration,
-                base_delay=base_delay,
-                response_retry_after=retry_after_val,
-                prepend_message="Operation in progress."
+                base_delay=5,
+                response_retry_after=120,
+                prepend_message=f"{constants.INDENT}Operation in progress.",
             )
             iteration += 1
 
