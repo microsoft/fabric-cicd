@@ -54,7 +54,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
         for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
             # Check if the item is published to avoid any post publish actions
-            if item.skip_publish:
+            if item_obj.skip_publish:
                 continue
             process_shortcuts(fabric_workspace_obj, item_obj)
 
