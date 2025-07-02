@@ -171,3 +171,410 @@ def test_environment_param_with_utf8_chars(
         )
 
     assert workspace.environment == utf8_test_chars["nordic"]
+
+
+def test_workspace_id_replacement_in_json(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that workspace IDs are properly replaced in JSON files (like pipeline-content.json)."""
+    # JSON content with workspace ID that should be replaced
+    json_content = '''{
+  "properties": {
+    "activities": [
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    ]
+  }
+}'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["DataPipeline"]
+        )
+    
+    # Test the workspace ID replacement function
+    result = workspace._replace_workspace_ids(json_content)
+    
+    # Verify that the default workspace ID was replaced with the target workspace ID
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert valid_workspace_id in result
+    assert '"workspaceId": "' + valid_workspace_id + '"' in result
+
+
+def test_workspace_id_replacement_in_python(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that workspace IDs are properly replaced in Python files (like notebook-content.py)."""
+    # Python content with workspace ID that should be replaced (as in notebook metadata)
+    python_content = '''# META {
+# META   "dependencies": {
+# META     "environment": {
+# META       "environmentId": "a277ea4a-e87f-8537-4ce0-39db11d4aade",
+# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
+# META     }
+# META   }
+# META }'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
+    
+    # Test the workspace ID replacement function
+    result = workspace._replace_workspace_ids(python_content)
+    
+    # Verify that the default workspace ID was replaced with the target workspace ID
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert valid_workspace_id in result
+    assert 'workspaceId": "' + valid_workspace_id + '"' in result
+
+
+def test_workspace_id_replacement_eventstream_json(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test workspace ID replacement in Eventstream JSON files with multiple occurrences."""
+    eventstream_content = '''{
+  "destinations": [
+    {
+      "name": "DataActivator",
+      "type": "Activator",
+      "properties": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "c3bf82de-14b6-af39-4852-dda67eccd7c0"
+      }
+    },
+    {
+      "name": "Lakehouse",
+      "type": "Lakehouse",
+      "properties": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "c916eeb0-dd6a-ae32-4f4f-966d2414b239"
+      }
+    },
+    {
+      "name": "Eventhouse",
+      "type": "Eventhouse",
+      "properties": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "a51e98dd-5993-8e1c-443f-02aa53d4db74"
+      }
+    }
+  ]
+}'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Eventstream"]
+        )
+    
+    result = workspace._replace_workspace_ids(eventstream_content)
+    
+    # Verify all three workspace IDs were replaced
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert result.count(f'"workspaceId": "{valid_workspace_id}"') == 3
+
+
+def test_workspace_id_replacement_yaml_format(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test workspace ID replacement in YAML-style formats."""
+    yaml_content = '''
+configuration:
+  lakehouse:
+    default_lakehouse_workspace_id: "00000000-0000-0000-0000-000000000000"
+  environment:
+    workspaceId = "00000000-0000-0000-0000-000000000000"
+  other:
+    workspace: "00000000-0000-0000-0000-000000000000"
+'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Environment"]
+        )
+    
+    result = workspace._replace_workspace_ids(yaml_content)
+    
+    # Verify all different property name formats are replaced
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert f'default_lakehouse_workspace_id: "{valid_workspace_id}"' in result
+    assert f'workspaceId = "{valid_workspace_id}"' in result
+    assert f'workspace: "{valid_workspace_id}"' in result
+
+
+def test_workspace_id_replacement_mixed_formats(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test workspace ID replacement with mixed JSON and YAML formats in same content."""
+    mixed_content = '''{
+  "pipeline": {
+    "properties": {
+      "workspaceId": "00000000-0000-0000-0000-000000000000"
+    }
+  },
+  "configuration": {
+    "default_lakehouse_workspace_id": "00000000-0000-0000-0000-000000000000",
+    "workspace" = "00000000-0000-0000-0000-000000000000"
+  }
+}'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["DataPipeline"]
+        )
+    
+    result = workspace._replace_workspace_ids(mixed_content)
+    
+    # Verify all formats are replaced correctly
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert f'"workspaceId": "{valid_workspace_id}"' in result
+    assert f'"default_lakehouse_workspace_id": "{valid_workspace_id}"' in result
+    assert f'"workspace" = "{valid_workspace_id}"' in result
+
+
+def test_workspace_id_replacement_whitespace_variations(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test workspace ID replacement with various whitespace patterns."""
+    whitespace_content = '''
+{
+  "test1": {
+    "workspaceId":"00000000-0000-0000-0000-000000000000"
+  },
+  "test2": {
+    "workspaceId"  :  "00000000-0000-0000-0000-000000000000"
+  },
+  "test3": {
+    workspaceId   =   "00000000-0000-0000-0000-000000000000"
+  },
+  "test4": {
+    "workspace"    :    "00000000-0000-0000-0000-000000000000"
+  }
+}
+'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["DataPipeline"]
+        )
+    
+    result = workspace._replace_workspace_ids(whitespace_content)
+    
+    # Verify all whitespace variations are handled
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert result.count(valid_workspace_id) == 4
+
+
+def test_workspace_id_replacement_non_default_values_preserved(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that non-default workspace IDs are NOT replaced (regression test)."""
+    # Use a different workspace ID that should not be replaced
+    other_workspace_id = "12345678-1234-1234-1234-123456789012"
+    content_with_other_id = f'''{{
+  "properties": {{
+    "activities": [
+      {{
+        "type": "TridentNotebook",
+        "typeProperties": {{
+          "workspaceId": "{other_workspace_id}",
+          "notebookId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c"
+        }}
+      }},
+      {{
+        "type": "TridentNotebook",
+        "typeProperties": {{
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "notebookId": "88a570c5-0c79-9dc4-4c9b-fa16c621384c"
+        }}
+      }}
+    ]
+  }}
+}}'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["DataPipeline"]
+        )
+    
+    result = workspace._replace_workspace_ids(content_with_other_id)
+    
+    # Verify only default workspace ID was replaced, other ID preserved
+    assert "00000000-0000-0000-0000-000000000000" not in result
+    assert other_workspace_id in result  # This should be preserved
+    assert result.count(valid_workspace_id) == 1  # Only one replacement
+    assert result.count(other_workspace_id) == 1  # Original preserved
+
+
+def test_workspace_id_replacement_edge_cases(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test workspace ID replacement edge cases and current regex behavior."""
+    edge_cases_content = '''
+// Comment with workspaceId: "00000000-0000-0000-0000-000000000000" - this gets replaced due to current regex
+{
+  "validCase1": {
+    "workspaceId": "00000000-0000-0000-0000-000000000000"
+  },
+  "validCase2": {
+    "default_lakehouse_workspace_id": "00000000-0000-0000-0000-000000000000"
+  },
+  "invalidCase1": {
+    "workspaceIdNot": "00000000-0000-0000-0000-000000000000"
+  },
+  "invalidCase2": {
+    "notworkspaceId": "00000000-0000-0000-0000-000000000000"
+  },
+  "validCase3": {
+    workspace: "00000000-0000-0000-0000-000000000000"
+  }
+}
+'''
+    
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["DataPipeline"]
+        )
+    
+    result = workspace._replace_workspace_ids(edge_cases_content)
+    
+    # Current regex behavior: matches comments and partial matches like "notworkspaceId"
+    # This documents the current behavior for regression testing
+    assert result.count(valid_workspace_id) == 5  # comment, validCase1, validCase2, invalidCase2, validCase3
+    assert '"workspaceIdNot": "00000000-0000-0000-0000-000000000000"' in result  # Should not be replaced (prefix case)
+    assert f'"notworkspaceId": "{valid_workspace_id}"' in result  # Gets replaced (suffix matches workspaceId)
+    assert f'// Comment with workspaceId: "{valid_workspace_id}"' in result  # Comment gets replaced
+
+
+def test_workspace_id_replacement_comprehensive_item_types(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test workspace ID replacement across different item type contexts."""
+    # Test content that might appear in different item types
+    comprehensive_content = '''
+{
+  "notebook": {
+    "metadata": {
+      "environment": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  },
+  "pipeline": {
+    "activities": [{
+      "typeProperties": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000"
+      }
+    }]
+  },
+  "eventstream": {
+    "destinations": [{
+      "properties": {
+        "workspaceId": "00000000-0000-0000-0000-000000000000"
+      }
+    }]
+  },
+  "lakehouse": {
+    "default_lakehouse_workspace_id": "00000000-0000-0000-0000-000000000000"
+  },
+  "environment": {
+    "workspace": "00000000-0000-0000-0000-000000000000"
+  }
+}
+'''
+    
+    # Test with different item types to ensure the replacement works regardless of item type context
+    item_types_to_test = ["Notebook", "DataPipeline", "Eventstream", "Lakehouse", "Environment"]
+    
+    for item_type in item_types_to_test:
+        with patch.object(FabricWorkspace, "_refresh_repository_items"):
+            workspace = patched_fabric_workspace(
+                workspace_id=valid_workspace_id,
+                repository_directory=str(temp_workspace_dir),
+                item_type_in_scope=[item_type]
+            )
+        
+        result = workspace._replace_workspace_ids(comprehensive_content)
+        
+        # Verify all workspace IDs are replaced regardless of item type context
+        assert "00000000-0000-0000-0000-000000000000" not in result, f"Failed for item type: {item_type}"
+        assert result.count(valid_workspace_id) == 5, f"Incorrect replacement count for item type: {item_type}"
+
+
+def test_environment_parameter_replacement_issue(patched_fabric_workspace, temp_workspace_dir, valid_workspace_id):
+    """Test that parameter replacement works correctly with different environment values.
+    
+    This test ensures that the issue where parameter replacement doesn't work when
+    environment defaults to 'N/A' is properly handled.
+    """
+    # Create parameter.yml file with environment-specific replacements
+    parameter_content = """
+find_replace:
+    - find_value: "test-guid-to-replace"
+      replace_value:
+        PPE: "ppe-replacement-value"
+        PROD: "prod-replacement-value"
+      item_type: "Notebook"
+      item_name: ["Test Notebook"]
+"""
+    
+    # Create notebook structure
+    notebook_dir = temp_workspace_dir / "Test Notebook.Notebook"
+    notebook_dir.mkdir(parents=True)
+    
+    notebook_content = 'test_value = "test-guid-to-replace"'
+    
+    # Write files
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (notebook_dir / "notebook-content.py").write_text(notebook_content)
+    
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+    
+    # Test 1: Without environment parameter (defaults to 'N/A')
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace_no_env = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+    
+    # Test 2: With environment parameter (PPE)
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace_with_env = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE"
+        )
+    
+    # Create test objects for parameter replacement
+    test_item = Item(
+        type="Notebook",
+        name="Test Notebook", 
+        description="",
+        guid="test-guid",
+        path=notebook_dir
+    )
+    test_file = File(
+        item_path=notebook_dir,
+        file_path=notebook_dir / "notebook-content.py"
+    )
+    
+    # Test parameter replacement with default environment
+    replaced_content_no_env = workspace_no_env._replace_parameters(test_file, test_item)
+    
+    # Test parameter replacement with specific environment
+    replaced_content_with_env = workspace_with_env._replace_parameters(test_file, test_item)
+    
+    # Assertions
+    # With default environment ('N/A'), replacement should NOT occur
+    assert "test-guid-to-replace" in replaced_content_no_env, "Original value should remain when environment is N/A"
+    assert "ppe-replacement-value" not in replaced_content_no_env, "Replacement should not occur with default environment"
+    
+    # With specific environment (PPE), replacement SHOULD occur
+    assert "test-guid-to-replace" not in replaced_content_with_env, "Original value should be replaced when environment matches"
+    assert "ppe-replacement-value" in replaced_content_with_env, "Replacement should occur with matching environment"

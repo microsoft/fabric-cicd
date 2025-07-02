@@ -7,11 +7,31 @@
 -   **Initial deployment** may not reflect streaming data immediately.
 -   **Reflex** is the item name in source control. Source control may not support all activators/reflexes, as not all sources are compatible.
 
+## API for GraphQL
+
+-   **Parameterization:**
+    -   The source will always point to the source in the original workspace unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    -   It is recommended to use the supported variables in `find_replace` for dynamic replacement of the source workspace and item IDs.
+    -   If you are using a connection and expect it to change between different environments, then it needs to be parameterized in the `parameter.yml` file.
+-   When using the **Saved Credential** method to connect to data sources, developers must have access to the Saved Credential information in order to successfully deploy GraphQL item.
+-   Changes made to the original API query are not source controlled. You will need to manually update the query in the GraphQL item's query editor within the target workspace.
+-   Only user authentication is currently supported for GraphQL items that source data from the SQL Analytics Endpoint.
+
 ## Copy Jobs
 
 -   **Parameterization:**
     -   Connections will always point to the original data source unless parameterized in the `find_replace` section of the `parameter.yml` file.
 -   **Initial deployment** requires manual configuration of the connection after deployment.
+
+## Dataflows
+
+-   **Parameterization:**
+    -   Source/destination items (e.g., Dataflow, Lakehouse, Warehouse) will always reference the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    -   The recommended approach for re-pointing source/destination items is using `find_value` regex and `replace_value` variables in the `find_replace` parameter (see Parameterization -> Dataflows example).
+-   **Initial deployment** may require a manual refresh of the dataflow. After re-pointing dataflows during deployment, temporary errors may appear but should resolve after refreshing and allowing time for processing (especially when a dataflow sources from another dataflow in the target workspace).
+-   `fabric ci-cd` automatically manages ordered deployment of dataflows that source from other dataflows in the same workspace.
+-   **Connections** are not source controlled and require manual creation.
+-   If you use connections that differ between environments, parameterize them in the `parameter.yml` file.
 
 ## Data Pipelines
 
@@ -19,7 +39,7 @@
     -   Activities connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     -   Activities connected to items within the same workspace are re-pointed to the new item in the target workspace.
 -   **Connections** are not source controlled and must be created manually.
--   If you are using connections and expect them to change between different environments, then those need to be parameterized in the parameter.yml file.
+-   If you are using connections and expect them to change between different environments, then those need to be parameterized in the `parameter.yml` file.
 -   The **executing identity** of the deployment must have access to the connections, or the deployment will fail.
 
 ## Environments
@@ -78,6 +98,12 @@
 -   **Parameterization:**
     -   Notebooks attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
 -   **Resources** are not source controlled and will not be deployed.
+
+## Real-Time Dashboard
+
+-   **Parameterization:**
+    -   Real-Time Dashboard attached to KQL databases always point to the original KQL database unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   The **cluster/query URI** of the KQL database(s) used in the dashboard must be present in the Real-Time Dashboard JSON for rebinding. If the Real-Time Dashboard is attached to a KQL database within the same workspace, the cluster URI value is empty and needs to be re-added. `fabric ci-cd` handles this automatically.
 
 ## Reports
 

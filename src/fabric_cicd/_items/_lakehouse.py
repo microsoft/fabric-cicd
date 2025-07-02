@@ -6,7 +6,7 @@
 import json
 import logging
 
-import dpath.util
+import dpath
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
@@ -54,7 +54,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
         for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
             # Check if the item is published to avoid any post publish actions
-            if item.skip_publish:
+            if item_obj.skip_publish:
                 continue
             process_shortcuts(fabric_workspace_obj, item_obj)
 
@@ -77,7 +77,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/lakehouses/{item_obj.guid}"
         )
 
-        sql_endpoint_status = dpath.util.get(
+        sql_endpoint_status = dpath.get(
             response_state, "body/properties/sqlEndpointProperties/provisioningStatus", default=None
         )
 

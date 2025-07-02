@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLDashboard",
+    "displayName": "HelloRealTimeDashboard",
+    "description": "HelloRealTimeDashboard"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "d105911e-7acf-b25d-45a2-0cf90211a6d0"
+  }
+}

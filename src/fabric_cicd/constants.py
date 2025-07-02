@@ -4,9 +4,10 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.19"
+VERSION = "0.1.22"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
+FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
@@ -28,6 +29,9 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Eventstream",
     "Warehouse",
     "SQLDatabase",
+    "KQLDashboard",
+    "Dataflow",
+    "GraphQLApi",
 )
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
@@ -37,18 +41,31 @@ MAX_RETRY_OVERRIDE = {
     "Report": 10,
     "Eventstream": 10,
     "KQLDatabase": 10,
+    "SQLDatabase": 10,
+    "Warehouse": 10,
+    "Dataflow": 10,
     "VariableLibrary": 7,
-    "SQLDatabase": 7,
+    "GraphQLApi": 7,
 }
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-WORKSPACE_ID_REFERENCE_REGEX = r'"(default_lakehouse_workspace_id|workspaceId)": "(.*?)"'
+WORKSPACE_ID_REFERENCE_REGEX = r'\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\"'
+DATAFLOW_ID_REFERENCE_REGEX = r'(dataflowId)\s*=\s*"(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
+
+# Item Type to File Mapping (to check for item dependencies)
+ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json", "Dataflow": "mashup.pq"}
+# Data Pipeline Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name, api_get_item_lookup]}
+DATA_PIPELINE_ACTIVITY_TYPES = {
+    "RefreshDataflow": ["workspaceId", "Dataflow", "dataflowId", "dataflows"],
+    "PBISemanticModelRefresh": ["groupId", "SemanticModel", "datasetId", "semanticModels"],
+}
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
@@ -71,7 +88,6 @@ PARAMETER_MSGS = {
     "valid structure": "Parameter file structure is valid",
     "invalid name": "Invalid parameter name '{}' found in the parameter file",
     "valid name": "Parameter names are valid",
-    "parameter not found": "{} parameter is not present",
     "invalid data type": "The provided '{}' is not of type {} in {}",
     "missing key": "{} is missing keys",
     "invalid key": "{} contains invalid keys",
@@ -87,7 +103,7 @@ PARAMETER_MSGS = {
     "invalid file path": "Path '{}' not found in the repository directory",
     "valid optional": "Optional values in {} are valid",
     "valid parameter": "{} parameter is valid",
-    "skip": "The find value '{}' replacement will be skipped due to {} in parameter {}",
+    "skip": "The {} '{}' replacement will be skipped due to {} in parameter {}",
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }

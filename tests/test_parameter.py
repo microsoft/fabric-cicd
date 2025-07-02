@@ -54,6 +54,35 @@ find_replace:
       item_type: "Notebook"
       item_name: ["Hello World"] 
       file_path: "/Hello World.Notebook/notebook-content.py"
+key_value_replace:
+    - find_key: $.variables[?(@.name=="SQL_Server")].value
+      replace_value:
+        PPE: "contoso-ppe.database.windows.net"
+        PROD: "contoso-prod.database.windows.net"
+        UAT: "contoso-uat.database.windows.net"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+        UAT: "UAT"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value
+      replace_value:
+        PROD: "contoso-production-override.database.windows.net"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="Environment")].value
+      replace_value:
+        PROD: "PROD_ENV"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
 """
 
 SAMPLE_INVALID_PARAMETER_FILE = """
@@ -169,6 +198,17 @@ find_replace:
       file_path: "/Hello World.Notebook/notebook-content.py"
 """
 
+SAMPLE_PARAMETER_INVALID_IS_REGEX = """
+find_replace:
+    # Required Fields
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional Fields
+      is_regex: True
+      item_type: "Notebook"
+"""
 
 SAMPLE_PLATFORM_FILE = """
 {
@@ -232,6 +272,9 @@ def repository_directory(tmp_path):
 
     invalid_parameter_file_path7 = workspace_dir / "invalid_yaml_char_parameter.yml"
     invalid_parameter_file_path7.write_text(SAMPLE_PARAMETER_INVALID_YAML_CHAR)
+
+    invalid_parameter_file_path8 = workspace_dir / "invalid_is_regex_parameter.yml"
+    invalid_parameter_file_path8.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX)
 
     # Create the sample parameter file with multiple of a parameter
     multiple_parameter_file_path = workspace_dir / "multiple_parameter.yml"
@@ -303,6 +346,10 @@ def test_multiple_parameter_validation(repository_directory, item_type_in_scope,
         True,
         constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
     )
+    assert multi_param_obj._validate_parameter("key_value_replace") == (
+        True,
+        constants.PARAMETER_MSGS["valid parameter"].format("key_value_replace"),
+    )
     assert multi_param_obj._validate_parameter_file() == True
 
 
@@ -311,7 +358,7 @@ def test_multiple_parameter_validation(repository_directory, item_type_in_scope,
     [
         ("find_replace", ["find_value", "replace_value"], True, "valid keys"),
         ("find_replace", ["find_value", "item_type", "item_name", "file_path"], False, "missing key"),
-        ("find_replace", ["find_value", "replace_value", "item_type"], True, "valid keys"),
+        ("find_replace", ["find_value", "replace_value", "is_regex", "item_type"], True, "valid keys"),
         ("spark_pool", ["instance_pool_id", "replace_value", "item_name"], True, "valid keys"),
         ("spark_pool", ["instance_pool_id", "replace_value", "item_name", "file_path"], False, "invalid key"),
     ],
@@ -503,10 +550,8 @@ def test_validate_data_type(parameter_object):
 
 def test_validate_yaml_content(parameter_object):
     """Test the validation of the YAML content"""
-    quoted_content = "'Hello World"
-    assert parameter_object._validate_yaml_content(quoted_content) == [
-        constants.PARAMETER_MSGS["invalid content"]["quote"].format("'")
-    ]
+    invalid_content = "\n\n\n\t"
+    assert parameter_object._validate_yaml_content(invalid_content) == ["YAML content is empty"]
 
     invalid_content = "\U0001f600"
     assert parameter_object._validate_yaml_content(invalid_content) == [
@@ -589,6 +634,7 @@ def test_validate_parameter_environment_and_filters(parameter_object, param_name
         ("invalid_name_parameter.yml", False, "invalid name"),
         ("invalid_yaml_struc_parameter.yml", False, "invalid load"),
         ("invalid_yaml_char_parameter.yml", False, "invalid load"),
+        ("invalid_is_regex_parameter.yml", False, "invalid data type"),
     ],
 )
 def test_validate_invalid_parameters(
@@ -654,4 +700,20 @@ def test_validate_invalid_parameters(
 
     # Mismatched quotes in YAML content
     if param_file_name == "invalid_yaml_char_parameter.yml":
-        assert constants.PARAMETER_MSGS["invalid load"].format(["Unclosed quote: '"]) == param_obj.LOAD_ERROR_MSG
+        is_valid, msg = param_obj._validate_parameter_load()
+        try:
+            with Path.open(repository_directory / param_file_name, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml.full_load(yaml_content)
+        except yaml.YAMLError as e:
+            error_message = str(e)
+
+        assert is_valid == result
+        assert msg == constants.PARAMETER_MSGS["invalid load"].format(error_message)
+
+    # Invalid is_regex value in find_replace parameter
+    if param_file_name == "invalid_is_regex_parameter.yml":
+        assert param_obj._validate_parameter("find_replace") == (
+            result,
+            constants.PARAMETER_MSGS[msg].format("is_regex", "string", "find_replace"),
+        )
