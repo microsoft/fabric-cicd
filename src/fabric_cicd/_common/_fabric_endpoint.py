@@ -160,6 +160,7 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
+    **kwargs: any,  # noqa: ARG001 - kept for backward compatibility
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -173,6 +174,7 @@ def _handle_response(
         body: The JSON body used in the request.
         long_running: A boolean indicating if the operation is long-running.
         iteration_count: The current iteration count of the loop.
+        **kwargs: Additional keyword arguments kept for backward compatibility.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
@@ -207,17 +209,13 @@ def _handle_response(
                 # Rely on the operation to provide proper completion response
                 retry_after_val = float(response.headers.get("Retry-After", 60))
                 base_delay = 0.5
-                delay = min(retry_after_val, base_delay * (2**(iteration_count - 1)))
                 
-                # Format delay for logging
-                delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
-                second_str = "second" if delay == 1 else "seconds"
-                
-                logger.info(
-                    f"{constants.INDENT}{constants.INDENT}Operation in progress. "
-                    f"Checking again in {delay_str} {second_str}..."
+                handle_retry(
+                    attempt=iteration_count,
+                    base_delay=base_delay,
+                    response_retry_after=retry_after_val,
+                    prepend_message="Operation in progress."
                 )
-                time.sleep(delay)
         else:
             time.sleep(1)
             long_running = True
@@ -295,35 +293,47 @@ def _handle_response(
 
 
 def handle_retry(
-    attempt: int, base_delay: float, max_retries: int, response_retry_after: float = 60, prepend_message: str = ""
+    attempt: int, base_delay: float, response_retry_after: float = 60, prepend_message: str = "", max_retries: int | None = None
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
+    For long-running operations, continues indefinitely until the operation provides an end state.
+    For transient errors, uses max_retries limit when provided.
 
     Args:
         attempt: The current attempt number.
         base_delay: Base delay in seconds for backoff.
-        max_retries: Maximum number of retry attempts.
         response_retry_after: The value of the Retry-After header from the response.
         prepend_message: Message to prepend to the retry log.
+        max_retries: Maximum number of retry attempts. If None, retries indefinitely.
     """
-    if attempt < max_retries:
-        retry_after = float(response_retry_after)
-        base_delay = float(base_delay)
-        delay = min(retry_after, base_delay * (2**attempt))
+    # Check if we've exceeded retry limit for transient errors
+    if max_retries is not None and attempt >= max_retries:
+        msg = f"Maximum retry attempts ({max_retries}) exceeded."
+        raise Exception(msg)
+    
+    retry_after = float(response_retry_after)
+    base_delay = float(base_delay)
+    delay = min(retry_after, base_delay * (2**attempt))
 
-        # modify output for proper plurality and formatting
-        delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
-        second_str = "second" if delay == 1 else "seconds"
-        prepend_message += " " if prepend_message else ""
+    # modify output for proper plurality and formatting
+    delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
+    second_str = "second" if delay == 1 else "seconds"
+    prepend_message += " " if prepend_message else ""
 
+    # Format message based on whether this is unlimited or limited retries
+    if max_retries is None:
+        # Unlimited retries for long-running operations
+        logger.info(
+            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt})..."
+        )
+    else:
+        # Limited retries for transient errors
         logger.info(
             f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
         )
-        time.sleep(delay)
-    else:
-        msg = f"Maximum retry attempts ({max_retries}) exceeded."
-        raise Exception(msg)
+    
+    time.sleep(delay)
 
 
 def _decode_jwt(token: str) -> dict:
