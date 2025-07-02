@@ -302,7 +302,7 @@ def handle_retry(
         prepend_message: Message to prepend to the retry log.
         max_retries: Maximum number of retry attempts. If None, retries indefinitely.
     """
-    if attempt < max_retries or max_retries is None:
+    if max_retries is None or attempt < max_retries:
         retry_after = float(response_retry_after)
         base_delay = float(base_delay)
         delay = min(retry_after, base_delay * (2**attempt))
