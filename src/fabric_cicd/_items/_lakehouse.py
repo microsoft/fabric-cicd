@@ -89,16 +89,11 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
             msg = f"Cannot resolve SQL endpoint for lakehouse {item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger)
 
-        # SQL Endpoint provisioning - continue polling without retry limits
-        # Rely on the operation to provide proper completion response
-        retry_after_val = 30.0
-        base_delay = 5.0
-        
         handle_retry(
             attempt=iteration,
-            base_delay=base_delay,
-            response_retry_after=retry_after_val,
-            prepend_message="SQL Endpoint provisioning in progress."
+            base_delay=5,
+            response_retry_after=30,
+            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress.",
         )
         iteration += 1
 
