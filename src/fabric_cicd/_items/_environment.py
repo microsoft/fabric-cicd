@@ -6,7 +6,6 @@
 import logging
 import os
 import re
-import time
 import urllib.parse
 from pathlib import Path
 
@@ -14,6 +13,7 @@ import dpath
 import yaml
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._fabric_endpoint import handle_retry
 
 logger = logging.getLogger(__name__)
 
@@ -125,17 +125,13 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
             # Rely on the operation to provide proper completion response
             retry_after_val = 120.0
             base_delay = 5.0
-            delay = min(retry_after_val, base_delay * (2**(iteration - 1)))
             
-            # Format delay for logging
-            delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
-            second_str = "second" if delay == 1 else "seconds"
-            
-            logger.info(
-                f"{constants.INDENT}Operation in progress. "
-                f"Checking again in {delay_str} {second_str}..."
+            handle_retry(
+                attempt=iteration,
+                base_delay=base_delay,
+                response_retry_after=retry_after_val,
+                prepend_message="Operation in progress."
             )
-            time.sleep(delay)
             iteration += 1
 
     if not initial_check:
