@@ -205,15 +205,10 @@ def _handle_response(
                 msg = f"Operation is in an undefined state. Full Body: {response_json}"
                 raise Exception(msg)
             else:
-                # For long-running operations, continue polling without retry limits
-                # Rely on the operation to provide proper completion response
-                retry_after_val = float(response.headers.get("Retry-After", 60))
-                base_delay = 0.5
-                
                 handle_retry(
                     attempt=iteration_count,
-                    base_delay=base_delay,
-                    response_retry_after=retry_after_val,
+                    base_delay=0.5,
+                    response_retry_after=retry_after,
                     prepend_message="Operation in progress."
                 )
         else:
