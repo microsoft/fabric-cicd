@@ -206,10 +206,10 @@ def _handle_response(
                 raise Exception(msg)
             else:
                 handle_retry(
-                    attempt=iteration_count,
+                    attempt=iteration_count - 1,
                     base_delay=0.5,
                     response_retry_after=retry_after,
-                    prepend_message="Operation in progress."
+                    prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
             time.sleep(1)
@@ -292,9 +292,7 @@ def handle_retry(
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
-    For long-running operations, continues indefinitely until the operation provides an end state.
-    Preserves the option to use max_retries limit when provided for specific scenarios.
-
+    
     Args:
         attempt: The current attempt number.
         base_delay: Base delay in seconds for backoff.
@@ -302,33 +300,23 @@ def handle_retry(
         prepend_message: Message to prepend to the retry log.
         max_retries: Maximum number of retry attempts. If None, retries indefinitely.
     """
-    # Check if we've exceeded retry limit when max_retries is specified
-    if max_retries is not None and attempt >= max_retries:
-        msg = f"Maximum retry attempts ({max_retries}) exceeded."
-        raise Exception(msg)
-    
-    retry_after = float(response_retry_after)
-    base_delay = float(base_delay)
-    delay = min(retry_after, base_delay * (2**attempt))
+    if attempt < max_retries or max_retries is None:
+        retry_after = float(response_retry_after)
+        base_delay = float(base_delay)
+        delay = min(retry_after, base_delay * (2**attempt))
 
-    # modify output for proper plurality and formatting
-    delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
-    second_str = "second" if delay == 1 else "seconds"
-    prepend_message += " " if prepend_message else ""
+        # modify output for proper plurality and formatting
+        delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
+        second_str = "second" if delay == 1 else "seconds"
+        prepend_message += " " if prepend_message else ""
 
-    # Format message based on whether this is unlimited or limited retries
-    if max_retries is None:
-        # Unlimited retries for long-running operations
         logger.info(
             f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt})..."
         )
+        time.sleep(delay)
     else:
-        # Limited retries when max_retries is specified
-        logger.info(
-            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
-        )
-    
-    time.sleep(delay)
+        msg = f"Maximum retry attempts ({max_retries}) exceeded."
+        raise Exception(msg)
 
 
 def _decode_jwt(token: str) -> dict:
