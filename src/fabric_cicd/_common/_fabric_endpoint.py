@@ -298,7 +298,7 @@ def handle_retry(
     """
     Handles retry logic with exponential backoff based on the response.
     For long-running operations, continues indefinitely until the operation provides an end state.
-    For transient errors, uses max_retries limit when provided.
+    Preserves the option to use max_retries limit when provided for specific scenarios.
 
     Args:
         attempt: The current attempt number.
@@ -307,7 +307,7 @@ def handle_retry(
         prepend_message: Message to prepend to the retry log.
         max_retries: Maximum number of retry attempts. If None, retries indefinitely.
     """
-    # Check if we've exceeded retry limit for transient errors
+    # Check if we've exceeded retry limit when max_retries is specified
     if max_retries is not None and attempt >= max_retries:
         msg = f"Maximum retry attempts ({max_retries}) exceeded."
         raise Exception(msg)
@@ -328,7 +328,7 @@ def handle_retry(
             f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt})..."
         )
     else:
-        # Limited retries for transient errors
+        # Limited retries when max_retries is specified
         logger.info(
             f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
         )
