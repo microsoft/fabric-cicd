@@ -160,7 +160,7 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
-    **kwargs: any,
+    **kwargs: any,  # noqa: ARG001 - kept for backward compatibility, previously used max_retries
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
