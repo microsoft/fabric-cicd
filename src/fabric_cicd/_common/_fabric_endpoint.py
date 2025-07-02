@@ -160,7 +160,6 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
-    **kwargs: any,
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -174,7 +173,6 @@ def _handle_response(
         body: The JSON body used in the request.
         long_running: A boolean indicating if the operation is long-running.
         iteration_count: The current iteration count of the loop.
-        kwargs: Additional keyword arguments to pass to the method.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
@@ -288,11 +286,15 @@ def _handle_response(
 
 
 def handle_retry(
-    attempt: int, base_delay: float, response_retry_after: float = 60, prepend_message: str = "", max_retries: int | None = None
+    attempt: int,
+    base_delay: float,
+    response_retry_after: float = 60,
+    prepend_message: str = "",
+    max_retries: int | None = None,
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
-    
+
     Args:
         attempt: The current attempt number.
         base_delay: Base delay in seconds for backoff.
