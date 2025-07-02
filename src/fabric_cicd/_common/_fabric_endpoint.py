@@ -209,7 +209,7 @@ def _handle_response(
                     attempt=iteration_count - 1,
                     base_delay=0.5,
                     response_retry_after=retry_after,
-                    max_retries=kwargs.get("max_retries", 5),
+                    max_retries=None,  # Unlimited retries for long-running operations
                     prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
@@ -289,7 +289,7 @@ def _handle_response(
 
 
 def handle_retry(
-    attempt: int, base_delay: float, max_retries: int, response_retry_after: float = 60, prepend_message: str = ""
+    attempt: int, base_delay: float, max_retries: Optional[int], response_retry_after: float = 60, prepend_message: str = ""
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
@@ -297,11 +297,14 @@ def handle_retry(
     Args:
         attempt: The current attempt number.
         base_delay: Base delay in seconds for backoff.
-        max_retries: Maximum number of retry attempts.
+        max_retries: Maximum number of retry attempts. Use None or -1 for unlimited retries.
         response_retry_after: The value of the Retry-After header from the response.
         prepend_message: Message to prepend to the retry log.
     """
-    if attempt < max_retries:
+    # Support unlimited retries when max_retries is None or -1
+    unlimited_retries = max_retries is None or max_retries == -1
+    
+    if unlimited_retries or attempt < max_retries:
         retry_after = float(response_retry_after)
         base_delay = float(base_delay)
         delay = min(retry_after, base_delay * (2**attempt))
@@ -311,9 +314,14 @@ def handle_retry(
         second_str = "second" if delay == 1 else "seconds"
         prepend_message += " " if prepend_message else ""
 
-        logger.info(
-            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
-        )
+        if unlimited_retries:
+            logger.info(
+                f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt})..."
+            )
+        else:
+            logger.info(
+                f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
+            )
         time.sleep(delay)
     else:
         msg = f"Maximum retry attempts ({max_retries}) exceeded."

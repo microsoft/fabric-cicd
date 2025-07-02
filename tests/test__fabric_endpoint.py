@@ -397,3 +397,109 @@ def test_format_invoke_log():
     log_message = _format_invoke_log(response, "GET", "http://example.com", "{}")
     assert "Method: GET" in log_message
     assert "URL: http://example.com" in log_message
+
+
+def test_handle_retry_unlimited_retries(setup_mocks):
+    """Test handle_retry with unlimited retries (max_retries=None)."""
+    from fabric_cicd._common._fabric_endpoint import handle_retry
+    
+    dl, mock_requests = setup_mocks
+    
+    # Test with max_retries=None (unlimited)
+    handle_retry(
+        attempt=10,
+        base_delay=1,
+        max_retries=None,
+        response_retry_after=2,
+        prepend_message="Operation in progress."
+    )
+    
+    # Should log without showing max attempts
+    expected = f"{constants.INDENT}Operation in progress. Checking again in 2 seconds (Attempt 10)..."
+    assert dl.messages == [expected]
+
+
+def test_handle_retry_unlimited_retries_negative_one(setup_mocks):
+    """Test handle_retry with unlimited retries (max_retries=-1)."""
+    from fabric_cicd._common._fabric_endpoint import handle_retry
+    
+    dl, mock_requests = setup_mocks
+    
+    # Test with max_retries=-1 (unlimited)
+    handle_retry(
+        attempt=50,
+        base_delay=0.5,
+        max_retries=-1,
+        response_retry_after=60,
+        prepend_message="Long running operation."
+    )
+    
+    # Should log without showing max attempts, and use smaller delay (min of retry_after and exponential backoff)
+    expected = f"{constants.INDENT}Long running operation. Checking again in 60 seconds (Attempt 50)..."
+    assert dl.messages == [expected]
+
+
+def test_handle_retry_limited_retries_still_works(setup_mocks):
+    """Test handle_retry with limited retries still works as before."""
+    from fabric_cicd._common._fabric_endpoint import handle_retry
+    
+    dl, mock_requests = setup_mocks
+    
+    # Test with regular max_retries
+    handle_retry(
+        attempt=2,
+        base_delay=1,
+        max_retries=5,
+        response_retry_after=60,
+        prepend_message="API is throttled."
+    )
+    
+    # Should log with max attempts shown
+    expected = f"{constants.INDENT}API is throttled. Checking again in 4 seconds (Attempt 2/5)..."
+    assert dl.messages == [expected]
+
+
+def test_handle_retry_max_exceeded_still_raises(setup_mocks):
+    """Test handle_retry still raises exception when max retries exceeded for limited retries."""
+    from fabric_cicd._common._fabric_endpoint import handle_retry
+    
+    dl, mock_requests = setup_mocks
+    
+    # Test that max retries exceeded still raises exception for limited retries
+    with pytest.raises(Exception, match="Maximum retry attempts \\(3\\) exceeded."):
+        handle_retry(
+            attempt=3,
+            base_delay=1,
+            max_retries=3,
+            response_retry_after=60,
+            prepend_message="Test."
+        )
+
+
+def test_handle_response_long_running_operation_unlimited_retries(setup_mocks):
+    """Test _handle_response uses unlimited retries for long-running operations."""
+    dl, mock_requests = setup_mocks
+    response = Mock(
+        status_code=200,
+        headers={"Retry-After": "20", "Location": "http://example.com/operation"},
+        json=Mock(return_value={"status": "Running"})
+    )
+    
+    # This should not raise an exception even with high iteration_count
+    # because long-running operations now use unlimited retries
+    exit_loop, method, url, body, long_running = _handle_response(
+        response=response,
+        method="GET",
+        url="http://example.com",
+        body="{}",
+        long_running=True,
+        iteration_count=100,  # High number that would exceed old limit
+    )
+    
+    # Should continue waiting (not exit loop) and use unlimited retries
+    assert exit_loop is False
+    assert long_running is True
+    
+    # Should log without max attempts limit
+    expected = f"{constants.INDENT}{constants.INDENT}Operation in progress. Checking again in 20 seconds (Attempt 99)..."
+    assert dl.messages == [expected]
