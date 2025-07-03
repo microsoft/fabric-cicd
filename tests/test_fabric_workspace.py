@@ -605,15 +605,13 @@ def test_empty_logical_id_validation(temp_workspace_dir, patched_fabric_workspac
     with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("Dummy file content")
     
-    # Test that ParsingError is raised when validating repository metadata
-    workspace = patched_fabric_workspace(
-        workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
-        item_type_in_scope=["Notebook"]
-    )
-    
+    # Test that ParsingError is raised when trying to refresh repository items
     with pytest.raises(ParsingError) as exc_info:
-        workspace._validate_repository_metadata()
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
     
     # Verify the error message contains the expected information
     assert "logicalId cannot be empty" in str(exc_info.value)
@@ -645,15 +643,13 @@ def test_whitespace_only_logical_id_validation(temp_workspace_dir, patched_fabri
     with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("Dummy file content")
     
-    # Test that ParsingError is raised
-    workspace = patched_fabric_workspace(
-        workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
-        item_type_in_scope=["Notebook"]
-    )
-    
+    # Test that ParsingError is raised when trying to refresh repository items  
     with pytest.raises(ParsingError) as exc_info:
-        workspace._validate_repository_metadata()
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
     
     # Verify the error message
     assert "logicalId cannot be empty" in str(exc_info.value)
@@ -702,7 +698,7 @@ def test_valid_logical_id_works_correctly(temp_workspace_dir, patched_fabric_wor
 
 
 def test_empty_logical_id_validation_during_publish(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
-    """Test that empty logical IDs are caught early during publish_all_items workflow."""
+    """Test that empty logical IDs are caught during workspace initialization."""
     from fabric_cicd._common._exceptions import ParsingError
     from fabric_cicd.publish import publish_all_items
     
@@ -727,17 +723,100 @@ def test_empty_logical_id_validation_during_publish(temp_workspace_dir, patched_
     with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("Dummy file content")
     
-    # Create workspace
-    workspace = patched_fabric_workspace(
-        workspace_id=valid_workspace_id,
-        repository_directory=str(temp_workspace_dir),
-        item_type_in_scope=["Notebook"]
-    )
-    
-    # Test that ParsingError is raised early in publish_all_items before any folders are published
+    # Test that ParsingError is raised during workspace initialization
     with pytest.raises(ParsingError) as exc_info:
-        publish_all_items(workspace)
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
     
     # Verify the error message contains the expected information
     assert "logicalId cannot be empty" in str(exc_info.value)
     assert str(platform_file_path) in str(exc_info.value)
+
+
+def test_multiple_empty_logical_ids_validation(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that multiple empty logical IDs are all reported at once."""
+    from fabric_cicd._common._exceptions import ParsingError
+    
+    # Create multiple .platform files with empty logical IDs
+    item_dirs = ["TestItem1.Notebook", "TestItem2.Notebook", "TestItem3.Environment"]
+    platform_file_paths = []
+    
+    for item_dir_name in item_dirs:
+        item_dir = temp_workspace_dir / item_dir_name
+        item_dir.mkdir(parents=True, exist_ok=True)
+        platform_file_path = item_dir / ".platform"
+        platform_file_paths.append(platform_file_path)
+        
+        item_type = "Notebook" if "Notebook" in item_dir_name else "Environment"
+        metadata_content = {
+            "metadata": {
+                "type": item_type,
+                "displayName": f"Test Item {item_dir_name}",
+                "description": f"Test item for multiple empty logical ID validation",
+            },
+            "config": {"logicalId": ""},  # Empty logical ID
+        }
+        
+        with platform_file_path.open("w", encoding="utf-8") as f:
+            json.dump(metadata_content, f, ensure_ascii=False)
+        
+        # Create a dummy content file
+        with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+    
+    # Test that ParsingError is raised when trying to refresh repository items
+    with pytest.raises(ParsingError) as exc_info:
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook", "Environment"]
+        )
+    
+    # Verify the error message contains information about all empty logical IDs
+    error_message = str(exc_info.value)
+    assert "logicalId cannot be empty in the following files:" in error_message
+    for platform_file_path in platform_file_paths:
+        assert str(platform_file_path) in error_message
+
+
+def test_single_empty_logical_id_validation_message(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that a single empty logical ID shows the original error format."""
+    from fabric_cicd._common._exceptions import ParsingError
+    
+    # Create a .platform file with empty logical ID
+    item_dir = temp_workspace_dir / "TestItem.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    platform_file_path = item_dir / ".platform"
+    
+    metadata_content = {
+        "metadata": {
+            "type": "Notebook",
+            "displayName": "Test Item with Empty Logical ID",
+            "description": "Test item for single empty logical ID validation",
+        },
+        "config": {"logicalId": ""},  # Empty logical ID
+    }
+    
+    with platform_file_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata_content, f, ensure_ascii=False)
+    
+    # Create a dummy content file
+    with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("Dummy file content")
+    
+    # Test that ParsingError is raised when trying to refresh repository items
+    with pytest.raises(ParsingError) as exc_info:
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
+    
+    # Verify the error message uses single file format (not "following files:")
+    error_message = str(exc_info.value)
+    assert "logicalId cannot be empty in " in error_message
+    assert "following files:" not in error_message
+    assert str(platform_file_path) in error_message

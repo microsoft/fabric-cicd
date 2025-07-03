@@ -172,10 +172,11 @@ class FabricWorkspace:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
 
-    def _validate_repository_metadata(self) -> None:
-        """Validates metadata in all .platform files before any publish operations."""
-        print_header("Validating Repository Metadata")
-        
+    def _refresh_repository_items(self) -> None:
+        """Refreshes the repository_items dictionary by scanning the repository directory."""
+        self.repository_items = {}
+        empty_logical_id_paths = []  # Collect all paths with empty logical IDs
+
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
             # valid item directory with .platform file within
@@ -193,53 +194,25 @@ class FabricWorkspace:
                         item_metadata = json.load(file)
                 except FileNotFoundError as e:
                     msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"
-                    raise ParsingError(msg, logger)
+                    ParsingError(msg, logger)
                 except json.JSONDecodeError as e:
                     msg = f"Error decoding JSON in {item_metadata_path}. {e}"
-                    raise ParsingError(msg, logger)
+                    ParsingError(msg, logger)
 
                 # Ensure required metadata fields are present
                 if "type" not in item_metadata["metadata"] or "displayName" not in item_metadata["metadata"]:
                     msg = f"displayName & type are required in {item_metadata_path}"
                     raise ParsingError(msg, logger)
 
-                # Validate that logical ID is not empty
-                if "config" in item_metadata and "logicalId" in item_metadata["config"]:
-                    item_logical_id = item_metadata["config"]["logicalId"]
-                    if not item_logical_id or item_logical_id.strip() == "":
-                        msg = f"logicalId cannot be empty in {item_metadata_path}"
-                        raise ParsingError(msg, logger)
-
-    def _refresh_repository_items(self) -> None:
-        """Refreshes the repository_items dictionary by scanning the repository directory."""
-        self.repository_items = {}
-
-        for root, _dirs, files in os.walk(self.repository_directory):
-            directory = Path(root)
-            # valid item directory with .platform file within
-            if ".platform" in files:
-                item_metadata_path = directory / ".platform"
-
-                # Print a warning and skip directory if empty
-                if not any(directory.iterdir()):
-                    logger.warning(f"Directory {directory.name} is empty.")
-                    continue
-
-                # Attempt to read metadata file
-                try:
-                    with Path.open(item_metadata_path, encoding="utf-8") as file:
-                        item_metadata = json.load(file)
-                except FileNotFoundError as e:
-                    msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"
-                    ParsingError(msg, logger)
-                except json.JSONDecodeError as e:
-                    msg = f"Error decoding JSON in {item_metadata_path}. {e}"
-                    ParsingError(msg, logger)
-
                 item_type = item_metadata["metadata"]["type"]
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
+                
+                # Check for empty logical ID and collect the path
+                if not item_logical_id or item_logical_id.strip() == "":
+                    empty_logical_id_paths.append(str(item_metadata_path))
+                    continue  # Skip processing this item further
                 
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
@@ -267,6 +240,15 @@ class FabricWorkspace:
                 )
 
                 self.repository_items[item_type][item_name].collect_item_files()
+        
+        # If we found any empty logical IDs, raise an error with all paths
+        if empty_logical_id_paths:
+            if len(empty_logical_id_paths) == 1:
+                msg = f"logicalId cannot be empty in {empty_logical_id_paths[0]}"
+            else:
+                paths_list = "\n  - ".join(empty_logical_id_paths)
+                msg = f"logicalId cannot be empty in the following files:\n  - {paths_list}"
+            raise ParsingError(msg, logger)
 
     def _refresh_deployed_items(self) -> None:
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""

@@ -49,9 +49,6 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    # Validate repository metadata before any publish operations
-    fabric_workspace_obj._validate_repository_metadata()
-
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
