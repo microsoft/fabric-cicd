@@ -160,7 +160,6 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
-    **kwargs: any,
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -174,7 +173,6 @@ def _handle_response(
         body: The JSON body used in the request.
         long_running: A boolean indicating if the operation is long-running.
         iteration_count: The current iteration count of the loop.
-        kwargs: Additional keyword arguments to pass to the method.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
@@ -209,7 +207,6 @@ def _handle_response(
                     attempt=iteration_count - 1,
                     base_delay=0.5,
                     response_retry_after=retry_after,
-                    max_retries=kwargs.get("max_retries", 5),
                     prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
@@ -289,7 +286,11 @@ def _handle_response(
 
 
 def handle_retry(
-    attempt: int, base_delay: float, max_retries: int, response_retry_after: float = 60, prepend_message: str = ""
+    attempt: int,
+    base_delay: float,
+    response_retry_after: float = 60,
+    prepend_message: str = "",
+    max_retries: int | None = None,
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
@@ -297,11 +298,11 @@ def handle_retry(
     Args:
         attempt: The current attempt number.
         base_delay: Base delay in seconds for backoff.
-        max_retries: Maximum number of retry attempts.
         response_retry_after: The value of the Retry-After header from the response.
         prepend_message: Message to prepend to the retry log.
+        max_retries: Maximum number of retry attempts. If None, retries indefinitely.
     """
-    if attempt < max_retries:
+    if max_retries is None or attempt < max_retries:
         retry_after = float(response_retry_after)
         base_delay = float(base_delay)
         delay = min(retry_after, base_delay * (2**attempt))
@@ -312,7 +313,7 @@ def handle_retry(
         prepend_message += " " if prepend_message else ""
 
         logger.info(
-            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt}/{max_retries})..."
+            f"{constants.INDENT}{prepend_message}Checking again in {delay_str} {second_str} (Attempt {attempt})..."
         )
         time.sleep(delay)
     else:
