@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,7 @@ from fabric_cicd._common._exceptions import InputError, ParameterFileError, Pars
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd.publish_log_entry import PublishLogEntry
 
 logger = logging.getLogger(__name__)
 
@@ -123,10 +125,12 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.items_to_include: list[str] = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+        self.publish_log_entries: list[PublishLogEntry] = []
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -431,6 +435,27 @@ class FabricWorkspace:
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
                 return
 
+        # Skip publishing if the item is not in the include list
+        if self.items_to_include is not None:
+            current_item = f"{item_name}.{item_type}"
+            logger.debug(f"Checking if '{current_item}' is in items_to_include: {self.items_to_include}")
+
+            # Check for exact match or case-insensitive match
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
+
+            # Check for exact match or case-insensitive match
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
+
+            if not match_found:
+                item.skip_publish = True
+                logger.info(f"Skipping publishing {item_name}.{item_type} as it is not in the items to include list.")
+                logger.debug(f"Include list: {self.items_to_include}")
+                return
+            logger.info(f"Publishing {item_name}.{item_type} as it is in the items to include list.")
+        else:
+            logger.info(f"Publishing {item_name}.{item_type} as no items to include list is provided.")
+
         item_guid = item.guid
         item_files = item.item_files
 
@@ -515,6 +540,18 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published")
+
+        self.publish_log_entries.append(
+            PublishLogEntry(
+                name=item_name,
+                item_type=item_type,
+                success=True,
+                error=None,
+                start_time=datetime.now(),
+                end_time=datetime.now(),
+            )
+        )
+
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
