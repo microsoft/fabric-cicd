@@ -7,6 +7,7 @@ and for debugging the parameter file. The utilities include validating the param
 parameter dictionary structure, processing parameter values, and handling parameter value replacements.
 """
 
+import glob
 import json
 import logging
 import os
@@ -269,53 +270,99 @@ def _check_parameter_structure(param_value: any) -> bool:
     return isinstance(param_value, list)
 
 
-def process_input_path(
-    repository_directory: Path, input_path: Union[str, list[str], None]
-) -> Union[Path, list[Path], None]:
+def _resolve_input_path(repository_directory: Path, input_path: str, is_wildcard: bool = False) -> list[Path]:
     """
-    Processes the input_path value according to its type.
+    Resolves the input_path string to a list of Path objects.
+    Handles both wildcard and regular paths, ensuring paths exist within the repository directory.
 
     Args:
         repository_directory: The directory of the repository.
-        input_path: The input path value to process (None value, a string value, or list of string values).
+        input_path: The input path string to resolve.
+        is_wildcard: Boolean indicating if the input_path contains wildcard characters.
+    """
+    paths = []
+
+    if is_wildcard:
+        normalized_path = input_path.replace("\\", "/")
+
+        # Handle recursive wildcard
+        if normalized_path.startswith("**/"):
+            search_pattern = f"**/{normalized_path[3:]}"
+
+        # Handle absolute wildcard path
+        elif Path(normalized_path).is_absolute():
+            abs_path = Path(normalized_path)
+            try:
+                rel_path = abs_path.relative_to(repository_directory)
+                search_pattern = str(rel_path)
+            except ValueError:
+                logger.error(
+                    f"Invalid absolute wildcard path. '{input_path}' does not exist in the repository directory."
+                )
+                return []
+        else:
+            search_pattern = normalized_path
+
+        paths = [path for path in repository_directory.glob(search_pattern) if path.is_file()]
+        if paths:
+            logger.debug(f"Wildcard path '{input_path}' matched {len(paths)} files\n{paths}.")
+        return paths
+
+    # Normalize and resolve regular path
+    normalized_path = Path(input_path.lstrip("/\\"))
+
+    if not normalized_path.is_absolute():
+        absolute_path = (repository_directory / normalized_path).resolve()
+        if absolute_path.exists() and absolute_path.is_file():
+            logger.debug(f"Relative path '{input_path}' resolved as '{absolute_path}'")
+            paths.append(absolute_path)
+        else:
+            logger.debug(f"Relative path '{input_path}' does not exist or is not a file.")
+        return paths
+
+    # Handle absolute path
+    absolute_path = normalized_path
+    try:
+        absolute_path.relative_to(repository_directory)
+        if absolute_path.exists() and absolute_path.is_file():
+            paths.append(absolute_path)
+    except ValueError:
+        logger.error(f"Invalid absolute path. '{input_path}' does not exist in the repository directory.")
+
+    return paths
+
+
+def process_input_path(repository_directory: Path, input_path: Union[str, list[str], None]) -> Union[list[Path], None]:
+    """
+    Processes the input_path value according to its type. Supports both
+    regular paths and wildcard paths, including mixed lists.
+
+    Args:
+        repository_directory: The directory of the repository.
+        input_path: The input path value to process (None, a string, or list of strings).
     """
     if not input_path:
         return input_path
 
     if isinstance(input_path, list):
-        return [_convert_value_to_path(repository_directory, path) for path in input_path]
+        paths = []
+        for path in input_path:
+            is_wildcard = glob.has_magic(path)
+            paths.extend(_resolve_input_path(repository_directory, path, is_wildcard))
 
-    return _convert_value_to_path(repository_directory, input_path)
+        if not paths:
+            logger.debug(f"No valid paths found from input list: {input_path}")
 
+        return paths
 
-def _convert_value_to_path(repository_directory: Path, input_path: str) -> Path:
-    """
-    Converts the input_path string value to a Path object
-    and resolves a relative path as an absolute path, if present.
-    """
-    if not Path(input_path).is_absolute():
-        # Strip leading slashes or backslashes
-        normalized_path = Path(input_path.lstrip("/\\"))
-        # Set the absolute path
-        absolute_path = repository_directory / normalized_path
-        if absolute_path.exists():
-            logger.debug(f"Relative path '{input_path}' resolved as '{absolute_path}'")
-        else:
-            logger.debug(f"Relative path '{input_path}' does not exist, provide a valid path")
-
-        return absolute_path
-
-    absolute_path = Path(input_path)
-    if not absolute_path.exists():
-        logger.debug(f"Absolute path '{input_path}' does not exist, provide a valid path")
-
-    return absolute_path
+    is_wildcard = glob.has_magic(input_path)
+    return _resolve_input_path(repository_directory, input_path, is_wildcard)
 
 
 def check_replacement(
     input_type: Union[str, list[str], None],
     input_name: Union[str, list[str], None],
-    input_path: Union[Path, list[str], None],
+    input_path: Union[list[Path], None],
     item_type: str,
     item_name: str,
     file_path: Path,
@@ -357,7 +404,7 @@ def check_replacement(
 
 
 def _find_match(
-    param_value: Union[str, list, Path, None],
+    param_value: Union[str, list, None],
     compare_value: Union[str, Path],
 ) -> bool:
     """

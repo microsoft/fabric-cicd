@@ -477,9 +477,7 @@ class Parameter:
         """Validate the file path exists."""
         # Convert input path to Path object
         input_path_new = process_input_path(self.repository_directory, input_path)
-
-        # Check if the file path exists
-        if not input_path_new.exists():
+        if not input_path_new:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path)
 
         return True, "Valid file path"
