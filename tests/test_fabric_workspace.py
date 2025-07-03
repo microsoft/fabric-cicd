@@ -685,13 +685,7 @@ def test_valid_logical_id_works_correctly(temp_workspace_dir, patched_fabric_wor
         item_type_in_scope=["Notebook"]
     )
     
-    # Validation should pass without exception
-    workspace._validate_repository_metadata()
-    
-    # Load repository items to verify everything works
-    workspace._refresh_repository_items()
-    
-    # Verify the item was loaded correctly
+    # Verify the item was loaded correctly (validation happens automatically during refresh)
     assert "Notebook" in workspace.repository_items
     assert "Test Item with Valid Logical ID" in workspace.repository_items["Notebook"]
     assert workspace.repository_items["Notebook"]["Test Item with Valid Logical ID"].logical_id == "valid-logical-id-123"
@@ -700,7 +694,6 @@ def test_valid_logical_id_works_correctly(temp_workspace_dir, patched_fabric_wor
 def test_empty_logical_id_validation_during_publish(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that empty logical IDs are caught during workspace initialization."""
     from fabric_cicd._common._exceptions import ParsingError
-    from fabric_cicd.publish import publish_all_items
     
     # Create a .platform file with empty logical ID
     item_dir = temp_workspace_dir / "TestItem.Notebook"
@@ -725,7 +718,7 @@ def test_empty_logical_id_validation_during_publish(temp_workspace_dir, patched_
     
     # Test that ParsingError is raised during workspace initialization
     with pytest.raises(ParsingError) as exc_info:
-        workspace = patched_fabric_workspace(
+        patched_fabric_workspace(
             workspace_id=valid_workspace_id,
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"]
@@ -755,7 +748,7 @@ def test_multiple_empty_logical_ids_validation(temp_workspace_dir, patched_fabri
             "metadata": {
                 "type": item_type,
                 "displayName": f"Test Item {item_dir_name}",
-                "description": f"Test item for multiple empty logical ID validation",
+                "description": "Test item for multiple empty logical ID validation",
             },
             "config": {"logicalId": ""},  # Empty logical ID
         }
