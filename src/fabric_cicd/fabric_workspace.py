@@ -207,6 +207,12 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
+                
+                # Validate that logical ID is not empty
+                if not item_logical_id or item_logical_id.strip() == "":
+                    msg = f"logicalId cannot be empty in {item_metadata_path}"
+                    raise ParsingError(msg, logger)
+                
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 relative_parent_path = "/".join(relative_path.split("/")[:-1])

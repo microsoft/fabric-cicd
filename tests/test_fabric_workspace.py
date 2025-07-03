@@ -578,3 +578,114 @@ find_replace:
     # With specific environment (PPE), replacement SHOULD occur
     assert "test-guid-to-replace" not in replaced_content_with_env, "Original value should be replaced when environment matches"
     assert "ppe-replacement-value" in replaced_content_with_env, "Replacement should occur with matching environment"
+
+
+def test_empty_logical_id_validation(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that empty logical IDs raise a ParsingError during repository refresh."""
+    from fabric_cicd._common._exceptions import ParsingError
+    
+    # Create a .platform file with empty logical ID
+    item_dir = temp_workspace_dir / "TestItem.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    platform_file_path = item_dir / ".platform"
+    
+    metadata_content = {
+        "metadata": {
+            "type": "Notebook",
+            "displayName": "Test Item with Empty Logical ID",
+            "description": "Test item for empty logical ID validation",
+        },
+        "config": {"logicalId": ""},  # Empty logical ID
+    }
+    
+    with platform_file_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata_content, f, ensure_ascii=False)
+    
+    # Create a dummy content file
+    with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("Dummy file content")
+    
+    # Test that ParsingError is raised when trying to refresh repository items
+    with pytest.raises(ParsingError) as exc_info:
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
+    
+    # Verify the error message contains the expected information
+    assert "logicalId cannot be empty" in str(exc_info.value)
+    assert str(platform_file_path) in str(exc_info.value)
+
+
+def test_whitespace_only_logical_id_validation(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that logical IDs with only whitespace raise a ParsingError."""
+    from fabric_cicd._common._exceptions import ParsingError
+    
+    # Create a .platform file with whitespace-only logical ID
+    item_dir = temp_workspace_dir / "TestItem.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    platform_file_path = item_dir / ".platform"
+    
+    metadata_content = {
+        "metadata": {
+            "type": "Notebook", 
+            "displayName": "Test Item with Whitespace Logical ID",
+            "description": "Test item for whitespace logical ID validation",
+        },
+        "config": {"logicalId": "   "},  # Whitespace-only logical ID
+    }
+    
+    with platform_file_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata_content, f, ensure_ascii=False)
+    
+    # Create a dummy content file
+    with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("Dummy file content")
+    
+    # Test that ParsingError is raised
+    with pytest.raises(ParsingError) as exc_info:
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"]
+        )
+    
+    # Verify the error message
+    assert "logicalId cannot be empty" in str(exc_info.value)
+
+
+def test_valid_logical_id_works_correctly(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that valid logical IDs continue to work correctly after adding validation."""
+    # Create a .platform file with valid logical ID
+    item_dir = temp_workspace_dir / "TestItem.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    platform_file_path = item_dir / ".platform"
+    
+    metadata_content = {
+        "metadata": {
+            "type": "Notebook",
+            "displayName": "Test Item with Valid Logical ID",
+            "description": "Test item for valid logical ID verification",
+        },
+        "config": {"logicalId": "valid-logical-id-123"},  # Valid logical ID
+    }
+    
+    with platform_file_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata_content, f, ensure_ascii=False)
+    
+    # Create a dummy content file
+    with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("Dummy file content")
+    
+    # This should work without raising any exception
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook"]
+    )
+    
+    # Verify the item was loaded correctly
+    assert "Notebook" in workspace.repository_items
+    assert "Test Item with Valid Logical ID" in workspace.repository_items["Notebook"]
+    assert workspace.repository_items["Notebook"]["Test Item with Valid Logical ID"].logical_id == "valid-logical-id-123"
