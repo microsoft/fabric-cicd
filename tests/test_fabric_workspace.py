@@ -605,13 +605,15 @@ def test_empty_logical_id_validation(temp_workspace_dir, patched_fabric_workspac
     with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("Dummy file content")
     
-    # Test that ParsingError is raised when trying to refresh repository items
+    # Test that ParsingError is raised when validating repository metadata
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook"]
+    )
+    
     with pytest.raises(ParsingError) as exc_info:
-        patched_fabric_workspace(
-            workspace_id=valid_workspace_id,
-            repository_directory=str(temp_workspace_dir),
-            item_type_in_scope=["Notebook"]
-        )
+        workspace._validate_repository_metadata()
     
     # Verify the error message contains the expected information
     assert "logicalId cannot be empty" in str(exc_info.value)
@@ -644,12 +646,14 @@ def test_whitespace_only_logical_id_validation(temp_workspace_dir, patched_fabri
         f.write("Dummy file content")
     
     # Test that ParsingError is raised
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook"]
+    )
+    
     with pytest.raises(ParsingError) as exc_info:
-        patched_fabric_workspace(
-            workspace_id=valid_workspace_id,
-            repository_directory=str(temp_workspace_dir),
-            item_type_in_scope=["Notebook"]
-        )
+        workspace._validate_repository_metadata()
     
     # Verify the error message
     assert "logicalId cannot be empty" in str(exc_info.value)
@@ -685,7 +689,55 @@ def test_valid_logical_id_works_correctly(temp_workspace_dir, patched_fabric_wor
         item_type_in_scope=["Notebook"]
     )
     
+    # Validation should pass without exception
+    workspace._validate_repository_metadata()
+    
+    # Load repository items to verify everything works
+    workspace._refresh_repository_items()
+    
     # Verify the item was loaded correctly
     assert "Notebook" in workspace.repository_items
     assert "Test Item with Valid Logical ID" in workspace.repository_items["Notebook"]
     assert workspace.repository_items["Notebook"]["Test Item with Valid Logical ID"].logical_id == "valid-logical-id-123"
+
+
+def test_empty_logical_id_validation_during_publish(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that empty logical IDs are caught early during publish_all_items workflow."""
+    from fabric_cicd._common._exceptions import ParsingError
+    from fabric_cicd.publish import publish_all_items
+    
+    # Create a .platform file with empty logical ID
+    item_dir = temp_workspace_dir / "TestItem.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    platform_file_path = item_dir / ".platform"
+    
+    metadata_content = {
+        "metadata": {
+            "type": "Notebook",
+            "displayName": "Test Item with Empty Logical ID",
+            "description": "Test item for empty logical ID validation during publish",
+        },
+        "config": {"logicalId": ""},  # Empty logical ID
+    }
+    
+    with platform_file_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata_content, f, ensure_ascii=False)
+    
+    # Create a dummy content file
+    with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("Dummy file content")
+    
+    # Create workspace
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook"]
+    )
+    
+    # Test that ParsingError is raised early in publish_all_items before any folders are published
+    with pytest.raises(ParsingError) as exc_info:
+        publish_all_items(workspace)
+    
+    # Verify the error message contains the expected information
+    assert "logicalId cannot be empty" in str(exc_info.value)
+    assert str(platform_file_path) in str(exc_info.value)
