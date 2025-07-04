@@ -336,7 +336,7 @@ key_value_replace:
       replace_value:
           PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE SQL Connection GUID
           PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD SQL Connection GUID
-      item_type: "Data Pipeline" # filter on Data Pipelines files
+      item_type: "DataPipeline" # filter on Data Pipelines files
       item_name: "Example Pipeline" # filter on specific Data Pipelines files
 ```
 
