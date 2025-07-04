@@ -331,7 +331,7 @@ This replacement is managed by the `find_key` input in the `parameter.yml` file 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
 ```yaml
-find_replace:
+key_value_replace:
     - find_key: $.properties.activities[?(@.name=="Copy Data")].typeProperties.source.datasetSettings.externalReferences.connection
       replace_value:
           PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE SQL Connection GUID
