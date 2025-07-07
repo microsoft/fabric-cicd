@@ -5,68 +5,28 @@ labels: ["tech debt"]
 body:
     - type: markdown
       attributes:
-          value: |
-              Used internally to raise improvements in code quality, maintainability, and technical debt.
-              
-              **Quick Start**: Only the Problem Description and Proposed Solution are required to get started.
+          value: Used internally to raise improvements in code quality, maintainability, and technical debt.
 
     - type: textarea
       id: problem-description
       attributes:
-          label: Problem Description
-          description: |
-              Describe the technical debt in detail:
-              - Current state and why it's problematic
-              - How it affects development, maintenance, or users
-              - Specific examples of the issues it causes
-          placeholder: |
-              The current implementation of [component] has the following issues:
-              1. [Specific problem 1]
-              2. [Specific problem 2]
-              
-              This affects us by...
-              Examples of problems this causes:...
+          label: What is the problem?
+          description: Describe what the gap is and how to reproduce it.
       validations:
           required: true
 
     - type: textarea
       id: solution-description
       attributes:
-          label: Proposed Solution
-          description: |
-              Describe the ideal solution to address this technical debt:
-              - High-level approach
-              - Key changes needed
-              - Benefits of the solution
-          placeholder: |
-              Proposed approach: ...
-              Key changes:
-              1. ...
-              2. ...
-              
-              Benefits:
-              - Improved maintainability
-              - Better performance
-              - Enhanced user experience
+          label: Is there an ideal solution?
+          description: Describe the ideal solution if there is one.
       validations:
-          required: true
+          required: false
 
     - type: textarea
-      id: additional-details
+      id: additional-context
       attributes:
-          label: Additional Details (Optional)
-          description: |
-              Help us understand and prioritize this technical debt:
-          placeholder: |
-              Technical debt category: Code Quality/Performance/Security/Testing/etc.
-              Impact level: Critical/High/Medium/Low
-              Complexity estimate: Simple/Medium/Complex/Major
-              Affected components: Core deployment, Authentication, etc.
-              Root cause: This was introduced because...
-              Current workarounds: We currently work around this by...
-              Implementation plan: Phase 1, Phase 2, Prerequisites, Risks
-              Breaking changes: Yes/No, Migration path
-              Testing strategy: How we would test the solution
-              Success metrics: How we would measure success
+          label: Additional context
+          description: Add any other context or screenshots here.
       validations:
           required: false

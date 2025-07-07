@@ -5,74 +5,20 @@ labels: ["enhancement"]
 body:
     - type: markdown
       attributes:
-          value: |
-              Thanks for suggesting a feature! 
-              
-              **Quick Start**: Only the Feature Description is required to get started. Additional details help us understand and prioritize your request.
+          value: Thanks for suggesting a feature!
 
     - type: textarea
-      id: feature-description
+      id: problem-description
       attributes:
-          label: Feature Description
-          description: |
-              Describe the feature you'd like to see added. Include:
-              - What you want to accomplish
-              - How you envision it working
-              - Any specific API or configuration ideas
-          placeholder: |
-              I would like fabric-cicd to support...
-              
-              This would work by...
-              
-              Example usage:
-              ```python
-              # Your proposed API usage here
-              ```
+          label: What is the feature?
+          description: Describe what the gap is and the ideal solution.
       validations:
           required: true
 
     - type: textarea
-      id: use-case-description
-      attributes:
-          label: Use Case & Business Value (Optional)
-          description: |
-              Describe the specific use case and business value this feature would provide:
-              - What problem does this solve?
-              - How would this improve your workflow?
-              - What's the business impact?
-          placeholder: |
-              We need this feature because...
-              This would help us by...
-              The business value is...
-      validations:
-          required: false
-
-    - type: textarea
-      id: advanced-details
-      attributes:
-          label: Advanced Details (Optional)
-          description: |
-              Additional context to help us understand and prioritize your request:
-          placeholder: |
-              Priority: High/Medium/Low
-              Affected components: Core deployment, Authentication, etc.
-              Affected item types: Notebooks, Data Pipelines, etc.
-              Implementation complexity: Simple/Medium/Complex
-              Breaking changes: Yes/No/Not sure
-              Alternative solutions considered: ...
-              Current workarounds: ...
-      validations:
-          required: false
-
-    - type: textarea
       id: additional-context
       attributes:
-          label: Additional Context (Optional)
-          description: |
-              Add any other relevant information such as:
-              - Links to Microsoft Fabric documentation
-              - Related GitHub issues or discussions
-              - Screenshots or mockups
-              - Timeline requirements
+          label: Additional context
+          description: Add any other context or screenshots here.
       validations:
           required: false

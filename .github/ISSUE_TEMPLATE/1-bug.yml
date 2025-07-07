@@ -5,100 +5,36 @@ labels: ["bug"]
 body:
     - type: markdown
       attributes:
-          value: |
-              Thanks for reporting a bug! 
-              
-              **Quick Start**: Only the Problem Description and Steps to Reproduce are required to get started. More detail helps Copilot and maintainers help you faster, but only fill out what you're comfortable with.
+          value: Thanks for reporting a bug!
 
     - type: input
       id: library-version
       attributes:
           label: Library Version
-          description: What version of fabric-cicd are you using? (e.g., 1.0.0 or latest)
-          placeholder: "1.0.0"
+          description: What is the library version?
       validations:
-          required: false
+          required: true
 
     - type: textarea
       id: problem-description
       attributes:
-          label: Problem Description
-          description: |
-              Clearly describe the bug you encountered. Include:
-              - What you were trying to do
-              - What you expected to happen
-              - What actually happened
-          placeholder: |
-              I was trying to deploy a Notebook to my Fabric workspace...
-              Expected: The notebook should deploy successfully
-              Actual: Deployment failed with an error
+          label: What is the problem?
+          description: Describe what the gap is and how to reproduce it.
       validations:
           required: true
 
     - type: textarea
-      id: reproduction-steps
+      id: solution-description
       attributes:
-          label: Steps to Reproduce
-          description: |
-              Provide detailed steps to reproduce the issue. Include code samples if possible.
-              **Please remove any sensitive information like workspace IDs, connection strings, etc.**
-          placeholder: |
-              1. Create a FabricWorkspace object with these parameters...
-              2. Call publish_all_items()...
-              3. See error...
-              
-              ```python
-              from fabric_cicd import FabricWorkspace
-              workspace = FabricWorkspace(
-                  workspace_id="your-workspace-id",
-                  # ... other parameters
-              )
-              ```
-      validations:
-          required: true
-
-    - type: textarea
-      id: environment-details
-      attributes:
-          label: Environment Details (Optional)
-          description: |
-              Help us understand your environment. You can provide as much or as little detail as you'd like:
-          placeholder: |
-              Library version: 1.2.3
-              Python version: 3.11.0
-              OS: Ubuntu 22.04
-              Authentication: Managed Identity
-              Environment type: Production
-              Using parameterization: Yes
-              Affected item types: Notebooks, Data Pipelines
-      validations:
-          required: false
-
-    - type: textarea
-      id: error-output
-      attributes:
-          label: Error Output (Optional)
-          description: |
-              Please provide the complete error message and stack trace if available.
-          placeholder: |
-              ```
-              Traceback (most recent call last):
-                File "...", line ..., in ...
-                ...
-              Error message here
-              ```
+          label: Is there an ideal solution?
+          description: Describe the ideal solution if there is one.
       validations:
           required: false
 
     - type: textarea
       id: additional-context
       attributes:
-          label: Additional Context (Optional)
-          description: |
-              Add any other relevant details such as:
-              - Code samples (please sanitize sensitive information)
-              - Workspace configuration details
-              - Workarounds you've tried
-              - Screenshots or logs (use https://gist.github.com/ for large files)
+          label: Additional context, screenshots, logs, error output, etc
+          description: Add any other relevant details. If it is long, please paste to https://gist.github.com/ and inser t the link here.  Ensure to strip any non public information.
       validations:
           required: false
