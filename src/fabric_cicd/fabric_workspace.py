@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import dpath
 from azure.core.credentials import TokenCredential
@@ -20,6 +20,7 @@ from fabric_cicd._common._exceptions import InputError, ParameterFileError, Pars
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._publish_log_entry import PublishLogEntry
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,7 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.publish_log_entries: List[PublishLogEntry] = []
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
