@@ -69,13 +69,13 @@ class TestPathResolutionFunctions:
         test_file.touch()
 
         # Test with an absolute path inside the repository
-        paths = _resolve_input_path(tmp_path, test_file)
+        paths = _resolve_input_path(tmp_path, str(test_file))
         assert len(paths) == 1
         assert paths[0] == test_file
 
         # Test with an absolute path outside the repository
         outside_file = tmp_path.parent / "outside.txt"
-        paths = _resolve_input_path(tmp_path, outside_file)
+        paths = _resolve_input_path(tmp_path, str(outside_file))
         assert len(paths) == 0
 
     def test_resolve_input_path_nonexistent(self, tmp_path):
