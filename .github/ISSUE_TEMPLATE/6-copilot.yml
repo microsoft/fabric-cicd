@@ -11,7 +11,7 @@ body:
       id: problem-description
       attributes:
           label: What is the problem?
-          description: Describe what needs to be done and why.
+          description: Describe the issue, highlight specific error messages observed, specify why this is happening or what the likely cause is.
       validations:
           required: true
 
