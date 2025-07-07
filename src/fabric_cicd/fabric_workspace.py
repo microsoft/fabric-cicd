@@ -450,8 +450,6 @@ class FabricWorkspace:
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = constants.MAX_RETRY_OVERRIDE.get(item_type, 5)
-
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
@@ -487,7 +485,7 @@ class FabricWorkspace:
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body, max_retries=max_retries
+                method="POST", url=f"{self.base_api_url}/items", body=combined_body
             )
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
@@ -499,7 +497,6 @@ class FabricWorkspace:
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
-                max_retries=max_retries,
             )
         elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
@@ -511,7 +508,6 @@ class FabricWorkspace:
                 method="PATCH",
                 url=f"{self.base_api_url}/items/{item_guid}",
                 body=metadata_body,
-                max_retries=max_retries,
             )
 
         if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
@@ -522,7 +518,6 @@ class FabricWorkspace:
                     method="POST",
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
-                    max_retries=max_retries,
                 )
                 logger.debug(
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
