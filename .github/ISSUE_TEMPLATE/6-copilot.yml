@@ -1,0 +1,73 @@
+name: GitHub Copilot Assignment
+description: Issue template for tasks assigned to GitHub Copilot agent
+title: "Copilot: "
+labels: ["copilot-assignment"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              **GitHub Copilot Assignment**
+              
+              This template is designed for development team members to create issues specifically for GitHub Copilot agent assistance. All fields are optional to allow quick task assignment with focused context.
+
+    - type: textarea
+      id: task-context
+      attributes:
+          label: Task Context (Optional)
+          description: |
+              Describe what needs to be done and why. Include:
+              - The specific task or problem to solve
+              - Background context or motivation
+              - Any relevant issue references or discussion links
+          placeholder: |
+              Task: Implement support for XYZ feature
+              
+              Background: Users have requested this functionality to improve their workflow...
+              
+              Related: #123, discussion in PR #456
+      validations:
+          required: false
+
+    - type: textarea
+      id: technical-requirements
+      attributes:
+          label: Technical Requirements (Optional)
+          description: |
+              Provide specific technical details, constraints, or implementation guidance:
+              - API changes needed
+              - Code areas to focus on
+              - Dependencies or libraries to consider
+              - Architecture or design patterns to follow
+          placeholder: |
+              Implementation details:
+              - Modify the FabricWorkspace class to support...
+              - Add new methods to handle...
+              - Update documentation in...
+              - Ensure backward compatibility with...
+              
+              Code areas: src/fabric_cicd/core/
+              Dependencies: Microsoft Fabric REST API v1.0
+      validations:
+          required: false
+
+    - type: textarea
+      id: success-criteria
+      attributes:
+          label: Success Criteria (Optional)
+          description: |
+              Define how to know when the task is complete:
+              - Specific functionality that should work
+              - Tests that should pass
+              - Documentation that should be updated
+              - Performance or quality requirements
+          placeholder: |
+              Success criteria:
+              - [ ] Feature works as described in the task context
+              - [ ] All existing tests continue to pass
+              - [ ] New tests added to cover the functionality
+              - [ ] Documentation updated to reflect changes
+              - [ ] No breaking changes introduced
+              
+              Acceptance: Ready for team review when criteria are met
+      validations:
+          required: false
