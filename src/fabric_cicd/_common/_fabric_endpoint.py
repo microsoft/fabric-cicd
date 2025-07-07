@@ -239,7 +239,7 @@ def _handle_response(
     # Handle item name conflicts
     elif (
         response.status_code == 400
-        and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
+        and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameNotAvailableYet"
     ):
         handle_retry(
             attempt=iteration_count,

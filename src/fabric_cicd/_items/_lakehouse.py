@@ -82,7 +82,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         )
 
         if sql_endpoint_status == "Success":
-            print("SQL Endpoint provisioned successfully")
+            logger.info(f"{constants.INDENT}SQL Endpoint provisioned successfully")
             break
 
         if sql_endpoint_status == "Failed":
@@ -93,7 +93,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
             attempt=iteration,
             base_delay=5,
             response_retry_after=30,
-            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress.",
+            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress",
         )
         iteration += 1
 
