@@ -154,7 +154,7 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
                     "Failed to publish shortcut(s). This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
                 logger.info("The publish process will continue with the other items.")
-                break
+                continue
             msg = f"Failed to publish shortcut(s) for lakehouse {item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger) from e
 
