@@ -6,6 +6,24 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.23
+
+<span class="md-h2-subheader">Release Date: 2025-06-25</span>
+
+-   ✨ New Copilot issue template for tasks assigned to the GitHub Copilot Agent ([#309](https://github.com/microsoft/fabric-cicd/issues/309))
+-   ✨ Add GitHub actions workflow to enforce PR-to-issue linking ([#368](https://github.com/microsoft/fabric-cicd/issues/368))
+-   ✨ Enable passing in list of specific items to be published in publish_all_items ([#365](https://github.com/microsoft/fabric-cicd/issues/365))
+-   🔧 Fix issue with lakehouse shortcuts publishing ([#379] (https://github.com/microsoft/fabric-cicd/issues/379))
+-   🔧 Add validation for empty logical IDs to prevent deployment corruption ([#86](https://github.com/microsoft/fabric-cicd/issues/86))
+-   🔧 Fix SQL Provision Print Statement ([#329](https://github.com/microsoft/fabric-cicd/issues/329))
+-   🔧 Rename the error code for reserved item name from ItemDisplayNameAlreadyInUse to ItemDisplayNameNotAvailableYet per updated Microsoft Fabric API ([#388](https://github.com/microsoft/fabric-cicd/issues/388))
+-   🔧 Fix lakehoues exclude_regex to exclude shortcut publishing ([#385](https://github.com/microsoft/fabric-cicd/issues/385))
+-   🔧 Remove max retry limit to handle large deployments ([#299] (https://github.com/microsoft/fabric-cicd/issues/299))
+-   📝 Fix documentation for environment parameter replacement ([#383](https://github.com/microsoft/fabric-cicd/issues/383))
+-   📝 Fix YAML formatting in variable groups release pipeline example ([#377](https://github.com/microsoft/fabric-cicd/issues/377))
+-   📝 Update incorrect YAML Key in data pipeline parameterization example ([#396](https://github.com/microsoft/fabric-cicd/issues/396))
+-   ⚡ Exclude hints from PR Issue Link Check ([#371](https://github.com/microsoft/fabric-cicd/issues/371))
+
 ## Version 0.1.22
 
 <span class="md-h2-subheader">Release Date: 2025-06-25</span>
