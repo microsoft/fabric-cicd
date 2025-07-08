@@ -8,8 +8,6 @@ The following contains all major, minor, and patch version release notes.
 
 ## Version 0.1.23
 
-## Version 0.1.23
-
 <span class="md-h2-subheader">Release Date: 2025-07-08</span>
 
 -   ✨ New functionalities for GitHub Copilot Agent and PR-to-Issue linking
