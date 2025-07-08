@@ -8,7 +8,7 @@ The following contains all major, minor, and patch version release notes.
 
 ## Version 0.1.23
 
-<span class="md-h2-subheader">Release Date: 2025-06-25</span>
+<span class="md-h2-subheader">Release Date: 2025-07-08</span>
 
 -   ✨ New functionalties for GitHub Copilot Agent and PR-to-Issue linking
 -   🔧 Fix issue with lakehouse shortcuts publishing ([#379] (https://github.com/microsoft/fabric-cicd/issues/379))
