@@ -12,18 +12,16 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-            - name: Fetch all branches
-              run: git fetch --prune --unshallow
+            - name: Fetch main branch
+              run: git fetch origin main:origin/main --depth=1
             - name: Enforce version bump PR rules
               id: version_bump_check
               run: |
                   set -e
-                  echo ${{ github.repository }}
                   PR_TITLE="${{ github.event.pull_request.title }}"
                   VERSION_REGEX='^v([0-9]+\.[0-9]+\.[0-9]+)$'
                   BASE_REF="origin/main"
                   CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD)
-
 
                   VERSION_CHANGED=false
                   OLD_VERSION=""
