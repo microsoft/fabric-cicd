@@ -58,7 +58,7 @@ jobs:
                     SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
                     SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
                     if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
-                      echo "::error::Only constants.py and changelog.md are allowed to be included in a version bump PR. Found: $CHANGED_FILES"
+                      echo "::error::Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X. Found: $CHANGED_FILES"
                       exit 1
                     fi
                   fi
