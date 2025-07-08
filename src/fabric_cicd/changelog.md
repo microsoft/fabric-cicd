@@ -15,7 +15,7 @@ The following contains all major, minor, and patch version release notes.
 -   🔧 Add validation for empty logical IDs to prevent deployment corruption ([#86](https://github.com/microsoft/fabric-cicd/issues/86))
 -   🔧 Fix SQL Provision Print Statement ([#329](https://github.com/microsoft/fabric-cicd/issues/329))
 -   🔧 Rename the error code for reserved item name from ItemDisplayNameAlreadyInUse to ItemDisplayNameNotAvailableYet per updated Microsoft Fabric API ([#388](https://github.com/microsoft/fabric-cicd/issues/388))
--   🔧 Fix lakehoues exclude_regex to exclude shortcut publishing ([#385](https://github.com/microsoft/fabric-cicd/issues/385))
+-   🔧 Fix lakehouse exclude_regex to exclude shortcut publishing ([#385](https://github.com/microsoft/fabric-cicd/issues/385))
 -   🔧 Remove max retry limit to handle large deployments ([#299] (https://github.com/microsoft/fabric-cicd/issues/299))
 -   📝 Fix formatting and example errors
 -   ⚡ Exclude hints from PR Issue Link Check ([#371](https://github.com/microsoft/fabric-cicd/issues/371))
