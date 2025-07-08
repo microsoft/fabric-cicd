@@ -82,8 +82,7 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         )
 
         if sql_endpoint_status == "Success":
-            # print("SQL Endpoint provisioned successfully")
-            logger.info("SQL Endpoint provisioned successfully")
+            logger.info(f"{constants.INDENT}SQL Endpoint provisioned successfully")
             break
 
         if sql_endpoint_status == "Failed":
@@ -124,7 +123,7 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
 
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 
-    if len(shortcuts_to_publish) > 0:
+    if shortcuts_to_publish:
         logger.info(f"Publishing Lakehouse '{item_obj.name}' Shortcuts")
         shortcut_paths_to_unpublish = [path for path in deployed_shortcuts if path not in shortcuts_to_publish]
         unpublish_shortcuts(fabric_workspace_obj, item_obj, shortcut_paths_to_unpublish)
@@ -153,11 +152,12 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
         except Exception as e:
             if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
                 logger.error(
-                    "Failed to publish shortcut. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
+                    "Failed to publish shortcut(s). This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
                 logger.info("The publish process will continue with the other items.")
                 break
-            raise e
+            msg = f"Failed to publish shortcut(s) for lakehouse {item_obj.name}"
+            raise FailedPublishedItemStatusError(msg, logger) from e
 
 
 def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
