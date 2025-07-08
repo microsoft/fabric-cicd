@@ -10,7 +10,7 @@ The following contains all major, minor, and patch version release notes.
 
 <span class="md-h2-subheader">Release Date: 2025-06-25</span>
 
--   ✨ New functionalties for GitHub Copilot Agent and PR-to-Issue linking
+-   ✨ New functionalities for GitHub Copilot Agent and PR-to-Issue linking
 -   🔧 Fix issue with lakehouse shortcuts publishing ([#379] (https://github.com/microsoft/fabric-cicd/issues/379))
 -   🔧 Add validation for empty logical IDs to prevent deployment corruption ([#86](https://github.com/microsoft/fabric-cicd/issues/86))
 -   🔧 Fix SQL Provision Print Statement ([#329](https://github.com/microsoft/fabric-cicd/issues/329))
