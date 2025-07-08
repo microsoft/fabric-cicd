@@ -124,7 +124,6 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
             handle_retry(
                 attempt=iteration,
                 base_delay=5,
-                max_retries=20,
                 response_retry_after=120,
                 prepend_message=f"{constants.INDENT}Operation in progress.",
             )

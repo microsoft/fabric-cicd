@@ -92,9 +92,8 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         handle_retry(
             attempt=iteration,
             base_delay=5,
-            max_retries=10,
             response_retry_after=30,
-            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress.",
+            prepend_message=f"{constants.INDENT}SQL Endpoint provisioning in progress",
         )
         iteration += 1
 
