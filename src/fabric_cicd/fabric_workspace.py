@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import dpath
 from azure.core.credentials import TokenCredential
@@ -123,6 +123,7 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.publish_items_to_include = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -431,6 +432,22 @@ class FabricWorkspace:
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
                 return
 
+        # Skip publishing if the item is not in the include list
+        if self.publish_items_to_include:
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.publish_items_to_include}
+            
+            # Check for exact match or case-insensitive match
+            match_found = (
+                item_name in self.publish_items_to_include or 
+                item_name.lower() in normalized_include_set
+            )
+            
+            if not match_found:
+                item.skip_publish = True
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the items to include list.")
+                return
+            
         item_guid = item.guid
         item_files = item.item_files
 
