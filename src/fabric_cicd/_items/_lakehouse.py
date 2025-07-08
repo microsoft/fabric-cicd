@@ -82,7 +82,8 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         )
 
         if sql_endpoint_status == "Success":
-            print("SQL Endpoint provisioned successfully")
+            # print("SQL Endpoint provisioned successfully")
+            logger.info("SQL Endpoint provisioned successfully")
             break
 
         if sql_endpoint_status == "Failed":
@@ -121,18 +122,14 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         logger.debug("No shortcuts.metadata.json found")
         shortcuts = []
 
-    logger.info(f"Publishing Lakehouse '{item_obj.name}' Shortcuts")
-
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 
-    shortcut_paths_to_unpublish = [path for path in deployed_shortcuts if path not in shortcuts_to_publish]
-
-    unpublish_shortcuts(fabric_workspace_obj, item_obj, shortcut_paths_to_unpublish)
-
-    # Deploy and overwrite shortcuts
-    publish_shortcuts(fabric_workspace_obj, item_obj, shortcuts_to_publish)
-
-    logger.info(f"{constants.INDENT}Published")
+    if len(shortcuts_to_publish) > 0:
+        logger.info(f"Publishing Lakehouse '{item_obj.name}' Shortcuts")
+        shortcut_paths_to_unpublish = [path for path in deployed_shortcuts if path not in shortcuts_to_publish]
+        unpublish_shortcuts(fabric_workspace_obj, item_obj, shortcut_paths_to_unpublish)
+        # Deploy and overwrite shortcuts
+        publish_shortcuts(fabric_workspace_obj, item_obj, shortcuts_to_publish)
 
 
 def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_dict: dict) -> None:
@@ -146,11 +143,21 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
     """
     for shortcut in shortcut_dict.values():
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
-        fabric_workspace_obj.endpoint.invoke(
-            method="POST",
-            url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
-            body=shortcut,
-        )
+        try:
+            fabric_workspace_obj.endpoint.invoke(
+                method="POST",
+                url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
+                body=shortcut,
+            )
+            logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
+        except Exception as e:
+            if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
+                logger.error(
+                    "Failed to publish shortcut. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
+                )
+                logger.info("The publish process will continue with the other items.")
+                break
+            raise e
 
 
 def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
