@@ -143,7 +143,8 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
     
     except Exception as e:
         logger.error(f"An error occurred during publishing: {e}", exc_info=True)
-
+        return fabric_workspace_obj.publish_log_entries
+    
     return fabric_workspace_obj.publish_log_entries
 
 def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
