@@ -150,7 +150,7 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
             logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
         except Exception as e:
             if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
-                logger.error(
+                logger.warning(
                     "Failed to publish shortcut(s). This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
                 logger.info("The publish process will continue with the other items.")
