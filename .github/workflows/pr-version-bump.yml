@@ -1,0 +1,69 @@
+name: Validate Version Bump PR
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, edited]
+        branches:
+            - main
+
+jobs:
+    validate-version-bump:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Enforce version bump PR rules
+              id: version_bump_check
+              run: |
+                  set -e
+                  PR_TITLE="${{ github.event.pull_request.title }}"
+                  VERSION_REGEX='^v([0-9]+\.[0-9]+\.[0-9]+)$'
+                  BASE_REF="origin/main"
+                  CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD)
+
+
+                  VERSION_CHANGED=false
+                  OLD_VERSION=""
+                  NEW_VERSION=""
+                  CHANGELOG_CHANGED=false
+
+                  # Get VERSION from main branch
+                  OLD_VERSION=$(git show origin/main:src/fabric_cicd/constants.py | grep '^VERSION = ' | sed -E 's/VERSION = "([^"]+)"/\1/')
+                  # Get VERSION from current branch
+                  NEW_VERSION=$(grep '^VERSION = ' src/fabric_cicd/constants.py | sed -E 's/VERSION = "([^"]+)"/\1/')
+
+                  if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
+                    VERSION_CHANGED=true
+                  fi
+
+                  # Check if changelog was changed
+                  if echo "$CHANGED_FILES" | grep -q "src/fabric_cicd/changelog.md"; then
+                    CHANGELOG_CHANGED=true
+                  fi
+
+                  if [ "$VERSION_CHANGED" = true ]; then
+                    # PR title must match vX.X.X and match the new version
+                    if [[ ! "$PR_TITLE" =~ $VERSION_REGEX ]]; then
+                      echo "::error::PR title must be vX.X.X when VERSION is changed."
+                      exit 1
+                    fi
+                    PR_VERSION="${BASH_REMATCH[1]}"
+                    if [ "$PR_VERSION" != "$NEW_VERSION" ]; then
+                      echo "::error::PR title version (v$PR_VERSION) does not match VERSION in constants.py ($NEW_VERSION)."
+                      exit 1
+                    fi
+                    # Changelog must also be changed
+                    if [ "$CHANGELOG_CHANGED" != true ]; then
+                      echo "::error::When VERSION is changed, changelog.md must also be changed."
+                      exit 1
+                    fi
+                    # Only two files should be changed, and they must be constants.py and changelog.md
+                    EXPECTED_FILES="src/fabric_cicd/constants.py src/fabric_cicd/changelog.md"
+                    SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
+                    SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
+                    if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
+                      echo "::error::Exactly and only constants.py and changelog.md must be changed in a version bump PR. Found: $CHANGED_FILES"
+                      exit 1
+                    fi
+                  fi
+                  echo "Version bump PR rules passed."
