@@ -1,0 +1,27 @@
+name: Test
+description: "Run unit tests for the Fabric CICD project"
+
+on:
+    pull_request:
+        branches: ["main"]
+        types: [opened, edited, synchronize, ready_for_review]
+
+jobs:
+    unit_test:
+        name: Unit Test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with:
+                  python-version: "3.x"
+
+            - name: Run unit tests
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install uv
+                  uv sync --dev
+                  uv run pytest -v -s || exit 1  # Fail the job if any tests fail
