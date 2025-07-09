@@ -4,7 +4,7 @@
 """Module for publishing and unpublishing Fabric workspace items."""
 
 import logging
-from typing import List, Optional
+from typing import Optional
 
 import fabric_cicd._items as items
 from fabric_cicd import constants
@@ -19,16 +19,14 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(
-    fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None
-) -> List[PublishLogEntry]:
+def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> list[PublishLogEntry]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-
+    
     Returns:
         List[PublishLogEntry]: A list of structured log entries capturing the publish operations.
 
@@ -43,7 +41,7 @@ def publish_all_items(
         >>> log_entries = publish_all_items(workspace)
         >>> for entry in log_entries:
         ...     print(f"{entry.name}: {'Success' if entry.success else 'Failed'}")
-
+ 
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -61,7 +59,7 @@ def publish_all_items(
 
     # Clear any previous log entries
     fabric_workspace_obj.publish_log_entries = []
-
+    
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
@@ -75,7 +73,6 @@ def publish_all_items(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
-
     try:
         if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
             print_header("Publishing Variable Libraries")
@@ -142,13 +139,12 @@ def publish_all_items(
         if "Environment" in fabric_workspace_obj.item_type_in_scope:
             print_header("Checking Environment Publish State")
             items.check_environment_publish_state(fabric_workspace_obj)
-
+    
     except Exception as e:
         logger.error(f"An error occurred during publishing: {e}", exc_info=True)
         return fabric_workspace_obj.publish_log_entries
-
+    
     return fabric_workspace_obj.publish_log_entries
-
 
 def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
     """
