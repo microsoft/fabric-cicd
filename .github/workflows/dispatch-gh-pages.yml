@@ -1,5 +1,6 @@
 name: Github Pages
-# Once we release to pypi, this instead will be moved to DevOps as part of release
+description: "Deploy documentation to GitHub Pages"
+
 on:
     workflow_dispatch:
 

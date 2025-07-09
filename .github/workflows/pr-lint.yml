@@ -1,9 +1,14 @@
-name: Lint Python Code
+name: Lint
+description: "Run ruff for formatting and linting"
 
-on: [pull_request]
+on:
+    pull_request:
+        branches: ["main"]
+        types: [opened, edited, synchronize, ready_for_review]
 
 jobs:
     format_ruff:
+        name: Format with ruff
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
@@ -23,6 +28,7 @@ jobs:
               run: |
                   ruff format || exit 1
     lint_ruff:
+        name: Lint with ruff
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
