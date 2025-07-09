@@ -19,14 +19,16 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> List[PublishLogEntry]:
+def publish_all_items(
+    fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None
+) -> List[PublishLogEntry]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-    
+
     Returns:
         List[PublishLogEntry]: A list of structured log entries capturing the publish operations.
 
@@ -41,7 +43,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         >>> log_entries = publish_all_items(workspace)
         >>> for entry in log_entries:
         ...     print(f"{entry.name}: {'Success' if entry.success else 'Failed'}")
- 
+
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -59,7 +61,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
 
     # Clear any previous log entries
     fabric_workspace_obj.publish_log_entries = []
-    
+
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
@@ -140,12 +142,13 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         if "Environment" in fabric_workspace_obj.item_type_in_scope:
             print_header("Checking Environment Publish State")
             items.check_environment_publish_state(fabric_workspace_obj)
-    
+
     except Exception as e:
         logger.error(f"An error occurred during publishing: {e}", exc_info=True)
         return fabric_workspace_obj.publish_log_entries
-    
+
     return fabric_workspace_obj.publish_log_entries
+
 
 def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
     """
