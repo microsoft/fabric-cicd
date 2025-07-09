@@ -26,7 +26,12 @@ jobs:
 
             - name: Run ruff format
               run: |
-                  ruff format || exit 1
+                  if ruff format; then
+                    echo "✅ ruff format passed."
+                  else
+                    echo "❌ ruff format failed."
+                    exit 1
+                  fi
     lint_ruff:
         name: Code Linted
         runs-on: ubuntu-latest
@@ -46,11 +51,18 @@ jobs:
 
             - name: Run ruff lint
               run: |
-                  ruff check || exit 1  # Fail the job if ruff finds any issues
+                  if ruff check; then
+                    echo "✅ ruff lint passed."
+                  else
+                    echo "❌ ruff lint failed."
+                    exit 1
+                  fi
 
     validate-linked-issue:
         name: Issue Linked
         runs-on: ubuntu-latest
+        needs: validate-version-bump
+        if: needs.validate-version-bump.outputs.is_version_bump == 'false'
         permissions:
             pull-requests: read
             issues: read
@@ -193,6 +205,8 @@ jobs:
     validate-version-bump:
         name: Proper Version Bump
         runs-on: ubuntu-latest
+        outputs:
+            is_version_bump: ${{ steps.version_bump_check.outputs.is_version_bump }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
@@ -209,6 +223,7 @@ jobs:
                   CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD)
 
                   VERSION_CHANGED=false
+                  TITLE_IS_VERSION=false
                   OLD_VERSION=""
                   NEW_VERSION=""
                   # Get VERSION from main branch
@@ -216,22 +231,27 @@ jobs:
                   # Get VERSION from current branch
                   NEW_VERSION=$(grep '^VERSION = ' src/fabric_cicd/constants.py | sed -E 's/VERSION = "([^"]+)"/\1/')
 
-                  VERSION_CHANGED=false
                   if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
                     VERSION_CHANGED=true
                   fi
 
-                  # Check if PR title matches version bump format
-                  TITLE_IS_VERSION=false
                   if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
                     TITLE_IS_VERSION=true
+                  fi
+
+                  if [ "$TITLE_IS_VERSION" = true ] || [ "$VERSION_CHANGED" = true ]; then
+                    echo "is_version_bump=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "is_version_bump=false" >> $GITHUB_OUTPUT
+                    echo "✅ Version bump validation passed."
+                    exit 0
                   fi
 
                   # 1. If version is updated, title must match
                   if [ "$VERSION_CHANGED" = true ]; then
                     EXPECTED_TITLE="v$NEW_VERSION"
                     if [ "$PR_TITLE" != "$EXPECTED_TITLE" ]; then
-                      echo "::error::PR title must be vX.X.X when VERSION is changed. Expected title: $EXPECTED_TITLE"
+                      echo "❌ PR title must be vX.X.X when VERSION is changed. Expected title: $EXPECTED_TITLE"
                       exit 1
                     fi
                   fi
@@ -242,7 +262,8 @@ jobs:
                     SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
                     SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
                     if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
-                      echo "::error::Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X."
+                      echo "❌ Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X."
                       exit 1
                     fi
                   fi
+                  echo "✅ Version bump validation passed."
