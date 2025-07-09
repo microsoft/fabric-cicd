@@ -191,7 +191,7 @@ jobs:
 
                       console.log('✅ Pull request is properly linked to an issue.');
     validate-version-bump:
-        name: Version Bump
+        name: Proper Version Bump
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
