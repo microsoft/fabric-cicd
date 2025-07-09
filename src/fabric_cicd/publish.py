@@ -76,6 +76,7 @@ def publish_all_items(
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
         
+    # Set items to include filter
     if items_to_include:
         logger.info(f"Publishing only specified items: {items_to_include}")
         fabric_workspace_obj.publish_items_to_include = items_to_include
