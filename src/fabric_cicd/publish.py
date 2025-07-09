@@ -10,7 +10,7 @@ import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._logging import print_header
-from fabric_cicd._common._publish_log_entry_new import PublishLogEntry
+from fabric_cicd._common._publish_log_entry import PublishLogEntry
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
