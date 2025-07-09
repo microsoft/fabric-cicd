@@ -9,7 +9,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import dpath
 from azure.core.credentials import TokenCredential
@@ -125,7 +125,7 @@ class FabricWorkspace:
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
-        self.publish_log_entries: List[PublishLogEntry] = []
+        self.publish_log_entries: list[PublishLogEntry] = []
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
