@@ -346,9 +346,9 @@ def _resolve_input_path(repository_directory: Path, input_path: str, is_wildcard
                     paths.append(absolute_path)
 
             logger.debug(
-                f"Wildcard path '{input_path}' matched {len(paths)} files."
+                f"Wildcard path '{input_path}' matched {len(paths)} files"
                 if paths
-                else f"Wildcard path '{input_path}' did not match any files."
+                else f"Wildcard path '{input_path}' did not match any files"
             )
 
     # Step 2: Process non-wildcard paths
@@ -441,12 +441,12 @@ def _get_valid_file_path(input_path: Path, repository_directory: Path, path_type
         if path_type != "Wildcard":
             # Check 1: Path existence
             if not input_path.exists():
-                logger.error(f"{path_type} path '{input_path}' does not exist.")
+                logger.error(f"{path_type} path '{input_path}' does not exist")
                 return None
 
             # Check 2: File validation
             if not input_path.is_file():
-                logger.error(f"{path_type} path '{input_path}' is not a file.")
+                logger.error(f"{path_type} path '{input_path}' is not a file")
                 return None
 
         # Check 3: Repository boundary validation
@@ -456,13 +456,13 @@ def _get_valid_file_path(input_path: Path, repository_directory: Path, path_type
 
             # Get the relative path
             _ = resolved_path.relative_to(resolved_repo)
-            logger.debug(f"{path_type} path '{input_path}' is valid and within the repository.")
+            logger.debug(f"{path_type} path '{input_path}' is valid and within the repository directory")
 
             # Return the resolved absolute path
             return resolved_path
 
         except ValueError:
-            logger.error(f"{path_type} path '{input_path}' is outside the repository boundary.")
+            logger.error(f"{path_type} path '{input_path}' is outside the repository directory")
             return None
 
     except Exception as e:

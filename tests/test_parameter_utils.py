@@ -190,7 +190,7 @@ class TestPathUtilities:
 
         # Test with absolute path
         abs_path = str(temp_repository / "file2.json")
-        result = _resolve_input_path(temp_repository, abs_path)
+        result = _resolve_input_path(Path(temp_repository), abs_path)
         assert len(result) == 1
         assert result[0].name == "file2.json"
 
