@@ -4,7 +4,7 @@
 """Module for publishing and unpublishing Fabric workspace items."""
 
 import logging
-from typing import List, Optional
+from typing import Optional
 
 import fabric_cicd._items as items
 from fabric_cicd import constants
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def publish_all_items(
         fabric_workspace_obj: FabricWorkspace, 
         item_name_exclude_regex: Optional[str] = None,
-        items_to_include: Optional[List[str]] = None) -> None:
+        items_to_include: Optional[list[str]] = None) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
