@@ -81,6 +81,12 @@ def publish_all_items(
         logger.info(f"Publishing only specified items: {items_to_include}")
         fabric_workspace_obj.publish_items_to_include = items_to_include
 
+    if items_to_include:
+        logger.warning(
+            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.items_to_include = items_to_include
+
     if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
         print_header("Publishing Variable Libraries")
         items.publish_variablelibraries(fabric_workspace_obj)
