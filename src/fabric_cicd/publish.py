@@ -67,6 +67,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
+    fabric_workspace_obj.publish_log_entries = []
 
     if item_name_exclude_regex:
         logger.warning(

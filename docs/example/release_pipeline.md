@@ -130,7 +130,7 @@ This approach is best suited for the Passed Arguments example found in the Deplo
                 inputs:
                   scriptSource: 'filePath'
                   scriptPath: '.deploy/fabric_workspace.py'
-                  arguments: |
+                  arguments: >-
                     --spn_client_id $(client_id) # from Fabric_Deployment_Group_KeyVault
                     --spn_client_secret $(client_secret) # from Fabric_Deployment_Group_KeyVault
                     --tenant_id $(tenant_id) # from Fabric_Deployment_Group_KeyVault
