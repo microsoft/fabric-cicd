@@ -100,7 +100,7 @@ PARAMETER_MSGS = {
     "no optional": "No optional values provided in {}",
     "invalid item type": "Item type '{}' not in scope",
     "invalid item name": "Item name '{}' not found in the repository directory",
-    "invalid file path": "Path '{}' not found in the repository directory",
+    "invalid file path": "Path '{}' is invalid or not found in the repository directory",
     "valid optional": "Optional values in {} are valid. Checking for file matches in the repository directory",
     "valid parameter": "{} parameter is valid",
     "skip": "The {} '{}' replacement will be skipped due to {} in parameter {}",
