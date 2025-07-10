@@ -407,7 +407,8 @@ def _validate_wildcard_syntax(pattern: str) -> bool:
             if "," not in section:
                 logger.error(f"Brace expansion must contain at least one comma: '{pattern}'")
                 return False
-            if ",," in section:
+            # Check for empty options in braces like {,} or {a,,b}
+            if section.startswith(",") or section.endswith(",") or ",," in section:
                 logger.error(f"Invalid empty option in brace expansion: '{pattern}'")
                 return False
     except Exception as e:
