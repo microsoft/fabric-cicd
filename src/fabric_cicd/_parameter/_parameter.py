@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import ClassVar
 
 import yaml
-from azure.core.credentials import TokenCredential
-from azure.identity import DefaultAzureCredential
 
 import fabric_cicd.constants as constants
 from fabric_cicd._parameter._utils import (
@@ -48,11 +46,10 @@ class Parameter:
 
     def __init__(
         self,
-        repository_directory: str,
+        repository_directory: Path,
         item_type_in_scope: list[str],
         environment: str,
         parameter_file_name: str = "parameter.yml",
-        token_credential: TokenCredential = None,
     ) -> None:
         """
         Initializes the Parameter instance.
@@ -62,28 +59,11 @@ class Parameter:
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
             parameter_file_name: The name of the parameter file, default is "parameter.yml".
-            token_credential: The token credential to use for authentication, use for SPN auth.
         """
-        from fabric_cicd._common._fabric_endpoint import FabricEndpoint
-        from fabric_cicd._common._validate_input import (
-            validate_environment,
-            validate_item_type_in_scope,
-            validate_repository_directory,
-            validate_token_credential,
-        )
-
-        self.endpoint = FabricEndpoint(
-            # if credential is not defined, use DefaultAzureCredential
-            token_credential=(
-                # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token. Not internal Azure product.
-                DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
-            )
-        )
-
         # Set class variables
-        self.repository_directory: Path = validate_repository_directory(repository_directory)
-        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
-        self.environment = validate_environment(environment)
+        self.repository_directory = repository_directory
+        self.item_type_in_scope = item_type_in_scope
+        self.environment = environment
         self.parameter_file_name = parameter_file_name
 
         # Initialize the parameter file path and load parameters
@@ -495,8 +475,10 @@ class Parameter:
 
     def _validate_file_path(self, input_path: str) -> tuple[bool, str]:
         """Validate the file path exists."""
-        # Convert input path to Path object
+        # Convert input path to Path object, returned as a list of valid paths
         input_path_new = process_input_path(self.repository_directory, input_path)
+
+        # If list of paths is empty, no valid file paths found
         if not input_path_new:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path)
 
