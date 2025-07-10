@@ -204,32 +204,16 @@ def validate_parameter_file(
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
         token_credential: The token credential to use for authentication, use for SPN auth.
     """
-    from azure.identity import DefaultAzureCredential
-
-    from fabric_cicd._common._fabric_endpoint import FabricEndpoint
-    from fabric_cicd._common._validate_input import (
-        validate_environment,
-        validate_item_type_in_scope,
-        validate_repository_directory,
-        validate_token_credential,
-    )
-
     # Import the Parameter class here to avoid circular imports
     from fabric_cicd._parameter._parameter import Parameter
 
-    endpoint = FabricEndpoint(
-        # if credential is not defined, use DefaultAzureCredential
-        token_credential=(
-            # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token. Not internal Azure product.
-            DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
-        )
-    )
     # Initialize the Parameter object with the validated inputs
     parameter_obj = Parameter(
-        repository_directory=validate_repository_directory(repository_directory),
-        item_type_in_scope=validate_item_type_in_scope(item_type_in_scope, upn_auth=endpoint.upn_auth),
-        environment=validate_environment(environment),
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=environment,
         parameter_file_name=parameter_file_name,
+        token_credential=token_credential,
     )
     # Validate with _validate_parameter_file() method
     return parameter_obj._validate_parameter_file()
@@ -270,68 +254,6 @@ def _check_parameter_structure(param_value: any) -> bool:
     return isinstance(param_value, list)
 
 
-def _resolve_input_path(repository_directory: Path, input_path: str, is_wildcard: bool = False) -> list[Path]:
-    """
-    Resolves the input_path string to a list of Path objects.
-    Handles both wildcard and regular paths, ensuring paths exist within the repository directory.
-
-    Args:
-        repository_directory: The directory of the repository.
-        input_path: The input path string to resolve.
-        is_wildcard: Boolean indicating if the input_path contains wildcard characters.
-    """
-    paths = []
-
-    if is_wildcard:
-        normalized_path = input_path.replace("\\", "/")
-
-        # Handle recursive wildcard
-        if normalized_path.startswith("**/"):
-            search_pattern = f"**/{normalized_path[3:]}"
-
-        # Handle absolute wildcard path
-        elif Path(normalized_path).is_absolute():
-            abs_path = Path(normalized_path)
-            try:
-                rel_path = abs_path.relative_to(repository_directory)
-                search_pattern = str(rel_path)
-            except ValueError:
-                logger.error(
-                    f"Invalid absolute wildcard path. '{input_path}' does not exist in the repository directory."
-                )
-                return []
-        else:
-            search_pattern = normalized_path
-
-        paths = [path for path in repository_directory.glob(search_pattern) if path.is_file()]
-        if paths:
-            logger.debug(f"Wildcard path '{input_path}' matched {len(paths)} files\n{paths}.")
-        return paths
-
-    # Normalize and resolve regular path
-    normalized_path = Path(input_path.lstrip("/\\"))
-
-    if not normalized_path.is_absolute():
-        absolute_path = (repository_directory / normalized_path).resolve()
-        if absolute_path.exists() and absolute_path.is_file():
-            logger.debug(f"Relative path '{input_path}' resolved as '{absolute_path}'")
-            paths.append(absolute_path)
-        else:
-            logger.debug(f"Relative path '{input_path}' does not exist or is not a file.")
-        return paths
-
-    # Handle absolute path
-    absolute_path = normalized_path
-    try:
-        absolute_path.relative_to(repository_directory)
-        if absolute_path.exists() and absolute_path.is_file():
-            paths.append(absolute_path)
-    except ValueError:
-        logger.error(f"Invalid absolute path. '{input_path}' does not exist in the repository directory.")
-
-    return paths
-
-
 def process_input_path(repository_directory: Path, input_path: Union[str, list[str], None]) -> Union[list[Path], None]:
     """
     Processes the input_path value according to its type. Supports both
@@ -350,13 +272,185 @@ def process_input_path(repository_directory: Path, input_path: Union[str, list[s
             is_wildcard = glob.has_magic(path)
             paths.extend(_resolve_input_path(repository_directory, path, is_wildcard))
 
-        if not paths:
-            logger.debug(f"No valid paths found from input list: {input_path}")
-
         return paths
 
     is_wildcard = glob.has_magic(input_path)
     return _resolve_input_path(repository_directory, input_path, is_wildcard)
+
+
+def _resolve_input_path(repository_directory: Path, input_path: str, is_wildcard: bool = False) -> list[Path]:
+    """
+    Resolves the input_path string to a list of Path objects.
+    Handles both wildcard and regular paths, ensuring paths exist within the repository directory.
+
+    Args:
+        repository_directory: The directory of the repository.
+        input_path: The input path string to resolve.
+        is_wildcard: Boolean indicating if the input_path contains wildcard characters.
+    """
+    paths = []
+
+    # Step 1: Process wildcard paths
+    if is_wildcard:
+        # Normalize path for consistent handling
+        normalized_wildcard_path = input_path.replace("\\", "/")
+        search_pattern = ""
+
+        # Step 1a: Validate wildcard pattern syntax
+        if not _validate_wildcard_syntax(normalized_wildcard_path):
+            return paths
+
+        # Step 1b: Determine search pattern based on path type
+        if normalized_wildcard_path.startswith("**/"):
+            logger.debug("Recursive wildcard path detected")
+            search_pattern = f"**/{normalized_wildcard_path[3:]}"
+
+        elif Path(normalized_wildcard_path).is_absolute():
+            logger.debug("Absolute wildcard path detected")
+            try:
+                # Check if the path is within the repository
+                rel_path = Path(normalized_wildcard_path).relative_to(repository_directory)
+                search_pattern = str(rel_path)
+            except ValueError:
+                logger.error(f"Invalid absolute wildcard path. '{input_path}' is outside the repository directory")
+                return paths
+        else:
+            logger.debug("Non-recursive and non-absolute wildcard path detected")
+            search_pattern = normalized_wildcard_path
+
+        # Step 1c: Process the glob pattern if search pattern is valid
+        if search_pattern:
+            # First filter files that exist
+            filtered_paths = [path for path in repository_directory.glob(search_pattern) if path.is_file()]
+
+            # Validate each path and add if valid
+            for path in filtered_paths:
+                absolute_path = _get_valid_file_path(path, repository_directory, "Wildcard")
+                if absolute_path:
+                    paths.append(absolute_path)
+
+            logger.debug(
+                f"Wildcard path '{input_path}' matched {len(paths)} files."
+                if paths
+                else f"Wildcard path '{input_path}' did not match any files."
+            )
+
+    # Step 2: Process non-wildcard paths
+    else:
+        # Normalize path consistently
+        normalized_path = Path(input_path.lstrip("/\\"))
+
+        # Step 2a: Handle relative paths
+        if not normalized_path.is_absolute():
+            absolute_path = repository_directory / normalized_path
+
+            # Validate the path and add if valid
+            valid_path = _get_valid_file_path(absolute_path, repository_directory, "Relative")
+            if valid_path:
+                logger.debug(f"Relative path '{input_path}' resolved as '{absolute_path}'")
+                paths.append(valid_path)
+
+        # Step 2b: Handle absolute paths
+        else:
+            # Validate the path and add if valid
+            valid_path = _get_valid_file_path(normalized_path, repository_directory, "Absolute")
+            if valid_path:
+                paths.append(valid_path)
+
+    return paths
+
+
+def _validate_wildcard_syntax(pattern: str) -> bool:
+    """Validates wildcard pattern syntax before using glob."""
+    # Check for empty or whitespace-only patterns
+    if not pattern or pattern.isspace():
+        logger.error("Wildcard pattern is empty")
+        return False
+
+    # First perform basic syntax validations
+    for validation in constants.WILDCARD_PATH_VALIDATIONS:
+        if validation["check"](pattern):
+            logger.error(validation["message"](pattern))
+            return False
+
+    # Perform more complex validations using regex
+    # Check bracket content
+    bracket_sections = re.findall(r"\[(.*?)\]", pattern)
+    for section in bracket_sections:
+        if not section or section.startswith("]") or section.startswith("-") or "--" in section:
+            logger.error(f"Invalid character class in pattern: '{pattern}'")
+            return False
+
+    # Check brace content
+    try:
+        brace_sections = re.findall(r"\{(.*?)\}", pattern)
+        for section in brace_sections:
+            if not section:
+                logger.error(f"Empty brace expansion in pattern: '{pattern}'")
+                return False
+            if "," not in section:
+                logger.error(f"Brace expansion must contain at least one comma: '{pattern}'")
+                return False
+            if ",," in section:
+                logger.error(f"Invalid empty option in brace expansion: '{pattern}'")
+                return False
+    except Exception as e:
+        logger.error(f"Error validating brace content in pattern '{pattern}': {e}")
+        return False
+
+    # Check for path traversal attempts (../)
+    pattern = pattern.lower()
+    traversal_patterns = [
+        "../",
+        ".." + os.sep,
+        ".." + os.altsep if os.altsep else "",
+        "..%2F",
+        "..%5C",
+        "..%2f",
+        "..%5c",
+    ]
+    for p in traversal_patterns:
+        if p and p in pattern:
+            logger.error(f"Path traversal sequences not allowed: '{pattern}'")
+            return False
+
+    return True
+
+
+def _get_valid_file_path(input_path: Path, repository_directory: Path, path_type: str) -> Optional[Path]:
+    """Validates that a path exists, is a file, and is within the repository directory and returns the valid path"""
+    try:
+        # For wildcard paths, skip existence and file checks
+        if path_type != "Wildcard":
+            # Check 1: Path existence
+            if not input_path.exists():
+                logger.error(f"{path_type} path '{input_path}' does not exist.")
+                return None
+
+            # Check 2: File validation
+            if not input_path.is_file():
+                logger.error(f"{path_type} path '{input_path}' is not a file.")
+                return None
+
+        # Check 3: Repository boundary validation
+        try:
+            resolved_repo = repository_directory.resolve()
+            resolved_path = input_path.resolve() if path_type != "Wildcard" else input_path
+
+            # Get the relative path
+            _ = resolved_path.relative_to(resolved_repo)
+            logger.debug(f"{path_type} path '{input_path}' is valid and within the repository.")
+
+            # Return the resolved absolute path
+            return resolved_path
+
+        except ValueError:
+            logger.error(f"{path_type} path '{input_path}' is outside the repository boundary.")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error validating {path_type.lower()} path '{input_path}': {e}")
+        return None
 
 
 def check_replacement(

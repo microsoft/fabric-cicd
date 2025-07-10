@@ -108,5 +108,28 @@ PARAMETER_MSGS = {
     "no filter match": "unmatched optional filters",
 }
 
+# Wildcard path support validations
+WILDCARD_PATH_VALIDATIONS = [
+    # Invalid combinations
+    {
+        "check": lambda p: any(bad in p for bad in ["/**/*/", "**/**", "//", "\\\\", "**/**/"]),
+        "message": lambda p: f"Invalid wildcard combination in pattern: '{p}'",
+    },
+    # Incorrect recursive wildcard format
+    {
+        "check": lambda p: "**" in p and not ("**/" in p or "/**" in p),
+        "message": lambda p: f"Invalid recursive wildcard format (use **/ or /**): '{p}'",
+    },
+    # Unbalanced or empty brackets/braces
+    {
+        "check": lambda p: p.count("[") != p.count("]") or "[]" in p,
+        "message": lambda p: f"Invalid square brackets in pattern: '{p}'",
+    },
+    {
+        "check": lambda p: p.count("{") != p.count("}") or "{}" in p,
+        "message": lambda p: f"Invalid curly braces in pattern: '{p}'",
+    },
+]
+
 
 INDENT = "->"
