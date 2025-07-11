@@ -405,6 +405,7 @@ def _resolve_file_path(
         # Step 1: Resolve the input path based on its type
         if path_type == "Relative":
             resolved_path = (repository_directory / input_path).resolve()
+            logger.debug(f"{path_type} path '{input_path}' resolved as '{resolved_path}'")
         elif path_type == "Absolute":
             resolved_path = input_path.resolve()
         else:
@@ -429,7 +430,7 @@ def _resolve_file_path(
                 log_func(f"{path_type} path '{input_path}' is not a file")
                 return None
 
-        logger.debug(f"{path_type} path '{input_path}' is valid and within the repository directory")
+        logger.debug(f"Path '{resolved_path}' is valid and within the repository directory")
         return resolved_path
 
     except Exception as e:

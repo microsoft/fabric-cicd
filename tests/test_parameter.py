@@ -775,7 +775,8 @@ def test_validate_file_path_scenarios(parameter_object):
         missing_paths = original_paths - processed_paths
 
         if missing_paths:
-            return False, constants.PARAMETER_MSGS["invalid file path"].format(list(missing_paths))
+            path_diff = len(original_paths) - len(processed_paths)
+            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
 
@@ -796,7 +797,10 @@ def test_validate_file_path_scenarios(parameter_object):
         assert "invalid_path.py" in msg
 
         # Make sure we're getting the specific "invalid file path" message
-        expected_msg = constants.PARAMETER_MSGS["invalid file path"].format(["invalid_path.py"])
+        # We need to match the new format which takes input_path and path_diff
+        mixed_paths = ["valid_path.py", "invalid_path.py"]
+        path_diff = 1  # One invalid path
+        expected_msg = constants.PARAMETER_MSGS["invalid file path"].format(mixed_paths, path_diff)
         assert msg == expected_msg
     finally:
         # Restore the original method

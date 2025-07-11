@@ -486,14 +486,9 @@ class Parameter:
         if not valid_paths:
             return False, constants.PARAMETER_MSGS["no valid file path"].format(input_path)
 
-        # Normalize paths for comparison
-        processed_paths = {str(p).replace("\\", "/") for p in valid_paths}
-        original_paths = {str(p).replace("\\", "/") for p in input_path}
-
-        # Find invalid paths
-        missing_paths = original_paths - processed_paths
-
-        if missing_paths:
-            return False, constants.PARAMETER_MSGS["invalid file path"].format(list(missing_paths))
+        # Check for some invalid paths
+        path_diff = len(input_path) - len(valid_paths)
+        if path_diff > 0:
+            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
