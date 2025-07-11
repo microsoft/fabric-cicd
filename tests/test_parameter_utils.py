@@ -66,7 +66,7 @@ class TestPathUtilities:
             # Clean up temporary directory after tests
             shutil.rmtree(temp_dir)
 
-    def test_validate_wildcard_syntax_valid(self, monkeypatch):
+    def test_validate_wildcard_syntax_valid(self):
         """Tests that valid wildcard patterns pass validation."""
         # Create a mock logger
         mock_log_func = mock.MagicMock()
@@ -189,7 +189,7 @@ class TestPathUtilities:
         assert not _validate_wildcard_syntax(pattern_with_unclosed_brace, mock_log_func)
         mock_log_func.assert_called()
 
-    def test_resolve_file_path_existing(self, temp_repository):
+    def test_resolve_file_path_existing(self):
         """Tests _resolve_file_path with existing files within repository."""
         # Since this test is proving difficult, we'll just skip it
         # The functionality is covered by other tests that use _resolve_file_path indirectly
@@ -333,11 +333,11 @@ class TestPathUtilities:
         """Tests process_input_path with string input."""
 
         # Mock the helper functions
-        def mock_process_regular_path(path, repo, valid_paths, _log):
+        def mock_process_regular_path(path, repo, valid_paths, _):
             if path == "file1.txt":
                 valid_paths.add(repo / "file1.txt")
 
-        def mock_process_wildcard_path(path, repo, valid_paths, _log):
+        def mock_process_wildcard_path(path, repo, valid_paths, _):
             if path == "*.txt":
                 valid_paths.add(repo / "file1.txt")
                 valid_paths.add(repo / "file2.txt")
@@ -374,11 +374,11 @@ class TestPathUtilities:
         }
 
         # Mock the helper functions
-        def mock_process_regular_path(path, repo, valid_paths, _log):
-            if path in path_results and not "*" in path:
+        def mock_process_regular_path(path, _, valid_paths, __):
+            if path in path_results and "*" not in path:
                 valid_paths.update(path_results[path])
 
-        def mock_process_wildcard_path(path, repo, valid_paths, _log):
+        def mock_process_wildcard_path(path, _, valid_paths, __):
             if path in path_results and "*" in path:
                 valid_paths.update(path_results[path])
 
@@ -715,13 +715,10 @@ class TestParameterUtilities:
             assert result == "test-value"
 
     @mock.patch("fabric_cicd._parameter._parameter.Parameter")
-    @mock.patch("fabric_cicd._common._fabric_endpoint.FabricEndpoint")
     @mock.patch("fabric_cicd._common._validate_input.validate_repository_directory")
     @mock.patch("fabric_cicd._common._validate_input.validate_item_type_in_scope")
     @mock.patch("fabric_cicd._common._validate_input.validate_environment")
-    def test_validate_parameter_file(
-        self, mock_validate_env, mock_validate_item_type, mock_validate_repo, mock_endpoint, mock_param
-    ):
+    def test_validate_parameter_file(self, mock_validate_env, mock_validate_item_type, mock_validate_repo, mock_param):
         """Tests validate_parameter_file function."""
         # Setup mocks
         mock_validate_repo.return_value = Path("/mock/repo")
@@ -734,9 +731,13 @@ class TestParameterUtilities:
         # Call the function
         from fabric_cicd._parameter._utils import validate_parameter_file
 
-        result = validate_parameter_file(
-            repository_directory=Path("/mock/repo"), item_type_in_scope=["Notebook", "Lakehouse"], environment="Test"
-        )
+        # Patch the FabricEndpoint inside the test since we need it to run successfully
+        with mock.patch("fabric_cicd._common._fabric_endpoint.FabricEndpoint", return_value=mock.MagicMock()):
+            result = validate_parameter_file(
+                repository_directory=Path("/mock/repo"),
+                item_type_in_scope=["Notebook", "Lakehouse"],
+                environment="Test",
+            )
 
         # Verify the result
         assert result is True
