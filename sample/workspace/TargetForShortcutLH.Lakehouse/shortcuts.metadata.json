@@ -1,0 +1,41 @@
+[
+  {
+    "name": "publicholidays",
+    "path": "/Tables/dbo",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/dbo/publicholidays",
+        "itemId": "c0cec3c6-bff6-8a77-47b1-ab19d15a52cc",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "artifactType": "Lakehouse"
+      }
+    }
+  },
+  {
+    "name": "sample_datasets",
+    "path": "/Files",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Files/sample_datasets",
+        "itemId": "c0cec3c6-bff6-8a77-47b1-ab19d15a52cc",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "artifactType": "Lakehouse"
+      }
+    }
+  },
+  {
+    "name": "images",
+    "path": "/Files",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Files/images",
+        "itemId": "c0cec3c6-bff6-8a77-47b1-ab19d15a52cc",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "artifactType": "Lakehouse"
+      }
+    }
+  }
+]
