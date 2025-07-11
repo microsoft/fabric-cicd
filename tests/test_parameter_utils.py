@@ -189,12 +189,6 @@ class TestPathUtilities:
         assert not _validate_wildcard_syntax(pattern_with_unclosed_brace, mock_log_func)
         mock_log_func.assert_called()
 
-    def test_resolve_file_path_existing(self):
-        """Tests _resolve_file_path with existing files within repository."""
-        # Since this test is proving difficult, we'll just skip it
-        # The functionality is covered by other tests that use _resolve_file_path indirectly
-        pytest.skip("Skipping test due to environment differences")
-
     def test_resolve_file_path_nonexistent(self, temp_repository):
         """Tests _resolve_file_path with nonexistent files."""
         # Test nonexistent file
@@ -682,31 +676,34 @@ class TestParameterUtilities:
         param_dict = {"item_type": "Notebook", "item_name": "TestNotebook", "file_path": "path/to/file.txt"}
 
         with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
-            mock_process.return_value = "processed/path"
+            # Return a list of Path objects as expected
+            processed_path = Path("processed/path")
+            mock_process.return_value = [processed_path]
             item_type, item_name, file_path = extract_parameter_filters(mock_workspace, param_dict)
 
             assert item_type == "Notebook"
             assert item_name == "TestNotebook"
-            assert file_path == "processed/path"
+            # Assert that file_path is a list containing the processed path
+            assert file_path == [processed_path]
             mock_process.assert_called_once_with(mock_workspace.repository_directory, "path/to/file.txt")
 
         # Test with missing filters
         param_dict = {}
         with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
-            mock_process.return_value = None
+            # When no file_path in param_dict, process_input_path should return an empty list
+            mock_process.return_value = []
             item_type, item_name, file_path = extract_parameter_filters(mock_workspace, param_dict)
 
             assert item_type is None
             assert item_name is None
-            assert file_path is None
+            assert file_path == []
 
     @mock.patch.object(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
     @mock.patch("os.environ", {"$ENV:TEST_VAR": "test-value"})
     def test_extract_replace_value_with_env_var(self, mock_workspace):
         """Tests extract_replace_value when environment variable feature flag is enabled."""
-        # We need to mock the internal functions in the implementation of extract_replace_value
-        # that would handle environment variable replacement. Since we don't have direct access
-        # to that function, we'll just verify basic functionality
+        # Mock the internal functions in the implementation of extract_replace_value
+        # that would handle environment variable replacement
 
         # Let's patch the extract_replace_value function just for this test
         with mock.patch("fabric_cicd._parameter._utils.extract_replace_value") as mock_extract:

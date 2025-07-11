@@ -24,7 +24,7 @@ from fabric_cicd._common._exceptions import InputError, ParsingError
 
 logger = logging.getLogger(__name__)
 
-"""Function to extract parameter values"""
+"""Functions to extract parameter values"""
 
 
 def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> str:
@@ -191,7 +191,7 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
     return raw_file
 
 
-"""Function to validate the parameter file"""
+"""Functions to validate the parameter file"""
 
 
 def validate_parameter_file(

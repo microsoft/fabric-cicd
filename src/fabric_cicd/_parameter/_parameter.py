@@ -478,20 +478,22 @@ class Parameter:
         return True, "Valid item name"
 
     def _validate_file_path(self, input_path: list[str]) -> tuple[bool, str]:
-        """Validate the file path exists."""
-        # Convert input path to Path object, returned as a list of valid paths
-        valid_paths = process_input_path(self.repository_directory, input_path, True)
+        """Validate that the file paths exist within the repository directory."""
+        # Convert input path to Path objects, returned as a list of valid paths
+        valid_paths = process_input_path(self.repository_directory, input_path, validation_flag=True)
 
-        # If list of paths is empty
+        # If list of paths is empty, all paths were invalid
         if not valid_paths:
-            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path)
+            return False, constants.PARAMETER_MSGS["no valid file path"].format(input_path)
 
-        # Check if all input paths were processed successfully
-        processed_paths = {str(p) for p in valid_paths}
-        original_paths = set(input_path)
+        # Normalize paths for comparison
+        processed_paths = {str(p).replace("\\", "/") for p in valid_paths}
+        original_paths = {str(p).replace("\\", "/") for p in input_path}
+
+        # Find invalid paths
         missing_paths = original_paths - processed_paths
 
-        if processed_paths < original_paths:
+        if missing_paths:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(list(missing_paths))
 
         return True, "Valid file path"
