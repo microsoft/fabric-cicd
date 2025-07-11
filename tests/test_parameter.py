@@ -619,15 +619,10 @@ def test_validate_parameter_environment_and_filters(parameter_object, param_name
         False,
         constants.PARAMETER_MSGS["invalid item name"].format("Hello World 2"),
     )
-
-    # Test with a single invalid path - simple test case with mocking
-    # More comprehensive tests are in test_validate_file_path_scenarios
-    invalid_path = ["Hello World 2.Notebook/notebook-content.py"]
-    with mock.patch("fabric_cicd._parameter._utils.process_input_path", return_value=[]):
-        assert parameter_object._validate_file_path(invalid_path) == (
-            False,
-            constants.PARAMETER_MSGS["no valid file path"].format(invalid_path),
-        )
+    assert parameter_object._validate_file_path(["Hello World 2.Notebook/notebook-content.py"]) == (
+        False,
+        constants.PARAMETER_MSGS["no valid file path"].format(["Hello World 2.Notebook/notebook-content.py"]),
+    )
 
 
 @pytest.mark.parametrize(
