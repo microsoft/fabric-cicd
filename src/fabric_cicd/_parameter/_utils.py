@@ -296,18 +296,26 @@ def process_input_path(
     # Set the logging function based on validation_flag
     log_func = logger.error if validation_flag else logger.debug
 
+    # Return empty list for None or empty input
     if not input_path:
         return []
-
-    # Standardize to list for consistent processing
-    paths_to_process = [input_path] if isinstance(input_path, str) else input_path
 
     # Use a set to avoid duplicate paths
     valid_paths = set()
 
+    # Standardize to list for consistent processing
+    paths_to_process = [input_path] if isinstance(input_path, str) else input_path
+
     for path in paths_to_process:
         # Process path based on whether it contains wildcard characters
-        if glob.has_magic(path):
+        has_wildcard = False
+        try:
+            has_wildcard = glob.has_magic(path)
+        except Exception as e:
+            log_func(f"Error checking for wildcard in path '{path}': {e}")
+            continue
+
+        if has_wildcard:
             _process_wildcard_path(path, repository_directory, valid_paths, log_func)
         else:
             _process_regular_path(path, repository_directory, valid_paths, log_func)

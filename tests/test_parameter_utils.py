@@ -6,6 +6,7 @@ Tests for the parameter utility functions in _utils.py.
 These tests focus on the path handling functions and should be compatible with both Windows and Linux.
 """
 
+import json
 import logging
 import shutil
 import tempfile
@@ -402,20 +403,81 @@ class TestPathUtilities:
 
     def test_process_input_path_with_has_magic_exception(self, temp_repository, monkeypatch):
         """Tests process_input_path when glob.has_magic raises an exception."""
-        # Instead of testing the actual function which has changed behavior,
-        # we'll create a simplified test that just verifies the new implementation
+        # Create a mock logger to verify logging
+        mock_logger = mock.MagicMock()
+        monkeypatch.setattr("fabric_cicd._parameter._utils.logger", mock_logger)
 
-        # Mock process_input_path to avoid the exception
-        def mock_process_input_path(repo_dir, input_path, validation_flag=False):
-            # Just return an empty list for this test
-            return []
+        # Mock glob.has_magic to raise an exception
+        def mock_has_magic(_):
+            msg = "Mock exception in has_magic"
+            raise ValueError(msg)
 
-        monkeypatch.setattr("fabric_cicd._parameter._utils.process_input_path", mock_process_input_path)
+        monkeypatch.setattr("glob.has_magic", mock_has_magic)
 
-        # Test with a simple path - should work without exception
-        result = process_input_path(temp_repository, "file1.txt")
+        # Test with a single path - should handle the exception gracefully
+        result = process_input_path(temp_repository, "file1.txt", False)
+
+        # Verify the result is a list and it's empty (since we couldn't process the path)
         assert isinstance(result, list)
         assert len(result) == 0
+
+        # Verify that the error was logged
+        assert mock_logger.debug.called
+        assert "Error checking for wildcard" in mock_logger.debug.call_args_list[0][0][0]
+        mock_logger.reset_mock()
+
+        # Test with a list of paths - should attempt to process each path but return empty list
+        # since all paths will fail the glob.has_magic check with an exception
+        result = process_input_path(temp_repository, ["file1.txt", "file2.txt"], False)
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+        # Verify that errors were logged for both paths
+        assert mock_logger.debug.call_count == 2
+        assert "Error checking for wildcard" in mock_logger.debug.call_args_list[0][0][0]
+        assert "Error checking for wildcard" in mock_logger.debug.call_args_list[1][0][0]
+
+    def test_process_input_path_with_mixed_valid_invalid(self, temp_repository, monkeypatch):
+        """Tests process_input_path with a mix of valid paths and paths that cause errors."""
+        # Create a mock logger
+        mock_logger = mock.MagicMock()
+        monkeypatch.setattr("fabric_cicd._parameter._utils.logger", mock_logger)
+
+        # Create test files we need for this test
+        (temp_repository / "valid_file.txt").write_text("valid content")
+
+        # Mock glob.has_magic to succeed for specific paths and fail for others
+        import glob as glob_module
+
+        original_has_magic = glob_module.has_magic
+
+        def mock_has_magic(path):
+            if path == "error_path.txt":
+                msg = "Mock error for specific path"
+                raise ValueError(msg)
+            return original_has_magic(path)
+
+        monkeypatch.setattr("glob.has_magic", mock_has_magic)
+
+        # Mock _resolve_file_path to return a valid path for specific files
+        def mock_resolve_file_path(path, *_):
+            if "valid_file.txt" in str(path):
+                return path
+            return None
+
+        monkeypatch.setattr("fabric_cicd._parameter._utils._resolve_file_path", mock_resolve_file_path)
+
+        # Test with a mix of valid and problematic paths
+        result = process_input_path(temp_repository, ["valid_file.txt", "error_path.txt", "nonexistent_file.txt"])
+
+        # Should return only valid paths
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "valid_file.txt" in str(result[0])
+
+        # Verify errors were logged for problematic paths
+        assert mock_logger.debug.called
+        assert any("Error checking for wildcard" in call[0][0] for call in mock_logger.debug.call_args_list)
 
     def test_find_match(self):
         """Tests _find_match function with various inputs."""
@@ -712,11 +774,14 @@ class TestParameterUtilities:
 
         # Test successful replacement
         result = replace_key_value(param_dict, json_content, "dev")
-        assert "dev-server.example.com" in result
+        # Parse the JSON result and check the exact value to avoid substring sanitization issues
+        result_json = json.loads(result)
+        assert result_json["server"]["host"] == "dev-server.example.com"
 
         # Test with environment not in replace_value
         result = replace_key_value(param_dict, json_content, "test")
-        assert "localhost" in result
+        result_json = json.loads(result)
+        assert result_json["server"]["host"] == "localhost"
 
         # Test with invalid JSON content
         with pytest.raises(ValueError, match="Expecting property name"):
