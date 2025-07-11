@@ -150,7 +150,14 @@ spark_pool:
 -   Input values must be **string** or **array** (enables one or many values to filter on).
 -   YAML supports array inputs using bracket ( **[ ]** ) or dash ( **-** ) notation.
 -   Item types must be valid; see valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype).
--   `file_path` accepts absolute or relative paths. Relative paths must be relative to the _repository directory_.
+-   `file_path` accepts three types of paths within the _repository directory_ boundary:
+    -   **Absolute paths**: Full path starting from the drive root.
+    -   **Relative paths**: Paths relative to the _repository directory_.
+    -   **Wildcard paths**: Paths containing glob patterns.
+-   When using wildcard paths:
+    -   Common patterns include `*` (matches any characters in a filename), `**` (matches any directory depth).
+    -   All matched files must exist within the _repository directory_.
+    -   Examples: `**/notebook-content.py` matches all notebook files in the repository, `Sample Pipelines/*.json` matches json files in the Sample Pipelines folder.
 
 ### Parameter File Validation
 
