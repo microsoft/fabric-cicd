@@ -6,6 +6,19 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.23
+
+<span class="md-h2-subheader">Release Date: 2025-07-08</span>
+
+-   ✨ New functionalities for GitHub Copilot Agent and PR-to-Issue linking
+-   🔧 Fix issue with lakehouse shortcuts publishing ([#379] (https://github.com/microsoft/fabric-cicd/issues/379))
+-   🔧 Add validation for empty logical IDs to prevent deployment corruption ([#86](https://github.com/microsoft/fabric-cicd/issues/86))
+-   🔧 Fix SQL provision print statement ([#329](https://github.com/microsoft/fabric-cicd/issues/329))
+-   🔧 Rename the error code for reserved item name per updated Microsoft Fabric API ([#388](https://github.com/microsoft/fabric-cicd/issues/388))
+-   🔧 Fix lakehouse exclude_regex to exclude shortcut publishing ([#385](https://github.com/microsoft/fabric-cicd/issues/385))
+-   🔧 Remove max retry limit to handle large deployments ([#299] (https://github.com/microsoft/fabric-cicd/issues/299))
+-   📝 Fix formatting and examples in the How to and Examples pages
+
 ## Version 0.1.22
 
 <span class="md-h2-subheader">Release Date: 2025-06-25</span>
