@@ -1,0 +1,37 @@
+name: GitHub Copilot Assignment
+description: Issue template for tasks assigned to GitHub Copilot Agent
+title: "Copilot"
+labels: ["copilot"]
+body:
+    - type: markdown
+      attributes:
+          value: Used internally to raise issues specifically for GitHub Copilot agent assistance. All fields are optional to allow quick task assignment with focused context.
+
+    - type: textarea
+      id: problem-description
+      attributes:
+          label: What is the problem?
+          description: Describe the issue, highlight specific error messages observed, specify why this is happening or what the likely cause is.
+      validations:
+          required: true
+
+    - type: textarea
+      id: solution-description
+      attributes:
+          label: Is there an ideal solution?
+          description: Describe the ideal solution if there is one. Provide specific technical details.
+      validations:
+          required: false
+
+    - type: textarea
+      id: success-criteria
+      attributes:
+          label: Success Criteria
+          description: |
+              Define how to know when the task is complete:
+              - Specific functionality that should work
+              - Tests that should pass
+              - Documentation that should be updated
+              - Performance or quality requirements
+      validations:
+          required: false

@@ -175,6 +175,7 @@ class FabricWorkspace:
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
+        empty_logical_id_paths = []  # Collect all paths with empty logical IDs
 
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
@@ -207,6 +208,12 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
+                
+                # Check for empty logical ID and collect the path
+                if not item_logical_id or item_logical_id.strip() == "":
+                    empty_logical_id_paths.append(str(item_metadata_path))
+                    continue  # Skip processing this item further
+                
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 relative_parent_path = "/".join(relative_path.split("/")[:-1])
@@ -233,6 +240,15 @@ class FabricWorkspace:
                 )
 
                 self.repository_items[item_type][item_name].collect_item_files()
+        
+        # If we found any empty logical IDs, raise an error with all paths
+        if empty_logical_id_paths:
+            if len(empty_logical_id_paths) == 1:
+                msg = f"logicalId cannot be empty in {empty_logical_id_paths[0]}"
+            else:
+                paths_list = "\n  - ".join(empty_logical_id_paths)
+                msg = f"logicalId cannot be empty in the following files:\n  - {paths_list}"
+            raise ParsingError(msg, logger)
 
     def _refresh_deployed_items(self) -> None:
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
@@ -437,8 +453,6 @@ class FabricWorkspace:
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = constants.MAX_RETRY_OVERRIDE.get(item_type, 5)
-
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
@@ -474,7 +488,7 @@ class FabricWorkspace:
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body, max_retries=max_retries
+                method="POST", url=f"{self.base_api_url}/items", body=combined_body
             )
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
@@ -486,7 +500,6 @@ class FabricWorkspace:
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
-                max_retries=max_retries,
             )
         elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
@@ -498,7 +511,6 @@ class FabricWorkspace:
                 method="PATCH",
                 url=f"{self.base_api_url}/items/{item_guid}",
                 body=metadata_body,
-                max_retries=max_retries,
             )
 
         if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
@@ -509,7 +521,6 @@ class FabricWorkspace:
                     method="POST",
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
-                    max_retries=max_retries,
                 )
                 logger.debug(
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
