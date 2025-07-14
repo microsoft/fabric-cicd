@@ -259,16 +259,19 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties based on item type
-            if item_type == "Lakehouse":
-                lakehouse_response = self.endpoint.invoke(
-                    method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
+            if item_type in ["Lakehouse", "Warehouse"]:
+                # Construct the endpoint URL and set the property path based on item type
+                endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+                response = self.endpoint.invoke(method="GET", url=endpoint_url)
+                property_path = (
+                    "body/properties/sqlEndpointProperties/connectionString"
+                    if item_type == "Lakehouse"
+                    else "body/properties/connectionString"
                 )
                 # Use dpath.get for safe nested property access
-                sql_endpoint = dpath.get(
-                    lakehouse_response, "body/properties/sqlEndpointProperties/connectionString", default=""
-                )
+                sql_endpoint = dpath.get(response, property_path, default="")
                 if not sql_endpoint:
-                    logger.debug(f"Failed to get SQL endpoint for Lakehouse '{item_name}'")
+                    logger.debug(f"Failed to get SQL endpoint for {item_type} '{item_name}'")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
