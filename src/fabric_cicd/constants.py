@@ -40,7 +40,7 @@ SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-WORKSPACE_ID_REFERENCE_REGEX = r'\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\"'
+WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
 DATAFLOW_ID_REFERENCE_REGEX = r'(dataflowId)\s*=\s*"(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 
@@ -50,6 +50,12 @@ ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json", "Dataflow": "mashu
 DATA_PIPELINE_ACTIVITY_TYPES = {
     "RefreshDataflow": ["workspaceId", "Dataflow", "dataflowId", "dataflows"],
     "PBISemanticModelRefresh": ["groupId", "SemanticModel", "datasetId", "semanticModels"],
+}
+
+# Property path to get SQL Endpoint
+PROPERTY_PATH_MAPPING = {
+    "Lakehouse": "body/properties/sqlEndpointProperties/connectionString",
+    "Warehouse": "body/properties/connectionString",
 }
 
 # Parameter file configs
