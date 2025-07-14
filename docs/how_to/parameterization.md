@@ -59,7 +59,7 @@ The `replace_value` field supports variables that reference workspace or deploye
 -   **Format**: Item type and name are **case-sensitive**. Enter the item name exactly as it appears, including spaces. For example: `$items.Notebook.Hello World.id`
 -   **Supported attributes**: `id` (item ID) and `sqlendpoint`. Attributes should be lowercase.
 -   **Important**: If the specified item type or name does not exist in the deployed workspace, or if an invalid attribute is provided, or if the attribute value does not exist, the deployment will fail.
--   For an in-depth example, see the **notebook example** alternate approach.
+-   For an in-depth example, see the **advanced notebook example**.
 
 ```yaml
 find_replace:
@@ -227,9 +227,11 @@ spark_pool:
 
 ### Notebooks
 
+<span class="md-h4-nonanchor">Basic Example</span>
+
 A Notebook is attached to a Lakehouse which resides in different workspaces. The Workspace and Lakehouse GUIDs in the Notebook need to be updated to ensure the Notebook points to the correct Lakehouse once deployed.
 
-In the `notebook-content.py` file, the default_lakehouse `123e4567-e89b-12d3-a456-426614174000`, and default_lakehouse_workspace_id `8f5c0cec-a8ea-48cd-9da4-871dc2642f4c` must be replaced with the corresponding GUIDs of the Lakehouse in the target environment (PPE/PROD/etc).
+In the `notebook-content.py` file, the default_lakehouse `47592d55-9a83-41a8-9b21-e1ef44264161`, and default_lakehouse_workspace_id `2190baad-a374-4114-addd-0dcf0533e69d` must be replaced with the corresponding GUIDs of the Lakehouse in the target environment (PPE/PROD/etc).
 
 This replacement is managed by the `find_replace` input in the `parameter.yml` file where fabric-cicd finds every instance of the string within the _specified_ repository files and replaces it with the string for the deployed environment.
 
@@ -237,16 +239,86 @@ This replacement is managed by the `find_replace` input in the `parameter.yml` f
 
 ```yaml
 find_replace:
-    - find_value: "123e4567-e89b-12d3-a456-426614174000" # lakehouse GUID to be replaced
+    - find_value: "47592d55-9a83-41a8-9b21-e1ef44264161" # lakehouse GUID to be replaced
       replace_value:
-          PPE: "f47ac10b-58cc-4372-a567-0e02b2c3d479" # PPE lakehouse GUID
-          PROD: "9b2e5f4c-8d3a-4f1b-9c3e-2d5b6e4a7f8c" # PROD lakehouse GUID
+          PPE: "a21e502a-51a5-4455-bb3d-6faf1e3e21fb" # PPE lakehouse GUID
+          PROD: "1069f2ff-bb30-42a0-97b3-1f4655705b8a" # PROD lakehouse GUID
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
-    - find_value: "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c" # workspace ID to be replaced
+    - find_value: "2190baad-a374-4114-addd-0dcf0533e69d" # workspace ID to be replaced
       replace_value:
-          PPE: "d4e5f6a7-b8c9-4d1e-9f2a-3b4c5d6e7f8a" # PPE workspace ID
-          PROD: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d" # PROD workspace ID
+          PPE: "5a6ebbe6-9289-4105-b47c-cf158247b911" # PPE workspace ID
+          PROD: "f9e8cbe0-2669-4e06-a026-7c75e5af8107" # PROD workspace ID
+      file_path: # filter on notebook files with these paths
+          - "/Hello World.Notebook/notebook-content.py"
+          - "\\Goodbye World.Notebook\\notebook-content.py"
+```
+
+<span class="md-h4-nonanchor">notebook-content.py file</span>
+
+```python
+# Fabric notebook source
+
+# METADATA ********************
+
+# META {
+# META   "kernel_info": {
+# META     "name": "synapse_pyspark"
+# META   },
+# META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse": "47592d55-9a83-41a8-9b21-e1ef44264161",
+# META       "default_lakehouse_name": "Example_LH",
+# META       "default_lakehouse_workspace_id": "2190baad-a374-4114-addd-0dcf0533e69d"
+# META     },
+# META     "environment": {
+# META       "environmentId": "a277ea4a-e87f-8537-4ce0-39db11d4aade",
+# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
+# META     }
+# META   }
+# META }
+
+# CELL ********************
+
+df = spark.sql("SELECT * FROM Example_LH.Table1 LIMIT 1000")
+display(df)
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+```
+
+<span class="md-h4-nonanchor">Advanced Example</span>
+
+A Notebook is attached to a Lakehouse which resides in the same workspace. When deploying both the Lakehouse and the Notebook to a target environment (PPE/PROD/etc), the Workspace and Lakehouse GUIDs referenced in the Notebook must be updated to ensure it correctly points to the corresponding Lakehouse in the new environment.
+
+This approach uses a regex pattern and dynamic variables to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
+
+The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be dynamically replaced with the appropriate value for the deployed environment.
+
+This approach is particularly useful for replacing values that are not known until deployment time, such as item IDs.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    # lakehouse GUID matching group 1 of regex pattern to be replaced
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          PPE: "$items.Lakehouse.Example_LH.id" # PPE lakehouse GUID (dynamic)
+          PROD: "$items.Lakehouse.Example_LH.id" # PROD lakehouse GUID (dynamic)
+      is_regex: "true"
+      item_type: "Notebook" # filter on notebook files
+      item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
+    # workspace ID matching group 1 of regex pattern to be replaced
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          PPE: "$workspace.id" # PPE workspace ID (dynamic)
+          PROD: "$workspace.id" # PROD workspace ID (dynamic)
+      is_regex: "true"
       file_path: # filter on notebook files with these paths
           - "/Hello World.Notebook/notebook-content.py"
           - "\\Goodbye World.Notebook\\notebook-content.py"
@@ -287,37 +359,6 @@ display(df)
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
-```
-
-<span class="md-h4-nonanchor">Alternate approach</span>
-
-This approach uses a regex pattern and dynamic variables to manage replacement. In this `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
-
-The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be replaced with the string dynamically derived from the variable for the deployed environment.
-
-This approach is especially useful when replacing values that are not known until deployment time, such as item ids.
-
-<span class="md-h4-nonanchor">parameter.yml file</span>
-
-```yaml
-find_replace:
-    # lakehouse GUID matching group 1 of regex pattern to be replaced
-    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-      replace_value:
-          PPE: "$items.Lakehouse.Example_LH.id" # PPE lakehouse GUID (dynamic)
-          PROD: "$items.Lakehouse.Example_LH.id" # PROD lakehouse GUID (dynamic)
-      is_regex: "true"
-      item_type: "Notebook" # filter on notebook files
-      item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
-    # workspace ID matching group 1 of regex pattern to be replaced
-    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-      replace_value:
-          PPE: "$workspace.id" # PPE workspace ID (dynamic)
-          PROD: "$workspace.id" # PROD workspace ID (dynamic)
-      is_regex: "true"
-      file_path: # filter on notebook files with these paths
-          - "/Hello World.Notebook/notebook-content.py"
-          - "\\Goodbye World.Notebook\\notebook-content.py"
 ```
 
 ### Data Pipelines
