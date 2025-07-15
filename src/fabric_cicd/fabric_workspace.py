@@ -208,12 +208,12 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                
+
                 # Check for empty logical ID and collect the path
                 if not item_logical_id or item_logical_id.strip() == "":
                     empty_logical_id_paths.append(str(item_metadata_path))
                     continue  # Skip processing this item further
-                
+
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 relative_parent_path = "/".join(relative_path.split("/")[:-1])
@@ -240,7 +240,7 @@ class FabricWorkspace:
                 )
 
                 self.repository_items[item_type][item_name].collect_item_files()
-        
+
         # If we found any empty logical IDs, raise an error with all paths
         if empty_logical_id_paths:
             if len(empty_logical_id_paths) == 1:
@@ -275,16 +275,14 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties based on item type
-            if item_type == "Lakehouse":
-                lakehouse_response = self.endpoint.invoke(
-                    method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
-                )
+            if item_type in ["Lakehouse", "Warehouse"]:
+                # Construct the endpoint URL and set the property path based on item type
+                endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+                response = self.endpoint.invoke(method="GET", url=endpoint_url)
                 # Use dpath.get for safe nested property access
-                sql_endpoint = dpath.get(
-                    lakehouse_response, "body/properties/sqlEndpointProperties/connectionString", default=""
-                )
+                sql_endpoint = dpath.get(response, constants.PROPERTY_PATH_MAPPING[item_type], default="")
                 if not sql_endpoint:
-                    logger.debug(f"Failed to get SQL endpoint for Lakehouse '{item_name}'")
+                    logger.debug(f"Failed to get SQL endpoint for {item_type} '{item_name}'")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
