@@ -91,6 +91,10 @@ def update_activity_references(fabric_workspace_obj: FabricWorkspace, file_obj: 
         fabric_workspace_obj: The FabricWorkspace object.
         file_obj: The file object.
     """
+    # If the feature flag is not enabled, return the file contents as is
+    if "enable_item_reference_replacement" not in constants.FEATURE_FLAG:
+        return file_obj.contents
+
     # Create a dictionary from the raw file
     item_content_dict = json.loads(file_obj.contents)
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._common._exceptions import ParsingError
+from fabric_cicd._common._exceptions import ItemNotFoundError, ParsingError
 from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
@@ -181,13 +181,17 @@ def lookup_referenced_item(
         api_item_type: The API GET item type (e.g., 'dataflows').
         get_name: If True, return the item name instead of the guid.
     """
-    # Get the item name using the workspace ID and item ID
-    response = fabric_workspace_obj.endpoint.invoke(
-        method="GET",
-        url=f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
-    )
-    item_name = response.get("body", {}).get("displayName", "")
-    logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
+    try:
+        # Get the item name using the workspace ID and item ID
+        response = fabric_workspace_obj.endpoint.invoke(
+            method="GET",
+            url=f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
+        )
+        item_name = response.get("body", {}).get("displayName", "")
+        logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
+    except Exception as e:
+        error_msg = f"Failed to lookup {item_type} with id '{item_id}' in workspace '{workspace_id}'"
+        raise ItemNotFoundError(error_msg) from e
 
     # Return name if requested, otherwise return guid if found, or empty string
     return (
