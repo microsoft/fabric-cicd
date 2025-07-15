@@ -15,7 +15,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_item_reference_replacement`\*     | Set to enable replacing referenced item GUIDs in pipeline activities |
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                       |
 
-\* The `enable_item_reference_replacement` flag enables replacement of referenced items in pipeline activities that use workspace-specific GUIDs (versus workspace- agnostic GUIDs). Currently, this works for Dataflow refresh and Semantic Model refresh activities (please raise a GitHub issue to request for other activities). This functionality provides an alternative to parameterizing GUIDs found in pipeline activities by automatically resolving the correct GUIDs across environments. Note that this functionality only works when the same workspace access permissions are granted across all environments.
+\* The `enable_item_reference_replacement` flag enables replacement of referenced items in pipeline activities that use workspace-specific GUIDs (versus workspace-agnostic GUIDs). Currently, this works for dataflow refresh and semantic model refresh activities (please raise a GitHub issue to request for other activities). This functionality provides an alternative to parameterizing GUIDs found in pipeline activities by automatically resolving the GUIDs across environments. Note that this functionality only works when the same workspace access permissions are granted across all environments.
 
 <span class="md-h3-nonanchor">Example</span>
 
