@@ -111,7 +111,13 @@ def sort_items(
         if lookup_type == "Deployed":
             unpublish_items.append(item_name)
 
-        referenced_items = find_referenced_items_func(fabric_workspace_obj, item_content, lookup_type)
+        if lookup_type == "Repository":
+            # For publish: Find and cache referenced items
+            referenced_items = find_referenced_items_func(fabric_workspace_obj, item_content, lookup_type)
+            constants.DEPENDENCY_CACHE[item_name] = referenced_items
+        else:
+            # For unpublish: Use cached references to avoid API calls to removed items
+            referenced_items = constants.DEPENDENCY_CACHE.get(item_name, [])
 
         for referenced_name in referenced_items:
             graph[referenced_name].append(item_name)
@@ -191,7 +197,7 @@ def lookup_referenced_item(
         logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
     except Exception as e:
         error_msg = f"Failed to lookup {item_type} with id '{item_id}' in workspace '{workspace_id}'"
-        raise ItemNotFoundError(error_msg) from e
+        raise ItemNotFoundError(error_msg, logger) from e
 
     # Return name if requested, otherwise return guid if found, or empty string
     return (
