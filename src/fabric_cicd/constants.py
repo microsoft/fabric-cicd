@@ -40,7 +40,7 @@ SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-WORKSPACE_ID_REFERENCE_REGEX = r'\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\"'
+WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
 DATAFLOW_ID_REFERENCE_REGEX = r'(dataflowId)\s*=\s*"(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 
@@ -95,13 +95,28 @@ PARAMETER_MSGS = {
     "no optional": "No optional values provided in {}",
     "invalid item type": "Item type '{}' not in scope",
     "invalid item name": "Item name '{}' not found in the repository directory",
-    "invalid file path": "Path '{}' not found in the repository directory",
-    "valid optional": "Optional values in {} are valid",
+    "invalid file path": "Number of paths in list '{}' that are invalid or not found in the repository directory: {}",
+    "no valid file path": "No valid file path found in the repository directory for {}",
+    "valid optional": "Optional values in {} are valid. Checking for file matches in the repository directory",
     "valid parameter": "{} parameter is valid",
     "skip": "The {} '{}' replacement will be skipped due to {} in parameter {}",
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }
+
+# Wildcard path support validations
+WILDCARD_PATH_VALIDATIONS = [
+    # Invalid combinations
+    {
+        "check": lambda p: any(bad in p for bad in ["/**/*/", "**/**", "//", "\\\\", "**/**/"]),
+        "message": lambda p: f"Invalid wildcard combination in pattern: '{p}'",
+    },
+    # Incorrect recursive wildcard format
+    {
+        "check": lambda p: "**" in p and not ("**/" in p or "/**" in p),
+        "message": lambda p: f"Invalid recursive wildcard format (use **/ or /**): '{p}'",
+    },
+]
 
 
 INDENT = "->"
