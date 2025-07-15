@@ -461,6 +461,10 @@ def _validate_wildcard_syntax(pattern: str, log_func: logging.Logger) -> bool:
             log_func(validation["message"](pattern))
             return False
 
+    # Validate proper nesting of brackets and braces
+    if not _validate_nested_brackets_braces(pattern, log_func):
+        return False
+
     # Validate character classes (bracket expressions)
     for section in re.findall(r"\[(.*?)\]", pattern):
         if not section or section.startswith("]") or section.startswith("-") or "--" in section:
@@ -500,6 +504,33 @@ def _validate_wildcard_syntax(pattern: str, log_func: logging.Logger) -> bool:
         if traversal and traversal in pattern_lower:
             log_func(f"Path traversal sequences not allowed: '{pattern}'")
             return False
+
+    return True
+
+
+def _validate_nested_brackets_braces(pattern: str, log_func: logging.Logger) -> bool:
+    """Validates proper nesting of brackets and braces in a wildcard pattern."""
+    stack = []
+
+    for pos, char in enumerate(pattern):
+        if char in "[{":
+            stack.append(char)
+        elif char in "]}":
+            # Check if stack is empty (closing without opening)
+            if not stack:
+                log_func(f"Unmatched closing '{char}' at position {pos} in pattern: '{pattern}'")
+                return False
+
+            # Check for proper matching
+            last_open = stack.pop()
+            if (char == "]" and last_open != "[") or (char == "}" and last_open != "{"):
+                log_func(f"Mismatched bracket/brace pair '{last_open}{char}' at position {pos} in pattern: '{pattern}'")
+                return False
+
+    # Check if all brackets and braces were closed
+    if stack:
+        log_func(f"Unclosed bracket(s) or brace(s) in pattern: '{pattern}'")
+        return False
 
     return True
 

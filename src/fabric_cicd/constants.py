@@ -110,15 +110,6 @@ WILDCARD_PATH_VALIDATIONS = [
         "check": lambda p: "**" in p and not ("**/" in p or "/**" in p),
         "message": lambda p: f"Invalid recursive wildcard format (use **/ or /**): '{p}'",
     },
-    # Unbalanced or empty brackets/braces
-    {
-        "check": lambda p: p.count("[") != p.count("]") or "[]" in p,
-        "message": lambda p: f"Invalid square brackets in pattern: '{p}'",
-    },
-    {
-        "check": lambda p: p.count("{") != p.count("}") or "{}" in p,
-        "message": lambda p: f"Invalid curly braces in pattern: '{p}'",
-    },
 ]
 
 
