@@ -111,13 +111,7 @@ def sort_items(
         if lookup_type == "Deployed":
             unpublish_items.append(item_name)
 
-        if lookup_type == "Repository":
-            # For publish: Find and cache referenced items
-            referenced_items = find_referenced_items_func(fabric_workspace_obj, item_content, lookup_type)
-            constants.DEPENDENCY_CACHE[item_name] = referenced_items
-        else:
-            # For unpublish: Use cached references to avoid API calls to removed items
-            referenced_items = constants.DEPENDENCY_CACHE.get(item_name, [])
+        referenced_items = find_referenced_items_func(fabric_workspace_obj, item_content, lookup_type)
 
         for referenced_name in referenced_items:
             graph[referenced_name].append(item_name)
