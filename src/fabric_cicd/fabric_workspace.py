@@ -44,7 +44,7 @@ class FabricWorkspace:
             workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
-            item_type_in_scope: Item types that should be deployed for a given workspace.
+            item_type_in_scope: Item types that should be deployed for a given workspace. Use ["all"] to include all available item types.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
             kwargs: Additional keyword arguments.
@@ -73,6 +73,14 @@ class FabricWorkspace:
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
             ...     environment="your-target-environment"
+            ... )
+
+            Using all available item types
+            >>> from fabric_cicd import FabricWorkspace
+            >>> workspace = FabricWorkspace(
+            ...     workspace_id="your-workspace-id",
+            ...     repository_directory="/path/to/repo",
+            ...     item_type_in_scope=["all"]
             ... )
 
             With token credential
