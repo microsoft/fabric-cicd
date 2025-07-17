@@ -813,3 +813,79 @@ def test_single_empty_logical_id_validation_message(temp_workspace_dir, patched_
     assert "logicalId cannot be empty in " in error_message
     assert "following files:" not in error_message
     assert str(platform_file_path) in error_message
+
+
+def test_item_type_in_scope_all_functionality():
+    """Test the 'all' functionality for item_type_in_scope parameter."""
+    import fabric_cicd.constants as constants
+    from fabric_cicd._common._validate_input import validate_item_type_in_scope
+
+    # Test 1: 'all' with UPN authentication
+    result_upn = validate_item_type_in_scope(["all"], upn_auth=True)
+    expected_upn = list(constants.ACCEPTED_ITEM_TYPES_UPN)
+    assert result_upn == expected_upn, f"UPN test failed: expected {expected_upn}, got {result_upn}"
+
+    # Test 2: 'all' with non-UPN authentication
+    result_non_upn = validate_item_type_in_scope(["all"], upn_auth=False)
+    expected_non_upn = list(constants.ACCEPTED_ITEM_TYPES_NON_UPN)
+    assert result_non_upn == expected_non_upn, f"Non-UPN test failed: expected {expected_non_upn}, got {result_non_upn}"
+
+    # Test 3: Case insensitive 'ALL'
+    result_upper = validate_item_type_in_scope(["ALL"], upn_auth=True)
+    assert result_upper == expected_upn, "Case insensitive 'ALL' test failed"
+
+    # Test 4: Mixed case 'All'
+    result_mixed = validate_item_type_in_scope(["All"], upn_auth=True)
+    assert result_mixed == expected_upn, "Mixed case 'All' test failed"
+
+    # Test 5: Specific item types still work
+    specific_types = ["Notebook", "Environment", "DataPipeline"]
+    result_specific = validate_item_type_in_scope(specific_types, upn_auth=True)
+    assert result_specific == specific_types, "Specific types test failed"
+
+    # Test 6: 'all' with other items should validate each item (regression test)
+    from fabric_cicd._common._exceptions import InputError
+
+    with pytest.raises(InputError, match="Invalid or unsupported item type: 'all'"):
+        validate_item_type_in_scope(["all", "Notebook"], upn_auth=True)
+
+
+def test_fabric_workspace_with_all_item_types(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that FabricWorkspace works correctly when initialized with 'all' item types."""
+    # Create a sample item to test with
+    item_dir = temp_workspace_dir / "TestNotebook.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    platform_file_path = item_dir / ".platform"
+
+    metadata_content = {
+        "metadata": {
+            "type": "Notebook",
+            "displayName": "Test Notebook",
+            "description": "Test notebook for all item types test",
+        },
+        "config": {"logicalId": "test-logical-id-all"},
+    }
+
+    with platform_file_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata_content, f, ensure_ascii=False)
+
+    # Create a dummy content file
+    with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("Dummy file content")
+
+    # Test that workspace initializes correctly with 'all'
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id, repository_directory=str(temp_workspace_dir), item_type_in_scope=["all"]
+    )
+
+    # Verify that item_type_in_scope was expanded to all available types
+    import fabric_cicd.constants as constants
+
+    expected_types = list(constants.ACCEPTED_ITEM_TYPES_UPN)  # Assuming UPN auth in mock
+    assert set(workspace.item_type_in_scope) == set(expected_types), (
+        f"Expected all item types, got {workspace.item_type_in_scope}"
+    )
+
+    # Verify that the notebook item was loaded correctly
+    assert "Notebook" in workspace.repository_items
+    assert "Test Notebook" in workspace.repository_items["Notebook"]
