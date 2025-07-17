@@ -64,7 +64,7 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
 
     if len(input_value) == 1 and input_value[0].lower() == "all":
         auth_type = "UPN" if upn_auth else "Service Principal/Managed Identity"
-        logger.info(f"Using all available item types for {auth_type} authentication")
+        logger.debug(f"Using all available item types for {auth_type} authentication")
         return list(accepted_item_types)
 
     for item_type in input_value:
