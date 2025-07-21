@@ -102,6 +102,11 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> st
             msg = f"Item type '{item_type}' is invalid or not found in deployed items"
             raise InputError(msg, logger)
 
+        # Return an empty string for Dataflow items since ID replacement is already handled separately
+        if item_type == "Dataflow":
+            logger.debug("Dataflow item type detected, skipping ID replacement as it is handled separately")
+            return ""
+
         if item_name not in workspace_obj.workspace_items[item_type]:
             msg = f"Item '{item_name}' not found as a deployed {item_type}"
             raise InputError(msg, logger)

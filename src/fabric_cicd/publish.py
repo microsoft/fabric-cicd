@@ -211,11 +211,9 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         to_delete_set = deployed_names - repository_names
         to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type in ("Dataflow", "DataPipeline"):
-            # Use the find referenced items function specific to the item type
-            find_referenced_items_func = (
-                items.find_referenced_datapipelines if item_type == "DataPipeline" else items.find_referenced_dataflows
-            )
+        if item_type == "DataPipeline":
+            find_referenced_items_func = items.find_referenced_datapipelines
+
             # Determine order to delete w/o dependencies
             to_delete_list = items.set_unpublish_order(
                 fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
