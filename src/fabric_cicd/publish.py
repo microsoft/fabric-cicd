@@ -10,6 +10,7 @@ import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._publish_log_entry import PublishLogEntry
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
 )
@@ -18,19 +19,16 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(
-    fabric_workspace_obj: FabricWorkspace,
-    item_name_exclude_regex: Optional[str] = None,
-    items_to_include: Optional[list[str]] = None,
-) -> None:
+def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> list[PublishLogEntry]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-        items_to_include: Optional list of items to include in the publishing process. If None, all item types in scope will be published.
-
+    
+    Returns:
+        List[PublishLogEntry]: A list of structured log entries capturing the publish operations.
 
     Examples:
         Basic usage
@@ -40,7 +38,10 @@ def publish_all_items(
         ...     repository_directory="/path/to/repo",
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
-        >>> publish_all_items(workspace)
+        >>> log_entries = publish_all_items(workspace)
+        >>> for entry in log_entries:
+        ...     print(f"{entry.name}: {'Success' if entry.success else 'Failed'}")
+ 
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -50,10 +51,15 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> exclude_regex = ".*_do_not_publish"
-        >>> publish_all_items(workspace, exclude_regex)
+        >>> log_entries = publish_all_items(workspace, exclude_regex)
+        >>> successful = [entry for entry in log_entries if entry.success]
+        >>> print(f"Successfully published {len(successful)} items")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
+    # Clear any previous log entries
+    fabric_workspace_obj.publish_log_entries = []
+    
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
@@ -68,13 +74,6 @@ def publish_all_items(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
-        
-    if items_to_include:
-        logger.warning(
-            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
-        fabric_workspace_obj.items_to_include = items_to_include
-        
     try:
         if "VariableLibrary" in fabric_workspace_obj.item_type_in_scope:
             print_header("Publishing Variable Libraries")
@@ -141,13 +140,12 @@ def publish_all_items(
         if "Environment" in fabric_workspace_obj.item_type_in_scope:
             print_header("Checking Environment Publish State")
             items.check_environment_publish_state(fabric_workspace_obj)
-
+    
     except Exception as e:
-        logger.error(f"An error occurred during publishing: {e}")
+        logger.error(f"An error occurred during publishing: {e}", exc_info=True)
         return fabric_workspace_obj.publish_log_entries
-
+    
     return fabric_workspace_obj.publish_log_entries
-
 
 def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
     """
