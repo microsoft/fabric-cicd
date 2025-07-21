@@ -19,17 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 def publish_all_items(
-    fabric_workspace_obj: FabricWorkspace,
-    item_name_exclude_regex: Optional[str] = None,
-    items_to_include: Optional[list[str]] = None,
-) -> None:
+        fabric_workspace_obj: FabricWorkspace, 
+        item_name_exclude_regex: Optional[str] = None,
+        items_to_include: Optional[list[str]] = None) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-        items_to_include: Optional list of items to include in the publishing process. If None, all item types in scope will be published.
+        items_to_include: List of specific item names to include. If provided, only these items will be published.
 
 
     Examples:
@@ -51,6 +50,15 @@ def publish_all_items(
         ... )
         >>> exclude_regex = ".*_do_not_publish"
         >>> publish_all_items(workspace, exclude_regex)
+        
+        With specific items to include
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> items_to_include = ["Notebook", "Environment"]
+        >>> publish_all_items(workspace, items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -67,6 +75,11 @@ def publish_all_items(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+        
+    # Set items to include filter
+    if items_to_include:
+        logger.info(f"Publishing only specified items: {items_to_include}")
+        fabric_workspace_obj.publish_items_to_include = items_to_include
 
     if items_to_include:
         logger.warning(
