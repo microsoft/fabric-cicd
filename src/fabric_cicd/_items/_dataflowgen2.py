@@ -82,7 +82,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
 
         # If the item is already in the temporary visited set, it indicates a cycle
         if item in temp_visited:
-            msg = f"Circular dependency found for item {item}. Cannot determine a valid publish order."
+            msg = f"Circular dependency found for item {item}. Cannot determine a valid publish order"
             raise ParsingError(msg, logger)
 
         # Add the item to the temporary visited set
