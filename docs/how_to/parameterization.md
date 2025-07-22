@@ -176,7 +176,7 @@ find_replace:
 
 File filtering is supported in all\* parameters. This feature is optional and can be used to specify the files where replacement is intended to occur.
 
--   **Supported filters:** `item_type`, `item_name`, and `file_path`, see [File Filters](#file-filters).
+-   **Supported filters:** `item_type`, `item_name`, and `file_path`, see [Supported File Filters](#supported-file-filters).
 -   **Expected behavior:**
     -   If at least one filter value does not match, the replacement will be skipped for that file.
     -   If none of the optional filter fields or values are provided, the value found in _any_ repository file is subject to replacement.
@@ -235,7 +235,7 @@ You can use both `is_regex` and filter fields together in the same parameter con
 -   When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
 -   When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
 
-### File Filters
+### Supported File Filters
 
 #### `item_type`
 
