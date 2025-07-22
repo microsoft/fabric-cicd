@@ -37,7 +37,7 @@
 
 -   **Parameterization:**
     -   Activities connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
-    -   Activities connected to items within the same workspace are automatically re-pointed to the new item in the target workspace. **Note:** Activities referencing items that don't use _logical ID_ and _default workspace ID_ (such as Refresh Dataflow and Refresh Semantic Model) require parameterization.
+    -   Activities connected to items within the same workspace are automatically re-pointed to the new item in the target workspace. **Note: Activities referencing items that don't use _logical ID_ and _default workspace ID_ (such as Refresh Dataflow and Refresh Semantic Model) require parameterization.**
 -   **Connections** are not source controlled and must be created manually.
 -   If you are using connections and expect them to change between different environments, then those need to be parameterized in the `parameter.yml` file.
 -   The **executing identity** of the deployment must have access to the connections, or the deployment will fail.
