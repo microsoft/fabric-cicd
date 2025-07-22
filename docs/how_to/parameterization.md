@@ -266,8 +266,6 @@ Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, man
 
 **Deployment:** At the start of a deployment, an automated validation checks the validity of the `parameter.yml` file, if it is present. This step ensures that valid parameters are loaded, allowing deployment to run smoothly with correctly applied parameterized configurations. If the parameter file is invalid, the deployment will NOT proceed.
 
-## Item Specific Parameterization
-
 ## Sample Parameter File
 
 An exhaustive example of all capabilities currently supported in the `parameter.yml` file.
@@ -613,7 +611,7 @@ runtime_version: 1.3
 
 Dataflows can have different kinds of Fabric sources and destinations that need to be parameterized, depending on the scenario.
 
-**Connection Overview:**
+#### Parameterization Overview:\*\*
 
 Take a Lakehouse source/destination as an example, the Lakehouse is connected to a Dataflow in the following ways:
 
@@ -624,11 +622,11 @@ Take a Lakehouse source/destination as an example, the Lakehouse is connected to
 
 \***Note:** A Dataflow that sources from another Dataflow introduces a dependency that requires a specific order of deploying. In certain cases, the source Dataflow will need to be deployed first followed by its dependent Dataflow. A Dataflow is referenced by the item ID in the workspace and the actual workspace ID, this makes re-pointing more complex (See parameterization guidance below).
 
-#### Dataflows Parameterization Guidance:
+#### Parameterization Guidance:
 
 Connections must be parameterized, independent of item references.
 
-**Deploying a Dataflow that contains a source Dataflow reference scenario:**
+<span class="md-h4-nonanchor">Deploying a Dataflow that contains a source Dataflow reference scenario:</span>
 
 1. Source Dataflow exists in the **same workspace** as the dependent Dataflow:
 
@@ -645,7 +643,7 @@ Connections must be parameterized, independent of item references.
     - When source Dataflow exists in a different workspace, deployment order is unaffected.
     - To re-point the source Dataflow from one workspace to another workspace, you can parameterize using the `find_replace` parameter. The Dataflow ID AND Workspace ID of the source Dataflow both need to be parameterized. **Note:** dynamic replacement for item ID and workspace ID will NOT work here since the source Dataflow does not exist in the _repository directory_.
 
-**Deploying a Dataflow that contains other Fabric items (e.g., Lakehouse, Warehouse, etc.) references scenario:**
+<span class="md-h4-nonanchor">Deploying a Dataflow that contains other Fabric items (e.g., Lakehouse, Warehouse, etc.) references scenario:</span>
 
 1. Source/destination item exists in the **same workspace** as the dependent Dataflow:
 
