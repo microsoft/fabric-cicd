@@ -41,6 +41,12 @@ def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
 def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -> list[str]:
     """
     Sets the publish order where the source dataflow, if present always proceeds the referencing dataflow.
+    Algorithm for determining dataflow publish order:
+    1. Find all dataflows that reference other dataflows in the repository
+    2. Build a dependency graph where each dataflow depends on its source dataflow
+    3. Use a modified depth-first search with cycle detection to create a topological sort
+       ensuring that source dataflows are published before the dataflows that reference them
+    4. Add any remaining standalone dataflows (without dependencies) to the end of the publish order
 
     Args:
         workspace_obj: The FabricWorkspace object.
@@ -61,7 +67,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
                 )
                 if dataflow_name:
                     DATAFLOW_DEPENDENCIES[item.name] = dataflow_name
-                    # Map the dataflow name to its ID for later use
+                    # Map the dataflow name to its IDs for later use
                     SOURCE_DATAFLOW_ID_MAPPING[dataflow_name] = dataflow_id
                     SOURCE_DATAFLOW_WORKSPACE_ID_MAPPING[dataflow_name] = dataflow_workspace_id
 
@@ -117,7 +123,8 @@ def contains_source_dataflow(file_content: str) -> bool:
         file_content: Content of the file to check.
     """
     try:
-        match = re.search(constants.SOURCE_DATAFLOW_REGEX, file_content)
+        # Check if file contains the PowerPlatform.Dataflows pattern (group 1 of the regex)
+        match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
         return bool(match and match.group(1))
     except (re.error, TypeError, IndexError) as e:
         logger.debug(f"Error checking for source dataflow: {e}")
@@ -150,16 +157,18 @@ def get_source_dataflow_name(
 
     try:
         # Extract the dataflow ID and workspace ID from the file content using regex
-        match = re.search(constants.SOURCE_DATAFLOW_REGEX, file_content)
+        match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
         if not match:
             msg = f"No dataflow source pattern found in file content for {file_path}"
             raise ParsingError(msg, logger)
+        # Extract the dataflow ID (group 3) and workspace ID (group 2) using regex
         dataflow_id = match.group(3)
         dataflow_workspace_id = match.group(2)
     except Exception as e:
         msg = f"Error extracting dataflow information from file content: {e}"
         raise ParsingError(msg, logger) from e
 
+    # Validate the extracted dataflow ID and workspace ID are valid GUIDs
     if not dataflow_id or not re.match(constants.VALID_GUID_REGEX, dataflow_id):
         msg = f"Invalid dataflow ID: {dataflow_id} in file content for {file_path}"
         raise ParsingError(msg, logger)

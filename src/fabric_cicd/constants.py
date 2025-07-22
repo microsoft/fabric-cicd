@@ -41,16 +41,11 @@ SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
+DATAFLOW_SOURCE_REGEX = r'(Source\s*=\s*PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
-SOURCE_DATAFLOW_REGEX = r'(Source\s*=\s*PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
 
 # Item Type to File Mapping (to check for item dependencies)
-ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json", "Dataflow": "mashup.pq"}
-# Data Pipeline Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name, api_get_item_lookup]}
-DATA_PIPELINE_ACTIVITY_TYPES = {
-    "RefreshDataflow": ["workspaceId", "Dataflow", "dataflowId", "dataflows"],
-    "PBISemanticModelRefresh": ["groupId", "SemanticModel", "datasetId", "semanticModels"],
-}
+ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
 
 # Property path to get SQL Endpoint
 PROPERTY_PATH_MAPPING = {
