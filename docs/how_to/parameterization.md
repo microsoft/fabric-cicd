@@ -124,6 +124,7 @@ find_replace:
 
 The `replace_value` field in the `find_replace` parameter supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
 
+-   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the _repository directory_.**
 -   Dynamic replacement works in tandem with `find_value` as either a regex or a literal string.
 -   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
 -   **Supported variables:**
@@ -134,13 +135,12 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
         -   Item type must be valid and in scope.
         -   Item name must be an **exact match** (include spaces, if present).
         -   **Example:** set `$items.Notebook.Hello World.id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
--   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the _repository directory_.**
 -   **Important**: Deployment will fail in the following cases:
-    -   Incorrect variable syntax used, e.g., `$**item**.Notebook.Hello World.id` instead of `$**items**.Notebook.Hello World.id`.
-    -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.**HelloWorld**.id` or `$items.**Environment**.Hello World.id`.
-    -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.**guid**` instead of `$items.Notebook.Hello World.**id**`.
+    -   Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.id` instead of `$items.Notebook.Hello World.id`.
+    -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.id` or `$items.Environment.Hello World.id`.
+    -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.guid` instead of `$items.Notebook.Hello World.id`.
     -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.sqlendpoint` (Notebook items don't have a SQL Endpoint).
--   For example use-cases, see the **Notebook and Dataflow Advanced `find_replace` Parameterization Case.**
+-   For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
 
 ```yaml
 find_replace:
@@ -222,9 +222,10 @@ spark_pool:
 
 When optional fields are omitted or left empty, only basic parameterization functionality will be available. To enable advanced features, you must add the specific optional field(s) (if applicable) and set appropriately.
 
-For optional field inputs, string values should be wrapped in quotes. Remember to escape special characters, such as **\\** in `file_path` inputs.
+**Important:**
 
-You can use both `is_regex` and filter fields together in the same parameter configuration.
+-   String input values should be wrapped in quotes. Remember to escape special characters, such as **\\** in `file_path` inputs.
+-   `is_regex` and filter fields can be used in the same parameter configuration.
 
 ### Regex Pattern Match
 
@@ -343,7 +344,7 @@ spark_pool:
 
 **Case:** A Notebook is attached to a Lakehouse which resides in different workspaces. The Workspace and Lakehouse GUIDs in the Notebook need to be updated to ensure the Notebook points to the correct Lakehouse once deployed.
 
-**Solution:** In the `notebook-content.py` file, the default_lakehouse `47592d55-9a83-41a8-9b21-e1ef44264161`, and default_lakehouse_workspace_id `2190baad-a374-4114-addd-0dcf0533e69d` must be replaced with the corresponding GUIDs of the Lakehouse in the target environment (PPE/PROD/etc). This replacement is managed by the `find_replace` input in the `parameter.yml` file where fabric-cicd finds every instance of the string within the <em>>specified<em>> repository files and replaces it with the string for the deployed environment.
+**Solution:** In the `notebook-content.py` file, the default_lakehouse `47592d55-9a83-41a8-9b21-e1ef44264161`, and default_lakehouse_workspace_id `2190baad-a374-4114-addd-0dcf0533e69d` must be replaced with the corresponding GUIDs of the Lakehouse in the target environment (PPE/PROD/etc). This replacement is managed by the `find_replace` input in the `parameter.yml` file where fabric-cicd finds every instance of the string within the <em>specified<em> repository files and replaces it with the string for the deployed environment.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
