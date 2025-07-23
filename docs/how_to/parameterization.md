@@ -140,7 +140,7 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
     -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.**HelloWorld**.id` or `$items.**Environment**.Hello World.id`.
     -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.**guid**` instead of `$items.Notebook.Hello World.**id**`.
     -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.sqlendpoint` (Notebook items don't have a SQL Endpoint).
--   See the [example use-case](#advanced-find-replace-parameterization-case).
+-   For example use-cases, see the **Notebook and Dataflow Advanced `find_replace` Parameterization Case.**
 
 ```yaml
 find_replace:
@@ -343,7 +343,7 @@ spark_pool:
 
 **Case:** A Notebook is attached to a Lakehouse which resides in different workspaces. The Workspace and Lakehouse GUIDs in the Notebook need to be updated to ensure the Notebook points to the correct Lakehouse once deployed.
 
-**Solution:** In the `notebook-content.py` file, the default*lakehouse `47592d55-9a83-41a8-9b21-e1ef44264161`, and default_lakehouse_workspace_id `2190baad-a374-4114-addd-0dcf0533e69d` must be replaced with the corresponding GUIDs of the Lakehouse in the target environment (PPE/PROD/etc). This replacement is managed by the `find_replace` input in the `parameter.yml` file where fabric-cicd finds every instance of the string within the \_specified* repository files and replaces it with the string for the deployed environment.
+**Solution:** In the `notebook-content.py` file, the default_lakehouse `47592d55-9a83-41a8-9b21-e1ef44264161`, and default_lakehouse_workspace_id `2190baad-a374-4114-addd-0dcf0533e69d` must be replaced with the corresponding GUIDs of the Lakehouse in the target environment (PPE/PROD/etc). This replacement is managed by the `find_replace` input in the `parameter.yml` file where fabric-cicd finds every instance of the string within the <em>>specified<em>> repository files and replaces it with the string for the deployed environment.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
@@ -405,9 +405,9 @@ display(df)
 
 **Case:** A Notebook is attached to a Lakehouse which resides in the same workspace. When deploying both the Lakehouse and the Notebook to a target environment (PPE/PROD/etc), the Workspace and Lakehouse GUIDs referenced in the Notebook must be updated to ensure it correctly points to the corresponding Lakehouse in the new environment.
 
-**Solution:** This approach uses **`find_value`** [** regex**](#find_value-regex)\* and [**dynamic variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
+**Solution:** This approach uses `find_value` [**regex**](#find_value-regex)\*\* and [**dynamic variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
 
-\*The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be dynamically replaced with the appropriate value for the deployed environment.
+\*\*The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be dynamically replaced with the appropriate value for the deployed environment.
 
 This approach is particularly useful for replacing values that are not known until deployment time, such as item IDs.
 
@@ -620,7 +620,7 @@ Take a Lakehouse source/destination as an example, the Lakehouse is connected to
 2. Workspace and item IDs in the `mashup.pq` file:
     - Source and/or destination item references, such as a Dataflow (source only\*\*), Lakehouse, Warehouse, etc. appear in the `mashup.pq` file and need to be parameterized to ensure proper deployment across environments.
 
-\*\***Note:** A Dataflow that sources from another Dataflow introduces a dependency that may require a specific order of deploying (source first then dependent). A Dataflow is referenced by the item ID in the workspace and the actual workspace ID, this makes re-pointing more complex (see [guidance](parameterization-guidance)).
+\*\***Note:** A Dataflow that sources from another Dataflow introduces a dependency that may require a specific order of deploying (source first then dependent). A Dataflow is referenced by the item ID in the workspace and the actual workspace ID, this makes re-pointing more complex (see parameterization guidance below).
 
 #### Parameterization Guidance:
 
@@ -632,7 +632,7 @@ Connections must be parameterized in addition to item references.
 
     - The source Dataflow must be deployed BEFORE the dependent Dataflow (especially during first time deployment).
     - To handle this dependency correctly and prevent deployment errors, set up the `find_replace` parameter with the following requirements (incorrect setup may introduce failure during Dataflow deployment):
-        - Set `find_value` to match the `dataflowId` GUID referenced in the `mashup.pq` file (literal string or [regex pattern](#find_value-regex)).
+        - Set `find_value` to match the `dataflowId` GUID referenced in the `mashup.pq` file (literal string or [regex](#find_value-regex)).
         - Set `replace_value` to the variable `$items.Dataflow.<The Source Dataflow Name>.id`. **Important:** Make sure the **item type** is `"Dataflow"` and the **item name** matches the source Dataflow name in the repository directory exactly (case sensitive, include any spaces).
         - File filters are optional but recommended when using a regex pattern for `find_value`.
         - **You don't need to parameterize the source dataflow workspace ID here** as the library automatically handles this replacement when you use the Items variable in _this_ Dataflow scenario.
