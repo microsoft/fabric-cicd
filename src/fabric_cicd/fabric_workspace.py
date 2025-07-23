@@ -128,6 +128,9 @@ class FabricWorkspace:
         self.deployed_folders = {}
         self.deployed_items = {}
 
+        # Initialize dataflow dependencies dictionary (used in dataflow item processing)
+        self.dataflow_dependencies = {}
+
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
             logger.warning(
@@ -360,7 +363,7 @@ class FabricWorkspace:
 
                 # Replace any found references with specified environment value if conditions are met
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
-                    replace_value = extract_replace_value(self, replace_value_dict[self.environment])
+                    replace_value = extract_replace_value(self, replace_value_dict[self.environment], item_type)
                     if replace_value:
                         raw_file = raw_file.replace(find_value, replace_value)
                         logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")

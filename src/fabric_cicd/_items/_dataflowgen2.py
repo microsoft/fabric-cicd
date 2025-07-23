@@ -7,17 +7,12 @@ import logging
 import re
 
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._common._exceptions import InputError, ItemDependencyError, ParsingError
+from fabric_cicd._common._exceptions import InputError, ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._parameter._utils import check_replacement, extract_find_value, extract_parameter_filters
 
 logger = logging.getLogger(__name__)
-
-# Constants for Dataflow Gen2 processing
-DATAFLOW_DEPENDENCIES = {}
-SOURCE_DATAFLOW_ID_MAPPING = {}
-SOURCE_DATAFLOW_WORKSPACE_ID_MAPPING = {}
 
 
 def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
@@ -56,20 +51,28 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
     visited = set()
     temp_visited = set()
 
+    param_dict = workspace_obj.environment_parameter.get("find_replace", [])
+
     # Collect dataflow items with a source dataflow that exists in the repository
     for item in workspace_obj.repository_items.get(item_type, {}).values():
         for file in item.item_files:
             # Check if a source dataflow is referenced in the file
-            if file.type == "text" and str(file.file_path).endswith(".pq") and contains_source_dataflow(file.contents):
+            if (
+                file.type == "text"
+                and str(file.file_path).endswith(".pq")
+                and contains_source_dataflow(file.contents)
+                and param_dict  # Checking dependency requires find_replace parameter
+            ):
                 # Store the dataflow and its source dataflow in the constant dictionaries
-                dataflow_name, dataflow_id, dataflow_workspace_id = get_source_dataflow_name(
+                dataflow_name, dataflow_workspace_id, dataflow_id = get_source_dataflow_name(
                     workspace_obj, file.contents, item.name, file.file_path
                 )
                 if dataflow_name:
-                    DATAFLOW_DEPENDENCIES[item.name] = dataflow_name
-                    # Map the dataflow name to its IDs for later use
-                    SOURCE_DATAFLOW_ID_MAPPING[dataflow_name] = dataflow_id
-                    SOURCE_DATAFLOW_WORKSPACE_ID_MAPPING[dataflow_name] = dataflow_workspace_id
+                    workspace_obj.dataflow_dependencies[item.name] = {
+                        "source_name": dataflow_name,
+                        "source_workspace_id": dataflow_workspace_id,
+                        "source_id": dataflow_id,
+                    }
 
     def add_dataflow_with_dependency(item: str) -> bool:
         """
@@ -89,8 +92,8 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
         temp_visited.add(item)
 
         # First add the dependency if it exists
-        if DATAFLOW_DEPENDENCIES.get(item):
-            dependency = DATAFLOW_DEPENDENCIES[item]
+        if workspace_obj.dataflow_dependencies.get(item):
+            dependency = workspace_obj.dataflow_dependencies[item]["source_name"]
             # Propagate cycle detection
             if not add_dataflow_with_dependency(dependency):
                 return False
@@ -104,7 +107,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
         return True
 
     # Process each item in the dataflow dependencies
-    for item in list(DATAFLOW_DEPENDENCIES.keys()):
+    for item in list(workspace_obj.dataflow_dependencies.keys()):
         add_dataflow_with_dependency(item)
 
     # Add any remaining dataflows from the repository that aren't in the publish order (standalone dataflows)
@@ -125,10 +128,43 @@ def contains_source_dataflow(file_content: str) -> bool:
     try:
         # Check if file contains the PowerPlatform.Dataflows pattern (group 1 of the regex)
         match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
-        return bool(match and match.group(1))
+        return match is not None and bool(match.group(1))
     except (re.error, TypeError, IndexError) as e:
         logger.debug(f"Error checking for source dataflow: {e}")
         return False
+
+
+def get_source_dataflow_ids(file_content: str, item_name: str) -> tuple[str, str]:
+    """
+    A helper function to get the dataflow ID and workspace ID of a referenced dataflow.
+
+    Args:
+        file_content: Content of the file to extract dataflow IDs.
+        item_name: Name of the dataflow item containing the dataflow IDs.
+    """
+    try:
+        match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
+        if not match:
+            msg = f"No dataflow source pattern found in the {item_name} file content"
+            raise ParsingError(msg, logger)
+
+        # Extract the source dataflow IDs from the regex match
+        dataflow_workspace_id = match.group(2)
+        dataflow_id = match.group(3)
+
+    except Exception as e:
+        msg = f"Error extracting dataflow information from file content: {e}"
+        raise ParsingError(msg, logger) from e
+
+    # Validate the extracted IDs are valid GUIDs
+    if not dataflow_workspace_id or not re.match(constants.VALID_GUID_REGEX, dataflow_workspace_id):
+        msg = f"Invalid workspace ID: {dataflow_workspace_id} in {item_name} file content"
+        raise ParsingError(msg, logger)
+    if not dataflow_id or not re.match(constants.VALID_GUID_REGEX, dataflow_id):
+        msg = f"Invalid dataflow ID: {dataflow_id} in {item_name} file content"
+        raise ParsingError(msg, logger)
+
+    return dataflow_workspace_id, dataflow_id
 
 
 def get_source_dataflow_name(
@@ -147,47 +183,16 @@ def get_source_dataflow_name(
     Returns:
         A tuple containing (dataflow_name, dataflow_id, dataflow_workspace_id)
     """
-    # Check if the environment parameter 'find_replace' exists
-    parameter_dict = workspace_obj.environment_parameter.get("find_replace", [])
-    if not parameter_dict:
-        logger.warning(
-            f"'find_replace' parameter not found in the parameter dictionary. Cannot look up {item_name}'s source dataflow in the repository"
-        )
-        return "", "", ""
+    # Get the workspace and dataflow IDs of the source dataflow
+    dataflow_workspace_id, dataflow_id = get_source_dataflow_ids(file_content, item_name)
 
-    try:
-        # Extract the dataflow ID and workspace ID from the file content using regex
-        match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
-        if not match:
-            msg = f"No dataflow source pattern found in file content for {file_path}"
-            raise ParsingError(msg, logger)
-        # Extract the dataflow ID (group 3) and workspace ID (group 2) using regex
-        dataflow_id = match.group(3)
-        dataflow_workspace_id = match.group(2)
-    except Exception as e:
-        msg = f"Error extracting dataflow information from file content: {e}"
-        raise ParsingError(msg, logger) from e
-
-    # Validate the extracted dataflow ID and workspace ID are valid GUIDs
-    if not dataflow_id or not re.match(constants.VALID_GUID_REGEX, dataflow_id):
-        msg = f"Invalid dataflow ID: {dataflow_id} in file content for {file_path}"
-        raise ParsingError(msg, logger)
-
-    if not dataflow_workspace_id or not re.match(constants.VALID_GUID_REGEX, dataflow_workspace_id):
-        msg = f"Invalid workspace ID: {dataflow_workspace_id} in file content for {file_path}"
-        raise ParsingError(msg, logger)
-
-    # Create case-insensitive lookup dictionaries for repository and workspace dataflow names
+    # Create case-insensitive lookup dictionary of dataflows in the repository
     dataflow_repo_lookup = {}
     for key in workspace_obj.repository_items.get("Dataflow", {}):
-        dataflow_repo_lookup[key.lower().strip()] = key
-
-    dataflow_workspace_lookup = {}
-    for key in workspace_obj.deployed_items.get("Dataflow", {}):
-        dataflow_workspace_lookup[key.lower().strip()] = key
+        dataflow_repo_lookup[key.lower()] = key
 
     # Look for a parameter that contains the dataflow ID
-    for param in parameter_dict:
+    for param in workspace_obj.environment_parameter.get("find_replace", []):
         # Extract values from the parameter
         input_type, input_name, input_path = extract_parameter_filters(workspace_obj, param)
         filter_match = check_replacement(input_type, input_name, input_path, "Dataflow", item_name, file_path)
@@ -206,12 +211,11 @@ def get_source_dataflow_name(
         # If it references a dataflow item, extract the dataflow name
         if replace_value.startswith("$items.Dataflow"):
             source_dataflow_name = replace_value.split(".")[2]
+            normalized_name = source_dataflow_name.lower()
+
             logger.debug(
                 f"Found the dataflow name {source_dataflow_name} for dataflow ID: {dataflow_id} in the replace_value"
             )
-
-            normalized_name = source_dataflow_name.lower().strip()
-
             # Check if the source dataflow name exists in the repository
             if normalized_name in dataflow_repo_lookup:
                 if source_dataflow_name != dataflow_repo_lookup[normalized_name]:
@@ -219,23 +223,17 @@ def get_source_dataflow_name(
                         f"Source dataflow '{source_dataflow_name}' exists in the repository as '{dataflow_repo_lookup[normalized_name]}'"
                     )
                     source_dataflow_name = dataflow_repo_lookup[normalized_name]
-                return source_dataflow_name, dataflow_id, dataflow_workspace_id
 
-            # Throw an error if the source dataflow exists in the workspace, but not in the repository
-            if normalized_name in dataflow_workspace_lookup:
-                msg = f"Cannot delete the source dataflow {dataflow_workspace_lookup[normalized_name]} as it is referenced by an existing dataflow: {item_name}"
-                raise ItemDependencyError(msg, logger)
+                return source_dataflow_name, dataflow_workspace_id, dataflow_id
 
             msg = f"The source dataflow name '{source_dataflow_name}' was not found in the repository, please check the name is correct"
             raise InputError(msg, logger)
 
-        logger.warning(
-            f"Dataflow item '{item_name}' references a source dataflow, but dependency sorting cannot be enabled"
-        )
-        logger.warning(
-            'To enable proper dependency sorting and ensure correct deployment order, set the replace_value to "$items.Dataflow.Source Dataflow Name.id"'
-        )
+    logger.debug(
+        f"Cannot look up the source dataflow name of '{item_name}' in the repository as the replace_value was not set to '$items.Dataflow.<Insert Source Dataflow Name Here>.id'"
+    )
 
+    logger.debug("Dataflow publish will be unsorted")
     return "", "", ""
 
 
@@ -249,10 +247,10 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
         file_obj: The file object.
     """
     # Replace the dataflow ID with the logical ID of the source dataflow in the file content
-    return replace_dataflow_id(workspace_obj, item_obj, file_obj)
+    return replace_source_dataflow_ids(workspace_obj, item_obj, file_obj)
 
 
-def replace_dataflow_id(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
+def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
     """
     Replaces both the dataflow ID and workspace ID of the source dataflow
     with logical values for cross-environment compatibility.
@@ -263,24 +261,27 @@ def replace_dataflow_id(workspace_obj: FabricWorkspace, item_obj: Item, file_obj
         file_obj: The file object.
     """
     if str(file_obj.file_path).endswith(".pq"):
-        source_dataflow = DATAFLOW_DEPENDENCIES.get(item_obj.name, "")
+        # Get source dataflow info from the dependency dictionary
+        source_dataflow_info = workspace_obj.dataflow_dependencies.get(item_obj.name, {})
 
-        # If there is a source dataflow in the dataflow item
-        if source_dataflow:
-            logical_id = (
-                workspace_obj.repository_items.get("Dataflow", {}).get(source_dataflow, {}).logical_id
-                if source_dataflow
-                else None
-            )
-            dataflow_id = SOURCE_DATAFLOW_ID_MAPPING.get(source_dataflow)
-            dataflow_workspace_id = SOURCE_DATAFLOW_WORKSPACE_ID_MAPPING.get(source_dataflow)
+        if source_dataflow_info:
+            source_dataflow_name = source_dataflow_info["source_name"]
+            source_dataflow_workspace_id = source_dataflow_info["source_workspace_id"]
+            source_dataflow_id = source_dataflow_info["source_id"]
+
+            # Get the logical ID of the source dataflow from repository items
+            logical_id = workspace_obj.repository_items.get("Dataflow", {}).get(source_dataflow_name, {}).logical_id
 
             # Replace the dataflow ID with its logical ID and the workspace ID with the default workspace ID
-            if logical_id and dataflow_id and dataflow_workspace_id:
-                file_obj.contents = file_obj.contents.replace(dataflow_id, logical_id)
-                file_obj.contents = file_obj.contents.replace(dataflow_workspace_id, constants.DEFAULT_WORKSPACE_ID)
+            if logical_id:
+                file_obj.contents = file_obj.contents.replace(source_dataflow_id, logical_id)
+                file_obj.contents = file_obj.contents.replace(
+                    source_dataflow_workspace_id, constants.DEFAULT_WORKSPACE_ID
+                )
                 logger.debug(
-                    f"Replaced dataflow ID '{dataflow_id}' with logical ID '{logical_id}' and workspace ID '{dataflow_workspace_id}' with default workspace ID '{constants.DEFAULT_WORKSPACE_ID}' in '{item_obj.name}' file"
+                    f"Replaced dataflow ID '{source_dataflow_id}' with logical ID '{logical_id}' and workspace ID "
+                    f"'{source_dataflow_workspace_id}' with default workspace ID '{constants.DEFAULT_WORKSPACE_ID}' "
+                    f"in '{item_obj.name}' file"
                 )
 
     return file_obj.contents
