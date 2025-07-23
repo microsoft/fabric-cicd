@@ -124,7 +124,7 @@ find_replace:
 
 The `replace_value` field in the `find_replace` parameter supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
 
--   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the _repository directory_.**
+-   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
 -   Dynamic replacement works in tandem with `find_value` as either a regex or a literal string.
 -   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
 -   **Supported variables:**
