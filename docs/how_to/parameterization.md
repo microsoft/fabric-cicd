@@ -620,7 +620,7 @@ Take a Lakehouse source/destination as an example, the Lakehouse is connected to
 2. Workspace and item IDs in the `mashup.pq` file:
     - Source and/or destination item references, such as a Dataflow (source only\*\*), Lakehouse, Warehouse, etc. appear in the `mashup.pq` file and need to be parameterized to ensure proper deployment across environments.
 
-\*\***Note:** A Dataflow that sources from another Dataflow introduces a dependency that may require a specific order of deploying (source first then dependent). A Dataflow is referenced by the item ID in the workspace and the actual workspace ID, this makes re-pointing more complex (see parameterization guidance below).
+**\*\*Note:** A Dataflow that sources from another Dataflow introduces a dependency that may require a specific order of deploying (source first then dependent). A Dataflow is referenced by the item ID in the workspace and the actual workspace ID, this makes re-pointing more complex (see parameterization guidance below).
 
 #### Parameterization Guidance:
 
