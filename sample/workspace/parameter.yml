@@ -9,7 +9,7 @@ find_replace:
       item_name: ["Hello World", "Hello World Subfolder"]
       file_path:
        - "/Hello World.Notebook/notebook-content.py"
-       - "\\subfolder\\Hello World Subfolder.Notebook/notebook-content.py"
+       - "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
     # Lakehouse Connection Guid regex
     - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
@@ -34,6 +34,14 @@ find_replace:
       # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; sqlendpoint attribute returns the deployed item's sql endpoint)
         PPE: "$items.Lakehouse.WithoutSchema.sqlendpoint"   
         PROD: "$items.Lakehouse.WithoutSchema.sqlendpoint" 
+      # Optional fields:
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Eventhouse query URI
+    - find_value: "https://trd-origineventhouse.z4.kusto.fabric.microsoft.com"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; queryserviceuri attribute returns the deployed item's query service URI)
+        PPE: "$items.Eventhouse.SampleEventhouse.queryserviceuri"   
+        PROD: "$items.Eventhouse.SampleEventhouse.queryserviceuri" 
       # Optional fields:
       file_path: "/Example Notebook.Notebook/notebook-content.py"
     
