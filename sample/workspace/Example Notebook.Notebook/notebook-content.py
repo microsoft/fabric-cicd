@@ -26,6 +26,8 @@
 # Type here in the cell editor to add code!
 print("This notebook is attached to the 'WithoutSchema' lakehouse.")
 print("This its SQL analytics endpoint: sqlserverconnectionstringinoriginlakehouse.com")
+print("This workspace includes 'SampleEventhouse' eventhouse.")
+print("This its eventhouse query URI: https://trd-origineventhouse.z4.kusto.fabric.microsoft.com")
 
 # METADATA ********************
 

@@ -57,7 +57,7 @@ The `replace_value` field supports variables that reference workspace or deploye
 -   **`$workspace.id`**: Replace value is the workspace ID of the target environment.
 -   **`$items.type.name.attribute`**: Replace value is an attribute of a deployed item.
 -   **Format**: Item type and name are **case-sensitive**. Enter the item name exactly as it appears, including spaces. For example: `$items.Notebook.Hello World.id`
--   **Supported attributes**: `id` (item ID) and `sqlendpoint`. Attributes should be lowercase.
+-   **Supported attributes**: `id` (item ID), `sqlendpoint`, and `queryserviceuri`. Attributes should be lowercase.
 -   **Important**: If the specified item type or name does not exist in the deployed workspace, or if an invalid attribute is provided, or if the attribute value does not exist, the deployment will fail.
 -   For an in-depth example, see the **advanced notebook example**.
 
@@ -75,6 +75,10 @@ find_replace:
       replace_value:
           PPE: "$items.Lakehouse.Sample_LH.sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
           PROD: "$items.Lakehouse.Sample_LH.sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
+    - find_value: "https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com" # Eventhouse query service URI
+      replace_value:
+          PPE: "$items.Eventhouse.Sample_EH.queryserviceuri" # PPE Sample_EH Eventhouse query service URI
+          PROD: "$items.Eventhouse.Sample_EH.queryserviceuri" # PROD Sample_EH Eventhouse query service URI
 ```
 
 <span class="md-h4-nonanchor">Environment Variable Replacement</span>
