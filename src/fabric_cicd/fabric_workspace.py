@@ -266,6 +266,7 @@ class FabricWorkspace:
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
             sql_endpoint = ""
+            query_service_uri = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
@@ -275,14 +276,23 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties based on item type
-            if item_type in ["Lakehouse", "Warehouse"]:
+            if item_type in ["Lakehouse", "Warehouse", "Eventhouse"]:
                 # Construct the endpoint URL and set the property path based on item type
                 endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
                 response = self.endpoint.invoke(method="GET", url=endpoint_url)
                 # Use dpath.get for safe nested property access
-                sql_endpoint = dpath.get(response, constants.PROPERTY_PATH_MAPPING[item_type], default="")
-                if not sql_endpoint:
-                    logger.debug(f"Failed to get SQL endpoint for {item_type} '{item_name}'")
+                property_path = constants.PROPERTY_PATH_MAPPING[item_type]
+                property_value = dpath.get(response, property_path, default="")
+                # Set the appropriate variable based on the last segment of the path
+                if not property_value:
+                    logger.debug(f"Failed to get endpoint for {item_type} '{item_name}'")
+                elif property_path.endswith("connectionString"):
+                    sql_endpoint = property_value
+                elif property_path.endswith("queryServiceUri"):
+                    query_service_uri = property_value
+                # sql_endpoint = dpath.get(response, constants.PROPERTY_PATH_MAPPING[item_type], default="")
+                # if not sql_endpoint:
+                #     logger.debug(f"Failed to get SQL endpoint for {item_type} '{item_name}'")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -294,7 +304,11 @@ class FabricWorkspace:
             )
 
             # Add item details to the workspace_items dictionary required for parameterization (public-facing attributes)
-            self.workspace_items[item_type][item_name] = {"id": item_guid, "sqlendpoint": sql_endpoint}
+            self.workspace_items[item_type][item_name] = {
+                "id": item_guid,
+                "sqlendpoint": sql_endpoint,
+                "queryserviceuri": query_service_uri,
+            }
 
     def _replace_logical_ids(self, raw_file: str) -> str:
         """

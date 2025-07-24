@@ -52,15 +52,16 @@ DATA_PIPELINE_ACTIVITY_TYPES = {
     "PBISemanticModelRefresh": ["groupId", "SemanticModel", "datasetId", "semanticModels"],
 }
 
-# Property path to get SQL Endpoint
+# Property path to get SQL Endpoint or Eventhouse URI
 PROPERTY_PATH_MAPPING = {
     "Lakehouse": "body/properties/sqlEndpointProperties/connectionString",
     "Warehouse": "body/properties/connectionString",
+    "Eventhouse": "body/properties/queryServiceUri",
 }
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
-ITEM_ATTR_LOOKUP = ["id", "sqlendpoint"]
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
