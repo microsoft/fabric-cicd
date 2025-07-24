@@ -290,9 +290,6 @@ class FabricWorkspace:
                     sql_endpoint = property_value
                 elif property_path.endswith("queryServiceUri"):
                     query_service_uri = property_value
-                # sql_endpoint = dpath.get(response, constants.PROPERTY_PATH_MAPPING[item_type], default="")
-                # if not sql_endpoint:
-                #     logger.debug(f"Failed to get SQL endpoint for {item_type} '{item_name}'")
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
