@@ -27,8 +27,9 @@
 
 -   **Parameterization:**
     -   Source/destination items (e.g., Dataflow, Lakehouse, Warehouse) will always reference the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
-    -   The recommended approach for re-pointing source/destination items is using `find_value` regex and `replace_value` variables in the `find_replace` parameter (see Parameterization -> Dataflows example).
--   **Initial deployment** may require a manual refresh of the dataflow. After re-pointing dataflows during deployment, temporary errors may appear but should resolve after refreshing and allowing time for processing (especially when a dataflow sources from another dataflow in the target workspace).
+    -   The recommended approach for re-pointing source/destination items that exist in the _same_ workspace as the Dataflow is to use **`replace_value` variables** in the `find_replace` parameter along with a `find_value` regex (literal string works too). For more guidance, see [Parameterization -> Dataflows](parameterization.md#dataflows).
+    -   **Important** for Dataflows that reference another Dataflow in the _same_ workspace, ONLY parameterize the referenced **dataflowId** in the `mashup.pq` file (workspaceId re-pointing is handled automatically in this approach) using the following `replace_value`: `$items.Dataflow.<The Source Dataflow Name>.id`. This ensures proper dependency resolution and ordered publishing.
+-   **Initial deployment** will require a manual publish and refresh of the dataflow. After re-pointing dataflows during deployment, temporary errors may appear but should resolve after refreshing and allowing time for processing (especially when a dataflow sources from another dataflow in the target workspace).
 -   `fabric ci-cd` automatically manages ordered deployment of dataflows that source from other dataflows in the same workspace.
 -   **Connections** are not source controlled and require manual creation.
 -   If you use connections that differ between environments, parameterize them in the `parameter.yml` file.
