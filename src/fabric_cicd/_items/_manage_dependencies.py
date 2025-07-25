@@ -12,7 +12,6 @@ from typing import Callable
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
-from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
 
@@ -157,47 +156,3 @@ def sort_items(
 
     logger.debug(f"Sorted items in {lookup_type}: {sorted_items}")
     return sorted_items
-
-
-def lookup_referenced_item(
-    fabric_workspace_obj: FabricWorkspace,
-    workspace_id: str,
-    item_type: str,
-    item_id: str,
-    api_item_type: str,
-    get_name: bool = False,
-) -> str:
-    """
-    Looks up a referenced item in its source workspace and checks if the same
-    item name exists in the repository or deployed workspace (indicating the referenced
-    item exists in the same workspace as the referencing item). If found, returns either
-    the item's name (when get_name is True) or its guid in the target workspace.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object.
-        workspace_id: The workspace ID of the item.
-        item_type: Type of the item (e.g., 'DataPipeline', 'Dataflow').
-        item_id: The guid of the item to look up.
-        api_item_type: The API GET item type (e.g., 'dataflows').
-        get_name: If True, return the item name instead of the guid.
-    """
-    # Get the item name using the workspace ID and item ID
-    response = fabric_workspace_obj.endpoint.invoke(
-        method="GET",
-        url=f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{workspace_id}/{api_item_type}/{item_id}",
-    )
-    item_name = response.get("body", {}).get("displayName", "")
-    logger.debug(f"Looking up item: '{item_name}' with id: '{item_id}' in workspace: '{workspace_id}'")
-
-    # Return name if requested, otherwise return guid if found, or empty string
-    return (
-        item_name
-        if (
-            get_name
-            and (
-                item_name in fabric_workspace_obj.repository_items.get(item_type, {})
-                or item_name in fabric_workspace_obj.deployed_items.get(item_type, {})
-            )
-        )
-        else fabric_workspace_obj.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid or ""
-    )

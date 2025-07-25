@@ -62,70 +62,94 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
     return find_value
 
 
-def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str) -> str:
+def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, item_type: str) -> str:
     """Extracts the replace_value and sets the value. Processes the replace_value if a valid variable is provided."""
+    if not replace_value.startswith("$"):
+        return replace_value
+
     # If $workspace variable, return the workspace ID value
     if replace_value == "$workspace.id":
         return workspace_obj.workspace_id
 
     # If $items variable, return the item attribute value if found
-    if replace_value.startswith("$items"):
-        return _extract_item_attribute(workspace_obj, replace_value)
+    if replace_value.startswith("$items."):
+        return _extract_item_attribute(workspace_obj, replace_value, item_type)
 
-    # Otherwise, return the replace_value as is
-    return replace_value
+    # Otherwise, raise an error for invalid variable syntax
+    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id"
+    raise InputError(msg, logger)
 
 
-def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str) -> str:
+def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, item_type: str) -> str:
     """Extracts the item attribute value from the $items variable to set as the replace_value.
 
     Args:
         workspace_obj: The FabricWorkspace object containing the workspace items dictionary used to access item metadata.
         variable: The $items variable string to be parsed and processed, format: $items.type.name.attribute (supported attributes: id and sqlendpoint).
+        item_type: The item type of the file in which the replacement will be applied.
     """
+    # The item type of the file being processed
+    item_type_of_file = item_type
+
     try:
         # Split the variable into 3 parts (item type, name, and attribute)
         var_parts = variable.removeprefix("$items.").split(".")
         if len(var_parts) != 3:
-            msg = f"Invalid $items variable syntax: {variable}"
-            raise InputError(msg, logger)
+            msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.attribute"
+            raise ParsingError(msg, logger)
 
         item_type = var_parts[0].strip()
         item_name = var_parts[1].strip()
         attribute = var_parts[2].strip()
 
+        # Validate attribute before further processing
+        attr_name = attribute.lower()
+        if attr_name not in constants.ITEM_ATTR_LOOKUP:
+            msg = f"Attribute '{attribute}' is invalid. Supported attributes: {list(constants.ITEM_ATTR_LOOKUP)}"
+            raise ParsingError(msg, logger)
+
+        logger.debug(
+            f"Processing $items variable with item_type={item_type}, item_name={item_name}, attribute={attribute}"
+        )
+        # A bool to check if it's a Dataflow that references another Dataflow (special handling)
+        is_parameterized_dataflow = item_type_of_file == "Dataflow" and item_type == "Dataflow"
+
         # Refresh the workspace items to get the latest deployed items
         workspace_obj._refresh_deployed_items()
 
-        # Validate items exist in the workspace
-        if item_type not in workspace_obj.workspace_items:
+        # Validate item type exists in the deployed workspace
+        if item_type not in workspace_obj.workspace_items and not is_parameterized_dataflow:
             msg = f"Item type '{item_type}' is invalid or not found in deployed items"
-            raise InputError(msg, logger)
+            raise ParsingError(msg, logger)
 
-        if item_name not in workspace_obj.workspace_items[item_type]:
+        # Check if the specific item is deployed
+        if item_name not in workspace_obj.workspace_items[item_type] and not is_parameterized_dataflow:
             msg = f"Item '{item_name}' not found as a deployed {item_type}"
-            raise InputError(msg, logger)
+            raise ParsingError(msg, logger)
 
-        # Get the item's attributes and look for the provided attribute
-        item_attr = workspace_obj.workspace_items[item_type][item_name]
-        attr_name = attribute.lower()
+        # Special case: for a Dataflow that references another Dataflow return the item name directly
+        if is_parameterized_dataflow:
+            if item_type in workspace_obj.repository_items and item_name in workspace_obj.repository_items[item_type]:
+                logger.debug("Source Dataflow reference will be replaced separately")
+                return item_name
+            # Return None for non-existent Dataflow
+            return None
 
-        # Validate the attribute is supported
-        if attr_name not in constants.ITEM_ATTR_LOOKUP:
-            msg = f"Attribute '{attribute}' is an invalid item attribute, use one of the following: {constants.ITEM_ATTR_LOOKUP}"
-            raise InputError(msg, logger)
+        # Get the item's attributes from workspace items
+        item_attr_values = workspace_obj.workspace_items[item_type][item_name]
 
         # Get the attribute value and check if it exists
-        attr_value = item_attr.get(attr_name)
+        attr_value = item_attr_values.get(attr_name)
         if not attr_value:
             msg = f"Value does not exist for attribute '{attribute}' in the {item_type} item '{item_name}'"
-            raise InputError(msg, logger)
+            raise ParsingError(msg, logger)
 
         logger.debug(f"Found attribute '{attr_name}' with value '{attr_value}'")
         return attr_value
 
     except Exception as e:
         msg = f"Error parsing $items variable: {e!s}"
+        logger.error(msg, exc_info=True)
         raise ParsingError(msg, logger) from e
 
 
