@@ -111,18 +111,18 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, item_
         logger.debug(
             f"Processing $items variable with item_type={item_type}, item_name={item_name}, attribute={attribute}"
         )
-
+        # A bool to check if it's a Dataflow that references another Dataflow (special handling)
         is_parameterized_dataflow = item_type_of_file == "Dataflow" and item_type == "Dataflow"
 
         # Refresh the workspace items to get the latest deployed items
         workspace_obj._refresh_deployed_items()
 
-        # Validate item type exists in the deployed workspace (exclude a Dataflow item that references another Dataflow item)
+        # Validate item type exists in the deployed workspace
         if item_type not in workspace_obj.workspace_items and not is_parameterized_dataflow:
             msg = f"Item type '{item_type}' is invalid or not found in deployed items"
             raise ParsingError(msg, logger)
 
-        # Check if the specific item is deployed (exclude a Dataflow item that references another Dataflow item)
+        # Check if the specific item is deployed
         if item_name not in workspace_obj.workspace_items[item_type] and not is_parameterized_dataflow:
             msg = f"Item '{item_name}' not found as a deployed {item_type}"
             raise ParsingError(msg, logger)
