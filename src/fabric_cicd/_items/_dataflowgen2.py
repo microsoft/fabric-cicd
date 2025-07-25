@@ -7,10 +7,15 @@ import logging
 import re
 
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._common._exceptions import InputError, ParsingError
+from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
-from fabric_cicd._parameter._utils import check_replacement, extract_find_value, extract_parameter_filters
+from fabric_cicd._parameter._utils import (
+    check_replacement,
+    extract_find_value,
+    extract_parameter_filters,
+    extract_replace_value,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +66,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
                 file.type == "text"
                 and str(file.file_path).endswith(".pq")
                 and contains_source_dataflow(file.contents)
-                and param_dict  # Checking dependency requires find_replace parameter
+                and param_dict  # Source dataflow look up requires find_replace parameter
             ):
                 # Store the dataflow and its source dataflow in the constant dictionaries
                 dataflow_name, dataflow_workspace_id, dataflow_id = get_source_dataflow_name(
@@ -183,13 +188,8 @@ def get_source_dataflow_name(
     Returns:
         A tuple containing (dataflow_name, dataflow_id, dataflow_workspace_id)
     """
-    # Get the workspace and dataflow IDs of the source dataflow
+    # Get the IDs of the source dataflow
     dataflow_workspace_id, dataflow_id = get_source_dataflow_ids(file_content, item_name)
-
-    # Create case-insensitive lookup dictionary of dataflows in the repository
-    dataflow_repo_lookup = {}
-    for key in workspace_obj.repository_items.get("Dataflow", {}):
-        dataflow_repo_lookup[key.lower()] = key
 
     # Look for a parameter that contains the dataflow ID
     for param in workspace_obj.environment_parameter.get("find_replace", []):
@@ -204,36 +204,23 @@ def get_source_dataflow_name(
                 f"Find value: {find_value} does not match the dataflow ID: {dataflow_id}, skipping this parameter"
             )
             continue
-
-        # Get the replacement value for the current environment
+        # Extract the replace value for the current environment
         replace_value = param.get("replace_value", {}).get(workspace_obj.environment, "")
 
-        # If it references a dataflow item, extract the dataflow name
-        if replace_value.startswith("$items.Dataflow"):
-            source_dataflow_name = replace_value.split(".")[2]
-            normalized_name = source_dataflow_name.lower()
-
-            logger.debug(
-                f"Found the dataflow name {source_dataflow_name} for dataflow ID: {dataflow_id} in the replace_value"
-            )
-            # Check if the source dataflow name exists in the repository
-            if normalized_name in dataflow_repo_lookup:
-                if source_dataflow_name != dataflow_repo_lookup[normalized_name]:
-                    logger.debug(
-                        f"Source dataflow '{source_dataflow_name}' exists in the repository as '{dataflow_repo_lookup[normalized_name]}'"
-                    )
-                    source_dataflow_name = dataflow_repo_lookup[normalized_name]
-
+        # Check if it is an Items variable for a Dataflow item
+        if replace_value.startswith("$items.Dataflow."):
+            source_dataflow_name = extract_replace_value(workspace_obj, replace_value, "Dataflow")
+            if source_dataflow_name:
+                logger.debug(
+                    f"Found the source dataflow name '{source_dataflow_name}' for dataflow ID: {dataflow_id} in the replace_value"
+                )
                 return source_dataflow_name, dataflow_workspace_id, dataflow_id
 
-            msg = f"The source dataflow name '{source_dataflow_name}' was not found in the repository, please check the name is correct"
-            raise InputError(msg, logger)
+            logger.warning(f"The source dataflow name in '{replace_value}' was not found in the repository")
+            logger.warning(f"The source dataflow in '{item_name}' will not be re-pointed")
 
-    logger.debug(
-        f"Cannot look up the source dataflow name of '{item_name}' in the repository as the replace_value was not set to '$items.Dataflow.<Insert Source Dataflow Name Here>.id'"
-    )
+    logger.warning("Dataflow will be published without enforcing dependency ordering")
 
-    logger.debug("Dataflow publish will be unsorted")
     return "", "", ""
 
 
