@@ -130,7 +130,7 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
 -   **Supported variables:**
     -   **Workspace ID variable:** `$workspace.id`, replaces a workspace ID with the workspace ID of the **target environment.**
     -   **Item attribute variable:** `$items.<item_type>.<item_name>.<attribute>`, replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
-        -   **Supported attributes**: `id` (item ID of the deployed item) and `sqlendpoint` (sql connection string of the deployed item, if applicable). Attributes should be lowercase.
+        -   **Supported attributes**: `id` (item ID of the deployed item), `sqlendpoint` (sql connection string of the deployed item, only applicable to lakehouse and warehouse items), and `queryserviceuri` (query uri of the deployed item, only applicable to eventhouse item). Attributes should be lowercase.
         -   Item type and name are **case-sensitive**.
         -   Item type must be valid and in scope.
         -   Item name must be an **exact match** (include spaces, if present).
