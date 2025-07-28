@@ -156,6 +156,10 @@ find_replace:
       replace_value:
           PPE: "$items.Lakehouse.Sample_LH.sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
           PROD: "$items.Lakehouse.Sample_LH.sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
+    - find_value: "https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com" # Eventhouse query service URI
+      replace_value:
+          PPE: "$items.Eventhouse.Sample_EH.queryserviceuri" # PPE Sample_EH Eventhouse query service URI
+          PROD: "$items.Eventhouse.Sample_EH.queryserviceuri" # PROD Sample_EH Eventhouse query service URI
 ```
 
 ### Environment Variable Replacement
