@@ -412,9 +412,9 @@ display(df)
 
 **Solution:** This approach uses `find_value` [**regex**](#find_value-regex)\*\* and [**dynamic variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
 
-\*\*The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be dynamically replaced with the appropriate value for the deployed environment.
-
 This approach is particularly useful for replacing values that are not known until deployment time, such as item IDs.
+
+\*\*The regex pattern must include a capture group, defined using `()`, and the `find_value` must always match **group 1**. The value captured in this group will be dynamically replaced with the appropriate value for the deployed environment.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
@@ -640,8 +640,8 @@ Connections must be parameterized in addition to item references.
         - Set `find_value` to match the `dataflowId` GUID referenced in the `mashup.pq` file (literal string or [regex](#find_value-regex)).
         - Set `replace_value` to the variable `$items.Dataflow.<The Source Dataflow Name>.id`. **Important:** Make sure the **item type** is `"Dataflow"` and the **item name** matches the source Dataflow name in the repository directory exactly (case sensitive, include any spaces).
         - File filters are optional but recommended when using a regex pattern for `find_value`.
-        - **You don't need to parameterize the source dataflow workspace ID here** as the library automatically handles this replacement when you use the Items variable in _this_ Dataflow scenario.
-    - **How this works:** This parameterization approach ensures correct deployment of interdependent dataflows while automatically updating references to point to the newly deployed dataflow in the target workspace.
+        - **You don't need to parameterize the source Dataflow workspace ID here** as the library automatically handles this replacement when you use the Items variable in _this_ Dataflow scenario.
+    - **How this works:** This parameterization approach ensures correct deployment of interdependent Dataflows while automatically updating references to point to the newly deployed Dataflow in the target workspace.
 
 2. Source Dataflow exists in a **different workspace** from the dependent Dataflow:
 
