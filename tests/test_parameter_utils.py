@@ -222,8 +222,19 @@ class TestParameterUtilities:
             _extract_item_attribute(mock_workspace, "$items.Notebook.InvalidName.id", False)
 
         # Test with invalid attributes
+<<<<<<< HEAD
         with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
             _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", False)
+=======
+        # Mock the constants lookup
+        original_lookup = constants.ITEM_ATTR_LOOKUP
+        constants.ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
+        try:
+            with pytest.raises(ParsingError):
+                _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", "Notebook")
+        finally:
+            constants.ITEM_ATTR_LOOKUP = original_lookup
+>>>>>>> 377d547a5132c17953575ea7c87c6de0fe98ff32
 
     def test_extract_item_attribute_empty_value(self, monkeypatch):
         """Test _extract_item_attribute with empty attribute values."""
