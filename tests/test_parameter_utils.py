@@ -201,7 +201,7 @@ class TestParameterUtilities:
         # Test with invalid attributes
         # Mock the constants lookup
         original_lookup = constants.ITEM_ATTR_LOOKUP
-        constants.ITEM_ATTR_LOOKUP = ["id", "sqlendpoint"]
+        constants.ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
         try:
             with pytest.raises(ParsingError):
                 _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", "Notebook")
