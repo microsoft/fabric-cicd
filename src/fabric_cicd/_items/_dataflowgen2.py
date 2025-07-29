@@ -56,18 +56,20 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
     visited = set()
     temp_visited = set()
 
+    # Only sort dataflows based on dependencies if the find_replace parameter exists (granular check happens later)
     param_dict = workspace_obj.environment_parameter.get("find_replace", [])
+    if not param_dict:
+        logger.warning(
+            "find_replace parameter not found - dataflows will not be checked for dependencies. "
+            "Dataflows will be published in arbitrary order, which may cause errors in the deployed items"
+        )
+        return list(workspace_obj.repository_items.get(item_type, {}).keys())
 
     # Collect dataflow items with a source dataflow that exists in the repository
     for item in workspace_obj.repository_items.get(item_type, {}).values():
         for file in item.item_files:
             # Check if a source dataflow is referenced in the file
-            if (
-                file.type == "text"
-                and str(file.file_path).endswith(".pq")
-                and contains_source_dataflow(file.contents)
-                and param_dict  # Source dataflow look up requires find_replace parameter
-            ):
+            if file.type == "text" and str(file.file_path).endswith(".pq") and contains_source_dataflow(file.contents):
                 # Store the dataflow and its source dataflow in the constant dictionaries
                 dataflow_name, dataflow_workspace_id, dataflow_id = get_source_dataflow_name(
                     workspace_obj, file.contents, item.name, file.file_path
@@ -78,6 +80,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
                         "source_workspace_id": dataflow_workspace_id,
                         "source_id": dataflow_id,
                     }
+                logger.warning(f"The '{item.name}' dataflow will be published without considering its dependency")
 
     def add_dataflow_with_dependency(item: str) -> bool:
         """
@@ -204,22 +207,12 @@ def get_source_dataflow_name(
                 f"Find value: {find_value} does not match the dataflow ID: {dataflow_id}, skipping this parameter"
             )
             continue
+
         # Extract the replace value for the current environment
         replace_value = param.get("replace_value", {}).get(workspace_obj.environment, "")
-
-        # Check if it is an Items variable for a Dataflow item
-        if replace_value.startswith("$items.Dataflow."):
-            source_dataflow_name = extract_replace_value(workspace_obj, replace_value, "Dataflow")
-            if source_dataflow_name:
-                logger.debug(
-                    f"Found the source dataflow name '{source_dataflow_name}' for dataflow ID: {dataflow_id} in the replace_value"
-                )
-                return source_dataflow_name, dataflow_workspace_id, dataflow_id
-
-            logger.warning(f"The source dataflow name in '{replace_value}' was not found in the repository")
-            logger.warning(f"The source dataflow in '{item_name}' will not be re-pointed")
-
-    logger.warning("Dataflow will be published without enforcing dependency ordering")
+        source_dataflow_name = extract_replace_value(workspace_obj, replace_value, get_name=True)
+        if source_dataflow_name:
+            return source_dataflow_name, dataflow_workspace_id, dataflow_id
 
     return "", "", ""
 

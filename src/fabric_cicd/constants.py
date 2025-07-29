@@ -41,7 +41,9 @@ SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
-DATAFLOW_SOURCE_REGEX = r'(Source\s*=\s*PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
+DATAFLOW_SOURCE_REGEX = (
+    r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
+)
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 
 # Item Type to File Mapping (to check for item dependencies)

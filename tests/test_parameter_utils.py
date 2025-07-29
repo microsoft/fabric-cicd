@@ -86,6 +86,8 @@ class TestParameterUtilities:
                 "Test_Lakehouse": {"id": "lakehouse-id", "sqlendpoint": "lakehouse-endpoint"},
             },
         }
+        # Mock _refresh_deployed_items to avoid API calls in all tests using this fixture
+        mock_ws._refresh_deployed_items = MagicMock()
         return mock_ws
 
     def test_extract_find_value(self):
@@ -170,43 +172,58 @@ class TestParameterUtilities:
 
     def test_extract_replace_value(self, mock_workspace):
         """Tests extract_replace_value with different inputs."""
-        assert extract_replace_value(mock_workspace, "literal string", "Notebook") == "literal string"
-        assert extract_replace_value(mock_workspace, "$workspace.id", "Notebook") == "mock-workspace-id"
-        assert extract_replace_value(mock_workspace, "$items.Notebook.TestNotebook.id", "Notebook") == "notebook-id"
-        assert extract_replace_value(mock_workspace, "$items.Lakehouse.Test_Lakehouse.id", "Notebook") == "lakehouse-id"
+        # Regular string should be returned as is
+        assert extract_replace_value(mock_workspace, "literal string", False) == "literal string"
+
+        # With get_name=True for regular string, should return None
+        assert extract_replace_value(mock_workspace, "literal string", True) is None
+
+        # Workspace ID variable should return the workspace ID
+        assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
+
+        # Item attribute variables should extract values from workspace items
+        with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
+            mock_extract.return_value = "notebook-id"
+            result = extract_replace_value(mock_workspace, "$items.Notebook.TestNotebook.id", False)
+            assert result == "notebook-id"
+            mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.TestNotebook.id", False)
 
     def test_extract_item_attribute_valid(self, mock_workspace):
         """Tests _extract_item_attribute with valid variables."""
-        assert _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id", "Notebook") == "notebook-id"
-        assert (
-            _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.id", "Notebook") == "lakehouse-id"
-        )
+        # Verify test assumptions about the constant
+        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
+
+        # Test with valid notebook item
+        result = _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id", False)
+        assert result == "notebook-id"
+
+        # Test with valid lakehouse item
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.id", False)
+        assert result == "lakehouse-id"
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
         """Tests _extract_item_attribute with invalid variable cases."""
+        # Verify test assumptions about the actual constant
+        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test expects 'id' in ITEM_ATTR_LOOKUP"
+        assert "invalidattr" not in constants.ITEM_ATTR_LOOKUP, "Test expects 'invalidattr' not in ITEM_ATTR_LOOKUP"
+
         # Test with invalid syntax
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(mock_workspace, "$items.Notebook", "Notebook")
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook", "Notebook")
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id.extra", "Notebook")
+        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook", False)
+        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook", False)
+        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id.extra", False)
 
         # Test with invalid item types or names
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(mock_workspace, "$items.InvalidType.TestNotebook.id", "Notebook")
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.InvalidName.id", "Notebook")
+        with pytest.raises(ParsingError, match="Item type 'InvalidType' is invalid"):
+            _extract_item_attribute(mock_workspace, "$items.InvalidType.TestNotebook.id", False)
+        with pytest.raises(ParsingError, match="Item 'InvalidName' not found"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.InvalidName.id", False)
 
         # Test with invalid attributes
-        # Mock the constants lookup
-        original_lookup = constants.ITEM_ATTR_LOOKUP
-        constants.ITEM_ATTR_LOOKUP = ["id", "sqlendpoint"]
-        try:
-            with pytest.raises(ParsingError):
-                _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", "Notebook")
-        finally:
-            constants.ITEM_ATTR_LOOKUP = original_lookup
+        with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", False)
 
     def test_extract_item_attribute_empty_value(self, monkeypatch):
         """Test _extract_item_attribute with empty attribute values."""
@@ -222,9 +239,12 @@ class TestParameterUtilities:
         # Mock _refresh_deployed_items to avoid API calls
         monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
 
-        # Test with empty attribute value - should wrap InputError in ParsingError
-        with pytest.raises(ParsingError, match="Error parsing \\$items variable"):
-            _extract_item_attribute(mock_workspace, "$items.lakehouse.test_lakehouse.id", "Notebook")
+        # Verify test assumptions about the actual constant
+        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
+
+        # Test with empty attribute value - should raise ParsingError
+        with pytest.raises(ParsingError, match="Value does not exist for attribute"):
+            _extract_item_attribute(mock_workspace, "$items.lakehouse.test_lakehouse.id", False)
 
     def test_extract_item_attribute_dataflow_special_case(self, monkeypatch):
         """Test _extract_item_attribute with special handling for Dataflow references."""
@@ -258,45 +278,33 @@ class TestParameterUtilities:
         # Mock _refresh_deployed_items to avoid API calls
         monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
 
+        # Verify test assumptions about the actual constant
+        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
+
         # Test with None attribute value - should raise ParsingError
-        with pytest.raises(ParsingError, match="Error parsing \\$items variable"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id", "Notebook")
+        with pytest.raises(ParsingError, match="Value does not exist for attribute"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id", False)
 
     def test_extract_item_attribute_dataflow_case_sensitive(self, monkeypatch):
         """Test _extract_item_attribute with case-sensitive Dataflow handling."""
-        # Mock FabricWorkspace
+        # Mock FabricWorkspace with only repository items (special case for Dataflow)
         mock_workspace = MagicMock()
         mock_workspace.repository_items = {"Dataflow": {"SourceDataflow": {"id": "source-dataflow-id"}}}
+        mock_workspace.workspace_items = {}
 
         # Mock _refresh_deployed_items to avoid API calls
         monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
 
-        # Test with correct case of "Dataflow" in both parameters
+        # Verify test assumptions about the actual constant
+        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
+
+        # Special case: Dataflow with get_name=True returns the name
         result = _extract_item_attribute(
             mock_workspace,
-            "$items.Dataflow.SourceDataflow.id",  # correct case in variable
-            "Dataflow",  # correct case in item_type_of_file
+            "$items.Dataflow.SourceDataflow.id",
+            True,
         )
-
-        # Should correctly handle the special case
-        assert result == "SourceDataflow"
-
-        # Test with lowercase "dataflow" in variable - should not treat as special case
-        # and should fall through to normal processing
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(
-                mock_workspace,
-                "$items.dataflow.SourceDataflow.id",  # lowercase in variable
-                "Dataflow",  # correct case in item_type_of_file
-            )
-
-        # Test with lowercase "dataflow" in item_type_of_file - should not treat as special case
-        with pytest.raises(ParsingError):
-            _extract_item_attribute(
-                mock_workspace,
-                "$items.Dataflow.SourceDataflow.id",  # correct case in variable
-                "dataflow",  # lowercase in item_type_of_file
-            )
+        assert result == "SourceDataflow", "Should return the dataflow name directly"
 
     def test_extract_item_attribute_empty_value_displayname(self, mock_workspace):
         """Test _extract_item_attribute with empty display name."""
@@ -309,12 +317,70 @@ class TestParameterUtilities:
             }
         }
 
-        # Mock _refresh_deployed_items to avoid API calls
-        mock_workspace._refresh_deployed_items = MagicMock()
+        # Verify test assumptions about the actual constant
+        assert "displayName" not in constants.ITEM_ATTR_LOOKUP, "Test requires 'displayName' not in ITEM_ATTR_LOOKUP"
 
         # Parse the variable as it would be in real code and pass the extracted parts to the function
         with pytest.raises(ParsingError, match="Attribute 'displayName' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.TestType.TestItem.displayName", "TestType")
+            _extract_item_attribute(mock_workspace, "$items.TestType.TestItem.displayName", False)
+
+    def test_extract_item_attribute_error_handling(self, monkeypatch):
+        """Test _extract_item_attribute with various error scenarios to ensure errors are collected and raised properly."""
+        # Mock FabricWorkspace
+        mock_workspace = MagicMock()
+        mock_workspace.workspace_items = {
+            "Dataflow": {"TestDataflow": {"id": "test-id"}},
+            "Notebook": {"TestNotebook": {"id": "notebook-id"}},
+        }
+
+        # Mock _refresh_deployed_items to avoid API calls
+        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
+
+        # Test 1: Invalid variable format (wrong number of parts)
+        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
+            _extract_item_attribute(mock_workspace, "$items.InvalidFormat", False)
+
+        # Test 2: Item type doesn't exist in workspace
+        with pytest.raises(ParsingError, match="Item type 'NonExistentType' is invalid"):
+            _extract_item_attribute(mock_workspace, "$items.NonExistentType.SomeName.id", False)
+
+        # Test 3: Item name doesn't exist within the type
+        with pytest.raises(ParsingError, match="Item 'NonExistentName' not found"):
+            _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentName.id", False)
+
+        # Test 4: Invalid attribute
+        with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
+            _extract_item_attribute(mock_workspace, "$items.Dataflow.TestDataflow.invalidattr", False)
+
+    def test_extract_item_attribute_with_get_name_true(self, monkeypatch):
+        """Test _extract_item_attribute with get_name=True to verify special case handling."""
+        # Mock FabricWorkspace with repository_items
+        mock_workspace = MagicMock()
+        mock_workspace.repository_items = {
+            "Dataflow": {"SourceDataflow": {"id": "dataflow-id"}},
+        }
+        mock_workspace.workspace_items = {
+            "Dataflow": {"TestDataflow": {"id": "test-id"}},
+        }
+
+        # Mock _refresh_deployed_items to avoid API calls
+        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
+
+        # Test 1: Dataflow with get_name=True returns name instead of ID
+        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.SourceDataflow.id", True)
+        assert result == "SourceDataflow", "Should return the dataflow name directly"
+
+        # Test 2: Non-existent dataflow should return None with get_name=True instead of raising an error
+        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentFlow.id", True)
+        assert result is None, "Should return None for non-existent item with get_name=True"
+
+        # Test 3: Invalid format should still raise an error even with get_name=True
+        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
+            _extract_item_attribute(mock_workspace, "$items.InvalidFormat", True)
+
+        # Test 4: Invalid attribute should still raise an error with get_name=True
+        with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
+            _extract_item_attribute(mock_workspace, "$items.Dataflow.SourceDataflow.invalidattr", True)
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""
