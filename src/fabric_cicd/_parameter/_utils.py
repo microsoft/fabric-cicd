@@ -89,7 +89,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
     raise InputError(msg, logger)
 
 
-def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_dataflow_name: bool = False) -> str:
+def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_dataflow_name: bool) -> str:
     """
     Extracts the item attribute value from the $items variable to set as the replace_value.
 
