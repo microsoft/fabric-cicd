@@ -8,6 +8,7 @@ The tests focused on path handling functions should be compatible with both Wind
 
 import json
 import logging
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -77,14 +78,26 @@ class TestParameterUtilities:
         mock_ws.workspace_id = "mock-workspace-id"
         mock_ws.workspace_items = {
             "Notebook": {
-                "TestNotebook": {"id": "notebook-id", "sqlendpoint": "notebook-endpoint"},
+                "Test Notebook": {"id": "notebook-id", "sqlendpoint": "", "queryserviceuri": ""},
             },
             "Warehouse": {
-                "TestWarehouse": {"id": "warehouse-id", "sqlendpoint": "warehouse-endpoint"},
+                "TestWarehouse": {"id": "warehouse-id", "sqlendpoint": "warehouse-endpoint", "queryserviceuri": ""},
             },
             "Lakehouse": {
-                "Test_Lakehouse": {"id": "lakehouse-id", "sqlendpoint": "lakehouse-endpoint"},
+                "Test_Lakehouse": {"id": "lakehouse-id", "sqlendpoint": "lakehouse-endpoint", "queryserviceuri": ""},
             },
+            "Eventhouse": {
+                "Test Eventhouse": {
+                    "id": "eventhouse-id",
+                    "sqlendpoint": "",
+                    "queryserviceuri": "eventhouse-query-uri",
+                },
+            },
+        }
+        mock_ws.repository_items = {
+            "Dataflow": {
+                "Source Dataflow": {"id": "source-dataflow-id"},
+            }
         }
         # Mock _refresh_deployed_items to avoid API calls in all tests using this fixture
         mock_ws._refresh_deployed_items = MagicMock()
@@ -99,84 +112,36 @@ class TestParameterUtilities:
 
     def test_extract_find_value_valid_regex(self):
         """Tests extract_find_value with regex pattern."""
+        param_dict = {"find_value": "id=([\\w-]+)", "is_regex": "true"}
+
         # Test with regex
-        param_dict = {"find_value": r"id=([\w-]+)", "is_regex": "true"}
         assert extract_find_value(param_dict, "content with id=abc-123", True) == "abc-123"
-
         # Test with non-matching regex
-        param_dict = {"find_value": r"id=([\w-]+)", "is_regex": "true"}
-        assert extract_find_value(param_dict, "unrelated content", True) == r"id=([\w-]+)"
-
+        assert extract_find_value(param_dict, "unrelated content", True) == "id=([\\w-]+)"
         # Test with regex but filter_match=False
-        param_dict = {"find_value": r"id=([\w-]+)", "is_regex": "true"}
-        assert extract_find_value(param_dict, "content with id=abc-123", False) == r"id=([\w-]+)"
+        assert extract_find_value(param_dict, "content with id=abc-123", False) == "id=([\\w-]+)"
 
     def test_extract_find_value_invalid_regex(self):
         """Tests extract_find_value with invalid regex capturing groups."""
         # Test with regex that has no capturing groups
-        param_dict = {"find_value": r"id=\w+", "is_regex": "true"}
+        param_dict = {"find_value": "id=\\w+", "is_regex": "true"}
         with pytest.raises(InputError):
             extract_find_value(param_dict, "content with id=abc123", True)
 
         # Test with regex that has multiple capturing groups
-        param_dict = {"find_value": r"(id)=([\w-]+)", "is_regex": "true"}
+        param_dict = {"find_value": "(id)=([\\w-]+)", "is_regex": "true"}
         with pytest.raises(InputError):
             extract_find_value(param_dict, "content with id=abc-123", True)
 
         # Test with regex that captures empty value
-        param_dict = {"find_value": r"id=()", "is_regex": "true"}
+        param_dict = {"find_value": "id=()", "is_regex": "true"}
         with pytest.raises(InputError):
             extract_find_value(param_dict, "content with id=", True)
 
-    def test_replace_key_value_valid_json(self):
-        """Tests replace_key_value with valid JSON content and environment."""
-        # Test JSON with server host configuration
-        test_json = '{"server": {"host": "localhost", "port": 8080}}'
-        param_dict = {
-            "find_key": "$.server.host",
-            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
-        }
-
-        # Test successful replacement for dev environment
-        result = replace_key_value(param_dict, test_json, "dev")
-        result_data = json.loads(result)
-        assert result_data["server"]["host"] == "dev-server.example.com"
-        assert result_data["server"]["port"] == 8080  # Verify other values unchanged
-
-        # Test successful replacement for prod environment
-        result = replace_key_value(param_dict, test_json, "prod")
-        result_data = json.loads(result)
-        assert result_data["server"]["host"] == "prod-server.example.com"
-
-    def test_replace_key_value_environment_not_found(self):
-        """Tests replace_key_value when environment is not in the replace_value dictionary."""
-        test_json = '{"server": {"host": "localhost", "port": 8080}}'
-        param_dict = {
-            "find_key": "$.server.host",
-            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
-        }
-
-        # Test when environment not in replace_value
-        result = replace_key_value(param_dict, test_json, "test")
-        result_data = json.loads(result)
-        assert result_data["server"]["host"] == "localhost"  # Original value unchanged
-
-    def test_replace_key_value_invalid_json(self):
-        """Tests replace_key_value with invalid JSON content."""
-        invalid_json = "{invalid json content}"
-        param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
-
-        # JSONDecodeError will be raised for invalid JSON and wrapped in ValueError
-        with pytest.raises(ValueError, match="Expecting property name"):
-            replace_key_value(param_dict, invalid_json, "dev")
-
-    def test_extract_replace_value(self, mock_workspace):
-        """Tests extract_replace_value with different inputs."""
+    def test_extract_replace_value_default(self, mock_workspace):
+        """Tests extract_replace_value with different inputs, get_dataflow_name=False."""
         # Regular string should be returned as is
-        assert extract_replace_value(mock_workspace, "literal string", False) == "literal string"
-
-        # With get_name=True for regular string, should return None
-        assert extract_replace_value(mock_workspace, "literal string", True) is None
+        assert extract_replace_value(mock_workspace, "literal string") == "literal string"
 
         # Workspace ID variable should return the workspace ID
         assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
@@ -184,214 +149,122 @@ class TestParameterUtilities:
         # Item attribute variables should extract values from workspace items
         with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
             mock_extract.return_value = "notebook-id"
-            result = extract_replace_value(mock_workspace, "$items.Notebook.TestNotebook.id", False)
+            result = extract_replace_value(mock_workspace, "$items.Notebook.Test Notebook.id")
             assert result == "notebook-id"
-            mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.TestNotebook.id", False)
+            mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.Test Notebook.id", False)
+
+    def test_extract_replace_value_get_dataflow_name(self, mock_workspace):
+        """Tests extract_replace_value with different inputs, get_dataflow_name=True."""
+        # With get_dataflow_name=True for regular string, should return None
+        assert extract_replace_value(mock_workspace, "literal string", True) is None
+
+        # With get_dataflow_name=True for workspace ID, should return an error
+        with pytest.raises(
+            InputError,
+            match=re.escape(
+                "Invalid replace_value variable format: '$workspace.id'. Expected format to get dataflow name: $items.type.name.attribute"
+            ),
+        ):
+            result = extract_replace_value(mock_workspace, "$workspace.id", True)
+
+        # With get_dataflow_name=True for non-Dataflow item, should return None
+        with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
+            mock_extract.return_value = None
+            result = extract_replace_value(mock_workspace, "$items.Notebook.Test Notebook.id", True)
+            assert result == None
+            mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.Test Notebook.id", True)
+
+        # With get_dataflow_name=True for a Dataflow item, should return the Dataflow name
+        with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
+            mock_extract.return_value = "Source Dataflow"
+            result = extract_replace_value(mock_workspace, "$items.Dataflow.Source Dataflow.id", True)
+            assert result == "Source Dataflow"
+            mock_extract.assert_called_once_with(mock_workspace, "$items.Dataflow.Source Dataflow.id", True)
 
     def test_extract_item_attribute_valid(self, mock_workspace):
         """Tests _extract_item_attribute with valid variables."""
-        # Verify test assumptions about the constant
-        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
-
         # Test with valid notebook item
-        result = _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id", False)
+        result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id", False)
         assert result == "notebook-id"
 
         # Test with valid lakehouse item
-        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.id", False)
-        assert result == "lakehouse-id"
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.sqlendpoint", False)
+        assert result == "lakehouse-endpoint"
+
+        # Test with valid warehouse item
+        result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.id", False)
+        assert result == "warehouse-id"
+
+        # Test with valid eventhouse item
+        result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
+        assert result == "eventhouse-query-uri"
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
         """Tests _extract_item_attribute with invalid variable cases."""
-        # Verify test assumptions about the actual constant
-        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test expects 'id' in ITEM_ATTR_LOOKUP"
-        assert "invalidattr" not in constants.ITEM_ATTR_LOOKUP, "Test expects 'invalidattr' not in ITEM_ATTR_LOOKUP"
-
         # Test with invalid syntax
         with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
             _extract_item_attribute(mock_workspace, "$items.Notebook", False)
         with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook", False)
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook", False)
         with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id.extra", False)
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id.extra", False)
 
-        # Test with invalid item types or names
+        mock_items_attr_lookup = list(constants.ITEM_ATTR_LOOKUP)
+
+        # Test with invalid item types, names, or attributes
         with pytest.raises(ParsingError, match="Item type 'InvalidType' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.InvalidType.TestNotebook.id", False)
+            _extract_item_attribute(mock_workspace, "$items.InvalidType.Test Notebook.id", False)
         with pytest.raises(ParsingError, match="Item 'InvalidName' not found"):
             _extract_item_attribute(mock_workspace, "$items.Notebook.InvalidName.id", False)
+        with pytest.raises(
+            ParsingError,
+            match=re.escape(f"Attribute 'guid' is invalid. Supported attributes: {mock_items_attr_lookup}"),
+        ):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.guid", False)
 
-        # Test with invalid attributes
-<<<<<<< HEAD
-        with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", False)
-=======
-        # Mock the constants lookup
-        original_lookup = constants.ITEM_ATTR_LOOKUP
-        constants.ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
-        try:
-            with pytest.raises(ParsingError):
-                _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.invalidattr", "Notebook")
-        finally:
-            constants.ITEM_ATTR_LOOKUP = original_lookup
->>>>>>> 377d547a5132c17953575ea7c87c6de0fe98ff32
+        # Test wrong type and attribute combination
+        with pytest.raises(
+            ParsingError, match="Value does not exist for attribute 'sqlendpoint' in the Notebook item 'Test Notebook'"
+        ):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.sqlendpoint", False)
 
-    def test_extract_item_attribute_empty_value(self, monkeypatch):
-        """Test _extract_item_attribute with empty attribute values."""
-        # Mock FabricWorkspace
-        mock_workspace = MagicMock()
-        mock_workspace.workspace_items = {
-            "lakehouse": {
-                "test_lakehouse": {
-                    "id": None,
-                }
-            }
-        }
-        # Mock _refresh_deployed_items to avoid API calls
-        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
-
-        # Verify test assumptions about the actual constant
-        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
-
-        # Test with empty attribute value - should raise ParsingError
-        with pytest.raises(ParsingError, match="Value does not exist for attribute"):
-            _extract_item_attribute(mock_workspace, "$items.lakehouse.test_lakehouse.id", False)
-
-    def test_extract_item_attribute_dataflow_special_case(self, monkeypatch):
+    def test_extract_item_attribute_get_dataflow_name(self, mock_workspace):
         """Test _extract_item_attribute with special handling for Dataflow references."""
-        # Mock FabricWorkspace
-        mock_workspace = MagicMock()
-        mock_workspace.repository_items = {"Dataflow": {"SourceDataflow": {"id": "source-dataflow-id"}}}
-
-        # Mock _refresh_deployed_items to avoid API calls
-        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
-
-        # Test when Dataflow references another Dataflow
-        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.SourceDataflow.id", "Dataflow")
-
-        # Should return the source dataflow name directly
-        assert result == "SourceDataflow"
+        # Test when Dataflow references another Dataflow in the repository
+        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.id", True)
+        assert result == "Source Dataflow"
 
         # Test when source Dataflow doesn't exist in repository - should return None
-        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentDataflow.id", "Dataflow")
+        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentDataflow.id", True)
         assert result is None
 
-    def test_extract_item_attribute_empty_value_none(self, monkeypatch):
-        """Test _extract_item_attribute when attribute value is None."""
-        # Mock FabricWorkspace
-        mock_workspace = MagicMock()
-        mock_workspace.workspace_items = {
-            "Notebook": {
-                "TestNotebook": {"id": None}  # Explicitly None value
-            }
-        }
+        # Test when source Dataflow type doesn't match (case sensitive) - should return None
+        result = _extract_item_attribute(mock_workspace, "$items.dataflow.Source Dataflow.id", get_dataflow_name=True)
+        assert result is None
 
-        # Mock _refresh_deployed_items to avoid API calls
-        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
+        # Test when source Dataflow name doesn't match (case sensitive) - should return None
+        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.source dataflow.id", get_dataflow_name=True)
+        assert result is None
 
-        # Verify test assumptions about the actual constant
-        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
+        # Test with non-Dataflow item, should return None
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test Lakehouse.id", True)
+        assert result is None
 
-        # Test with None attribute value - should raise ParsingError
-        with pytest.raises(ParsingError, match="Value does not exist for attribute"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.TestNotebook.id", False)
+        # Test with Dataflow item, but incorrect attribute should return None
+        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.sqlendpoint", True)
+        assert result is None
 
-    def test_extract_item_attribute_dataflow_case_sensitive(self, monkeypatch):
-        """Test _extract_item_attribute with case-sensitive Dataflow handling."""
-        # Mock FabricWorkspace with only repository items (special case for Dataflow)
-        mock_workspace = MagicMock()
-        mock_workspace.repository_items = {"Dataflow": {"SourceDataflow": {"id": "source-dataflow-id"}}}
-        mock_workspace.workspace_items = {}
-
-        # Mock _refresh_deployed_items to avoid API calls
-        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
-
-        # Verify test assumptions about the actual constant
-        assert "id" in constants.ITEM_ATTR_LOOKUP, "Test requires 'id' in ITEM_ATTR_LOOKUP"
-
-        # Special case: Dataflow with get_name=True returns the name
-        result = _extract_item_attribute(
-            mock_workspace,
-            "$items.Dataflow.SourceDataflow.id",
-            True,
-        )
-        assert result == "SourceDataflow", "Should return the dataflow name directly"
-
-    def test_extract_item_attribute_empty_value_displayname(self, mock_workspace):
-        """Test _extract_item_attribute with empty display name."""
-        # Reset and configure mock_workspace - use lowercase "displayname" as it appears in the code
-        mock_workspace.workspace_items = {
-            "TestType": {
-                "TestItem": {
-                    "displayname": ""  # Empty string, not None
-                }
-            }
-        }
-
-        # Verify test assumptions about the actual constant
-        assert "displayName" not in constants.ITEM_ATTR_LOOKUP, "Test requires 'displayName' not in ITEM_ATTR_LOOKUP"
-
-        # Parse the variable as it would be in real code and pass the extracted parts to the function
-        with pytest.raises(ParsingError, match="Attribute 'displayName' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.TestType.TestItem.displayName", False)
-
-    def test_extract_item_attribute_error_handling(self, monkeypatch):
-        """Test _extract_item_attribute with various error scenarios to ensure errors are collected and raised properly."""
-        # Mock FabricWorkspace
-        mock_workspace = MagicMock()
-        mock_workspace.workspace_items = {
-            "Dataflow": {"TestDataflow": {"id": "test-id"}},
-            "Notebook": {"TestNotebook": {"id": "notebook-id"}},
-        }
-
-        # Mock _refresh_deployed_items to avoid API calls
-        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
-
-        # Test 1: Invalid variable format (wrong number of parts)
+        # Test syntax error in variable
         with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
-            _extract_item_attribute(mock_workspace, "$items.InvalidFormat", False)
+            _extract_item_attribute(mock_workspace, "$item.Dataflow.Source Dataflow.id", True)
 
-        # Test 2: Item type doesn't exist in workspace
-        with pytest.raises(ParsingError, match="Item type 'NonExistentType' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.NonExistentType.SomeName.id", False)
-
-        # Test 3: Item name doesn't exist within the type
-        with pytest.raises(ParsingError, match="Item 'NonExistentName' not found"):
-            _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentName.id", False)
-
-        # Test 4: Invalid attribute
-        with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.Dataflow.TestDataflow.invalidattr", False)
-
-    def test_extract_item_attribute_with_get_name_true(self, monkeypatch):
-        """Test _extract_item_attribute with get_name=True to verify special case handling."""
-        # Mock FabricWorkspace with repository_items
-        mock_workspace = MagicMock()
-        mock_workspace.repository_items = {
-            "Dataflow": {"SourceDataflow": {"id": "dataflow-id"}},
-        }
-        mock_workspace.workspace_items = {
-            "Dataflow": {"TestDataflow": {"id": "test-id"}},
-        }
-
-        # Mock _refresh_deployed_items to avoid API calls
-        monkeypatch.setattr(mock_workspace, "_refresh_deployed_items", MagicMock())
-
-        # Test 1: Dataflow with get_name=True returns name instead of ID
-        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.SourceDataflow.id", True)
-        assert result == "SourceDataflow", "Should return the dataflow name directly"
-
-        # Test 2: Non-existent dataflow should return None with get_name=True instead of raising an error
-        result = _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentFlow.id", True)
-        assert result is None, "Should return None for non-existent item with get_name=True"
-
-        # Test 3: Invalid format should still raise an error even with get_name=True
-        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
-            _extract_item_attribute(mock_workspace, "$items.InvalidFormat", True)
-
-        # Test 4: Invalid attribute should still raise an error with get_name=True
-        with pytest.raises(ParsingError, match="Attribute 'invalidattr' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.Dataflow.SourceDataflow.invalidattr", True)
+        # Test with invalid attribute
+        mock_items_attr_lookup = list(constants.ITEM_ATTR_LOOKUP)
+        with pytest.raises(
+            ParsingError,
+            match=re.escape(f"Attribute 'guid' is invalid. Supported attributes: {mock_items_attr_lookup}"),
+        ):
+            _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.guid", True)
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""
@@ -530,6 +403,48 @@ class TestParameterUtilities:
         # Test with combination of matching/non-matching filters
         assert check_replacement("type1", "name2", [file_path], "type1", "name1", file_path) is False
         assert check_replacement("type1", "name1", [Path("other.txt")], "type1", "name1", file_path) is False
+
+    def test_replace_key_value_valid_json(self):
+        """Tests replace_key_value with valid JSON content and environment."""
+        # Test JSON with server host configuration
+        test_json = '{"server": {"host": "localhost", "port": 8080}}'
+        param_dict = {
+            "find_key": "$.server.host",
+            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
+        }
+
+        # Test successful replacement for dev environment
+        result = replace_key_value(param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["server"]["host"] == "dev-server.example.com"
+        assert result_data["server"]["port"] == 8080  # Verify other values unchanged
+
+        # Test successful replacement for prod environment
+        result = replace_key_value(param_dict, test_json, "prod")
+        result_data = json.loads(result)
+        assert result_data["server"]["host"] == "prod-server.example.com"
+
+    def test_replace_key_value_environment_not_found(self):
+        """Tests replace_key_value when environment is not in the replace_value dictionary."""
+        test_json = '{"server": {"host": "localhost", "port": 8080}}'
+        param_dict = {
+            "find_key": "$.server.host",
+            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
+        }
+
+        # Test when environment not in replace_value
+        result = replace_key_value(param_dict, test_json, "test")
+        result_data = json.loads(result)
+        assert result_data["server"]["host"] == "localhost"  # Original value unchanged
+
+    def test_replace_key_value_invalid_json(self):
+        """Tests replace_key_value with invalid JSON content."""
+        invalid_json = "{invalid json content}"
+        param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
+
+        # JSONDecodeError will be raised for invalid JSON and wrapped in ValueError
+        with pytest.raises(ValueError, match="Expecting property name"):
+            replace_key_value(param_dict, invalid_json, "dev")
 
     def test_replace_key_value(self):
         """Test replace_key_value function with JSON content."""

@@ -62,41 +62,41 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
     return find_value
 
 
-def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_name: bool = False) -> str:
+def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:
     """Extracts the replace_value and sets the value. Processes the replace_value if a valid variable is provided."""
     if not replace_value.startswith("$"):
-        if get_name:
-            logger.debug("The replace_value was set to a regular string, not a variable")
+        if get_dataflow_name:
+            logger.debug(
+                "Can't get dataflow name as the replace_value was set to a regular string, not the items variable"
+            )
             return None
         return replace_value
 
     # If $workspace variable, return the workspace ID value
     if replace_value == "$workspace.id":
-        if get_name:
-            msg = (
-                f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute"
-            )
+        if get_dataflow_name:
+            msg = "Invalid replace_value variable format: '$workspace.id'. Expected format to get dataflow name: $items.type.name.attribute"
             raise InputError(msg, logger)
 
         return workspace_obj.workspace_id
 
     # If $items variable, return the item attribute value if found
     if replace_value.startswith("$items."):
-        return _extract_item_attribute(workspace_obj, replace_value, get_name)
+        return _extract_item_attribute(workspace_obj, replace_value, get_dataflow_name)
 
     # Otherwise, raise an error for invalid variable syntax
     msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id"
     raise InputError(msg, logger)
 
 
-def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_name: bool = False) -> str:
+def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_dataflow_name: bool = False) -> str:
     """
     Extracts the item attribute value from the $items variable to set as the replace_value.
 
     Args:
         workspace_obj: The FabricWorkspace object containing the workspace items dictionary used to access item metadata.
         variable: The $items variable string to be parsed and processed, format: $items.type.name.attribute (supported attributes: id and sqlendpoint).
-        get_name: A boolean flag to indicate if the item name should be returned instead of the attribute value (gets the name from repo items).
+        get_dataflow_name: A boolean flag to indicate if the dataflow item name should be returned instead of the attribute value.
     """
     error = None
     try:
@@ -126,23 +126,24 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_n
         workspace_obj._refresh_deployed_items()
 
         # Validate item type exists in the deployed workspace
-        if item_type not in workspace_obj.workspace_items and not get_name:
+        if item_type not in workspace_obj.workspace_items and not get_dataflow_name:
             msg = f"Item type '{item_type}' is invalid or not found in deployed items"
             error = ParsingError(msg, logger)
             return None
 
         # Check if the specific item is deployed
-        if item_name not in workspace_obj.workspace_items.get(item_type, {}) and not get_name:
+        if item_name not in workspace_obj.workspace_items.get(item_type, {}) and not get_dataflow_name:
             msg = f"Item '{item_name}' not found as a deployed {item_type}"
             error = ParsingError(msg, logger)
             return None
 
-        # Special case: called in the context of a Dataflow that references another Dataflow
-        if get_name:
+        # Special case: set to True in the context of a Dataflow that references another Dataflow
+        if get_dataflow_name:
             if (
                 item_type in workspace_obj.repository_items
                 and item_type == "Dataflow"
                 and item_name in workspace_obj.repository_items[item_type]
+                and attribute == "id"
             ):
                 logger.debug("Source Dataflow reference will be replaced separately")
                 return item_name

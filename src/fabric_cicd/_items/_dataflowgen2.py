@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
     """
-    Publishes all dataflow items from the repository in the correct order based on their dependencies.
+    Publishes all dataflow items from the repository.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
@@ -41,6 +41,9 @@ def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
 def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -> list[str]:
     """
     Sets the publish order where the source dataflow, if present always proceeds the referencing dataflow.
+    This only applies to dataflows that reference another dataflow in the repository and the referenced
+    dataflowId is parameterized correctly (using the items attribute variable).
+
     Algorithm for determining dataflow publish order:
     1. Find all dataflows that reference other dataflows in the repository
     2. Build a dependency graph where each dataflow depends on its source dataflow
@@ -56,7 +59,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
     visited = set()
     temp_visited = set()
 
-    # Only sort dataflows based on dependencies if the find_replace parameter exists (granular check happens later)
+    # If the find_replace parameter doesn't exist, skip sorting dataflows by dependencies
     param_dict = workspace_obj.environment_parameter.get("find_replace", [])
     if not param_dict:
         logger.warning(
@@ -65,22 +68,24 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
         )
         return list(workspace_obj.repository_items.get(item_type, {}).keys())
 
-    # Collect dataflow items with a source dataflow that exists in the repository
+    # Otherwise, collect dataflow items with a source dataflow
     for item in workspace_obj.repository_items.get(item_type, {}).values():
         for file in item.item_files:
-            # Check if a source dataflow is referenced in the file
+            # Check if a dataflow is referenced in the file
             if file.type == "text" and str(file.file_path).endswith(".pq") and contains_source_dataflow(file.contents):
-                # Store the dataflow and its source dataflow in the constant dictionaries
+                # Try to get info associated with the dataflow reference
                 dataflow_name, dataflow_workspace_id, dataflow_id = get_source_dataflow_name(
                     workspace_obj, file.contents, item.name, file.file_path
                 )
+                # If the dataflow is found in the repository, add it to the dependencies dictionary
                 if dataflow_name:
                     workspace_obj.dataflow_dependencies[item.name] = {
                         "source_name": dataflow_name,
                         "source_workspace_id": dataflow_workspace_id,
                         "source_id": dataflow_id,
                     }
-                logger.warning(f"The '{item.name}' dataflow will be published without considering its dependency")
+                else:
+                    logger.warning(f"The '{item.name}' dataflow will be published without considering its dependency")
 
     def add_dataflow_with_dependency(item: str) -> bool:
         """
@@ -127,12 +132,7 @@ def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -
 
 
 def contains_source_dataflow(file_content: str) -> bool:
-    """
-    A helper function to check if the file content contains a source dataflow reference.
-
-    Args:
-        file_content: Content of the file to check.
-    """
+    """A helper function to check if the file content contains a source dataflow reference."""
     try:
         # Check if file contains the PowerPlatform.Dataflows pattern (group 1 of the regex)
         match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
@@ -143,17 +143,11 @@ def contains_source_dataflow(file_content: str) -> bool:
 
 
 def get_source_dataflow_ids(file_content: str, item_name: str) -> tuple[str, str]:
-    """
-    A helper function to get the dataflow ID and workspace ID of a referenced dataflow.
-
-    Args:
-        file_content: Content of the file to extract dataflow IDs.
-        item_name: Name of the dataflow item containing the dataflow IDs.
-    """
+    """A helper function to get the dataflow ID and workspace ID of a referenced dataflow."""
     try:
         match = re.search(constants.DATAFLOW_SOURCE_REGEX, file_content, re.DOTALL)
         if not match:
-            msg = f"No dataflow source pattern found in the {item_name} file content"
+            msg = f"No dataflow source pattern found in the '{item_name}' file content"
             raise ParsingError(msg, logger)
 
         # Extract the source dataflow IDs from the regex match
@@ -166,10 +160,10 @@ def get_source_dataflow_ids(file_content: str, item_name: str) -> tuple[str, str
 
     # Validate the extracted IDs are valid GUIDs
     if not dataflow_workspace_id or not re.match(constants.VALID_GUID_REGEX, dataflow_workspace_id):
-        msg = f"Invalid workspace ID: {dataflow_workspace_id} in {item_name} file content"
+        msg = f"Invalid workspace ID: {dataflow_workspace_id} in '{item_name}' file content"
         raise ParsingError(msg, logger)
     if not dataflow_id or not re.match(constants.VALID_GUID_REGEX, dataflow_id):
-        msg = f"Invalid dataflow ID: {dataflow_id} in {item_name} file content"
+        msg = f"Invalid dataflow ID: {dataflow_id} in '{item_name}' file content"
         raise ParsingError(msg, logger)
 
     return dataflow_workspace_id, dataflow_id
@@ -179,17 +173,9 @@ def get_source_dataflow_name(
     workspace_obj: FabricWorkspace, file_content: str, item_name: str, file_path: str
 ) -> tuple[str, str, str]:
     """
-    A helper function to extract the source dataflow name associated with the dataflow ID in the
-    file content using environment parameter and repository items dictionaries.
-
-    Args:
-        workspace_obj: The FabricWorkspace object.
-        file_content: Content of the dataflow file.
-        item_name: Name of the dataflow item.
-        file_path: Path to the dataflow file.
-
-    Returns:
-        A tuple containing (dataflow_name, dataflow_id, dataflow_workspace_id)
+    A helper function to extract the dataflow name, dataflow workspaceId and dataflowId
+    associated with the source dataflow referenced in the file content. The source dataflow
+    name is obtained by using the matching parameter dictionary input, if present.
     """
     # Get the IDs of the source dataflow
     dataflow_workspace_id, dataflow_id = get_source_dataflow_ids(file_content, item_name)
@@ -210,8 +196,12 @@ def get_source_dataflow_name(
 
         # Extract the replace value for the current environment
         replace_value = param.get("replace_value", {}).get(workspace_obj.environment, "")
-        source_dataflow_name = extract_replace_value(workspace_obj, replace_value, get_name=True)
+
+        # Pass in get_dataflow_name=True to get the source dataflow name, if it exists
+        source_dataflow_name = extract_replace_value(workspace_obj, replace_value, get_dataflow_name=True)
+
         if source_dataflow_name:
+            # Return the source dataflow name along with the IDs
             return source_dataflow_name, dataflow_workspace_id, dataflow_id
 
     return "", "", ""
@@ -244,6 +234,7 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
         # Get source dataflow info from the dependency dictionary
         source_dataflow_info = workspace_obj.dataflow_dependencies.get(item_obj.name, {})
 
+        # If the info was tracked, proceed to replace the IDs
         if source_dataflow_info:
             source_dataflow_name = source_dataflow_info["source_name"]
             source_dataflow_workspace_id = source_dataflow_info["source_workspace_id"]
