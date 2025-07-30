@@ -6,9 +6,12 @@
 import logging
 from typing import Optional
 
+import dpath.util as dpath
+
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
@@ -48,6 +51,19 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         >>> publish_all_items(workspace, exclude_regex)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
+    # check if workspace has assigned capacity, if not, exit
+    has_assigned_capacity = None
+
+    response_state = fabric_workspace_obj.endpoint.invoke(
+        method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
+    )
+
+    has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
+
+    if not has_assigned_capacity:
+        msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
+        raise FailedPublishedItemStatusError(msg, logger)
 
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
