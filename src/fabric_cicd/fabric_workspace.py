@@ -16,7 +16,7 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
-from fabric_cicd._common._exceptions import InputError, ParameterFileError, ParsingError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
@@ -179,6 +179,7 @@ class FabricWorkspace:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
         empty_logical_id_paths = []  # Collect all paths with empty logical IDs
+        visited_logical_ids = []  # Track visited logical IDs to avoid duplicates
 
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
@@ -216,6 +217,12 @@ class FabricWorkspace:
                 if not item_logical_id or item_logical_id.strip() == "":
                     empty_logical_id_paths.append(str(item_metadata_path))
                     continue  # Skip processing this item further
+
+                if item_logical_id not in visited_logical_ids:
+                    visited_logical_ids.append(item_logical_id)
+                else:
+                    msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
+                    raise FailedPublishedItemStatusError(msg, logger)
 
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
