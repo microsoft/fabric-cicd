@@ -640,8 +640,22 @@ Connections must be parameterized in addition to item references.
         - Set `find_value` to match the `dataflowId` GUID referenced in the `mashup.pq` file (literal string or [regex](#find_value-regex)).
         - Set `replace_value` to the variable `$items.Dataflow.<The Source Dataflow Name>.id`. **Important:** Make sure the **item type** is `"Dataflow"` and the **item name** matches the source Dataflow name in the repository directory exactly (case sensitive, include any spaces).
         - File filters are optional but recommended when using a regex pattern for `find_value`.
-        - **You don't need to parameterize the source Dataflow workspace ID here** as the library automatically handles this replacement when you use the Items variable in _this_ Dataflow scenario.
+        - **You don't need to parameterize the source Dataflow workspace ID here** as the library automatically handles this replacement when you use the items variable in _this_ Dataflow scenario.
     - **How this works:** This parameterization approach ensures correct deployment of interdependent Dataflows while automatically updating references to point to the newly deployed Dataflow in the target workspace.
+    - Example parameter input:
+
+    ```yaml
+    find_replace:
+        # The ID of the source Dataflow referenced in mashup.pq
+        - find_value: "0187104d-7a35-4abe-a2ca-a241ec81c8f1"
+          # Type = Dataflow and Name = <The Source Dataflow Name>, Attribute = id
+          replace_value:
+              PPE: "$items.Dataflow.Source Dataflow.id"
+              PROD: "$items.Dataflow.Source Dataflow.id"
+          # Optional fields:
+          file_path:
+              - "\\Referencing Dataflow.Dataflow\\mashup.pq"
+    ```
 
 2. Source Dataflow exists in a **different workspace** from the dependent Dataflow:
 
