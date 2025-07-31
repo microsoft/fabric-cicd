@@ -179,7 +179,7 @@ class FabricWorkspace:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
         empty_logical_id_paths = []  # Collect all paths with empty logical IDs
-        visited_logical_ids = []  # Track visited logical IDs to avoid duplicates
+        visited_logical_ids = set()  # Track visited logical IDs to avoid duplicates
 
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
@@ -219,7 +219,7 @@ class FabricWorkspace:
                     continue  # Skip processing this item further
 
                 if item_logical_id not in visited_logical_ids:
-                    visited_logical_ids.append(item_logical_id)
+                    visited_logical_ids.add(item_logical_id)
                 else:
                     msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
                     raise FailedPublishedItemStatusError(msg, logger)
