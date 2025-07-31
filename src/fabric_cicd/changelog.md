@@ -6,6 +6,18 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.24
+
+<span class="md-h2-subheader">Release Date: 2025-07-31</span>
+
+-   💥 Replacement of Dataflow and Semantic Model item references in Data Pipeline activities now requires explicit parameterization
+-   💥 Dataflow dependency management now requires specific parameterization when a Dataflow depends on another within the same workspace
+-   ✨ Added support for dynamic replacement of Eventhouse item query URIs via parameterization ([#414] (https://github.com/microsoft/fabric-cicd/issues/414))
+-   🔧 Fix Dataflow and Data Pipeline deployment failures caused by workspace permission issues ([#419] (https://github.com/microsoft/fabric-cicd/issues/419))
+-   🔧 Fix issue where items without assigned capacity were being deployed ([#402] (https://github.com/microsoft/fabric-cicd/issues/402))
+-   📝 Refine Parameterization documentation ([#415] (https://github.com/microsoft/fabric-cicd/issues/415))
+-   ⚡ SQL endpoint for Warehouse items is now exposed for use in dynamic replacement parameter variables ([#392] (https://github.com/microsoft/fabric-cicd/issues/392))
+
 ## Version 0.1.23
 
 <span class="md-h2-subheader">Release Date: 2025-07-08</span>
