@@ -1,0 +1,246 @@
+name: Bump Version
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+    workflow_dispatch:
+        inputs:
+            pr_number:
+                description: "Pull Request number to create release from"
+                required: true
+                type: string
+
+permissions:
+    contents: write
+    pull-requests: read
+
+jobs:
+    bump-version:
+        name: Bump Version and Publish Docs
+        if: |
+            (github.event.pull_request.merged == true && github.event_name == 'pull_request') ||
+            (github.event_name == 'workflow_dispatch')
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check if PR was validated as version bump
+              id: pr-check
+              uses: actions/github-script@v7
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      let prNumber;
+
+                      // Determine PR number based on trigger type
+                      if (context.eventName === 'pull_request') {
+                        prNumber = context.payload.pull_request.number;
+                        console.log(`🔄 PR merge trigger - checking PR #${prNumber}`);
+                      } else if (context.eventName === 'workflow_dispatch') {
+                        prNumber = parseInt('${{ github.event.inputs.pr_number }}');
+                        console.log(`🚀 Manual trigger - checking PR #${prNumber}`);
+                      }
+
+                      if (!prNumber) {
+                        core.setFailed('Could not determine PR number');
+                        return;
+                      }
+
+                      // Get PR labels
+                      const pr = await github.rest.pulls.get({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: prNumber
+                      });
+
+                      const labels = pr.data.labels.map(label => label.name);
+                      const hasVersionBumpLabel = labels.includes("Version Bump");
+
+                      if (!hasVersionBumpLabel) {
+                        console.log(`❌ PR #${prNumber} was not validated as a version bump. Skipping release process.`);
+                        core.setOutput('should_release', 'false');
+                        return;
+                      }
+
+                      console.log(`✅ PR #${prNumber} was validated as a version bump. Proceeding with release process.`);
+                      core.setOutput('should_release', 'true');
+                      core.setOutput('merge_commit_sha', pr.data.merge_commit_sha);
+
+            - name: Checkout repository
+              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ steps.pr-check.outputs.merge_commit_sha }}
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract version
+              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+              id: version-check
+              run: |
+                  # Extract version from constants.py
+                  if [ -f "src/fabric_cicd/constants.py" ]; then
+                    CONSTANTS_VERSION=$(grep -oP '(?<=^VERSION = ").*(?=")' src/fabric_cicd/constants.py)
+                    echo "Version in constants.py: $CONSTANTS_VERSION"
+                    
+                    if [ -z "$CONSTANTS_VERSION" ]; then
+                      echo "ERROR: Could not extract version from constants.py"
+                      exit 1
+                    fi
+                    
+                    echo "version_number=$CONSTANTS_VERSION" >> $GITHUB_OUTPUT
+                    echo "version_tag=v$CONSTANTS_VERSION" >> $GITHUB_OUTPUT
+                  else
+                    echo "ERROR: constants.py file not found"
+                    exit 1
+                  fi
+
+                  # Log trigger type
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    echo "🚀 Manual trigger for PR #${{ github.event.inputs.pr_number }}"
+                  elif [ "${{ github.event_name }}" = "pull_request" ]; then
+                    echo "🚀 PR merge trigger - validated version bump"
+                  fi
+
+            - name: Create tag if needed
+              if: steps.pr-check.outputs.should_release == 'true'
+              id: tag-creation
+              run: |
+                  TAG_NAME="${{ steps.version-check.outputs.version_tag }}"
+                  echo "Checking tag: $TAG_NAME"
+
+                  # Check if tag exists locally or remotely
+                  if git tag -l | grep -q "^$TAG_NAME$" || git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+                    echo "ℹ️ Tag $TAG_NAME already exists, will proceed with existing tag"
+                    echo "tag_created=false" >> $GITHUB_OUTPUT
+                  else
+                    echo "✅ Tag $TAG_NAME does not exist, creating new tag"
+                    
+                    # Configure git
+                    git config user.name "github-actions[bot]"
+                    git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                    # Create and push the tag
+                    git tag "$TAG_NAME"
+                    git push origin "$TAG_NAME"
+                    echo "✅ Created and pushed tag: $TAG_NAME"
+                    echo "tag_created=true" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Create GitHub Release
+              if: steps.pr-check.outputs.should_release == 'true'
+              uses: actions/github-script@v7
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const tagName = '${{ steps.version-check.outputs.version_tag }}';
+
+                      try {
+                        // Check if release already exists
+                        let existingRelease;
+                        try {
+                          existingRelease = await github.rest.repos.getReleaseByTag({
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            tag: tagName
+                          });
+                          console.log(`ℹ️ Release ${tagName} already exists: ${existingRelease.data.html_url}`);
+                          console.log('Skipping release creation');
+                          return;
+                        } catch (error) {
+                          if (error.status !== 404) {
+                            throw error;
+                          }
+                          // Release doesn't exist, proceed to create it
+                        }
+
+                        // Extract changelog content for new release
+                        const versionNumber = '${{ steps.version-check.outputs.version_number }}';
+                        const fs = require('fs');
+                        const path = 'src/fabric_cicd/changelog.md';
+                        
+                        let changelogContent = `Release ${tagName}`;
+                        
+                        if (fs.existsSync(path)) {
+                          try {
+                            const changelogText = fs.readFileSync(path, 'utf8');
+                            const lines = changelogText.split('\n');
+                            let found = false;
+                            let content = [];
+                            
+                            for (const line of lines) {
+                              if (line.startsWith('## Version ')) {
+                                if (found) break; // Hit next version, stop
+                                if (line.includes(`Version ${versionNumber}`)) {
+                                  found = true;
+                                  continue; // Skip the version header line
+                                }
+                              } else if (found) {
+                                // Skip span tags and empty lines
+                                if (line.trim() === '' || line.startsWith('<span')) continue;
+                                content.push(line);
+                              }
+                            }
+                            
+                            if (content.length > 0) {
+                              changelogContent = content.join('\n').trim();
+                            } else {
+                              console.log(`Changelog content not found for version ${versionNumber}`);
+                            }
+                          } catch (error) {
+                            console.log('Error reading changelog:', error.message);
+                          }
+                        } else {
+                          console.log('Changelog file not found');
+                        }
+
+                        // Create new release
+                        const release = await github.rest.repos.createRelease({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          tag_name: tagName,
+                          name: tagName,
+                          body: changelogContent,
+                          draft: false,
+                          prerelease: false
+                        });
+                        
+                        console.log(`✅ Created GitHub release: ${tagName}`);
+                        console.log(`Release URL: ${release.data.html_url}`);
+                      } catch (error) {
+                        console.error('Failed to create release:', error);
+                        throw error;
+                      }
+
+            - name: Install Python
+              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.9"
+
+            - name: Install Requirements
+              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install uv
+
+            - name: Deploy GitHub Pages
+              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  git config user.name github-actions[bot]
+                  git config user.email github-actions[bot]@users.noreply.github.com
+                  git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
+                  uv sync
+
+                  VERSION="${{ steps.version-check.outputs.version_number }}"
+                  echo "Deploying docs for version: $VERSION"
+
+                  uv run mike deploy \
+                    --update-aliases \
+                    --branch gh-pages \
+                    --push \
+                    $VERSION \
+                    latest
+                  uv run mike set-default --push latest
