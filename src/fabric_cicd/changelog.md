@@ -13,6 +13,7 @@ The following contains all major, minor, and patch version release notes.
 -   💥 Require parameterization for Dataflow and Semantic Model references in Data Pipeline activities
 -   💥 Require specific parameterization for deploying a Dataflow that depends on another in the same workspace (see Parameterization docs)
 -   🔧 Fix Dataflow/Data Pipeline deployment failures caused by workspace permissions ([#419](https://github.com/microsoft/fabric-cicd/issues/419))
+-   🔧 Prevent duplicate logical ID issue in Report and Semantic Model deployment ([#405](https://github.com/microsoft/fabric-cicd/issues/405))
 -   🔧 Fix deployment of items without assigned capacity ([#402](https://github.com/microsoft/fabric-cicd/issues/402))
 -   📝 Improve Parameterization documentation ([#415](https://github.com/microsoft/fabric-cicd/issues/415))
 -   ⚡ Support for Eventhouse query URI parameterization ([#414](https://github.com/microsoft/fabric-cicd/issues/414))
