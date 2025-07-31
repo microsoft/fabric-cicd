@@ -31,40 +31,72 @@ jobs:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |
                       let prNumber;
+                      let commitSha;
 
-                      // Determine PR number based on trigger type
+                      // Determine PR number and commit SHA based on trigger type
                       if (context.eventName === 'pull_request') {
                         prNumber = context.payload.pull_request.number;
-                        console.log(`🔄 PR merge trigger - checking PR #${prNumber}`);
+                        commitSha = context.payload.pull_request.head.sha;
+                        console.log(`🔄 PR merge trigger - checking PR #${prNumber} (SHA: ${commitSha})`);
                       } else if (context.eventName === 'workflow_dispatch') {
                         prNumber = parseInt('${{ github.event.inputs.pr_number }}');
                         console.log(`🚀 Manual trigger - checking PR #${prNumber}`);
+                        
+                        // Get PR details to find the head SHA
+                        const pr = await github.rest.pulls.get({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          pull_number: prNumber
+                        });
+                        commitSha = pr.data.head.sha;
+                        console.log(`Head SHA: ${commitSha}`);
                       }
 
-                      if (!prNumber) {
-                        core.setFailed('Could not determine PR number');
+                      if (!prNumber || !commitSha) {
+                        core.setFailed('Could not determine PR number or commit SHA');
                         return;
                       }
 
-                      // Get PR labels
-                      const pr = await github.rest.pulls.get({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        pull_number: prNumber
-                      });
-
-                      const labels = pr.data.labels.map(label => label.name);
-                      const hasVersionBumpLabel = labels.includes("Version Bump");
-
-                      if (!hasVersionBumpLabel) {
-                        console.log(`❌ PR #${prNumber} was not validated as a version bump. Skipping release process.`);
-                        core.setOutput('should_release', 'false');
-                        return;
+                      // Check for version bump status check
+                      try {
+                        const { data: statuses } = await github.rest.repos.listCommitStatusesForRef({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          ref: commitSha
+                        });
+                        
+                        console.log(`Found ${statuses.length} status checks for commit ${commitSha}`);
+                        
+                        // Look for our version bump validation status
+                        const versionBumpStatus = statuses.find(status => status.context === 'validation/version-bump');
+                        
+                        if (!versionBumpStatus) {
+                          console.log(`❌ PR #${prNumber} was not validated as a version bump. No validation/version-bump status found.`);
+                          core.setOutput('should_release', 'false');
+                          return;
+                        }
+                        
+                        if (versionBumpStatus.state !== 'success') {
+                          console.log(`❌ PR #${prNumber} version bump validation failed with state: ${versionBumpStatus.state}`);
+                          core.setOutput('should_release', 'false');
+                          return;
+                        }
+                        
+                        console.log(`✅ PR #${prNumber} was validated as a version bump via status check. Proceeding with release process.`);
+                        core.setOutput('should_release', 'true');
+                        
+                        // For PR merge trigger, get merge commit SHA
+                        if (context.eventName === 'pull_request') {
+                          core.setOutput('merge_commit_sha', context.payload.pull_request.merge_commit_sha);
+                        } else {
+                          // For manual trigger, we'll use the head SHA
+                          core.setOutput('merge_commit_sha', commitSha);
+                        }
+                        
+                      } catch (error) {
+                        console.error('Error checking status:', error);
+                        core.setFailed(`Failed to check version bump status: ${error.message}`);
                       }
-
-                      console.log(`✅ PR #${prNumber} was validated as a version bump. Proceeding with release process.`);
-                      core.setOutput('should_release', 'true');
-                      core.setOutput('merge_commit_sha', pr.data.merge_commit_sha);
 
             - name: Checkout repository
               if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'

@@ -271,3 +271,21 @@ jobs:
                     fi
                   fi
                   echo "✅ Version bump validation passed."
+
+            - name: Create version bump status check
+              if: steps.version_bump_check.outputs.is_version_bump == 'true'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      // Create a status check indicating this is a valid version bump PR
+                      await github.rest.repos.createCommitStatus({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          sha: context.payload.pull_request.head.sha,
+                          state: 'success',
+                          target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                          description: 'Valid version bump PR detected',
+                          context: 'validation/version-bump'
+                      });
+
+                      console.log('✅ Created version bump status check');
