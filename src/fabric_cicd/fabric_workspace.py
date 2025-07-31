@@ -128,6 +128,9 @@ class FabricWorkspace:
         self.deployed_folders = {}
         self.deployed_items = {}
 
+        # Initialize dataflow dependencies dictionary (used in dataflow item processing)
+        self.dataflow_dependencies = {}
+
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
             logger.warning(
@@ -208,12 +211,12 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
-                
+
                 # Check for empty logical ID and collect the path
                 if not item_logical_id or item_logical_id.strip() == "":
                     empty_logical_id_paths.append(str(item_metadata_path))
                     continue  # Skip processing this item further
-                
+
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 relative_parent_path = "/".join(relative_path.split("/")[:-1])
@@ -240,7 +243,7 @@ class FabricWorkspace:
                 )
 
                 self.repository_items[item_type][item_name].collect_item_files()
-        
+
         # If we found any empty logical IDs, raise an error with all paths
         if empty_logical_id_paths:
             if len(empty_logical_id_paths) == 1:
@@ -266,6 +269,7 @@ class FabricWorkspace:
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
             sql_endpoint = ""
+            query_service_uri = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
@@ -275,16 +279,20 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties based on item type
-            if item_type == "Lakehouse":
-                lakehouse_response = self.endpoint.invoke(
-                    method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
-                )
+            if item_type in ["Lakehouse", "Warehouse", "Eventhouse"]:
+                # Construct the endpoint URL and set the property path based on item type
+                endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+                response = self.endpoint.invoke(method="GET", url=endpoint_url)
                 # Use dpath.get for safe nested property access
-                sql_endpoint = dpath.get(
-                    lakehouse_response, "body/properties/sqlEndpointProperties/connectionString", default=""
-                )
-                if not sql_endpoint:
-                    logger.debug(f"Failed to get SQL endpoint for Lakehouse '{item_name}'")
+                property_path = constants.PROPERTY_PATH_MAPPING[item_type]
+                property_value = dpath.get(response, property_path, default="")
+                # Set the appropriate variable based on the last segment of the path
+                if not property_value:
+                    logger.debug(f"Failed to get endpoint for {item_type} '{item_name}'")
+                elif property_path.endswith("connectionString"):
+                    sql_endpoint = property_value
+                elif property_path.endswith("queryServiceUri"):
+                    query_service_uri = property_value
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -296,7 +304,11 @@ class FabricWorkspace:
             )
 
             # Add item details to the workspace_items dictionary required for parameterization (public-facing attributes)
-            self.workspace_items[item_type][item_name] = {"id": item_guid, "sqlendpoint": sql_endpoint}
+            self.workspace_items[item_type][item_name] = {
+                "id": item_guid,
+                "sqlendpoint": sql_endpoint,
+                "queryserviceuri": query_service_uri,
+            }
 
     def _replace_logical_ids(self, raw_file: str) -> str:
         """
@@ -363,8 +375,9 @@ class FabricWorkspace:
                 # Replace any found references with specified environment value if conditions are met
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
                     replace_value = extract_replace_value(self, replace_value_dict[self.environment])
-                    raw_file = raw_file.replace(find_value, replace_value)
-                    logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
+                    if replace_value:
+                        raw_file = raw_file.replace(find_value, replace_value)
+                        logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
 

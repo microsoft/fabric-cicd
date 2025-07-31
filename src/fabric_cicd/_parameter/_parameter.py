@@ -46,7 +46,7 @@ class Parameter:
 
     def __init__(
         self,
-        repository_directory: str,
+        repository_directory: Path,
         item_type_in_scope: list[str],
         environment: str,
         parameter_file_name: str = "parameter.yml",
@@ -416,11 +416,15 @@ class Parameter:
                 # Validate specific optional values and check for matches
                 if check_match and param in validation_methods:
                     values = value if isinstance(value, list) else [value]
-                    for item in values:
-                        is_valid, msg = validation_methods[param](item)
-                        if not is_valid:
-                            logger.debug(msg)
-                            return False, "no match"
+                    if param == "file_path":
+                        is_valid, msg = validation_methods[param](values)
+                    else:
+                        for item in values:
+                            is_valid, msg = validation_methods[param](item)
+
+                    if not is_valid:
+                        logger.debug(msg)
+                        return False, "no match"
 
         return True, constants.PARAMETER_MSGS["valid optional"].format(param_name)
 
@@ -473,13 +477,18 @@ class Parameter:
 
         return True, "Valid item name"
 
-    def _validate_file_path(self, input_path: str) -> tuple[bool, str]:
-        """Validate the file path exists."""
-        # Convert input path to Path object
-        input_path_new = process_input_path(self.repository_directory, input_path)
+    def _validate_file_path(self, input_path: list[str]) -> tuple[bool, str]:
+        """Validate that the file paths exist within the repository directory."""
+        # Convert input path to Path objects, returned as a list of valid paths
+        valid_paths = process_input_path(self.repository_directory, input_path, validation_flag=True)
 
-        # Check if the file path exists
-        if not input_path_new.exists():
-            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path)
+        # If list of paths is empty, all paths were invalid
+        if not valid_paths:
+            return False, constants.PARAMETER_MSGS["no valid file path"].format(input_path)
+
+        # Check for some invalid paths
+        path_diff = len(input_path) - len(valid_paths)
+        if path_diff > 0:
+            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
