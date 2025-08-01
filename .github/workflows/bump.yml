@@ -17,16 +17,45 @@ permissions:
     pull-requests: read
 
 jobs:
+    get-pr-details:
+        name: Get PR Details
+        runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch'
+        outputs:
+            pr_title: ${{ steps.pr-info.outputs.pr_title }}
+            pr_head_sha: ${{ steps.pr-info.outputs.pr_head_sha }}
+        steps:
+            - name: Get PR Information
+              id: pr-info
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const prNumber = parseInt('${{ github.event.inputs.pr_number }}');
+
+                      const { data: pr } = await github.rest.pulls.get({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          pull_number: prNumber
+                      });
+
+                      console.log(`PR #${prNumber}: ${pr.title}`);
+                      console.log(`Head SHA: ${pr.head.sha}`);
+
+                      core.setOutput('pr_title', pr.title);
+                      core.setOutput('pr_head_sha', pr.head.sha);
+
     validate-version-bump:
         name: Validate Version Bump
+        needs: [get-pr-details]
+        if: always() && !cancelled()
         uses: ./.github/workflows/validate-version-bump.yml
         with:
-            pr_title: ${{ github.event.pull_request.title || format('PR #{0}', github.event.inputs.pr_number) }}
-            pr_head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+            pr_title: ${{ github.event.pull_request.title || needs.get-pr-details.outputs.pr_title }}
+            pr_head_sha: ${{ github.event.pull_request.head.sha || needs.get-pr-details.outputs.pr_head_sha }}
 
     bump-version:
         name: Bump Version and Publish Docs
-        needs: validate-version-bump
+        needs: [get-pr-details, validate-version-bump]
         if: |
             (github.event_name == 'workflow_dispatch') ||
             (github.event_name == 'pull_request' && github.event.pull_request.merged == true && needs.validate-version-bump.outputs.is_version_bump == 'true')
