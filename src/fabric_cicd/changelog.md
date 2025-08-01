@@ -8,7 +8,7 @@ The following contains all major, minor, and patch version release notes.
 
 ## Version 0.1.24
 
-<span class="md-h2-subheader">Release Date: 2025-07-31</span>
+<span class="md-h2-subheader">Release Date: 2025-08-04</span>
 
 -   💥 Require parameterization for Dataflow and Semantic Model references in Data Pipeline activities
 -   💥 Require specific parameterization for deploying a Dataflow that depends on another in the same workspace (see Parameterization docs)
