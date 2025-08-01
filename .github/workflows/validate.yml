@@ -64,6 +64,13 @@ jobs:
                     exit 1
                   fi
 
+    validate-version-bump:
+        name: Proper Version Bump
+        uses: ./.github/workflows/validate-version-bump.yml
+        with:
+            pr_title: ${{ github.event.pull_request.title }}
+            pr_head_sha: ${{ github.event.pull_request.head.sha }}
+
     validate-linked-issue:
         name: Issue Linked
         runs-on: ubuntu-latest
@@ -208,9 +215,3 @@ jobs:
                       }
 
                       console.log('✅ Pull request is properly linked to an issue.');
-    validate-version-bump:
-        name: Proper Version Bump
-        uses: ./.github/workflows/validate-version-bump.yml
-        with:
-            pr_title: ${{ github.event.pull_request.title }}
-            pr_head_sha: ${{ github.event.pull_request.head.sha }}
