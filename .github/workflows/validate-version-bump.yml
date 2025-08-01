@@ -27,10 +27,7 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
               with:
-                  ref: ${{ inputs.pr_head_sha }}
-
-            - name: Fetch all branches
-              run: git fetch --prune --unshallow
+                  fetch-depth: 0
 
             - name: Validate Version Bump
               id: version_bump_check
