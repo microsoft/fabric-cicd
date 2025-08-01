@@ -17,97 +17,57 @@ permissions:
     pull-requests: read
 
 jobs:
-    bump-version:
-        name: Bump Version and Publish Docs
-        if: |
-            (github.event.pull_request.merged == true && github.event_name == 'pull_request') ||
-            (github.event_name == 'workflow_dispatch')
+    get-pr-details:
+        name: Get PR Details
         runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch'
+        outputs:
+            pr_title: ${{ steps.pr-info.outputs.pr_title }}
+            pr_head_sha: ${{ steps.pr-info.outputs.pr_head_sha }}
         steps:
-            - name: Check if PR was validated as version bump
-              id: pr-check
+            - name: Get PR Information
+              id: pr-info
               uses: actions/github-script@v7
               with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |
-                      let prNumber;
-                      let commitSha;
+                      const prNumber = parseInt('${{ github.event.inputs.pr_number }}');
 
-                      // Determine PR number and commit SHA based on trigger type
-                      if (context.eventName === 'pull_request') {
-                        prNumber = context.payload.pull_request.number;
-                        commitSha = context.payload.pull_request.head.sha;
-                        console.log(`🔄 PR merge trigger - checking PR #${prNumber} (SHA: ${commitSha})`);
-                      } else if (context.eventName === 'workflow_dispatch') {
-                        prNumber = parseInt('${{ github.event.inputs.pr_number }}');
-                        console.log(`🚀 Manual trigger - checking PR #${prNumber}`);
-                        
-                        // Get PR details to find the head SHA
-                        const pr = await github.rest.pulls.get({
+                      const { data: pr } = await github.rest.pulls.get({
                           owner: context.repo.owner,
                           repo: context.repo.repo,
                           pull_number: prNumber
-                        });
-                        commitSha = pr.data.head.sha;
-                        console.log(`Head SHA: ${commitSha}`);
-                      }
+                      });
 
-                      if (!prNumber || !commitSha) {
-                        core.setFailed('Could not determine PR number or commit SHA');
-                        return;
-                      }
+                      console.log(`PR #${prNumber}: ${pr.title}`);
+                      console.log(`Head SHA: ${pr.head.sha}`);
 
-                      // Check for version bump status check
-                      try {
-                        const { data: statuses } = await github.rest.repos.listCommitStatusesForRef({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          ref: commitSha
-                        });
-                        
-                        console.log(`Found ${statuses.length} status checks for commit ${commitSha}`);
-                        
-                        // Look for our version bump validation status
-                        const versionBumpStatus = statuses.find(status => status.context === 'validation/version-bump');
-                        
-                        if (!versionBumpStatus) {
-                          console.log(`❌ PR #${prNumber} was not validated as a version bump. No validation/version-bump status found.`);
-                          core.setOutput('should_release', 'false');
-                          return;
-                        }
-                        
-                        if (versionBumpStatus.state !== 'success') {
-                          console.log(`❌ PR #${prNumber} version bump validation failed with state: ${versionBumpStatus.state}`);
-                          core.setOutput('should_release', 'false');
-                          return;
-                        }
-                        
-                        console.log(`✅ PR #${prNumber} was validated as a version bump via status check. Proceeding with release process.`);
-                        core.setOutput('should_release', 'true');
-                        
-                        // For PR merge trigger, get merge commit SHA
-                        if (context.eventName === 'pull_request') {
-                          core.setOutput('merge_commit_sha', context.payload.pull_request.merge_commit_sha);
-                        } else {
-                          // For manual trigger, we'll use the head SHA
-                          core.setOutput('merge_commit_sha', commitSha);
-                        }
-                        
-                      } catch (error) {
-                        console.error('Error checking status:', error);
-                        core.setFailed(`Failed to check version bump status: ${error.message}`);
-                      }
+                      core.setOutput('pr_title', pr.title);
+                      core.setOutput('pr_head_sha', pr.head.sha);
 
+    validate-version-bump:
+        name: Validate Version Bump
+        needs: [get-pr-details]
+        if: always() && !cancelled()
+        uses: ./.github/workflows/validate-version-bump.yml
+        with:
+            pr_title: ${{ github.event.pull_request.title || needs.get-pr-details.outputs.pr_title }}
+            pr_head_sha: ${{ github.event.pull_request.head.sha || needs.get-pr-details.outputs.pr_head_sha }}
+
+    bump-version:
+        name: Bump Version and Publish Docs
+        needs: [get-pr-details, validate-version-bump]
+        if: |
+            (github.event_name == 'workflow_dispatch') ||
+            (github.event_name == 'pull_request' && github.event.pull_request.merged == true && needs.validate-version-bump.outputs.is_version_bump == 'true')
+        runs-on: ubuntu-latest
+        steps:
             - name: Checkout repository
-              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
               uses: actions/checkout@v4
               with:
-                  ref: ${{ steps.pr-check.outputs.merge_commit_sha }}
                   fetch-depth: 0
                   token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Extract version
-              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
               id: version-check
               run: |
                   # Extract version from constants.py
@@ -135,7 +95,7 @@ jobs:
                   fi
 
             - name: Create tag if needed
-              if: steps.pr-check.outputs.should_release == 'true'
+              if: needs.validate-version-bump.outputs.is_version_bump == 'true'
               id: tag-creation
               run: |
                   TAG_NAME="${{ steps.version-check.outputs.version_tag }}"
@@ -160,7 +120,7 @@ jobs:
                   fi
 
             - name: Create GitHub Release
-              if: steps.pr-check.outputs.should_release == 'true'
+              if: needs.validate-version-bump.outputs.is_version_bump == 'true'
               uses: actions/github-script@v7
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -245,19 +205,16 @@ jobs:
                       }
 
             - name: Install Python
-              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
               uses: actions/setup-python@v5
               with:
                   python-version: "3.9"
 
             - name: Install Requirements
-              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
               run: |
                   python -m pip install --upgrade pip
                   python -m pip install uv
 
             - name: Deploy GitHub Pages
-              if: steps.pr-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
