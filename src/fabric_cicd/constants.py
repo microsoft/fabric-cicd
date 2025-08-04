@@ -38,7 +38,7 @@ ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 # Publish
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
-# Does not require assigned capacity
+# Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = [["SemanticModel", "Report"], ["SemanticModel"], ["Report"]]
 
 # REGEX Constants
