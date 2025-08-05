@@ -404,7 +404,7 @@ class TestParameterUtilities:
         assert check_replacement("type1", "name2", [file_path], "type1", "name1", file_path) is False
         assert check_replacement("type1", "name1", [Path("other.txt")], "type1", "name1", file_path) is False
 
-    def test_replace_key_value_valid_json(self):
+    def test_replace_key_value_valid_json(self, mock_workspace):
         """Tests replace_key_value with valid JSON content and environment."""
         # Test JSON with server host configuration
         test_json = '{"server": {"host": "localhost", "port": 8080}}'
@@ -414,17 +414,17 @@ class TestParameterUtilities:
         }
 
         # Test successful replacement for dev environment
-        result = replace_key_value(param_dict, test_json, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
         result_data = json.loads(result)
         assert result_data["server"]["host"] == "dev-server.example.com"
         assert result_data["server"]["port"] == 8080  # Verify other values unchanged
 
         # Test successful replacement for prod environment
-        result = replace_key_value(param_dict, test_json, "prod")
+        result = replace_key_value(mock_workspace, param_dict, test_json, "prod")
         result_data = json.loads(result)
         assert result_data["server"]["host"] == "prod-server.example.com"
 
-    def test_replace_key_value_environment_not_found(self):
+    def test_replace_key_value_environment_not_found(self, mock_workspace):
         """Tests replace_key_value when environment is not in the replace_value dictionary."""
         test_json = '{"server": {"host": "localhost", "port": 8080}}'
         param_dict = {
@@ -433,20 +433,20 @@ class TestParameterUtilities:
         }
 
         # Test when environment not in replace_value
-        result = replace_key_value(param_dict, test_json, "test")
+        result = replace_key_value(mock_workspace, param_dict, test_json, "test")
         result_data = json.loads(result)
         assert result_data["server"]["host"] == "localhost"  # Original value unchanged
 
-    def test_replace_key_value_invalid_json(self):
+    def test_replace_key_value_invalid_json(self, mock_workspace):
         """Tests replace_key_value with invalid JSON content."""
         invalid_json = "{invalid json content}"
         param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
 
         # JSONDecodeError will be raised for invalid JSON and wrapped in ValueError
         with pytest.raises(ValueError, match="Expecting property name"):
-            replace_key_value(param_dict, invalid_json, "dev")
+            replace_key_value(mock_workspace, param_dict, invalid_json, "dev")
 
-    def test_replace_key_value(self):
+    def test_replace_key_value(self, mock_workspace):
         """Test replace_key_value function with JSON content."""
         # Create test parameter dictionary and JSON content
         param_dict = {
@@ -456,20 +456,20 @@ class TestParameterUtilities:
         json_content = '{"server": {"host": "localhost", "port": 8080}}'
 
         # Test successful replacement
-        result = replace_key_value(param_dict, json_content, "dev")
+        result = replace_key_value(mock_workspace, param_dict, json_content, "dev")
 
         # Parse the JSON result and check the exact value (avoid substring sanitization issues)
         result_json = json.loads(result)
         assert result_json["server"]["host"] == "dev-server.example.com"
 
         # Test with environment not in replace_value
-        result = replace_key_value(param_dict, json_content, "test")
+        result = replace_key_value(mock_workspace, param_dict, json_content, "test")
         result_json = json.loads(result)
         assert result_json["server"]["host"] == "localhost"
 
         # Test with invalid JSON content
         with pytest.raises(ValueError, match="Expecting property name"):
-            replace_key_value(param_dict, "{invalid json}", "dev")
+            replace_key_value(mock_workspace, param_dict, "{invalid json}", "dev")
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""

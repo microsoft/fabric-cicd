@@ -102,6 +102,7 @@ PARAMETER_MSGS = {
     "valid parameter": "{} parameter is valid",
     "skip": "The {} '{}' replacement will be skipped due to {} in parameter {}",
     "no target env": "target environment '{}' not found",
+    "all target env": "'ALL' environment key found. The replace value: '{}' will be applied for any target environment",
     "no filter match": "unmatched optional filters",
 }
 

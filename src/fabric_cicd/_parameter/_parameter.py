@@ -254,6 +254,12 @@ class Parameter:
                 )
                 continue
 
+            # Log if ALL environment is present in replace_value
+            if "ALL" in parameter_dict["replace_value"]:
+                logger.warning(
+                    constants.PARAMETER_MSGS["all target env"].format(parameter_dict["replace_value"]["ALL"])
+                )
+
             # Replacement skipped if optional filter values don't match
             if msg == "no match" and not is_valid_optional_val:
                 skip_msg = constants.PARAMETER_MSGS["no filter match"]
@@ -446,7 +452,7 @@ class Parameter:
 
     def _validate_environment(self, replace_value: dict) -> bool:
         """Check the target environment exists as a key in the replace_value dictionary."""
-        return self.environment in replace_value
+        return self.environment in replace_value or "ALL" in replace_value
 
     def _validate_item_type(self, input_type: str) -> tuple[bool, str]:
         """Validate the item type is in scope."""
