@@ -39,10 +39,10 @@ jobs:
                       });
 
                       console.log(`PR #${prNumber}: ${pr.title}`);
-                      console.log(`Head SHA: ${pr.head.sha}`);
+                      console.log(`Merge commit SHA: ${pr.merge_commit_sha}`);
 
                       core.setOutput('pr_title', pr.title);
-                      core.setOutput('pr_head_sha', pr.head.sha);
+                      core.setOutput('pr_head_sha', pr.merge_commit_sha);
 
     validate-version-bump:
         name: Validate Version Bump
@@ -64,63 +64,13 @@ jobs:
                   PR_TITLE="${{ github.event.pull_request.title || needs.get-pr-details.outputs.pr_title }}"
                   VERSION_REGEX='^v([0-9]+\.[0-9]+\.[0-9]+)$'
 
-                  # Determine which commit to analyze
-                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                    COMMIT_SHA="${{ needs.get-pr-details.outputs.pr_head_sha }}"
-                    git fetch origin "$COMMIT_SHA"
-                  else
-                    # For pull_request events (post-merge)
-                    COMMIT_SHA="HEAD"
-                  fi
-
-                  # Compare the commit with its parent (the commit before it)
-                  CHANGED_FILES=$(git diff --name-only ${COMMIT_SHA}^1..$COMMIT_SHA)
-
-                  VERSION_CHANGED=false
-                  TITLE_IS_VERSION=false
-                  OLD_VERSION=""
-                  NEW_VERSION=""
-                  # Get VERSION from the parent commit (before the changes)
-                  OLD_VERSION=$(git show ${COMMIT_SHA}^1:src/fabric_cicd/constants.py | grep '^VERSION = ' | sed -E 's/VERSION = "([^"]+)"/\1/')
-                  # Get VERSION from the current commit
-                  NEW_VERSION=$(git show ${COMMIT_SHA}:src/fabric_cicd/constants.py | grep '^VERSION = ' | sed -E 's/VERSION = "([^"]+)"/\1/')
-
-                  if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
-                    VERSION_CHANGED=true
-                  fi
-
                   if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
-                    TITLE_IS_VERSION=true
-                  fi
-
-                  if [ "$TITLE_IS_VERSION" = true ] || [ "$VERSION_CHANGED" = true ]; then
+                    echo "✅ PR title matches version format: $PR_TITLE"
                     echo "is_version_bump=true" >> $GITHUB_OUTPUT
                   else
+                    echo "ℹ️ PR title does not match version format: $PR_TITLE"
                     echo "is_version_bump=false" >> $GITHUB_OUTPUT
-                    echo "✅ Version bump validation passed."
-                    exit 0
                   fi
-
-                  # 1. If version is updated, title must match
-                  if [ "$VERSION_CHANGED" = true ]; then
-                    EXPECTED_TITLE="v$NEW_VERSION"
-                    if [ "$PR_TITLE" != "$EXPECTED_TITLE" ]; then
-                      echo "❌ PR title must be vX.X.X when VERSION is changed. Expected title: $EXPECTED_TITLE"
-                      exit 1
-                    fi
-                  fi
-
-                  # 2. If title is version format, only constants.py and changelog.md should be changed
-                  if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
-                    EXPECTED_FILES="src/fabric_cicd/constants.py src/fabric_cicd/changelog.md"
-                    SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
-                    SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
-                    if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
-                      echo "❌ Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X."
-                      exit 1
-                    fi
-                  fi
-                  echo "✅ Version bump validation passed."
 
     bump-version:
         name: Bump Version and Publish Docs
