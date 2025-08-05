@@ -181,16 +181,23 @@ def _handle_response(
     # https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-result
     if (response.status_code == 200 and long_running) or response.status_code == 202:
         location = response.headers.get("Location")
+        print("+"*60)
+        print("headers: ", response.headers)
+        print("url: ", url)
+        print("location: ", location)
+        print("long_running: ", long_running)
         method = "GET"
         body = "{}"
         response_json = response.json() if "application/json" in response.headers.get("Content-Type") else {}
 
         if long_running:
             status = response_json.get("status")
+            print("status: ", status)
             if status == "Succeeded":
                 long_running = False
                 # If location not included in operation success call, no body is expected to be returned
                 exit_loop = location is None
+                print("exit_loop: ", exit_loop)
 
             elif status == "Failed":
                 response_error = response_json["error"]
@@ -212,6 +219,7 @@ def _handle_response(
         else:
             # Only proceed with long-running operation if Location header exists
             if location:
+                print("Location Updated")
                 url = location
                 time.sleep(1)
                 long_running = True
