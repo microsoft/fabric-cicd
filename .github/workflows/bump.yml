@@ -80,11 +80,18 @@ jobs:
             (github.event_name == 'pull_request' && github.event.pull_request.merged == true && needs.validate-version-bump.outputs.is_version_bump == 'true')
         runs-on: ubuntu-latest
         steps:
+            - name: Generate GitHub App Token
+              id: app-token
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.APP_ID }}
+                  private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
             - name: Checkout repository
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  token: ${{ secrets.GITHUB_TOKEN }}
+                  token: ${{ steps.app-token.outputs.token }}
 
             - name: Extract version
               id: version-check
@@ -131,8 +138,8 @@ jobs:
                     echo "✅ Tag $TAG_NAME does not exist, creating new tag"
                     
                     # Configure git
-                    git config user.name "github-actions[bot]"
-                    git config user.email "github-actions[bot]@users.noreply.github.com"
+                    git config user.name "fabric-cicd-release[bot]"
+                    git config user.email "fabric-cicd-release[bot]@users.noreply.github.com"
 
                     # Create and push the tag
                     git tag "$TAG_NAME"
@@ -145,7 +152,7 @@ jobs:
               if: needs.validate-version-bump.outputs.is_version_bump == 'true'
               uses: actions/github-script@v7
               with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   script: |
                       const tagName = '${{ steps.version-check.outputs.version_tag }}';
 
@@ -238,10 +245,10 @@ jobs:
 
             - name: Deploy GitHub Pages
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
               run: |
-                  git config user.name github-actions[bot]
-                  git config user.email github-actions[bot]@users.noreply.github.com
+                  git config user.name "fabric-cicd-release[bot]"
+                  git config user.email "fabric-cicd-release[bot]@users.noreply.github.com"
                   git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
                   uv sync
 
