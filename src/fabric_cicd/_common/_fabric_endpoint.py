@@ -183,7 +183,7 @@ def _handle_response(
         url = response.headers.get("Location")
         method = "GET"
         body = "{}"
-        response_json = response.json()
+        response_json = response.json() if "application/json" in response.headers.get("Content-Type") else {}
 
         if long_running:
             status = response_json.get("status")
