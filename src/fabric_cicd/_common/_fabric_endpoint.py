@@ -190,7 +190,7 @@ def _handle_response(
             if status in ["Succeeded", "Completed"]:
                 long_running = False
                 # If location not included in operation success call, no body is expected to be returned
-                exit_loop = url is None
+                exit_loop = location is None
 
             elif status == "Failed":
                 response_error = response_json["error"]
