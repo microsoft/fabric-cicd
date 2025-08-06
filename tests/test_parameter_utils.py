@@ -93,6 +93,13 @@ class TestParameterUtilities:
                     "queryserviceuri": "eventhouse-query-uri",
                 },
             },
+            "SQLDatabase": {
+                "Test SQLDatabase": {
+                    "id": "sqldatabase-id",
+                    "sqlendpoint": "sqldatabase-connection-string",
+                    "queryserviceuri": "",
+                },
+            },
         }
         mock_ws.repository_items = {
             "Dataflow": {
@@ -198,6 +205,10 @@ class TestParameterUtilities:
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
         assert result == "eventhouse-query-uri"
+
+        # Test with valid sqldatabase item
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.Test SQLDatabase.sqlendpoint", False)
+        assert result == "sqldatabase-connection-string"
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
         """Tests _extract_item_attribute with invalid variable cases."""

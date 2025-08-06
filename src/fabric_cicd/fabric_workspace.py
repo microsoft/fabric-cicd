@@ -294,7 +294,7 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties based on item type
-            if item_type in ["Lakehouse", "Warehouse", "Eventhouse"]:
+            if item_type in ["Lakehouse", "Warehouse", "Eventhouse", "SQLDatabase"]:
                 # Construct the endpoint URL and set the property path based on item type
                 endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
                 response = self.endpoint.invoke(method="GET", url=endpoint_url)
