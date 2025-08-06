@@ -149,7 +149,7 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         items.publish_graphqlapis(fabric_workspace_obj)
 
     # Check Environment Publish
-    if "Environment" in fabric_workspace_obj.item_type_in_scope and "Environment" in fabric_workspace_obj.repository_items:
+    if _should_publish_item_type("Environment"):
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 
@@ -222,7 +222,8 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Warehouse",
         "VariableLibrary",
     ]:
-        if item_type in fabric_workspace_obj.item_type_in_scope:
+        if (item_type in fabric_workspace_obj.item_type_in_scope and 
+            item_type in fabric_workspace_obj.deployed_items):
             unpublish_flag = unpublish_flag_mapping.get(item_type)
             # Append item_type if no feature flag is required or the corresponding flag is enabled
             if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
