@@ -62,24 +62,16 @@ class FabricWorkspace:
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_name="your-workspace-name",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ...     repository_directory="/path/to/repo"
             ... )
 
-            With optional item types in scope
+            With optional parameters
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
             ...     environment="your-target-environment"
-            ... )
-
-            Using all available item types (default behavior)
-            >>> from fabric_cicd import FabricWorkspace
-            >>> workspace = FabricWorkspace(
-            ...     workspace_id="your-workspace-id",
-            ...     repository_directory="/path/to/repo"
             ... )
 
             With token credential
@@ -130,10 +122,7 @@ class FabricWorkspace:
         
         # Handle None case for item_type_in_scope by defaulting to all available item types
         if item_type_in_scope is None:
-            auth_type = "UPN" if self.endpoint.upn_auth else "Service Principal/Managed Identity"
-            logger.debug(f"Using all available item types for {auth_type} authentication")
-            accepted_item_types = constants.ACCEPTED_ITEM_TYPES_UPN if self.endpoint.upn_auth else constants.ACCEPTED_ITEM_TYPES_NON_UPN
-            self.item_type_in_scope = list(accepted_item_types)
+            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES_UPN)
         else:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)

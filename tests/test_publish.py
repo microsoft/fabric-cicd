@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Test the new publish behavior where only item types present in repository are published."""
+"""Test publishing functionality including selective publishing based on repository content."""
 
 import json
 import tempfile

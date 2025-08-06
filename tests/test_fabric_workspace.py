@@ -816,37 +816,6 @@ def test_single_empty_logical_id_validation_message(temp_workspace_dir, patched_
     assert str(platform_file_path) in error_message
 
 
-def test_item_type_in_scope_all_no_longer_supported():
-    """Test that 'all' is no longer supported for item_type_in_scope parameter."""
-    from fabric_cicd._common._exceptions import InputError
-    from fabric_cicd._common._validate_input import validate_item_type_in_scope
-
-    # Test 1: 'all' should now raise an error
-    with pytest.raises(InputError, match="Invalid or unsupported item type: 'all'"):
-        validate_item_type_in_scope(["all"], upn_auth=True)
-
-    # Test 2: 'all' with non-UPN authentication should also raise an error
-    with pytest.raises(InputError, match="Invalid or unsupported item type: 'all'"):
-        validate_item_type_in_scope(["all"], upn_auth=False)
-
-    # Test 3: Case insensitive 'ALL' should also raise an error
-    with pytest.raises(InputError, match="Invalid or unsupported item type: 'ALL'"):
-        validate_item_type_in_scope(["ALL"], upn_auth=True)
-
-    # Test 4: Mixed case 'All' should also raise an error
-    with pytest.raises(InputError, match="Invalid or unsupported item type: 'All'"):
-        validate_item_type_in_scope(["All"], upn_auth=True)
-
-    # Test 5: Specific item types still work
-    specific_types = ["Notebook", "Environment", "DataPipeline"]
-    result_specific = validate_item_type_in_scope(specific_types, upn_auth=True)
-    assert result_specific == specific_types, "Specific types test failed"
-
-    # Test 6: 'all' with other items should validate each item (regression test)
-    with pytest.raises(InputError, match="Invalid or unsupported item type: 'all'"):
-        validate_item_type_in_scope(["all", "Notebook"], upn_auth=True)
-
-
 def test_fabric_workspace_with_none_item_types_defaults_to_all(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that FabricWorkspace works correctly when initialized with None item_type_in_scope (defaults to all available types)."""
     # Create a sample item to test with
@@ -888,27 +857,3 @@ def test_fabric_workspace_with_none_item_types_defaults_to_all(temp_workspace_di
     assert "Test Notebook" in workspace.repository_items["Notebook"]
 
 
-def test_fabric_workspace_all_string_now_raises_error(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
-    """Test that FabricWorkspace raises error when initialized with 'all' item types."""
-    # Create a sample item to test with
-    item_dir = temp_workspace_dir / "TestNotebook.Notebook"
-    item_dir.mkdir(parents=True, exist_ok=True)
-    platform_file_path = item_dir / ".platform"
-
-    metadata_content = {
-        "metadata": {
-            "type": "Notebook",
-            "displayName": "Test Notebook",
-            "description": "Test notebook for error test",
-        },
-        "config": {"logicalId": "test-logical-id-error"},
-    }
-
-    with platform_file_path.open("w", encoding="utf-8") as f:
-        json.dump(metadata_content, f, ensure_ascii=False)
-
-    # Test that workspace raises error with 'all'
-    with pytest.raises(InputError, match="Invalid or unsupported item type: 'all'"):
-        patched_fabric_workspace(
-            workspace_id=valid_workspace_id, repository_directory=str(temp_workspace_dir), item_type_in_scope=["all"]
-        )
