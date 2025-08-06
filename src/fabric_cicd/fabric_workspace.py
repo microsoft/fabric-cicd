@@ -30,7 +30,7 @@ class FabricWorkspace:
     def __init__(
         self,
         repository_directory: str,
-        item_type_in_scope: list[str],
+        item_type_in_scope: Optional[list[str]] = None,
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
@@ -44,7 +44,7 @@ class FabricWorkspace:
             workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
-            item_type_in_scope: Item types that should be deployed for a given workspace. Use ["all"] to include all available item types.
+            item_type_in_scope: Item types that should be deployed for a given workspace. If omitted, defaults to all available item types.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
             kwargs: Additional keyword arguments.
@@ -66,7 +66,7 @@ class FabricWorkspace:
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
             ... )
 
-            With optional parameters
+            With optional item types in scope
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
@@ -75,12 +75,11 @@ class FabricWorkspace:
             ...     environment="your-target-environment"
             ... )
 
-            Using all available item types
+            Using all available item types (default behavior)
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["all"]
+            ...     repository_directory="/path/to/repo"
             ... )
 
             With token credential
@@ -128,7 +127,15 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
-        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
+        
+        # Handle None case for item_type_in_scope by defaulting to all available item types
+        if item_type_in_scope is None:
+            auth_type = "UPN" if self.endpoint.upn_auth else "Service Principal/Managed Identity"
+            logger.debug(f"Using all available item types for {auth_type} authentication")
+            accepted_item_types = constants.ACCEPTED_ITEM_TYPES_UPN if self.endpoint.upn_auth else constants.ACCEPTED_ITEM_TYPES_NON_UPN
+            self.item_type_in_scope = list(accepted_item_types)
+        else:
+            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.repository_folders = {}
