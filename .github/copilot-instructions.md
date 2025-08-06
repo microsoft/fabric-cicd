@@ -86,18 +86,16 @@ unpublish_all_orphan_items(workspace)
 - **validate.yml**: Runs `ruff format` and `ruff check` validation
 - **bump.yml**: Handles version bumps (requires PR title format vX.X.X)
 
-### Expected Item Types
-The library supports these Microsoft Fabric item types:
-- Notebook, DataPipeline, Environment, Report, SemanticModel
-- Warehouse, SQLDatabase, Lakehouse, Eventhouse, KQLDashboard
-- Dataflow, CopyJob, GraphQLApi, Reflex, Eventstream
-- KQLQueryset, MirroredDatabase, VariableLibrary
-
 ### Authentication Requirements
 - Uses Azure DefaultAzureCredential by default
 - Requires Azure CLI (`az login`) or Az.Accounts PowerShell module for local development
 - Service principal authentication supported for CI/CD pipelines
 - No authentication needed for basic library imports or testing
+
+### Microsoft Fabric APIs
+- The library primarily integrates with Microsoft Fabric Core APIs
+- API documentation: https://learn.microsoft.com/en-us/rest/api/fabric/core/
+- Common API operations include workspace management, item publishing, and artifact deployment
 
 ### Timing Expectations and Timeouts
 - **CRITICAL**: NEVER CANCEL any build or test commands. Always use adequate timeouts:
@@ -106,7 +104,8 @@ The library supports these Microsoft Fabric item types:
   - All other commands: 60+ seconds
 
 ### Pull Request Requirements
-- MUST be linked to an issue using "Fixes #123", "Closes #456", or "Resolves #789" in PR title/description
+- MUST be linked to an issue using "Fixes #123 - Short Description" format in PR title
+- PR description should be a copilot generated summary
 - MUST pass ruff formatting and linting checks
 - MUST pass all tests
 - Version bump PRs must follow specific format (title: vX.X.X, only change constants.py and changelog.md)
