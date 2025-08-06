@@ -1,0 +1,276 @@
+name: Validate PR
+description: "Validate pull requests for code conventions, naming conventions, linked issues, and version bumps"
+
+on:
+    pull_request:
+        branches: ["main"]
+        types: [opened, edited, synchronize, ready_for_review]
+
+permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+    statuses: write
+
+jobs:
+    format_ruff:
+        name: Code Formatted
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with:
+                  python-version: "3.x"
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install ruff
+
+            - name: Run ruff format
+              run: |
+                  if ruff format; then
+                    echo "✅ ruff format passed."
+                  else
+                    echo "❌ ruff format failed."
+                    exit 1
+                  fi
+    lint_ruff:
+        name: Code Linted
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with:
+                  python-version: "3.x"
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install ruff
+
+            - name: Run ruff lint
+              run: |
+                  if ruff check; then
+                    echo "✅ ruff lint passed."
+                  else
+                    echo "❌ ruff lint failed."
+                    exit 1
+                  fi
+
+    validate-version-bump:
+        name: Proper Version Bump
+        runs-on: ubuntu-latest
+        outputs:
+            is_version_bump: ${{ steps.version_bump_check.outputs.is_version_bump }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Validate Version Bump
+              id: version_bump_check
+              run: |
+                  set -e
+                  PR_TITLE="${{ github.event.pull_request.title }}"
+                  VERSION_REGEX='^v([0-9]+\.[0-9]+\.[0-9]+)$'
+                  BASE_REF="origin/main"
+                  CHANGED_FILES=$(git diff --name-only $BASE_REF...${{ github.event.pull_request.head.sha }})
+
+                  VERSION_CHANGED=false
+                  TITLE_IS_VERSION=false
+                  OLD_VERSION=""
+                  NEW_VERSION=""
+                  # Get VERSION from main branch
+                  OLD_VERSION=$(git show origin/main:src/fabric_cicd/constants.py | grep '^VERSION = ' | sed -E 's/VERSION = "([^"]+)"/\1/')
+                  # Get VERSION from current branch
+                  NEW_VERSION=$(grep '^VERSION = ' src/fabric_cicd/constants.py | sed -E 's/VERSION = "([^"]+)"/\1/')
+
+                  if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
+                    VERSION_CHANGED=true
+                  fi
+
+                  if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
+                    TITLE_IS_VERSION=true
+                  fi
+
+                  if [ "$TITLE_IS_VERSION" = true ] || [ "$VERSION_CHANGED" = true ]; then
+                    echo "is_version_bump=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "is_version_bump=false" >> $GITHUB_OUTPUT
+                    echo "✅ Version bump validation passed."
+                    exit 0
+                  fi
+
+                  # 1. If version is updated, title must match
+                  if [ "$VERSION_CHANGED" = true ]; then
+                    EXPECTED_TITLE="v$NEW_VERSION"
+                    if [ "$PR_TITLE" != "$EXPECTED_TITLE" ]; then
+                      echo "❌ PR title must be vX.X.X when VERSION is changed. Expected title: $EXPECTED_TITLE"
+                      exit 1
+                    fi
+                  fi
+
+                  # 2. If title is version format, only constants.py and changelog.md should be changed
+                  if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
+                    EXPECTED_FILES="src/fabric_cicd/constants.py src/fabric_cicd/changelog.md"
+                    SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
+                    SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
+                    if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
+                      echo "❌ Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X."
+                      exit 1
+                    fi
+                  fi
+                  echo "✅ Version bump validation passed."
+
+    validate-linked-issue:
+        name: Issue Linked
+        runs-on: ubuntu-latest
+        needs: validate-version-bump
+        if: needs.validate-version-bump.outputs.is_version_bump == 'false'
+        permissions:
+            pull-requests: read
+            issues: read
+        steps:
+            - name: Validate Linked Issue
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const prNumber = context.issue.number;
+                      const repo = context.repo;
+
+                      // Get PR details
+                      const pr = await github.rest.pulls.get({
+                        owner: repo.owner,
+                        repo: repo.repo,
+                        pull_number: prNumber
+                      });
+
+                      const prTitle = pr.data.title || '';
+
+                      // First, check for issues linked to the PR via GitHub's native linking
+                      let linkedIssues = [];
+                      try {
+                        // Use GraphQL to get linked issues
+                        const query = `
+                          query($owner: String!, $repo: String!, $number: Int!) {
+                            repository(owner: $owner, name: $repo) {
+                              pullRequest(number: $number) {
+                                closingIssuesReferences(first: 10) {
+                                  nodes {
+                                    number
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        `;
+                        
+                        const result = await github.graphql(query, {
+                          owner: repo.owner,
+                          repo: repo.repo,
+                          number: prNumber
+                        });
+                        
+                        linkedIssues = result.repository.pullRequest.closingIssuesReferences.nodes;
+                        
+                        if (linkedIssues.length > 0) {
+                          console.log(`✅ Found ${linkedIssues.length} linked issue(s): ${linkedIssues.map(issue => `#${issue.number}`).join(', ')}`);
+                          console.log('✅ Pull request is properly linked to an issue via GitHub linking.');
+                          return;
+                        }
+                      } catch (error) {
+                        console.log('⚠️ Could not check for linked issues via GraphQL, falling back to text analysis:', error.message);
+                      }
+
+                      // Issue reference patterns - more specific to avoid false positives
+                      const keywordPatterns = [
+                        /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi,
+                        /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/(\d+)/gi
+                      ];
+
+                      // Generic hash pattern (less specific, used as fallback)
+                      const hashPattern = /#(\d+)(?!\w)/g;
+
+                      let foundIssueNumbers = new Set();
+
+                      // Check PR title for issue references
+                      const textToCheck = prTitle;
+
+                      // First, look for keyword-based references (more reliable)
+                      for (const pattern of keywordPatterns) {
+                        const matches = textToCheck.matchAll(pattern);
+                        for (const match of matches) {
+                          const issueNumber = match[1];
+                          if (issueNumber && !isNaN(issueNumber)) {
+                            foundIssueNumbers.add(parseInt(issueNumber));
+                          }
+                        }
+                      }
+
+                      // If no keyword-based references found, look for simple hash references
+                      if (foundIssueNumbers.size === 0) {
+                        const matches = textToCheck.matchAll(hashPattern);
+                        for (const match of matches) {
+                          const issueNumber = match[1];
+                          if (issueNumber && !isNaN(issueNumber)) {
+                            foundIssueNumbers.add(parseInt(issueNumber));
+                          }
+                        }
+                      }
+
+                      if (foundIssueNumbers.size === 0) {
+                        core.setFailed(
+                          '❌ This pull request must be linked to an issue. Please:\n' +
+                          '1. Reference an issue in the PR title using "Fixes #123", "Closes #456", or "Resolves #789"\n' +
+                          '2. Make sure the referenced issue exists in this repository\n\n' +
+                          'See our contribution guidelines for more details.'
+                        );
+                        return;
+                      }
+
+                      // Verify that the referenced issues actually exist
+                      let validIssueFound = false;
+                      const invalidIssues = [];
+
+                      for (const issueNumber of foundIssueNumbers) {
+                        try {
+                          await github.rest.issues.get({
+                            owner: repo.owner,
+                            repo: repo.repo,
+                            issue_number: issueNumber
+                          });
+                          validIssueFound = true;
+                          console.log(`✅ Found valid issue reference: #${issueNumber}`);
+                        } catch (error) {
+                          if (error.status === 404) {
+                            invalidIssues.push(issueNumber);
+                            console.log(`❌ Issue #${issueNumber} does not exist`);
+                          }
+                        }
+                      }
+
+                      if (!validIssueFound) {
+                        const invalidList = invalidIssues.length > 0 ?
+                          `\n\nInvalid issue references found: ${invalidIssues.map(n => `#${n}`).join(', ')}` : '';
+
+                        core.setFailed(
+                          '❌ This pull request must be linked to a valid issue in this repository.' +
+                          invalidList +
+                          '\n\nPlease:\n' +
+                          '1. Create an issue first if one doesn\'t exist\n' +
+                          '2. Reference the issue in the PR title using "Fixes #123", "Closes #456", or "Resolves #789"\n' +
+                          '3. Make sure the issue number is correct\n\n' +
+                          'See our contribution guidelines for more details.'
+                        );
+                        return;
+                      }
+
+                      console.log('✅ Pull request is properly linked to an issue.');

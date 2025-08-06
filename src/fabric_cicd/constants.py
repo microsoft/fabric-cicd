@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.22"
+VERSION = "0.1.24"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -36,36 +36,32 @@ ACCEPTED_ITEM_TYPES_UPN = (
 ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
 # Publish
-MAX_RETRY_OVERRIDE = {
-    "SemanticModel": 10,
-    "Report": 10,
-    "Eventstream": 10,
-    "KQLDatabase": 10,
-    "SQLDatabase": 10,
-    "Warehouse": 10,
-    "Dataflow": 10,
-    "VariableLibrary": 7,
-    "GraphQLApi": 7,
-}
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
+
+# Items that do not require assigned capacity
+NO_ASSIGNED_CAPACITY_REQUIRED = [["SemanticModel", "Report"], ["SemanticModel"], ["Report"]]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-WORKSPACE_ID_REFERENCE_REGEX = r'\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\"'
-DATAFLOW_ID_REFERENCE_REGEX = r'(dataflowId)\s*=\s*"(.*?)"'
+WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
+DATAFLOW_SOURCE_REGEX = (
+    r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
+)
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 
 # Item Type to File Mapping (to check for item dependencies)
-ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json", "Dataflow": "mashup.pq"}
-# Data Pipeline Activities mapping dictionary: {Key: activity_name, Value: [item_type, item_id_name, api_get_item_lookup]}
-DATA_PIPELINE_ACTIVITY_TYPES = {
-    "RefreshDataflow": ["workspaceId", "Dataflow", "dataflowId", "dataflows"],
-    "PBISemanticModelRefresh": ["groupId", "SemanticModel", "datasetId", "semanticModels"],
+ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
+
+# Property path to get SQL Endpoint or Eventhouse URI
+PROPERTY_PATH_MAPPING = {
+    "Lakehouse": "body/properties/sqlEndpointProperties/connectionString",
+    "Warehouse": "body/properties/connectionString",
+    "Eventhouse": "body/properties/queryServiceUri",
 }
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
-ITEM_ATTR_LOOKUP = ["id", "sqlendpoint"]
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
@@ -100,13 +96,28 @@ PARAMETER_MSGS = {
     "no optional": "No optional values provided in {}",
     "invalid item type": "Item type '{}' not in scope",
     "invalid item name": "Item name '{}' not found in the repository directory",
-    "invalid file path": "Path '{}' not found in the repository directory",
-    "valid optional": "Optional values in {} are valid",
+    "invalid file path": "Number of paths in list '{}' that are invalid or not found in the repository directory: {}",
+    "no valid file path": "No valid file path found in the repository directory for {}",
+    "valid optional": "Optional values in {} are valid. Checking for file matches in the repository directory",
     "valid parameter": "{} parameter is valid",
     "skip": "The {} '{}' replacement will be skipped due to {} in parameter {}",
     "no target env": "target environment '{}' not found",
     "no filter match": "unmatched optional filters",
 }
+
+# Wildcard path support validations
+WILDCARD_PATH_VALIDATIONS = [
+    # Invalid combinations
+    {
+        "check": lambda p: any(bad in p for bad in ["/**/*/", "**/**", "//", "\\\\", "**/**/"]),
+        "message": lambda p: f"Invalid wildcard combination in pattern: '{p}'",
+    },
+    # Incorrect recursive wildcard format
+    {
+        "check": lambda p: "**" in p and not ("**/" in p or "/**" in p),
+        "message": lambda p: f"Invalid recursive wildcard format (use **/ or /**): '{p}'",
+    },
+]
 
 
 INDENT = "->"
