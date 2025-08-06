@@ -437,9 +437,10 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
             path: Full path of the desired item.
         """
-        for item_details in self.repository_items[item_type].values():
-            if item_details.path == Path(path):
-                return item_details.logical_id
+        if item_type in self.repository_items:
+            for item_details in self.repository_items[item_type].values():
+                if item_details.path == Path(path):
+                    return item_details.logical_id
         # if not found
         return None
 
