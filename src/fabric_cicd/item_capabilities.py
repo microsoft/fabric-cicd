@@ -197,23 +197,23 @@ def generate_capabilities_matrix() -> str:
     """Generate a markdown table showing item type capabilities matrix."""
     if not ITEM_CAPABILITIES:
         return "No item capabilities data available."
-    
+
     # Get all item types from constants to maintain order
     from fabric_cicd.constants import ACCEPTED_ITEM_TYPES_UPN
-    
+
     # Filter to only include items that have capability data
     available_items = [item for item in ACCEPTED_ITEM_TYPES_UPN if item in ITEM_CAPABILITIES]
-    
+
     if not available_items:
         return "No capability data available for supported item types."
-    
+
     # Get capability keys in a consistent order
     capability_keys = list(CAPABILITY_DESCRIPTIONS.keys())
-    
+
     # Generate table header
     header = "| Item Type | " + " | ".join(CAPABILITY_DESCRIPTIONS[key] for key in capability_keys) + " |"
     separator = "|" + "|".join([" --- "] * (len(capability_keys) + 1)) + "|"
-    
+
     # Generate table rows
     rows = []
     for item_type in available_items:
@@ -224,13 +224,13 @@ def generate_capabilities_matrix() -> str:
             # Use checkmarks and X marks for better visual clarity
             symbol = "✓" if value else "✗"
             row_values.append(f" {symbol} ")
-        
+
         row = f"| {item_type} | " + " | ".join(row_values) + " |"
         rows.append(row)
-    
+
     # Combine all parts
     table_parts = [header, separator, *rows]
-    
+
     # Add explanatory text
     explanation = """
 > **Legend**: ✓ = Supported/Required, ✗ = Not supported/Not required
@@ -244,5 +244,5 @@ def generate_capabilities_matrix() -> str:
 > - **Manual Initial Configuration**: Whether manual configuration steps are required after initial deployment
 > - **Ordered Deployment**: Whether the system automatically handles deployment order for dependencies
 """
-    
+
     return "\n".join(table_parts) + "\n" + explanation
