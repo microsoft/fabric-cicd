@@ -119,7 +119,7 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
-        
+
         # Handle None case for item_type_in_scope by defaulting to all available item types
         if item_type_in_scope is None:
             self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES_UPN)

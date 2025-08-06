@@ -84,8 +84,9 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
 
     def _should_publish_item_type(item_type: str) -> bool:
         """Check if an item type should be published based on scope and repository content."""
-        return (item_type in fabric_workspace_obj.item_type_in_scope and 
-                item_type in fabric_workspace_obj.repository_items)
+        return (
+            item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.repository_items
+        )
 
     if _should_publish_item_type("VariableLibrary"):
         print_header("Publishing Variable Libraries")
@@ -222,8 +223,7 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         "Warehouse",
         "VariableLibrary",
     ]:
-        if (item_type in fabric_workspace_obj.item_type_in_scope and 
-            item_type in fabric_workspace_obj.deployed_items):
+        if item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.deployed_items:
             unpublish_flag = unpublish_flag_mapping.get(item_type)
             # Append item_type if no feature flag is required or the corresponding flag is enabled
             if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
