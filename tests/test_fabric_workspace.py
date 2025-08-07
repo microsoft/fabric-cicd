@@ -850,7 +850,7 @@ def test_fabric_workspace_with_none_item_types_defaults_to_all(
     # Verify that item_type_in_scope was expanded to all available types
     import fabric_cicd.constants as constants
 
-    expected_types = list(constants.ACCEPTED_ITEM_TYPES_UPN)  # Assuming UPN auth in mock
+    expected_types = list(constants.ACCEPTED_ITEM_TYPES)  # Using the unified constant
     assert set(workspace.item_type_in_scope) == set(expected_types), (
         f"Expected all item types, got {workspace.item_type_in_scope}"
     )

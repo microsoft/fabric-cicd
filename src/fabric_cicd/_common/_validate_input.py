@@ -47,29 +47,21 @@ def validate_data_type(expected_type: str, variable_name: str, input_value: any)
     return input_value
 
 
-def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:
+def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:  # noqa: ARG001
     """
     Validate the item type in scope.
 
     Args:
         input_value: The input value to validate.
-        upn_auth: Whether UPN authentication is used.
+        upn_auth: Whether UPN authentication is used. (No longer used, kept for compatibility)
     """
-    accepted_item_types_upn = constants.ACCEPTED_ITEM_TYPES_UPN
-    accepted_item_types_non_upn = constants.ACCEPTED_ITEM_TYPES_NON_UPN
-
-    accepted_item_types = accepted_item_types_upn if upn_auth else accepted_item_types_non_upn
+    accepted_item_types = constants.ACCEPTED_ITEM_TYPES
 
     validate_data_type("list[string]", "item_type_in_scope", input_value)
 
     for item_type in input_value:
         if item_type not in accepted_item_types:
-            msg = (
-                f"Invalid or unsupported item type: '{item_type}'. "
-                f"For User Identity Authentication, must be one of {', '.join(accepted_item_types_upn)}. "
-                f"For Service Principal or Managed Identity Authentication, "
-                f"must be one of {', '.join(accepted_item_types_non_upn)}."
-            )
+            msg = f"Invalid or unsupported item type: '{item_type}'. Must be one of {', '.join(accepted_item_types)}."
             raise InputError(msg, logger)
 
     return input_value

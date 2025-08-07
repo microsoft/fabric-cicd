@@ -122,7 +122,7 @@ class FabricWorkspace:
 
         # Handle None case for item_type_in_scope by defaulting to all available item types
         if item_type_in_scope is None:
-            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES_UPN)
+            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES)
         else:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
