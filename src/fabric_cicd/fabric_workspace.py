@@ -16,7 +16,7 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
-from fabric_cicd._common._exceptions import InputError, ParameterFileError, ParsingError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
@@ -30,7 +30,7 @@ class FabricWorkspace:
     def __init__(
         self,
         repository_directory: str,
-        item_type_in_scope: list[str],
+        item_type_in_scope: Optional[list[str]] = None,
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
@@ -44,7 +44,7 @@ class FabricWorkspace:
             workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
-            item_type_in_scope: Item types that should be deployed for a given workspace.
+            item_type_in_scope: Item types that should be deployed for a given workspace. If omitted, defaults to all available item types.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
             kwargs: Additional keyword arguments.
@@ -62,8 +62,7 @@ class FabricWorkspace:
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_name="your-workspace-name",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ...     repository_directory="/path/to/repo"
             ... )
 
             With optional parameters
@@ -120,7 +119,12 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
-        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
+
+        # Handle None case for item_type_in_scope by defaulting to all available item types
+        if item_type_in_scope is None:
+            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES_UPN)
+        else:
+            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.publish_items_to_include = None
@@ -128,6 +132,9 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+
+        # Initialize dataflow dependencies dictionary (used in dataflow item processing)
+        self.dataflow_dependencies = {}
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -176,6 +183,8 @@ class FabricWorkspace:
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
         self.repository_items = {}
+        empty_logical_id_paths = []  # Collect all paths with empty logical IDs
+        visited_logical_ids = set()  # Track visited logical IDs to avoid duplicates
 
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
@@ -208,6 +217,18 @@ class FabricWorkspace:
                 item_description = item_metadata["metadata"].get("description", "")
                 item_name = item_metadata["metadata"]["displayName"]
                 item_logical_id = item_metadata["config"]["logicalId"]
+
+                # Check for empty logical ID and collect the path
+                if not item_logical_id or item_logical_id.strip() == "":
+                    empty_logical_id_paths.append(str(item_metadata_path))
+                    continue  # Skip processing this item further
+
+                if item_logical_id not in visited_logical_ids:
+                    visited_logical_ids.add(item_logical_id)
+                else:
+                    msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
+                    raise FailedPublishedItemStatusError(msg, logger)
+
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 relative_parent_path = "/".join(relative_path.split("/")[:-1])
@@ -235,6 +256,15 @@ class FabricWorkspace:
 
                 self.repository_items[item_type][item_name].collect_item_files()
 
+        # If we found any empty logical IDs, raise an error with all paths
+        if empty_logical_id_paths:
+            if len(empty_logical_id_paths) == 1:
+                msg = f"logicalId cannot be empty in {empty_logical_id_paths[0]}"
+            else:
+                paths_list = "\n  - ".join(empty_logical_id_paths)
+                msg = f"logicalId cannot be empty in the following files:\n  - {paths_list}"
+            raise ParsingError(msg, logger)
+
     def _refresh_deployed_items(self) -> None:
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
         # Get all items in workspace
@@ -251,6 +281,7 @@ class FabricWorkspace:
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
             sql_endpoint = ""
+            query_service_uri = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
@@ -260,16 +291,20 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties based on item type
-            if item_type == "Lakehouse":
-                lakehouse_response = self.endpoint.invoke(
-                    method="GET", url=f"{self.base_api_url}/lakehouses/{item_guid}"
-                )
+            if item_type in ["Lakehouse", "Warehouse", "Eventhouse"]:
+                # Construct the endpoint URL and set the property path based on item type
+                endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+                response = self.endpoint.invoke(method="GET", url=endpoint_url)
                 # Use dpath.get for safe nested property access
-                sql_endpoint = dpath.get(
-                    lakehouse_response, "body/properties/sqlEndpointProperties/connectionString", default=""
-                )
-                if not sql_endpoint:
-                    logger.debug(f"Failed to get SQL endpoint for Lakehouse '{item_name}'")
+                property_path = constants.PROPERTY_PATH_MAPPING[item_type]
+                property_value = dpath.get(response, property_path, default="")
+                # Set the appropriate variable based on the last segment of the path
+                if not property_value:
+                    logger.debug(f"Failed to get endpoint for {item_type} '{item_name}'")
+                elif property_path.endswith("connectionString"):
+                    sql_endpoint = property_value
+                elif property_path.endswith("queryServiceUri"):
+                    query_service_uri = property_value
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -281,7 +316,11 @@ class FabricWorkspace:
             )
 
             # Add item details to the workspace_items dictionary required for parameterization (public-facing attributes)
-            self.workspace_items[item_type][item_name] = {"id": item_guid, "sqlendpoint": sql_endpoint}
+            self.workspace_items[item_type][item_name] = {
+                "id": item_guid,
+                "sqlendpoint": sql_endpoint,
+                "queryserviceuri": query_service_uri,
+            }
 
     def _replace_logical_ids(self, raw_file: str) -> str:
         """
@@ -348,8 +387,9 @@ class FabricWorkspace:
                 # Replace any found references with specified environment value if conditions are met
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
                     replace_value = extract_replace_value(self, replace_value_dict[self.environment])
-                    raw_file = raw_file.replace(find_value, replace_value)
-                    logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
+                    if replace_value:
+                        raw_file = raw_file.replace(find_value, replace_value)
+                        logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
 
@@ -398,9 +438,10 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
             path: Full path of the desired item.
         """
-        for item_details in self.repository_items[item_type].values():
-            if item_details.path == Path(path):
-                return item_details.logical_id
+        if item_type in self.repository_items:
+            for item_details in self.repository_items[item_type].values():
+                if item_details.path == Path(path):
+                    return item_details.logical_id
         # if not found
         return None
 
@@ -451,8 +492,6 @@ class FabricWorkspace:
         item_guid = item.guid
         item_files = item.item_files
 
-        max_retries = constants.MAX_RETRY_OVERRIDE.get(item_type, 5)
-
         metadata_body = {"displayName": item_name, "type": item_type}
 
         # Only shell deployment, no definition support
@@ -488,7 +527,7 @@ class FabricWorkspace:
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body, max_retries=max_retries
+                method="POST", url=f"{self.base_api_url}/items", body=combined_body
             )
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
@@ -500,7 +539,6 @@ class FabricWorkspace:
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
-                max_retries=max_retries,
             )
         elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
@@ -512,7 +550,6 @@ class FabricWorkspace:
                 method="PATCH",
                 url=f"{self.base_api_url}/items/{item_guid}",
                 body=metadata_body,
-                max_retries=max_retries,
             )
 
         if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
@@ -523,7 +560,6 @@ class FabricWorkspace:
                     method="POST",
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
-                    max_retries=max_retries,
                 )
                 logger.debug(
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"

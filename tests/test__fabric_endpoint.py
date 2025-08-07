@@ -356,9 +356,9 @@ def test_handle_response_feature_not_available():
 def test_handle_response_item_display_name_already_in_use(setup_mocks):
     """Test _handle_response logs a retry message when item display name is already in use."""
     dl, mock_requests = setup_mocks
-    response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameAlreadyInUse"})
+    response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameNotAvailableYet"})
     _handle_response(response, "GET", "http://example.com", "{}", False, 1)
-    expected = f"{constants.INDENT}Item name is reserved. Checking again in 60 seconds (Attempt 1/5)..."
+    expected = f"{constants.INDENT}Item name is reserved. Checking again in 60 seconds (Attempt 1)..."
     assert dl.messages == [expected]
 
 
