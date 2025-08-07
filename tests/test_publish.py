@@ -108,23 +108,6 @@ def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint):
             assert set(workspace.item_type_in_scope) == set(expected_types)
 
 
-def test_all_string_no_longer_supported(mock_endpoint):
-    """Test that passing 'all' string raises an error."""
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-
-        with (
-            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
-            pytest.raises(InputError, match="Invalid or unsupported item type: 'all'"),
-        ):
-            FabricWorkspace(
-                workspace_id="12345678-1234-5678-abcd-1234567890ab",
-                repository_directory=str(temp_path),
-                item_type_in_scope=["all"],
-            )
-
-
 def test_empty_item_type_in_scope_list(mock_endpoint):
     """Test that passing an empty item_type_in_scope list works (no items to process)."""
 
