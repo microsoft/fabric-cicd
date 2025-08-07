@@ -123,3 +123,73 @@ def test_all_string_no_longer_supported(mock_endpoint):
                 repository_directory=str(temp_path),
                 item_type_in_scope=["all"],
             )
+
+
+def test_empty_item_type_in_scope_list(mock_endpoint):
+    """Test that passing an empty item_type_in_scope list works (no items to process)."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=[],
+            )
+            # Verify that an empty list is accepted and stored correctly
+            assert workspace.item_type_in_scope == []
+
+
+def test_invalid_item_types_in_scope(mock_endpoint):
+    """Test that passing invalid item types raises appropriate errors."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Test single invalid item type
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            pytest.raises(InputError, match="Invalid or unsupported item type: 'InvalidItemType'"),
+        ):
+            FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["InvalidItemType"],
+            )
+
+
+def test_multiple_invalid_item_types_in_scope(mock_endpoint):
+    """Test that passing multiple invalid item types raises error for the first invalid one."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Test multiple invalid item types (should fail on first invalid one)
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            pytest.raises(InputError, match="Invalid or unsupported item type: 'FakeType'"),
+        ):
+            FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["FakeType", "AnotherInvalidType"],
+            )
+
+
+def test_mixed_valid_and_invalid_item_types_in_scope(mock_endpoint):
+    """Test that passing a mix of valid and invalid item types raises error for the invalid one."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Test mix of valid and invalid item types (should fail on invalid one)
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            pytest.raises(InputError, match="Invalid or unsupported item type: 'BadType'"),
+        ):
+            FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook", "BadType", "Environment"],
+            )
