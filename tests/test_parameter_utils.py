@@ -61,6 +61,7 @@ from fabric_cicd._parameter._utils import (
     extract_parameter_filters,
     extract_replace_value,
     is_valid_structure,
+    process_environment_key,
     process_input_path,
     replace_key_value,
     replace_variables_in_parameter_file,
@@ -557,6 +558,81 @@ class TestParameterUtilities:
         assert "value: test_value" in result
         assert "other: another_value" in result
         assert "normal: NORMAL_VAR" in result  # Normal var unchanged
+
+    def test_process_environment_key(self, mock_workspace):
+        """Test process_environment_key function with ALL environment key replacement."""
+        # Test with ALL key present - should replace with target environment
+        replace_value_dict = {
+            "ALL": "universal-value",
+            "DEV": "dev-value",
+            "PROD": "prod-value",
+        }
+
+        # Mock the workspace environment
+        mock_workspace.environment = "TEST"
+
+        # Call the function
+        result = process_environment_key(mock_workspace, replace_value_dict)
+
+        # Verify ALL key is replaced with the target environment
+        assert "ALL" not in result
+        assert "TEST" in result
+        assert result["TEST"] == "universal-value"
+        # Other keys should remain unchanged
+        assert result["DEV"] == "dev-value"
+        assert result["PROD"] == "prod-value"
+
+    def test_process_environment_key_no_all_key(self, mock_workspace):
+        """Test process_environment_key function when ALL key is not present."""
+        # Test without ALL key - should return unchanged dictionary
+        replace_value_dict = {
+            "DEV": "dev-value",
+            "PROD": "prod-value",
+        }
+
+        # Mock the workspace environment
+        mock_workspace.environment = "TEST"
+
+        # Call the function
+        result = process_environment_key(mock_workspace, replace_value_dict)
+
+        # Dictionary should remain unchanged
+        assert result == replace_value_dict
+        assert "ALL" not in result
+        assert "TEST" not in result
+
+    def test_process_environment_key_all_key_only(self, mock_workspace):
+        """Test process_environment_key function with only ALL key present."""
+        # Test with only ALL key present
+        replace_value_dict = {"ALL": "universal-value"}
+
+        # Mock the workspace environment
+        mock_workspace.environment = "PPE"
+
+        # Call the function
+        result = process_environment_key(mock_workspace, replace_value_dict)
+
+        # ALL key should be replaced with PPE key
+        assert "ALL" not in result
+        assert result == {"PPE": "universal-value"}
+
+    def test_process_environment_key_overwrite_existing(self, mock_workspace):
+        """Test process_environment_key function when ALL key overwrites existing environment key."""
+        # Test with ALL key that should overwrite an existing environment key
+        replace_value_dict = {
+            "ALL": "universal-value",
+            "PROD": "original-prod-value",
+        }
+
+        # Mock the workspace environment to match existing key
+        mock_workspace.environment = "PROD"
+
+        # Call the function
+        result = process_environment_key(mock_workspace, replace_value_dict)
+
+        # ALL key should replace the existing PROD value
+        assert "ALL" not in result
+        assert result["PROD"] == "universal-value"
 
 
 class TestPathUtilities:
