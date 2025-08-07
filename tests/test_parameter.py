@@ -631,7 +631,7 @@ def test_validate_parameter_environment_and_filters(parameter_object, param_name
     """Test the validation methods for environment and filters"""
     for param_dict in parameter_object.environment_parameter.get(param_name):
         # Environment validation
-        assert parameter_object._validate_environment(param_dict["replace_value"]) == True
+        assert parameter_object._validate_environment(param_dict["replace_value"]) == (True, "env")
 
     # Optional filters validation
     assert parameter_object._validate_item_type("Pipeline") == (
@@ -846,8 +846,8 @@ def test_validate_file_path_scenarios(parameter_object):
         parameter_object._validate_file_path = original_method
 
 
-def test_validate_all_environment_scenarios():
-    """Test the validation of ALL environment key in different scenarios"""
+def test_validate_all_environment_key_valid():
+    """Test the validation of ALL environment key in valid scenarios"""
     # Test that ALL key is accepted as a valid environment
     import tempfile
 
@@ -902,21 +902,21 @@ spark_pool:
 
         # Test that the ALL environment key is properly recognized
         for param_dict in param_obj.environment_parameter.get("find_replace"):
-            assert param_obj._validate_environment(param_dict["replace_value"]) == True
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (True, "all")
 
         for param_dict in param_obj.environment_parameter.get("key_value_replace"):
-            assert param_obj._validate_environment(param_dict["replace_value"]) == True
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (True, "all")
 
         for param_dict in param_obj.environment_parameter.get("spark_pool"):
-            assert param_obj._validate_environment(param_dict["replace_value"]) == True
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (True, "all")
 
     finally:
         # Clean up temporary file
         Path(temp_file_path).unlink()
 
 
-def test_validate_all_environment_with_multiple_environments():
-    """Test ALL environment key with multiple environment keys in parameter file"""
+def test_validate_all_environment_key_invalid():
+    """Test validation of ALL environment key in invalid scenarios"""
     import tempfile
 
     from fabric_cicd._parameter._parameter import Parameter
@@ -957,26 +957,30 @@ spark_pool:
             parameter_file_name=Path(temp_file_path).name,
         )
 
-        # Should pass validation with multiple environment keys including ALL
+        # Should fail validation since ALL cannot coexist with other environment keys
         assert param_obj._validate_parameter("find_replace") == (
-            True,
-            constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
+            False,
+            constants.PARAMETER_MSGS["other target env"].format(
+                param_obj.environment_parameter["find_replace"][0]["replace_value"]
+            ),
         )
 
         assert param_obj._validate_parameter("spark_pool") == (
-            True,
-            constants.PARAMETER_MSGS["valid parameter"].format("spark_pool"),
+            False,
+            constants.PARAMETER_MSGS["other target env"].format(
+                param_obj.environment_parameter["spark_pool"][0]["replace_value"]
+            ),
         )
 
-        # Overall parameter file should be valid
-        assert param_obj._validate_parameter_file() == True
+        # Overall parameter file should be invalid
+        assert param_obj._validate_parameter_file() == False
 
-        # Test that all environment combinations are properly validated
+        # Test that mixed environment combinations are invalid
         for param_dict in param_obj.environment_parameter.get("find_replace"):
-            assert param_obj._validate_environment(param_dict["replace_value"]) == True
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (False, "all")
 
         for param_dict in param_obj.environment_parameter.get("spark_pool"):
-            assert param_obj._validate_environment(param_dict["replace_value"]) == True
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (False, "all")
 
     finally:
         # Clean up temporary file
@@ -1013,42 +1017,42 @@ spark_pool:
 
         # Test environment validation specifically for ALL key
         replace_value_with_all = {"ALL": "universal-value"}
-        assert param_obj._validate_environment(replace_value_with_all) == True
+        assert param_obj._validate_environment(replace_value_with_all) == (True, "all")
 
         # Test spark_pool with ALL environment key
         spark_pool_replace_value_with_all = {"ALL": {"type": "Capacity", "name": "UniversalPool"}}
-        assert param_obj._validate_environment(spark_pool_replace_value_with_all) == True
+        assert param_obj._validate_environment(spark_pool_replace_value_with_all) == (True, "all")
 
-        # Test environment validation with both target env and ALL key
+        # Test environment validation with both target env and ALL key (should fail)
         replace_value_mixed = {"TEST": "test-value", "ALL": "universal-value"}
-        assert param_obj._validate_environment(replace_value_mixed) == True
+        assert param_obj._validate_environment(replace_value_mixed) == (False, "all")
 
-        # Test spark_pool with mixed environment keys
+        # Test spark_pool with mixed environment keys (should fail)
         spark_pool_mixed = {
             "TEST": {"type": "Workspace", "name": "TestPool"},
             "ALL": {"type": "Capacity", "name": "UniversalPool"},
         }
-        assert param_obj._validate_environment(spark_pool_mixed) == True
+        assert param_obj._validate_environment(spark_pool_mixed) == (False, "all")
 
-        # Test environment validation with multiple environment keys including PROD
+        # Test environment validation with multiple environment keys including PROD (should fail)
         replace_value_multiple_envs = {"TEST": "test-value", "PROD": "prod-value", "ALL": "universal-value"}
-        assert param_obj._validate_environment(replace_value_multiple_envs) == True
+        assert param_obj._validate_environment(replace_value_multiple_envs) == (False, "all")
 
-        # Test spark_pool with multiple environment keys including PROD
+        # Test spark_pool with multiple environment keys including PROD (should fail)
         spark_pool_multiple_envs = {
             "TEST": {"type": "Workspace", "name": "TestPool"},
             "PROD": {"type": "Workspace", "name": "ProdPool"},
             "ALL": {"type": "Capacity", "name": "UniversalPool"},
         }
-        assert param_obj._validate_environment(spark_pool_multiple_envs) == True
+        assert param_obj._validate_environment(spark_pool_multiple_envs) == (False, "all")
 
         # Test environment validation with only target env (no ALL key)
         replace_value_target_only = {"TEST": "test-value"}
-        assert param_obj._validate_environment(replace_value_target_only) == True
+        assert param_obj._validate_environment(replace_value_target_only) == (True, "env")
 
         # Test environment validation with neither target env nor ALL key
         replace_value_other = {"PROD": "prod-value"}
-        assert param_obj._validate_environment(replace_value_other) == False
+        assert param_obj._validate_environment(replace_value_other) == (False, "env")
 
     finally:
         # Clean up temporary file
