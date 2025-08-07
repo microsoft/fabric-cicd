@@ -222,9 +222,9 @@ spark_pool:
       item_name: <item-name-filter-value>
 ```
 
-### ALL Environment
+### All Environment
 
-Setting the environment key to `ALL` in `replace_value` is supported for any parameter input (`find_replace`, `key_value_replace`, `spark_pool`). The `ALL` environment key cannot be used alongside other environment keys.
+Setting the environment key to `ALL` or `all` (case-insensitive) in `replace_value` is supported for any parameter input (`find_replace`, `key_value_replace`, `spark_pool`). The `ALL` environment key cannot be used alongside other environment keys.
 
 Use case: when the replace value applies to any target environment (particularly valuable in dynamic replacement scenarios).
 
@@ -233,7 +233,7 @@ find_replace:
     # Lakehouse GUID
     - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
       replace_value:
-          ALL: "$items.Lakehouse.Example_LH.id"
+          <ALL|all|All>: "$items.Lakehouse.Example_LH.id"
 ```
 
 ## Optional Fields

@@ -233,7 +233,7 @@ class Parameter:
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
 
             # Check if replacement will be skipped for a given find value
-            is_valid_env, case = self._validate_environment(parameter_dict["replace_value"])
+            is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
             log_func = logger.debug if param_name == "key_value_replace" else logger.warning
 
@@ -246,8 +246,10 @@ class Parameter:
 
             if self.environment != "N/A" and not is_valid_env:
                 # Return validation error for invalid ALL case (ALL used with other envs)
-                if case == "all":
-                    return False, constants.PARAMETER_MSGS["other target env"].format(parameter_dict["replace_value"])
+                if env_type.lower() == "all":
+                    return False, constants.PARAMETER_MSGS["other target env"].format(
+                        env_type, parameter_dict["replace_value"]
+                    )
 
                 # Otherwise, replacement skipped if target environment is not present
                 skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
@@ -258,10 +260,12 @@ class Parameter:
                 )
                 continue
 
-            # Log if ALL environment is present in replace_value
-            if case == "all":
+            # Log if all environment is present in replace_value
+            if env_type.lower() == "all":
                 logger.warning(
-                    constants.PARAMETER_MSGS["all target env"].format(parameter_dict["replace_value"]["ALL"])
+                    constants.PARAMETER_MSGS["all target env"].format(
+                        env_type, parameter_dict["replace_value"][env_type]
+                    )
                 )
 
             # Replacement skipped if optional filter values don't match
@@ -457,11 +461,17 @@ class Parameter:
     def _validate_environment(self, replace_value: dict) -> tuple[bool, str]:
         """
         Check the target environment exists as a key in the replace_value dictionary.
-        If "ALL" is present, it must be the only key.
+        If "ALL" (case insensitive) is present, it must be the only key.
         """
-        if "ALL" in replace_value:
+        # Check for "ALL" in any case variation
+        all_key = None
+        for key in replace_value:
+            if key.lower() == "all":
+                all_key = key
+                break
+        if all_key:
             # If ALL is present, it must be the only key
-            return len(replace_value) == 1, "all"
+            return len(replace_value) == 1, all_key
 
         # If ALL is not present, check if target environment is present
         return self.environment in replace_value, "env"

@@ -187,8 +187,11 @@ def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) 
 
 def process_environment_key(workspace_obj: FabricWorkspace, replace_value_dict: dict) -> dict:
     """Processes the replace_value dictionary to replace the 'ALL' environment key with the target environment when present."""
-    if "ALL" in replace_value_dict:
-        replace_value_dict[workspace_obj.environment] = replace_value_dict.pop("ALL")
+    # If there's only one key, check if it's "ALL" (case insensitive) and replace it
+    if len(replace_value_dict) == 1:
+        key = next(iter(replace_value_dict))
+        if key.lower() == "all":
+            replace_value_dict[workspace_obj.environment] = replace_value_dict.pop(key)
 
     return replace_value_dict
 
