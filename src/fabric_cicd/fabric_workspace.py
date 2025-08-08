@@ -124,7 +124,7 @@ class FabricWorkspace:
         if item_type_in_scope is None:
             self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES)
         else:
-            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
+            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.repository_folders = {}

@@ -47,13 +47,12 @@ def validate_data_type(expected_type: str, variable_name: str, input_value: any)
     return input_value
 
 
-def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:  # noqa: ARG001
+def validate_item_type_in_scope(input_value: list) -> list:
     """
     Validate the item type in scope.
 
     Args:
         input_value: The input value to validate.
-        upn_auth: Whether UPN authentication is used.
     """
     accepted_item_types = constants.ACCEPTED_ITEM_TYPES
 
