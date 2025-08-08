@@ -53,7 +53,7 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> exclude_regex = ".*_do_not_publish"
-        >>> publish_all_items(workspace, exclude_regex)
+        >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With items to include list
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -63,7 +63,7 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
-        >>> publish_all_items(workspace, items_to_include)
+        >>> publish_all_items(workspace, items_to_include_list=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 

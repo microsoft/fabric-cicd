@@ -13,9 +13,9 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the lakehouse |
 | `enable_environment_variable_replacement` | Set to enable the use of pipeline variables          |
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders       |
-| `experimental`                            | Set to enable selective deployment\*                 |
+| `experimental`                            | Set to enable selective deployments\*                |
 
-\*`experimental` flag must be used with `publish_all_items(workspace, publish_items_to_include_list)`
+\*Use the `experimental` flag to enable `items_to_include_list` in `publish_all_items()`.
 
 <span class="md-h3-nonanchor">Example</span>
 
