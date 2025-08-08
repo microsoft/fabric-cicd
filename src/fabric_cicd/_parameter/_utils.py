@@ -259,6 +259,8 @@ def validate_parameter_file(
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
         token_credential: The token credential to use for authentication, use for SPN auth.
     """
+    from azure.identity import DefaultAzureCredential
+
     from fabric_cicd._common._validate_input import (
         validate_environment,
         validate_item_type_in_scope,
@@ -269,8 +271,11 @@ def validate_parameter_file(
     # Import the Parameter class here to avoid circular imports
     from fabric_cicd._parameter._parameter import Parameter
 
-    # Validate the token_credential if provided
-    if token_credential is not None:
+    # Set up authentication credential - use DefaultAzureCredential if none provided, otherwise validate provided credential
+    if token_credential is None:
+        # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token. Not internal Azure product.
+        _credential = DefaultAzureCredential()
+    else:
         validate_token_credential(token_credential)
 
     # Initialize the Parameter object with the validated inputs
