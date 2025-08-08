@@ -53,7 +53,7 @@ def validate_item_type_in_scope(input_value: list, upn_auth: bool) -> list:  # n
 
     Args:
         input_value: The input value to validate.
-        upn_auth: Whether UPN authentication is used. (No longer used, kept for compatibility)
+        upn_auth: Whether UPN authentication is used.
     """
     accepted_item_types = constants.ACCEPTED_ITEM_TYPES
 
