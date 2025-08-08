@@ -245,8 +245,8 @@ class Parameter:
             )
 
             if self.environment != "N/A" and not is_valid_env:
-                # Return validation error for invalid ALL case (ALL used with other envs)
-                if env_type.lower() == "all":
+                # Return validation error for invalid _ALL_ case (_ALL_ used with other envs)
+                if env_type.lower() == "_all_":
                     return False, constants.PARAMETER_MSGS["other target env"].format(
                         env_type, parameter_dict["replace_value"]
                     )
@@ -260,12 +260,10 @@ class Parameter:
                 )
                 continue
 
-            # Log if all environment is present in replace_value
-            if env_type.lower() == "all":
+            # Log if _ALL_ environment is present in replace_value
+            if env_type.lower() == "_all_":
                 logger.warning(
-                    constants.PARAMETER_MSGS["all target env"].format(
-                        env_type, parameter_dict["replace_value"][env_type]
-                    )
+                    constants.PARAMETER_MSGS["all target env"].format(parameter_dict["replace_value"][env_type])
                 )
 
             # Replacement skipped if optional filter values don't match
@@ -461,19 +459,20 @@ class Parameter:
     def _validate_environment(self, replace_value: dict) -> tuple[bool, str]:
         """
         Check the target environment exists as a key in the replace_value dictionary.
-        If "ALL" (case insensitive) is present, it must be the only key.
+        If "_ALL_" (case insensitive) is present, it must be the only key.
         """
-        # Check for "ALL" in any case variation
+        # Check for _ALL_ in any case variation
         all_key = None
         for key in replace_value:
-            if key.lower() == "all":
+            if key.lower() == "_all_":
+                logger.warning(f"Found the reserved environment key '{key}'")
                 all_key = key
                 break
         if all_key:
-            # If ALL is present, it must be the only key
+            # If _ALL_ is present, it must be the only key
             return len(replace_value) == 1, all_key
 
-        # If ALL is not present, check if target environment is present
+        # If _ALL_ is not present, check if target environment is present
         return self.environment in replace_value, "env"
 
     def _validate_item_type(self, input_type: str) -> tuple[bool, str]:

@@ -562,22 +562,45 @@ class TestParameterUtilities:
     def test_process_environment_key(self, mock_workspace):
         """Test process_environment_key function with ALL environment key replacement."""
         # Test with ALL key only - should replace with target environment
-        replace_value_dict = {"ALL": "universal-value"}
+        replace_value_dict_1 = {"_ALL_": "universal-value"}
+        replace_value_dict_2 = {"_all_": "universal-value"}
+        replace_value_dict_3 = {"_All_": "universal-value"}
+        replace_value_dict_4 = {"ALL": "universal-value"}
 
         # Mock the workspace environment
         mock_workspace.environment = "TEST"
 
         # Call the function
-        result = process_environment_key(mock_workspace, replace_value_dict)
+        result_1 = process_environment_key(mock_workspace, replace_value_dict_1)
+        result_2 = process_environment_key(mock_workspace, replace_value_dict_2)
+        result_3 = process_environment_key(mock_workspace, replace_value_dict_3)
+        result_4 = process_environment_key(mock_workspace, replace_value_dict_4)
+
+        # Verify _ALL_ key is replaced with the target environment
+        assert "_ALL_" not in result_1
+        assert "TEST" in result_1
+        assert result_1["TEST"] == "universal-value"
+
+        # Verify _all_ key is replaced with the target environment
+        assert "_all_" not in result_2
+        assert "TEST" in result_2
+        assert result_2["TEST"] == "universal-value"
+
+        # Verify _All_ key is replaced with the target environment
+        assert "_All_" not in result_3
+        assert "TEST" in result_3
+        assert result_3["TEST"] == "universal-value"
 
         # Verify ALL key is replaced with the target environment
-        assert "ALL" not in result
-        assert "TEST" in result
-        assert result["TEST"] == "universal-value"
-        assert result == {"TEST": "universal-value"}
+        assert "ALL" in result_4
+        assert "TEST" not in result_4
+        assert result_4["ALL"] == "universal-value"
+
+        assert result_1 == {"TEST": "universal-value"}
+        assert result_1 == result_2 == result_3 != result_4
 
         # Test without ALL key - should return unchanged dictionary
-        replace_value_dict = {
+        replace_value_dict_5 = {
             "DEV": "dev-value",
             "PROD": "prod-value",
         }
@@ -586,11 +609,10 @@ class TestParameterUtilities:
         mock_workspace.environment = "TEST"
 
         # Call the function
-        result = process_environment_key(mock_workspace, replace_value_dict)
+        result = process_environment_key(mock_workspace, replace_value_dict_5)
 
         # Dictionary should remain unchanged
-        assert result == replace_value_dict
-        assert "ALL" not in result
+        assert result == replace_value_dict_5
         assert "TEST" not in result
 
 
