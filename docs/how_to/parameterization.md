@@ -222,18 +222,19 @@ spark_pool:
       item_name: <item-name-filter-value>
 ```
 
-### All Environment
+### \_ALL\_ Environment Key in `replace_value`
 
-Setting the environment key to `ALL` or `all` (case-insensitive) in `replace_value` is supported for any parameter input (`find_replace`, `key_value_replace`, `spark_pool`). The `ALL` environment key cannot be used alongside other environment keys.
+The `_ALL_` environment key (case-insensitive) in `replace_value` is supported for all parameter types (`find_replace`, `key_value_replace`, `spark_pool`) and applies the replacement to any target environment. When `_ALL_` is used, it must be the only environment key in the `replace_value` dictionary. Using `ALL` without underscores will be treated as a regular environment key.
 
-Use case: when the replace value applies to any target environment (particularly valuable in dynamic replacement scenarios).
+Use case: when the same replacement value applies to all target environments (particularly valuable in dynamic replacement scenarios).
 
 ```yaml
 find_replace:
     # Lakehouse GUID
     - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
       replace_value:
-          <ALL|all|All>: "$items.Lakehouse.Example_LH.id"
+          # use _ALL_ or _all_ or _All_
+          _ALL_: "$items.Lakehouse.Example_LH.id"
 ```
 
 ## Optional Fields
@@ -319,7 +320,7 @@ find_replace:
     # lakehouse workspace ID to be replaced (using regex pattern)
     - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-          ALL: "$workspace.id" # workspace ID of the target environment (dynamic)
+          _ALL_: "$workspace.id" # workspace ID of the target environment (dynamic)
       is_regex: "true" # enable regex pattern matching
       item_name: # filter on specific notebook files
           - "Hello World"
