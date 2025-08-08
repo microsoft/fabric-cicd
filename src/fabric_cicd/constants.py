@@ -12,7 +12,7 @@ FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
 # Item Type
-ACCEPTED_ITEM_TYPES_UPN = (
+ACCEPTED_ITEM_TYPES = (
     "DataPipeline",
     "Environment",
     "Notebook",
@@ -33,7 +33,6 @@ ACCEPTED_ITEM_TYPES_UPN = (
     "Dataflow",
     "GraphQLApi",
 )
-ACCEPTED_ITEM_TYPES_NON_UPN = ACCEPTED_ITEM_TYPES_UPN
 
 # Publish
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
