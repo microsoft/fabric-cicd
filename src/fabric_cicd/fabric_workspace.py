@@ -127,7 +127,7 @@ class FabricWorkspace:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
-        self.publish_items_to_include = None
+        self.items_to_include = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -474,16 +474,14 @@ class FabricWorkspace:
                 return
 
         # Skip publishing if the item is not in the include list
-        if self.publish_items_to_include:
+        if self.items_to_include:
             current_item = f"{item_name}.{item_type}"
 
             # Normalize include list to a lowercase set for efficient lookups
-            normalized_include_set = {include_item.lower() for include_item in self.publish_items_to_include}
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
 
             # Check for exact match or case-insensitive match
-            match_found = (
-                current_item in self.publish_items_to_include or current_item.lower() in normalized_include_set
-            )
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
             if not match_found:
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
@@ -579,6 +577,19 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
         """
         item_guid = self.deployed_items[item_type][item_name].guid
+
+        # Skip unpublishing if the item is not in the include list
+        if self.items_to_include:
+            current_item = f"{item_name}.{item_type}"
+
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
+
+            # Check for exact match or case-insensitive match
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
+            if not match_found:
+                logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
+                return
 
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
