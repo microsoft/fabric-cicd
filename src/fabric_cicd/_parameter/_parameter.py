@@ -233,7 +233,7 @@ class Parameter:
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
 
             # Check if replacement will be skipped for a given find value
-            is_valid_env = self._validate_environment(parameter_dict["replace_value"])
+            is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
             log_func = logger.debug if param_name == "key_value_replace" else logger.warning
 
@@ -244,8 +244,14 @@ class Parameter:
                 else "find value"
             )
 
-            # Replacement skipped if target environment is not present
             if self.environment != "N/A" and not is_valid_env:
+                # Return validation error for invalid _ALL_ case (_ALL_ used with other envs)
+                if env_type.lower() == "_all_":
+                    return False, constants.PARAMETER_MSGS["other target env"].format(
+                        env_type, parameter_dict["replace_value"]
+                    )
+
+                # Otherwise, replacement skipped if target environment is not present
                 skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
                 log_func(
                     constants.PARAMETER_MSGS["skip"].format(
@@ -253,6 +259,12 @@ class Parameter:
                     )
                 )
                 continue
+
+            # Log if _ALL_ environment is present in replace_value
+            if env_type.lower() == "_all_":
+                logger.warning(
+                    constants.PARAMETER_MSGS["all target env"].format(parameter_dict["replace_value"][env_type])
+                )
 
             # Replacement skipped if optional filter values don't match
             if msg == "no match" and not is_valid_optional_val:
@@ -444,9 +456,24 @@ class Parameter:
 
         return True, "Data type is valid"
 
-    def _validate_environment(self, replace_value: dict) -> bool:
-        """Check the target environment exists as a key in the replace_value dictionary."""
-        return self.environment in replace_value
+    def _validate_environment(self, replace_value: dict) -> tuple[bool, str]:
+        """
+        Check the target environment exists as a key in the replace_value dictionary.
+        If "_ALL_" (case insensitive) is present, it must be the only key.
+        """
+        # Check for _ALL_ in any case variation
+        all_key = None
+        for key in replace_value:
+            if key.lower() == "_all_":
+                logger.warning(f"Found the reserved environment key '{key}'")
+                all_key = key
+                break
+        if all_key:
+            # If _ALL_ is present, it must be the only key
+            return len(replace_value) == 1, all_key
+
+        # If _ALL_ is not present, check if target environment is present
+        return self.environment in replace_value, "env"
 
     def _validate_item_type(self, input_type: str) -> tuple[bool, str]:
         """Validate the item type is in scope."""

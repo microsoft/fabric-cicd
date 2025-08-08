@@ -222,6 +222,21 @@ spark_pool:
       item_name: <item-name-filter-value>
 ```
 
+### \_ALL\_ Environment Key in `replace_value`
+
+The `_ALL_` environment key (case-insensitive) in `replace_value` is supported for all parameter types (`find_replace`, `key_value_replace`, `spark_pool`) and applies the replacement to any target environment. When `_ALL_` is used, it must be the only environment key in the `replace_value` dictionary. Using `ALL` without underscores will be treated as a regular environment key.
+
+Use case: when the same replacement value applies to all target environments (particularly valuable in dynamic replacement scenarios).
+
+```yaml
+find_replace:
+    # Lakehouse GUID
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+          # use _ALL_ or _all_ or _All_
+          _ALL_: "$items.Lakehouse.Example_LH.id"
+```
+
 ## Optional Fields
 
 When optional fields are omitted or left empty, only basic parameterization functionality will be available. To enable advanced features, you must add the specific optional field(s) (if applicable) and set appropriately.
@@ -305,8 +320,7 @@ find_replace:
     # lakehouse workspace ID to be replaced (using regex pattern)
     - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-          PPE: "$workspace.id" # PPE workspace ID (dynamic)
-          PROD: "$workspace.id" # PROD workspace ID (dynamic)
+          _ALL_: "$workspace.id" # workspace ID of the target environment (dynamic)
       is_regex: "true" # enable regex pattern matching
       item_name: # filter on specific notebook files
           - "Hello World"
@@ -616,7 +630,7 @@ runtime_version: 1.3
 
 Dataflows can have different kinds of Fabric sources and destinations that need to be parameterized, depending on the scenario.
 
-#### Parameterization Overview:
+#### Parameterization Overview
 
 Take a Lakehouse source/destination as an example, the Lakehouse is connected to a Dataflow in the following ways:
 
@@ -627,7 +641,7 @@ Take a Lakehouse source/destination as an example, the Lakehouse is connected to
 
 **\*\*Note:** A Dataflow that sources from another Dataflow introduces a dependency that may require a specific order of deploying (source first then dependent). A Dataflow is referenced by the item ID in the workspace and the actual workspace ID, this makes re-pointing more complex (see parameterization guidance below).
 
-#### Parameterization Guidance:
+#### Parameterization Guidance
 
 Connections must be parameterized in addition to item references.
 

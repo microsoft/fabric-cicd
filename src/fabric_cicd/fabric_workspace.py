@@ -355,6 +355,7 @@ class FabricWorkspace:
             extract_find_value,
             extract_parameter_filters,
             extract_replace_value,
+            process_environment_key,
             replace_key_value,
         )
 
@@ -372,7 +373,7 @@ class FabricWorkspace:
 
                 # Perform replacement if condition is met
                 if filter_match and ".json" in file_path.suffix:
-                    raw_file = replace_key_value(parameter_dict, raw_file, self.environment)
+                    raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):
@@ -382,7 +383,7 @@ class FabricWorkspace:
 
                 # Extract the find_value and replace_value_dict
                 find_value = extract_find_value(parameter_dict, raw_file, filter_match)
-                replace_value_dict = parameter_dict.get("replace_value", {})
+                replace_value_dict = process_environment_key(self, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
