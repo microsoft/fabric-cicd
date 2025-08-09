@@ -193,11 +193,12 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     fabric_workspace_obj._refresh_repository_items()
     print_header("Unpublishing Orphaned Items")
 
-    # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
+    # Lakehouses, SQL Databases, Warehouses, and Eventhouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
         "Lakehouse": "enable_lakehouse_unpublish",
         "SQLDatabase": "enable_sqldatabase_unpublish",
         "Warehouse": "enable_warehouse_unpublish",
+        "Eventhouse": "enable_eventhouse_unpublish",
     }
 
     # Define order to unpublish items
@@ -228,6 +229,11 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
             # Append item_type if no feature flag is required or the corresponding flag is enabled
             if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
                 unpublish_order.append(item_type)
+            elif unpublish_flag and unpublish_flag not in constants.FEATURE_FLAG:
+                # Log warning when unpublish is skipped due to missing feature flag
+                logger.warning(
+                    f"Skipping unpublish for {item_type} items because the '{unpublish_flag}' feature flag is not enabled."
+                )
 
     for item_type in unpublish_order:
         deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())

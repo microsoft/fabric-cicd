@@ -57,6 +57,7 @@
     -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   The `exclude_path` variable is required when deploying an **Eventhouse** that is attached to a **KQL Database** (common scenario).
 -   There may be significant _differences_ in the streaming data between the source eventhouse and the deployed eventhouse.
+-   **Unpublish** is disabled by default, enable with feature flag `enable_eventhouse_unpublish`.
 
 ## Eventstreams
 
