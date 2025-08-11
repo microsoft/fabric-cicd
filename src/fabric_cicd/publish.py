@@ -35,6 +35,10 @@ def publish_all_items(
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
 
+    items_to_include:
+        This is one of the experimental features available in fabric-cicd. To use this feature, see How To -> Optional Features for
+        information on which flags to enable.
+
     Examples:
         Basic usage
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -195,6 +199,10 @@ def unpublish_all_orphan_items(
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished. Default is '^$' which will exclude nothing.
         items_to_include: List of items in the format "item_name.item_type" that should be unpublished.
+
+    items_to_include:
+        This is one of the experimental features available in fabric-cicd. To use this feature, see How To -> Optional Features for
+        information on which flags to enable.
 
     Examples:
         Basic usage
