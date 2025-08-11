@@ -36,8 +36,8 @@ def publish_all_items(
 
 
     items_to_include:
-        This is one of the experimental features available in fabric-cicd. To use this feature, see How To -> Optional Features for
-        information on which flags to enable.
+        This is one of the experimental features available in fabric-cicd to be used at your own risk as selective deployment is not recommended
+        due to item dependencies. To use this feature, see How To -> Optional Features for information on which flags to enable.
 
     Examples:
         Basic usage
@@ -201,8 +201,8 @@ def unpublish_all_orphan_items(
         items_to_include: List of items in the format "item_name.item_type" that should be unpublished.
 
     items_to_include:
-        This is one of the experimental features available in fabric-cicd. To use this feature, see How To -> Optional Features for
-        information on which flags to enable.
+        This is one of the experimental features available in fabric-cicd to be used at your own risk as selective unpublish is not recommended
+        due to item dependencies. To use this feature, see How To -> Optional Features for information on which flags to enable.
 
     Examples:
         Basic usage
