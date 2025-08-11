@@ -30,7 +30,7 @@ class FabricWorkspace:
     def __init__(
         self,
         repository_directory: str,
-        item_type_in_scope: list[str],
+        item_type_in_scope: Optional[list[str]] = None,
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
@@ -44,7 +44,7 @@ class FabricWorkspace:
             workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
-            item_type_in_scope: Item types that should be deployed for a given workspace. Use ["all"] to include all available item types.
+            item_type_in_scope: Item types that should be deployed for a given workspace. If omitted, defaults to all available item types.
             environment: The environment to be used for parameterization.
             token_credential: The token credential to use for API requests.
             kwargs: Additional keyword arguments.
@@ -62,8 +62,7 @@ class FabricWorkspace:
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_name="your-workspace-name",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ...     repository_directory="/path/to/repo"
             ... )
 
             With optional parameters
@@ -73,14 +72,6 @@ class FabricWorkspace:
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
             ...     environment="your-target-environment"
-            ... )
-
-            Using all available item types
-            >>> from fabric_cicd import FabricWorkspace
-            >>> workspace = FabricWorkspace(
-            ...     workspace_id="your-workspace-id",
-            ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["all"]
             ... )
 
             With token credential
@@ -128,9 +119,15 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
-        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
+
+        # Handle None case for item_type_in_scope by defaulting to all available item types
+        if item_type_in_scope is None:
+            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES_UPN)
+        else:
+            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.items_to_include = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -358,6 +355,7 @@ class FabricWorkspace:
             extract_find_value,
             extract_parameter_filters,
             extract_replace_value,
+            process_environment_key,
             replace_key_value,
         )
 
@@ -375,7 +373,7 @@ class FabricWorkspace:
 
                 # Perform replacement if condition is met
                 if filter_match and ".json" in file_path.suffix:
-                    raw_file = replace_key_value(parameter_dict, raw_file, self.environment)
+                    raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):
@@ -385,7 +383,7 @@ class FabricWorkspace:
 
                 # Extract the find_value and replace_value_dict
                 find_value = extract_find_value(parameter_dict, raw_file, filter_match)
-                replace_value_dict = parameter_dict.get("replace_value", {})
+                replace_value_dict = process_environment_key(self, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
@@ -474,6 +472,20 @@ class FabricWorkspace:
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
+        # Skip publishing if the item is not in the include list
+        if self.items_to_include:
+            current_item = f"{item_name}.{item_type}"
+
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
+
+            # Check for exact match or case-insensitive match
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
+            if not match_found:
+                item.skip_publish = True
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
         item_guid = item.guid
@@ -566,6 +578,19 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
         """
         item_guid = self.deployed_items[item_type][item_name].guid
+
+        # Skip unpublishing if the item is not in the include list
+        if self.items_to_include:
+            current_item = f"{item_name}.{item_type}"
+
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
+
+            # Check for exact match or case-insensitive match
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
+            if not match_found:
+                logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
+                return
 
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
