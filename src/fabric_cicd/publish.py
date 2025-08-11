@@ -104,10 +104,11 @@ def publish_all_items(
         if "enable_items_to_include" not in constants.FEATURE_FLAG:
             msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
             raise InputError(msg, logger)
+        logger.warning("Selective deployment is enabled.")
         logger.warning(
             "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
-        fabric_workspace_obj.publish_items_to_include = items_to_include
+        fabric_workspace_obj.items_to_include = items_to_include
 
     def _should_publish_item_type(item_type: str) -> bool:
         """Check if an item type should be published based on scope and repository content."""
@@ -232,6 +233,10 @@ def unpublish_all_orphan_items(
 
     regex_pattern = check_regex(item_name_exclude_regex)
 
+    fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._refresh_repository_items()
+    print_header("Unpublishing Orphaned Items")
+
     if items_to_include:
         if "enable_experimental_features" not in constants.FEATURE_FLAG:
             msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
@@ -239,14 +244,11 @@ def unpublish_all_orphan_items(
         if "enable_items_to_include" not in constants.FEATURE_FLAG:
             msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
             raise InputError(msg, logger)
+        logger.warning("Selective unpublish is enabled.")
         logger.warning(
-            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+            "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
-        fabric_workspace_obj.publish_items_to_include = items_to_include
-
-    fabric_workspace_obj._refresh_deployed_items()
-    fabric_workspace_obj._refresh_repository_items()
-    print_header("Unpublishing Orphaned Items")
+        fabric_workspace_obj.items_to_include = items_to_include
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
