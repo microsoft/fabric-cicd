@@ -246,7 +246,6 @@ def unpublish_all_orphan_items(
     fabric_workspace_obj._refresh_repository_items()
     print_header("Unpublishing Orphaned Items")
 
-    # Lakehouses, SQL Databases, Warehouses, and Eventhouses can only be unpublished if their feature flags are set
     if items_to_include:
         if "enable_experimental_features" not in constants.FEATURE_FLAG:
             msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
@@ -259,7 +258,7 @@ def unpublish_all_orphan_items(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
         fabric_workspace_obj.items_to_include = items_to_include
-
+    # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
         "Lakehouse": "enable_lakehouse_unpublish",
         "SQLDatabase": "enable_sqldatabase_unpublish",
