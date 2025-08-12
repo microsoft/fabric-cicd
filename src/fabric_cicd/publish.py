@@ -258,6 +258,7 @@ def unpublish_all_orphan_items(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
         fabric_workspace_obj.items_to_include = items_to_include
+
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
         "Lakehouse": "enable_lakehouse_unpublish",
