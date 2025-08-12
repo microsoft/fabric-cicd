@@ -61,6 +61,7 @@ from fabric_cicd._parameter._utils import (
     extract_parameter_filters,
     extract_replace_value,
     is_valid_structure,
+    process_environment_key,
     process_input_path,
     replace_key_value,
     replace_variables_in_parameter_file,
@@ -404,7 +405,7 @@ class TestParameterUtilities:
         assert check_replacement("type1", "name2", [file_path], "type1", "name1", file_path) is False
         assert check_replacement("type1", "name1", [Path("other.txt")], "type1", "name1", file_path) is False
 
-    def test_replace_key_value_valid_json(self):
+    def test_replace_key_value_valid_json(self, mock_workspace):
         """Tests replace_key_value with valid JSON content and environment."""
         # Test JSON with server host configuration
         test_json = '{"server": {"host": "localhost", "port": 8080}}'
@@ -414,17 +415,17 @@ class TestParameterUtilities:
         }
 
         # Test successful replacement for dev environment
-        result = replace_key_value(param_dict, test_json, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
         result_data = json.loads(result)
         assert result_data["server"]["host"] == "dev-server.example.com"
         assert result_data["server"]["port"] == 8080  # Verify other values unchanged
 
         # Test successful replacement for prod environment
-        result = replace_key_value(param_dict, test_json, "prod")
+        result = replace_key_value(mock_workspace, param_dict, test_json, "prod")
         result_data = json.loads(result)
         assert result_data["server"]["host"] == "prod-server.example.com"
 
-    def test_replace_key_value_environment_not_found(self):
+    def test_replace_key_value_environment_not_found(self, mock_workspace):
         """Tests replace_key_value when environment is not in the replace_value dictionary."""
         test_json = '{"server": {"host": "localhost", "port": 8080}}'
         param_dict = {
@@ -433,20 +434,20 @@ class TestParameterUtilities:
         }
 
         # Test when environment not in replace_value
-        result = replace_key_value(param_dict, test_json, "test")
+        result = replace_key_value(mock_workspace, param_dict, test_json, "test")
         result_data = json.loads(result)
         assert result_data["server"]["host"] == "localhost"  # Original value unchanged
 
-    def test_replace_key_value_invalid_json(self):
+    def test_replace_key_value_invalid_json(self, mock_workspace):
         """Tests replace_key_value with invalid JSON content."""
         invalid_json = "{invalid json content}"
         param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
 
         # JSONDecodeError will be raised for invalid JSON and wrapped in ValueError
         with pytest.raises(ValueError, match="Expecting property name"):
-            replace_key_value(param_dict, invalid_json, "dev")
+            replace_key_value(mock_workspace, param_dict, invalid_json, "dev")
 
-    def test_replace_key_value(self):
+    def test_replace_key_value(self, mock_workspace):
         """Test replace_key_value function with JSON content."""
         # Create test parameter dictionary and JSON content
         param_dict = {
@@ -456,20 +457,20 @@ class TestParameterUtilities:
         json_content = '{"server": {"host": "localhost", "port": 8080}}'
 
         # Test successful replacement
-        result = replace_key_value(param_dict, json_content, "dev")
+        result = replace_key_value(mock_workspace, param_dict, json_content, "dev")
 
         # Parse the JSON result and check the exact value (avoid substring sanitization issues)
         result_json = json.loads(result)
         assert result_json["server"]["host"] == "dev-server.example.com"
 
         # Test with environment not in replace_value
-        result = replace_key_value(param_dict, json_content, "test")
+        result = replace_key_value(mock_workspace, param_dict, json_content, "test")
         result_json = json.loads(result)
         assert result_json["server"]["host"] == "localhost"
 
         # Test with invalid JSON content
         with pytest.raises(ValueError, match="Expecting property name"):
-            replace_key_value(param_dict, "{invalid json}", "dev")
+            replace_key_value(mock_workspace, param_dict, "{invalid json}", "dev")
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
@@ -557,6 +558,62 @@ class TestParameterUtilities:
         assert "value: test_value" in result
         assert "other: another_value" in result
         assert "normal: NORMAL_VAR" in result  # Normal var unchanged
+
+    def test_process_environment_key(self, mock_workspace):
+        """Test process_environment_key function with ALL environment key replacement."""
+        # Test with ALL key only - should replace with target environment
+        replace_value_dict_1 = {"_ALL_": "universal-value"}
+        replace_value_dict_2 = {"_all_": "universal-value"}
+        replace_value_dict_3 = {"_All_": "universal-value"}
+        replace_value_dict_4 = {"ALL": "universal-value"}
+
+        # Mock the workspace environment
+        mock_workspace.environment = "TEST"
+
+        # Call the function
+        result_1 = process_environment_key(mock_workspace, replace_value_dict_1)
+        result_2 = process_environment_key(mock_workspace, replace_value_dict_2)
+        result_3 = process_environment_key(mock_workspace, replace_value_dict_3)
+        result_4 = process_environment_key(mock_workspace, replace_value_dict_4)
+
+        # Verify _ALL_ key is replaced with the target environment
+        assert "_ALL_" not in result_1
+        assert "TEST" in result_1
+        assert result_1["TEST"] == "universal-value"
+
+        # Verify _all_ key is replaced with the target environment
+        assert "_all_" not in result_2
+        assert "TEST" in result_2
+        assert result_2["TEST"] == "universal-value"
+
+        # Verify _All_ key is replaced with the target environment
+        assert "_All_" not in result_3
+        assert "TEST" in result_3
+        assert result_3["TEST"] == "universal-value"
+
+        # Verify ALL key is replaced with the target environment
+        assert "ALL" in result_4
+        assert "TEST" not in result_4
+        assert result_4["ALL"] == "universal-value"
+
+        assert result_1 == {"TEST": "universal-value"}
+        assert result_1 == result_2 == result_3 != result_4
+
+        # Test without ALL key - should return unchanged dictionary
+        replace_value_dict_5 = {
+            "DEV": "dev-value",
+            "PROD": "prod-value",
+        }
+
+        # Mock the workspace environment
+        mock_workspace.environment = "TEST"
+
+        # Call the function
+        result = process_environment_key(mock_workspace, replace_value_dict_5)
+
+        # Dictionary should remain unchanged
+        assert result == replace_value_dict_5
+        assert "TEST" not in result
 
 
 class TestPathUtilities:

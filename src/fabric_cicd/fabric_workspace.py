@@ -127,6 +127,7 @@ class FabricWorkspace:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope, upn_auth=self.endpoint.upn_auth)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.items_to_include = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -354,6 +355,7 @@ class FabricWorkspace:
             extract_find_value,
             extract_parameter_filters,
             extract_replace_value,
+            process_environment_key,
             replace_key_value,
         )
 
@@ -371,7 +373,7 @@ class FabricWorkspace:
 
                 # Perform replacement if condition is met
                 if filter_match and ".json" in file_path.suffix:
-                    raw_file = replace_key_value(parameter_dict, raw_file, self.environment)
+                    raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):
@@ -381,7 +383,7 @@ class FabricWorkspace:
 
                 # Extract the find_value and replace_value_dict
                 find_value = extract_find_value(parameter_dict, raw_file, filter_match)
-                replace_value_dict = parameter_dict.get("replace_value", {})
+                replace_value_dict = process_environment_key(self, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
@@ -470,6 +472,20 @@ class FabricWorkspace:
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
+        # Skip publishing if the item is not in the include list
+        if self.items_to_include:
+            current_item = f"{item_name}.{item_type}"
+
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
+
+            # Check for exact match or case-insensitive match
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
+            if not match_found:
+                item.skip_publish = True
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
         item_guid = item.guid
@@ -562,6 +578,19 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
         """
         item_guid = self.deployed_items[item_type][item_name].guid
+
+        # Skip unpublishing if the item is not in the include list
+        if self.items_to_include:
+            current_item = f"{item_name}.{item_type}"
+
+            # Normalize include list to a lowercase set for efficient lookups
+            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
+
+            # Check for exact match or case-insensitive match
+            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
+            if not match_found:
+                logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
+                return
 
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 

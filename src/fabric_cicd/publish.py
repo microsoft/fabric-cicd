@@ -11,7 +11,7 @@ import dpath.util as dpath
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
@@ -21,14 +21,24 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 logger = logging.getLogger(__name__)
 
 
-def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: Optional[str] = None) -> None:
+def publish_all_items(
+    fabric_workspace_obj: FabricWorkspace,
+    item_name_exclude_regex: Optional[str] = None,
+    items_to_include: Optional[list[str]] = None,
+) -> None:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
+        items_to_include: List of items in the format "item_name.item_type" that should be published.
 
+
+    items_to_include:
+        This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
+        not recommended due to item dependencies. To enable this feature, see How To -> Optional Features
+        for information on which flags to enable.
 
     Examples:
         Basic usage
@@ -48,7 +58,17 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> exclude_regex = ".*_do_not_publish"
-        >>> publish_all_items(workspace, exclude_regex)
+        >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+
+        With items to include
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
+        >>> publish_all_items(workspace, items_to_include=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -81,6 +101,19 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+
+    if items_to_include:
+        if "enable_experimental_features" not in constants.FEATURE_FLAG:
+            msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
+            raise InputError(msg, logger)
+        if "enable_items_to_include" not in constants.FEATURE_FLAG:
+            msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
+            raise InputError(msg, logger)
+        logger.warning("Selective deployment is enabled.")
+        logger.warning(
+            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.items_to_include = items_to_include
 
     def _should_publish_item_type(item_type: str) -> bool:
         """Check if an item type should be published based on scope and repository content."""
@@ -155,13 +188,22 @@ def publish_all_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_r
         items.check_environment_publish_state(fabric_workspace_obj)
 
 
-def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_exclude_regex: str = "^$") -> None:
+def unpublish_all_orphan_items(
+    fabric_workspace_obj: FabricWorkspace,
+    item_name_exclude_regex: str = "^$",
+    items_to_include: Optional[list[str]] = None,
+) -> None:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished. Default is '^$' which will exclude nothing.
+        items_to_include: List of items in the format "item_name.item_type" that should be unpublished.
+
+    items_to_include:
+        This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing is not recommended due to item dependencies.
+        To enable this feature, see How To -> Optional Features for information on which flags to enable.
 
     Examples:
         Basic usage
@@ -183,7 +225,18 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
         ... )
         >>> publish_all_items(workspace)
         >>> exclude_regex = ".*_do_not_delete"
-        >>> unpublish_orphaned_items(workspace, exclude_regex)
+        >>> unpublish_orphaned_items(workspace, item_name_exclude_regex=exclude_regex)
+
+        With items to include
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> publish_all_items(workspace)
+        >>> items_to_include = ["Hello World.Notebook", "Run Hello World.DataPipeline"]
+        >>> unpublish_orphaned_items(workspace, items_to_include=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -194,6 +247,19 @@ def unpublish_all_orphan_items(fabric_workspace_obj: FabricWorkspace, item_name_
     print_header("Unpublishing Orphaned Items")
 
     # Lakehouses, SQL Databases, Warehouses, and Eventhouses can only be unpublished if their feature flags are set
+    if items_to_include:
+        if "enable_experimental_features" not in constants.FEATURE_FLAG:
+            msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
+            raise InputError(msg, logger)
+        if "enable_items_to_include" not in constants.FEATURE_FLAG:
+            msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
+            raise InputError(msg, logger)
+        logger.warning("Selective unpublish is enabled.")
+        logger.warning(
+            "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
+        )
+        fabric_workspace_obj.items_to_include = items_to_include
+
     unpublish_flag_mapping = {
         "Lakehouse": "enable_lakehouse_unpublish",
         "SQLDatabase": "enable_sqldatabase_unpublish",
