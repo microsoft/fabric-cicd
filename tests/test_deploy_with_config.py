@@ -10,14 +10,14 @@ import pytest
 import yaml
 
 from fabric_cicd import deploy_with_config
-from fabric_cicd._common._exceptions import InputError
-from fabric_cicd.publish import (
-    _apply_config_overrides,
-    _extract_publish_settings,
-    _extract_unpublish_settings,
-    _extract_workspace_settings,
-    _load_config_file,
+from fabric_cicd._common._config_utils import (
+    apply_config_overrides,
+    extract_publish_settings,
+    extract_unpublish_settings,
+    extract_workspace_settings,
+    load_config_file,
 )
+from fabric_cicd._common._exceptions import InputError
 
 
 class TestConfigFileLoading:
@@ -35,13 +35,13 @@ class TestConfigFileLoading:
         with open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
-        result = _load_config_file(str(config_file))
+        result = load_config_file(str(config_file))
         assert result == config_data
 
     def test_load_nonexistent_config_file(self):
         """Test loading a non-existent config file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError, match="Configuration file not found"):
-            _load_config_file("nonexistent.yml")
+            load_config_file("nonexistent.yml")
 
     def test_load_invalid_yaml_syntax(self, tmp_path):
         """Test loading a file with invalid YAML syntax raises InputError."""
@@ -49,7 +49,7 @@ class TestConfigFileLoading:
         config_file.write_text("invalid: yaml: content: [")
 
         with pytest.raises(InputError, match="Invalid YAML syntax"):
-            _load_config_file(str(config_file))
+            load_config_file(str(config_file))
 
     def test_load_non_dict_yaml(self, tmp_path):
         """Test loading a YAML file that doesn't contain a dictionary."""
@@ -57,7 +57,7 @@ class TestConfigFileLoading:
         config_file.write_text("- item1\n- item2")
 
         with pytest.raises(InputError, match="must contain a YAML dictionary"):
-            _load_config_file(str(config_file))
+            load_config_file(str(config_file))
 
     def test_load_config_missing_core_section(self, tmp_path):
         """Test loading a config file without required 'core' section."""
@@ -67,7 +67,7 @@ class TestConfigFileLoading:
             yaml.dump(config_data, f)
 
         with pytest.raises(InputError, match="must contain a 'core' section"):
-            _load_config_file(str(config_file))
+            load_config_file(str(config_file))
 
 
 class TestWorkspaceSettingsExtraction:
@@ -82,7 +82,7 @@ class TestWorkspaceSettingsExtraction:
             }
         }
 
-        settings = _extract_workspace_settings(config, "dev")
+        settings = extract_workspace_settings(config, "dev")
         assert settings["workspace_id"] == "dev-id"
         assert settings["repository_directory"] == "test/path"
 
@@ -95,7 +95,7 @@ class TestWorkspaceSettingsExtraction:
             }
         }
 
-        settings = _extract_workspace_settings(config, "dev")
+        settings = extract_workspace_settings(config, "dev")
         assert settings["workspace_name"] == "dev-workspace"
         assert settings["repository_directory"] == "test/path"
 
@@ -108,7 +108,7 @@ class TestWorkspaceSettingsExtraction:
             }
         }
 
-        settings = _extract_workspace_settings(config, "dev")
+        settings = extract_workspace_settings(config, "dev")
         assert settings["workspace_id"] == "single-id"
 
     def test_extract_missing_environment(self):
@@ -121,7 +121,7 @@ class TestWorkspaceSettingsExtraction:
         }
 
         with pytest.raises(InputError, match="Environment 'prod' not found in workspace_id mappings"):
-            _extract_workspace_settings(config, "prod")
+            extract_workspace_settings(config, "prod")
 
     def test_extract_missing_workspace_config(self):
         """Test error when neither workspace_id nor workspace is provided."""
@@ -132,7 +132,7 @@ class TestWorkspaceSettingsExtraction:
         }
 
         with pytest.raises(InputError, match="must specify either 'workspace_id' or 'workspace'"):
-            _extract_workspace_settings(config, "dev")
+            extract_workspace_settings(config, "dev")
 
     def test_extract_missing_repository_directory(self):
         """Test error when repository_directory is missing."""
@@ -143,7 +143,7 @@ class TestWorkspaceSettingsExtraction:
         }
 
         with pytest.raises(InputError, match="must specify 'repository_directory'"):
-            _extract_workspace_settings(config, "dev")
+            extract_workspace_settings(config, "dev")
 
     def test_extract_optional_item_types(self):
         """Test extracting optional item_types_in_scope."""
@@ -155,14 +155,14 @@ class TestWorkspaceSettingsExtraction:
             }
         }
 
-        settings = _extract_workspace_settings(config, "dev")
+        settings = extract_workspace_settings(config, "dev")
         assert settings["item_types_in_scope"] == ["Notebook", "DataPipeline"]
 
 
 class TestPublishSettingsExtraction:
     """Test publish settings extraction from config."""
 
-    def test_extract_publish_settings_with_skip(self):
+    def testextract_publish_settings_with_skip(self):
         """Test extracting publish settings with environment-specific skip."""
         config = {
             "publish": {
@@ -171,14 +171,14 @@ class TestPublishSettingsExtraction:
             }
         }
 
-        settings = _extract_publish_settings(config, "dev")
+        settings = extract_publish_settings(config, "dev")
         assert settings["exclude_regex"] == "^DONT_DEPLOY.*"
         assert settings["skip"] is True
 
-        settings = _extract_publish_settings(config, "prod")
+        settings = extract_publish_settings(config, "prod")
         assert settings["skip"] is False
 
-    def test_extract_publish_settings_with_items_to_include(self):
+    def testextract_publish_settings_with_items_to_include(self):
         """Test extracting publish settings with items_to_include."""
         config = {
             "publish": {
@@ -186,17 +186,17 @@ class TestPublishSettingsExtraction:
             }
         }
 
-        settings = _extract_publish_settings(config, "dev")
+        settings = extract_publish_settings(config, "dev")
         assert settings["items_to_include"] == ["item1.Notebook", "item2.DataPipeline"]
 
-    def test_extract_publish_settings_no_config(self):
+    def testextract_publish_settings_no_config(self):
         """Test extracting publish settings when no publish config exists."""
         config = {}
 
-        settings = _extract_publish_settings(config, "dev")
+        settings = extract_publish_settings(config, "dev")
         assert settings == {}
 
-    def test_extract_publish_settings_single_skip_value(self):
+    def testextract_publish_settings_single_skip_value(self):
         """Test extracting publish settings with single skip value (not environment-specific)."""
         config = {
             "publish": {
@@ -204,14 +204,14 @@ class TestPublishSettingsExtraction:
             }
         }
 
-        settings = _extract_publish_settings(config, "dev")
+        settings = extract_publish_settings(config, "dev")
         assert settings["skip"] is True
 
 
 class TestUnpublishSettingsExtraction:
     """Test unpublish settings extraction from config."""
 
-    def test_extract_unpublish_settings_with_skip(self):
+    def testextract_unpublish_settings_with_skip(self):
         """Test extracting unpublish settings with environment-specific skip."""
         config = {
             "unpublish": {
@@ -220,18 +220,18 @@ class TestUnpublishSettingsExtraction:
             }
         }
 
-        settings = _extract_unpublish_settings(config, "dev")
+        settings = extract_unpublish_settings(config, "dev")
         assert settings["exclude_regex"] == "^DEBUG.*"
         assert settings["skip"] is True
 
-        settings = _extract_unpublish_settings(config, "prod")
+        settings = extract_unpublish_settings(config, "prod")
         assert settings["skip"] is False
 
-    def test_extract_unpublish_settings_no_config(self):
+    def testextract_unpublish_settings_no_config(self):
         """Test extracting unpublish settings when no unpublish config exists."""
         config = {}
 
-        settings = _extract_unpublish_settings(config, "dev")
+        settings = extract_unpublish_settings(config, "dev")
         assert settings == {}
 
 
@@ -243,7 +243,7 @@ class TestConfigOverrides:
         """Test applying feature flags from config."""
         config = {"features": ["enable_shortcut_publish", "enable_debug_mode"]}
 
-        _apply_config_overrides(config)
+        apply_config_overrides(config)
 
         from fabric_cicd import constants
 
@@ -256,14 +256,14 @@ class TestConfigOverrides:
 
         # This will log a warning since DEFAULT_API_ROOT_URL exists in constants
         # but it's hard to mock the setattr behavior cleanly. Let's just test it doesn't crash.
-        _apply_config_overrides(config)
+        apply_config_overrides(config)
 
     def test_apply_no_overrides(self):
         """Test applying config overrides when no overrides are specified."""
         config = {}
 
         # Should not raise any errors
-        _apply_config_overrides(config)
+        apply_config_overrides(config)
 
 
 class TestDeployWithConfig:
@@ -409,7 +409,7 @@ class TestConfigIntegration:
         sample_config_path = Path(__file__).parent.parent / "sample" / "workspace" / "config.yml"
 
         if sample_config_path.exists():
-            config = _load_config_file(str(sample_config_path))
+            config = load_config_file(str(sample_config_path))
 
             # Verify basic structure
             assert "core" in config
@@ -417,15 +417,15 @@ class TestConfigIntegration:
             assert "unpublish" in config
 
             # Test environment extraction
-            workspace_settings = _extract_workspace_settings(config, "dev")
+            workspace_settings = extract_workspace_settings(config, "dev")
             assert "repository_directory" in workspace_settings
 
             # Test settings extraction functions (verify they don't crash)
-            _extract_publish_settings(config, "dev")
-            _extract_unpublish_settings(config, "dev")
+            extract_publish_settings(config, "dev")
+            extract_unpublish_settings(config, "dev")
 
             # Should not raise any errors
-            _apply_config_overrides(config)
+            apply_config_overrides(config)
 
     def test_config_validation_comprehensive(self, tmp_path):
         """Test comprehensive config validation with all sections."""
@@ -450,16 +450,16 @@ class TestConfigIntegration:
             yaml.dump(config_data, f)
 
         # Test loading and parsing
-        config = _load_config_file(str(config_file))
+        config = load_config_file(str(config_file))
         assert config == config_data
 
         # Test all environment extractions
         for env in ["dev", "test", "prod"]:
-            workspace_settings = _extract_workspace_settings(config, env)
+            workspace_settings = extract_workspace_settings(config, env)
             assert workspace_settings["workspace_id"] == config_data["core"]["workspace_id"][env]
 
-            publish_settings = _extract_publish_settings(config, env)
+            publish_settings = extract_publish_settings(config, env)
             assert publish_settings["skip"] == config_data["publish"]["skip"][env]
 
-            unpublish_settings = _extract_unpublish_settings(config, env)
+            unpublish_settings = extract_unpublish_settings(config, env)
             assert unpublish_settings["skip"] == config_data["unpublish"]["skip"][env]

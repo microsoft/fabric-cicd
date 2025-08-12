@@ -4,16 +4,21 @@
 """Module for publishing and unpublishing Fabric workspace items."""
 
 import logging
-from pathlib import Path
 from typing import Optional
 
 import dpath.util as dpath
-import yaml
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._config_utils import (
+    apply_config_overrides,
+    extract_publish_settings,
+    extract_unpublish_settings,
+    extract_workspace_settings,
+    load_config_file,
+)
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
@@ -361,51 +366,20 @@ def deploy_with_config(
         ...     environment="prod",
         ...     token_credential=credential
         ... )
-
-    Config file structure:
-        ```yaml
-        core:
-          workspace_id:
-            dev: 8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b
-            test: 2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b
-            prod: 7c3e1f8b-2d4a-4b9e-8f2c-1a6c3b7d8e2f
-          repository_directory: "sample/workspace"
-          item_types_in_scope: [Environment, Notebook, DataPipeline]
-
-        publish:
-          exclude_regex: "^DONT_DEPLOY.*"
-          skip:
-            dev: true
-            test: false
-            prod: false
-
-        unpublish:
-          exclude_regex: "^DEBUG.*"
-          skip:
-            dev: true
-            test: false
-            prod: false
-
-        features:
-          - enable_shortcut_publish
-
-        constants:
-          DEFAULT_API_ROOT_URL: "https://msitapi.fabric.microsoft.com"
-        ```
     """
     print_header("Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file} for environment '{environment}'")
 
     # Load and validate configuration file
-    config = _load_config_file(config_file)
+    config = load_config_file(config_file)
 
     # Extract environment-specific settings
-    workspace_settings = _extract_workspace_settings(config, environment)
-    publish_settings = _extract_publish_settings(config, environment)
-    unpublish_settings = _extract_unpublish_settings(config, environment)
+    workspace_settings = extract_workspace_settings(config, environment)
+    publish_settings = extract_publish_settings(config, environment)
+    unpublish_settings = extract_unpublish_settings(config, environment)
 
     # Apply feature flags and constants if specified
-    _apply_config_overrides(config)
+    apply_config_overrides(config)
 
     # Create FabricWorkspace object with extracted settings
     workspace = FabricWorkspace(
@@ -439,140 +413,3 @@ def deploy_with_config(
         logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
     logger.info("Config-based deployment completed successfully")
-
-
-def _load_config_file(config_file: str) -> dict:
-    """Load and validate YAML configuration file."""
-    config_path = Path(config_file)
-    if not config_path.exists():
-        error_msg = f"Configuration file not found: {config_file}"
-        raise FileNotFoundError(error_msg)
-
-    try:
-        with config_path.open(encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        error_msg = f"Invalid YAML syntax in configuration file: {e}"
-        raise InputError(error_msg, logger) from e
-
-    if not isinstance(config, dict):
-        error_msg = "Configuration file must contain a YAML dictionary"
-        raise InputError(error_msg, logger)
-
-    # Validate required sections
-    if "core" not in config:
-        error_msg = "Configuration file must contain a 'core' section"
-        raise InputError(error_msg, logger)
-
-    return config
-
-
-def _extract_workspace_settings(config: dict, environment: str) -> dict:
-    """Extract workspace-specific settings from config for the given environment."""
-    core = config["core"]
-    settings = {}
-
-    # Extract workspace ID or name based on environment
-    if "workspace_id" in core:
-        if isinstance(core["workspace_id"], dict):
-            if environment not in core["workspace_id"]:
-                error_msg = f"Environment '{environment}' not found in workspace_id mappings"
-                raise InputError(error_msg, logger)
-            settings["workspace_id"] = core["workspace_id"][environment]
-        else:
-            settings["workspace_id"] = core["workspace_id"]
-
-    if "workspace" in core:
-        if isinstance(core["workspace"], dict):
-            if environment not in core["workspace"]:
-                error_msg = f"Environment '{environment}' not found in workspace mappings"
-                raise InputError(error_msg, logger)
-            settings["workspace_name"] = core["workspace"][environment]
-        else:
-            settings["workspace_name"] = core["workspace"]
-
-    # Validate that either workspace_id or workspace_name is provided
-    if "workspace_id" not in settings and "workspace_name" not in settings:
-        error_msg = "Configuration must specify either 'workspace_id' or 'workspace' in core section"
-        raise InputError(error_msg, logger)
-
-    # Extract other required settings
-    if "repository_directory" not in core:
-        error_msg = "Configuration must specify 'repository_directory' in core section"
-        raise InputError(error_msg, logger)
-    settings["repository_directory"] = core["repository_directory"]
-
-    # Optional settings
-    if "item_types_in_scope" in core:
-        settings["item_types_in_scope"] = core["item_types_in_scope"]
-
-    return settings
-
-
-def _extract_publish_settings(config: dict, environment: str) -> dict:
-    """Extract publish-specific settings from config for the given environment."""
-    settings = {}
-
-    if "publish" in config:
-        publish_config = config["publish"]
-
-        # Extract exclude regex
-        if "exclude_regex" in publish_config:
-            settings["exclude_regex"] = publish_config["exclude_regex"]
-
-        # Extract items to include
-        if "items_to_include" in publish_config:
-            settings["items_to_include"] = publish_config["items_to_include"]
-
-        # Extract environment-specific skip setting
-        if "skip" in publish_config:
-            if isinstance(publish_config["skip"], dict):
-                settings["skip"] = publish_config["skip"].get(environment, False)
-            else:
-                settings["skip"] = publish_config["skip"]
-
-    return settings
-
-
-def _extract_unpublish_settings(config: dict, environment: str) -> dict:
-    """Extract unpublish-specific settings from config for the given environment."""
-    settings = {}
-
-    if "unpublish" in config:
-        unpublish_config = config["unpublish"]
-
-        # Extract exclude regex
-        if "exclude_regex" in unpublish_config:
-            settings["exclude_regex"] = unpublish_config["exclude_regex"]
-
-        # Extract items to include
-        if "items_to_include" in unpublish_config:
-            settings["items_to_include"] = unpublish_config["items_to_include"]
-
-        # Extract environment-specific skip setting
-        if "skip" in unpublish_config:
-            if isinstance(unpublish_config["skip"], dict):
-                settings["skip"] = unpublish_config["skip"].get(environment, False)
-            else:
-                settings["skip"] = unpublish_config["skip"]
-
-    return settings
-
-
-def _apply_config_overrides(config: dict) -> None:
-    """Apply feature flags and constants overrides from config."""
-    # Apply feature flags
-    if "features" in config and isinstance(config["features"], list):
-        for feature in config["features"]:
-            if isinstance(feature, str):
-                constants.FEATURE_FLAG.add(feature)
-                logger.info(f"Enabled feature flag: {feature}")
-
-    # Apply constants overrides
-    if "constants" in config and isinstance(config["constants"], dict):
-        for key, value in config["constants"].items():
-            if hasattr(constants, key):
-                setattr(constants, key, value)
-                logger.info(f"Override constant {key} = {value}")
-            else:
-                logger.warning(f"Unknown constant '{key}' in configuration, ignoring")
