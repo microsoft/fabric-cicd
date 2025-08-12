@@ -322,71 +322,6 @@ def unpublish_all_orphan_items(
         fabric_workspace_obj._unpublish_folders()
 
 
-def deploy_all_items(
-    fabric_workspace_obj: FabricWorkspace,
-    publish_exclude_regex: Optional[str] = None,
-    unpublish_exclude_regex: str = "^$",
-) -> None:
-    """
-    Deploy all items by publishing repository items and unpublishing orphaned items.
-
-    This function provides a simplified interface that combines publish_all_items()
-    and unpublish_all_orphan_items() operations in a single call. This is the
-    recommended way to perform a complete deployment.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be deployed.
-        publish_exclude_regex: Regex pattern to exclude specific items from being published.
-        unpublish_exclude_regex: Regex pattern to exclude specific items from being unpublished.
-            Default is '^$' which excludes nothing.
-
-    Examples:
-        Basic usage (recommended)
-        >>> from fabric_cicd import FabricWorkspace, deploy_all_items
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-        ... )
-        >>> deploy_all_items(workspace)
-
-        With exclusion patterns
-        >>> from fabric_cicd import FabricWorkspace, deploy_all_items
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-        ... )
-        >>> deploy_all_items(
-        ...     workspace,
-        ...     publish_exclude_regex=".*_test",
-        ...     unpublish_exclude_regex=".*_preserve"
-        ... )
-
-        Equivalent to calling both functions separately
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-        ... )
-        >>> publish_all_items(workspace)
-        >>> unpublish_all_orphan_items(workspace)
-    """
-    fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
-
-    print_header("Deploying All Items")
-    logger.info("Starting deployment: publishing repository items and cleaning up orphaned items")
-
-    # First, publish all items from the repository
-    publish_all_items(fabric_workspace_obj, publish_exclude_regex)
-
-    # Then, unpublish any orphaned items not in the repository
-    unpublish_all_orphan_items(fabric_workspace_obj, unpublish_exclude_regex)
-
-    logger.info("Deployment completed successfully")
-
-
 def deploy_with_config(
     config_file: str,
     environment: str,
@@ -512,23 +447,23 @@ def _load_config_file(config_file: str) -> dict:
     if not config_path.exists():
         error_msg = f"Configuration file not found: {config_file}"
         raise FileNotFoundError(error_msg)
-    
+
     try:
         with config_path.open(encoding="utf-8") as f:
             config = yaml.safe_load(f)
     except yaml.YAMLError as e:
         error_msg = f"Invalid YAML syntax in configuration file: {e}"
         raise InputError(error_msg, logger) from e
-    
+
     if not isinstance(config, dict):
         error_msg = "Configuration file must contain a YAML dictionary"
         raise InputError(error_msg, logger)
-    
+
     # Validate required sections
     if "core" not in config:
         error_msg = "Configuration file must contain a 'core' section"
         raise InputError(error_msg, logger)
-    
+
     return config
 
 
@@ -560,7 +495,7 @@ def _extract_workspace_settings(config: dict, environment: str) -> dict:
     if "workspace_id" not in settings and "workspace_name" not in settings:
         error_msg = "Configuration must specify either 'workspace_id' or 'workspace' in core section"
         raise InputError(error_msg, logger)
-    
+
     # Extract other required settings
     if "repository_directory" not in core:
         error_msg = "Configuration must specify 'repository_directory' in core section"

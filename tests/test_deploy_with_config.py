@@ -419,11 +419,11 @@ class TestConfigIntegration:
             # Test environment extraction
             workspace_settings = _extract_workspace_settings(config, "dev")
             assert "repository_directory" in workspace_settings
-            
+
             # Test settings extraction functions (verify they don't crash)
             _extract_publish_settings(config, "dev")
             _extract_unpublish_settings(config, "dev")
-            
+
             # Should not raise any errors
             _apply_config_overrides(config)
 
