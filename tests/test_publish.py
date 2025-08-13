@@ -105,7 +105,7 @@ def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint):
             # Should include all available item types
             import fabric_cicd.constants as constants
 
-            expected_types = list(constants.ACCEPTED_ITEM_TYPES_UPN)
+            expected_types = list(constants.ACCEPTED_ITEM_TYPES)
             assert set(workspace.item_type_in_scope) == set(expected_types)
 
 
