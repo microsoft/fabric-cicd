@@ -472,6 +472,8 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
+        item_guid = item.guid
+        item_files = item.item_files
 
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
@@ -501,9 +503,6 @@ class FabricWorkspace:
         success = True
 
         try:
-            item_guid = item.guid
-            item_files = item.item_files
-
             metadata_body = {"displayName": item_name, "type": item_type}
 
             # Only shell deployment, no definition support
