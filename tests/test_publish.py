@@ -341,8 +341,8 @@ def test_unpublish_with_feature_flags_enabled(mock_endpoint, caplog):
             # Restore original feature flags
             constants.FEATURE_FLAG.clear()
             constants.FEATURE_FLAG.update(original_flags)
-           
-          
+
+
 def test_publish_all_items_deployment_log_entries(mock_endpoint):
     """Test that publish_all_items returns list of DeploymentLogEntry objects."""
 
@@ -509,4 +509,4 @@ def test_unpublish_all_orphan_items_returns_empty_list(mock_endpoint):
 
             # Verify return type
             assert isinstance(result, list)
-            assert len(result) == 0   
+            assert len(result) == 0
