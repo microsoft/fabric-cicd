@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import fabric_cicd.publish as publish
+from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -19,7 +20,7 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 def mock_endpoint():
     """Mock FabricEndpoint to avoid real API calls."""
     mock = MagicMock()
-    mock.invoke.return_value = {"body": {"value": [], "capacityId": "test-capacity"}}
+    mock.invoke.return_value = {"body": {"value": [], "capacityId": "test-capacity"}, "header": {}}
     mock.upn_auth = True
     return mock
 
@@ -176,3 +177,172 @@ def test_mixed_valid_and_invalid_item_types_in_scope(mock_endpoint):
                 repository_directory=str(temp_path),
                 item_type_in_scope=["Notebook", "BadType", "Environment"],
             )
+
+
+def test_publish_all_items_deployment_log_entries(mock_endpoint):
+    """Test that publish_all_items returns list of DeploymentLogEntry objects."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a notebook with proper .platform metadata
+        notebook_dir = temp_path / "Notebook_1.Notebook"
+        notebook_dir.mkdir(parents=True)
+        (notebook_dir / "notebook-content.py").write_text("print('test')")
+
+        platform_file = notebook_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "Notebook_1",
+                "description": "Test notebook",
+            },
+            "config": {"logicalId": "notebook-1-id"},
+        }
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        # Mock response with proper id field for successful publish
+        mock_endpoint.invoke.return_value = {
+            "body": {"value": [], "capacityId": "test-capacity", "id": "test-item-id"},
+            "header": {},
+        }
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook"],  # Only test notebooks to avoid complexity
+            )
+
+            # Test publish_all_items returns list of DeploymentLogEntry objects
+            result = publish.publish_all_items(workspace)
+
+            # Verify return type
+            assert isinstance(result, list)
+            assert len(result) >= 1  # Should have at least one entry
+
+            # Verify all entries are DeploymentLogEntry objects
+            for entry in result:
+                assert isinstance(entry, DeploymentLogEntry)
+                assert entry.operation_type == "publish"
+                assert entry.name == "Notebook_1"
+                assert entry.item_type == "Notebook"
+                assert isinstance(entry.success, bool)
+                assert entry.start_time is not None
+                assert entry.end_time is not None
+                assert entry.duration_seconds >= 0
+
+
+def test_unpublish_all_orphan_items_deployment_log_entries(mock_endpoint):
+    """Test that unpublish_all_orphan_items returns list of DeploymentLogEntry objects."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a notebook in the repository (so it's not orphaned)
+        (temp_path / "Notebook_1.Notebook").mkdir(parents=True)
+        (temp_path / "Notebook_1.Notebook" / "notebook-content.py").write_text("print('test')")
+
+        # Mock deployed items - include orphaned items that aren't in repository
+        deployed_items = [
+            {
+                "displayName": "Notebook_1",
+                "type": "Notebook",
+                "id": "11111111-1111-1111-1111-111111111111",
+                "description": "Test notebook 1",
+            },
+            {
+                "displayName": "OrphanedNotebook",
+                "type": "Notebook",
+                "id": "22222222-2222-2222-2222-222222222222",
+                "description": "Orphaned notebook",
+            },
+            {
+                "displayName": "OrphanedEnvironment",
+                "type": "Environment",
+                "id": "33333333-3333-3333-3333-333333333333",
+                "description": "Orphaned environment",
+            },
+        ]
+
+        # Override the default return value for this test
+        mock_endpoint.invoke.return_value = {"body": {"value": deployed_items, "capacityId": "test-capacity"}}
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook", "Environment"],
+            )
+
+            # Test unpublish_all_orphan_items returns list of DeploymentLogEntry objects
+            result = publish.unpublish_all_orphan_items(workspace)
+
+            # Verify return type - it might include more items due to test setup
+            assert isinstance(result, list)
+            assert len(result) >= 2  # Should have at least entries for orphaned items
+
+            # Verify all entries are DeploymentLogEntry objects
+            for entry in result:
+                assert isinstance(entry, DeploymentLogEntry)
+                assert entry.operation_type == "unpublish"
+                assert entry.name in ["Notebook_1", "OrphanedNotebook", "OrphanedEnvironment"]
+                assert entry.item_type in ["Notebook", "Environment"]
+                assert isinstance(entry.success, bool)
+                assert entry.start_time is not None
+                assert entry.end_time is not None
+                assert entry.duration_seconds >= 0
+
+
+def test_unpublish_all_orphan_items_returns_empty_list(mock_endpoint):
+    """Test that unpublish_all_orphan_items returns empty list when no orphans exist."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a notebook in the repository
+        notebook_dir = temp_path / "Notebook_1.Notebook"
+        notebook_dir.mkdir(parents=True)
+        (notebook_dir / "notebook-content.py").write_text("print('test')")
+
+        platform_file = notebook_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "Notebook_1",
+                "description": "Test notebook",
+            },
+            "config": {"logicalId": "notebook-1-id"},
+        }
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        # Mock deployed items - only items that exist in repository
+        deployed_items = [
+            {
+                "displayName": "Notebook_1",
+                "type": "Notebook",
+                "id": "11111111-1111-1111-1111-111111111111",
+                "description": "Test notebook",
+            }
+        ]
+
+        mock_endpoint.invoke.return_value = {
+            "body": {"value": deployed_items, "capacityId": "test-capacity"},
+            "header": {},
+        }
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook"],
+            )
+
+            # Test unpublish_all_orphan_items returns empty list
+            result = publish.unpublish_all_orphan_items(workspace)
+
+            # Verify return type
+            assert isinstance(result, list)
+            assert len(result) == 0
