@@ -11,6 +11,7 @@ import dpath.util as dpath
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
@@ -25,7 +26,7 @@ def publish_all_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
-) -> None:
+) -> list[DeploymentLogEntry]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
@@ -34,6 +35,8 @@ def publish_all_items(
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
+    Returns:
+        list[DeploymentLogEntry]: A list of structured log entries capturing the publish operations.
 
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -50,6 +53,21 @@ def publish_all_items(
         ... )
         >>> publish_all_items(workspace)
 
+        Basic usage with structured logs
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> log_entries = publish_all_items(workspace)
+        >>> for entry in log_entries:
+        ...     print(f"{entry.name}: {'Success' if entry.success else 'Failed'}")
+        ...     if not entry.success:
+        ...         print(f"{entry.item_type} '{entry.name}' id: {entry.guid}")
+        ...         print(f"{entry.operation_type} error: {entry.error}")
+        ...         print(f"start_time: {entry.start_time}, end_time: {entry.end_time}")
+
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
         >>> workspace = FabricWorkspace(
@@ -58,7 +76,9 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> exclude_regex = ".*_do_not_publish"
-        >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+        >>> log_entries = publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+        >>> successful = [entry for entry in log_entries if entry.success]
+        >>> print(f"Successfully published {len(successful)} items")
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -68,11 +88,16 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
-        >>> publish_all_items(workspace, items_to_include=items_to_include)
+        >>> log_entries = publish_all_items(workspace, items_to_include=items_to_include)
+        >>> successful = [entry for entry in log_entries if entry.success]
+        >>> print(f"Successfully published {len(successful)} items")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    # check if workspace has assigned capacity, if not, exit
+    # Clear any previous log entries
+    fabric_workspace_obj.publish_log_entries = []
+
+    # Check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
 
     response_state = fabric_workspace_obj.endpoint.invoke(
@@ -121,78 +146,85 @@ def publish_all_items(
             item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.repository_items
         )
 
-    if _should_publish_item_type("VariableLibrary"):
-        print_header("Publishing Variable Libraries")
-        items.publish_variablelibraries(fabric_workspace_obj)
-    if _should_publish_item_type("Warehouse"):
-        print_header("Publishing Warehouses")
-        items.publish_warehouses(fabric_workspace_obj)
-    if _should_publish_item_type("Lakehouse"):
-        print_header("Publishing Lakehouses")
-        items.publish_lakehouses(fabric_workspace_obj)
-    if _should_publish_item_type("SQLDatabase"):
-        print_header("Publishing SQL Databases")
-        items.publish_sqldatabases(fabric_workspace_obj)
-    if _should_publish_item_type("MirroredDatabase"):
-        print_header("Publishing Mirrored Databases")
-        items.publish_mirroreddatabase(fabric_workspace_obj)
-    if _should_publish_item_type("Environment"):
-        print_header("Publishing Environments")
-        items.publish_environments(fabric_workspace_obj)
-    if _should_publish_item_type("Notebook"):
-        print_header("Publishing Notebooks")
-        items.publish_notebooks(fabric_workspace_obj)
-    if _should_publish_item_type("SemanticModel"):
-        print_header("Publishing Semantic Models")
-        items.publish_semanticmodels(fabric_workspace_obj)
-    if _should_publish_item_type("Report"):
-        print_header("Publishing Reports")
-        items.publish_reports(fabric_workspace_obj)
-    if _should_publish_item_type("CopyJob"):
-        print_header("Publishing Copy Jobs")
-        items.publish_copyjobs(fabric_workspace_obj)
-    if _should_publish_item_type("Eventhouse"):
-        print_header("Publishing Eventhouses")
-        items.publish_eventhouses(fabric_workspace_obj)
-    if _should_publish_item_type("KQLDatabase"):
-        print_header("Publishing KQL Databases")
-        items.publish_kqldatabases(fabric_workspace_obj)
-    if _should_publish_item_type("KQLQueryset"):
-        print_header("Publishing KQL Querysets")
-        items.publish_kqlquerysets(fabric_workspace_obj)
-    if _should_publish_item_type("Reflex"):
-        print_header("Publishing Activators")
-        items.publish_activators(fabric_workspace_obj)
-    if _should_publish_item_type("Eventstream"):
-        print_header("Publishing Eventstreams")
-        items.publish_eventstreams(fabric_workspace_obj)
-    if _should_publish_item_type("KQLDashboard"):
-        print_header("Publishing KQL Dashboards")
-        items.publish_kqldashboard(fabric_workspace_obj)
-    if _should_publish_item_type("Dataflow"):
-        print_header("Publishing Dataflows")
-        items.publish_dataflows(fabric_workspace_obj)
-    if _should_publish_item_type("DataPipeline"):
-        print_header("Publishing Data Pipelines")
-        items.publish_datapipelines(fabric_workspace_obj)
-    if _should_publish_item_type("GraphQLApi"):
-        print_header("Publishing GraphQL APIs")
-        logger.warning(
-            "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
-        )
-        items.publish_graphqlapis(fabric_workspace_obj)
+    try:
+        if _should_publish_item_type("VariableLibrary"):
+            print_header("Publishing Variable Libraries")
+            items.publish_variablelibraries(fabric_workspace_obj)
+        if _should_publish_item_type("Warehouse"):
+            print_header("Publishing Warehouses")
+            items.publish_warehouses(fabric_workspace_obj)
+        if _should_publish_item_type("Lakehouse"):
+            print_header("Publishing Lakehouses")
+            items.publish_lakehouses(fabric_workspace_obj)
+        if _should_publish_item_type("SQLDatabase"):
+            print_header("Publishing SQL Databases")
+            items.publish_sqldatabases(fabric_workspace_obj)
+        if _should_publish_item_type("MirroredDatabase"):
+            print_header("Publishing Mirrored Databases")
+            items.publish_mirroreddatabase(fabric_workspace_obj)
+        if _should_publish_item_type("Environment"):
+            print_header("Publishing Environments")
+            items.publish_environments(fabric_workspace_obj)
+        if _should_publish_item_type("Notebook"):
+            print_header("Publishing Notebooks")
+            items.publish_notebooks(fabric_workspace_obj)
+        if _should_publish_item_type("SemanticModel"):
+            print_header("Publishing Semantic Models")
+            items.publish_semanticmodels(fabric_workspace_obj)
+        if _should_publish_item_type("Report"):
+            print_header("Publishing Reports")
+            items.publish_reports(fabric_workspace_obj)
+        if _should_publish_item_type("CopyJob"):
+            print_header("Publishing Copy Jobs")
+            items.publish_copyjobs(fabric_workspace_obj)
+        if _should_publish_item_type("Eventhouse"):
+            print_header("Publishing Eventhouses")
+            items.publish_eventhouses(fabric_workspace_obj)
+        if _should_publish_item_type("KQLDatabase"):
+            print_header("Publishing KQL Databases")
+            items.publish_kqldatabases(fabric_workspace_obj)
+        if _should_publish_item_type("KQLQueryset"):
+            print_header("Publishing KQL Querysets")
+            items.publish_kqlquerysets(fabric_workspace_obj)
+        if _should_publish_item_type("Reflex"):
+            print_header("Publishing Activators")
+            items.publish_activators(fabric_workspace_obj)
+        if _should_publish_item_type("Eventstream"):
+            print_header("Publishing Eventstreams")
+            items.publish_eventstreams(fabric_workspace_obj)
+        if _should_publish_item_type("KQLDashboard"):
+            print_header("Publishing KQL Dashboards")
+            items.publish_kqldashboard(fabric_workspace_obj)
+        if _should_publish_item_type("Dataflow"):
+            print_header("Publishing Dataflows")
+            items.publish_dataflows(fabric_workspace_obj)
+        if _should_publish_item_type("DataPipeline"):
+            print_header("Publishing Data Pipelines")
+            items.publish_datapipelines(fabric_workspace_obj)
+        if _should_publish_item_type("GraphQLApi"):
+            print_header("Publishing GraphQL APIs")
+            logger.warning(
+                "Only user authentication is supported for GraphQL API items sourced from SQL Analytics Endpoint"
+            )
+            items.publish_graphqlapis(fabric_workspace_obj)
 
-    # Check Environment Publish
-    if _should_publish_item_type("Environment"):
-        print_header("Checking Environment Publish State")
-        items.check_environment_publish_state(fabric_workspace_obj)
+        # Check Environment Publish
+        if _should_publish_item_type("Environment"):
+            print_header("Checking Environment Publish State")
+            items.check_environment_publish_state(fabric_workspace_obj)
+
+    except Exception as e:
+        logger.error(f"An error occurred during publishing: {e}", exc_info=True)
+        return fabric_workspace_obj.publish_log_entries
+
+    return fabric_workspace_obj.publish_log_entries
 
 
 def unpublish_all_orphan_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: str = "^$",
     items_to_include: Optional[list[str]] = None,
-) -> None:
+) -> list[DeploymentLogEntry]:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
 
@@ -205,6 +237,9 @@ def unpublish_all_orphan_items(
         This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing is not recommended due to item dependencies.
         To enable this feature, see How To -> Optional Features for information on which flags to enable.
 
+    Returns:
+        list[DeploymentLogEntry]: A list of structured log entries capturing the unpublish operations.
+
     Examples:
         Basic usage
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
@@ -214,7 +249,22 @@ def unpublish_all_orphan_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> publish_all_items(workspace)
-        >>> unpublish_orphaned_items(workspace)
+        >>> unpublish_all_orphan_items(workspace)
+
+        Basic usage with structured logs
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> publish_all_items(workspace)
+        >>> log_entries = unpublish_all_orphan_items(workspace)
+        >>> for entry in log_entries:
+        ...     print(f"{entry.name}: {'Success' if entry.success else 'Failed'}")
+        ...     if not entry.success:
+        ...         print(f"{entry.item_type} '{entry.name}' id: {entry.guid}")
+        ...         print(f"{entry.operation_type} error: {entry.error}, start_time: {entry.start_time}, end_time: {entry.end_time}")
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
@@ -225,7 +275,9 @@ def unpublish_all_orphan_items(
         ... )
         >>> publish_all_items(workspace)
         >>> exclude_regex = ".*_do_not_delete"
-        >>> unpublish_orphaned_items(workspace, item_name_exclude_regex=exclude_regex)
+        >>> log_entries = unpublish_all_orphan_items(workspace, item_name_exclude_regex=exclude_regex)
+        >>> successful = [entry for entry in log_entries if entry.success]
+        >>> print(f"Successfully unpublished {len(successful)} items")
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
@@ -236,9 +288,14 @@ def unpublish_all_orphan_items(
         ... )
         >>> publish_all_items(workspace)
         >>> items_to_include = ["Hello World.Notebook", "Run Hello World.DataPipeline"]
-        >>> unpublish_orphaned_items(workspace, items_to_include=items_to_include)
+        >>> log_entries = unpublish_all_orphan_items(workspace, items_to_include=items_to_include)
+        >>> successful = [entry for entry in log_entries if entry.success]
+        >>> print(f"Successfully unpublished {len(successful)} items")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
+    # Clear any previous log entries
+    fabric_workspace_obj.unpublish_log_entries = []
 
     regex_pattern = check_regex(item_name_exclude_regex)
 
@@ -295,25 +352,32 @@ def unpublish_all_orphan_items(
             if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
                 unpublish_order.append(item_type)
 
-    for item_type in unpublish_order:
-        deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
-        repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
+    try:
+        for item_type in unpublish_order:
+            deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
+            repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
-        to_delete_set = deployed_names - repository_names
-        to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
+            to_delete_set = deployed_names - repository_names
+            to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type == "DataPipeline":
-            find_referenced_items_func = items.find_referenced_datapipelines
+            if item_type == "DataPipeline":
+                find_referenced_items_func = items.find_referenced_datapipelines
 
-            # Determine order to delete w/o dependencies
-            to_delete_list = items.set_unpublish_order(
-                fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
-            )
+                # Determine order to delete w/o dependencies
+                to_delete_list = items.set_unpublish_order(
+                    fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
+                )
 
-        for item_name in to_delete_list:
-            fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
+            for item_name in to_delete_list:
+                fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
-    fabric_workspace_obj._refresh_deployed_items()
-    fabric_workspace_obj._refresh_deployed_folders()
-    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
-        fabric_workspace_obj._unpublish_folders()
+        fabric_workspace_obj._refresh_deployed_items()
+        fabric_workspace_obj._refresh_deployed_folders()
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+            fabric_workspace_obj._unpublish_folders()
+
+    except Exception as e:
+        logger.error(f"An error occurred during unpublishing: {e}", exc_info=True)
+        return fabric_workspace_obj.unpublish_log_entries
+
+    return fabric_workspace_obj.unpublish_log_entries

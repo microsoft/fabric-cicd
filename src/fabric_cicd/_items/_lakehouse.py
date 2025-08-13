@@ -5,10 +5,12 @@
 
 import json
 import logging
+from datetime import datetime
 
 import dpath
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
@@ -140,23 +142,49 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
         shortcut_dict: The dict of shortcuts to publish
     """
     for shortcut in shortcut_dict.values():
-        # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
+        # Capture the start time for structured logging
+        start_time = datetime.now()
+        error_msg = None
+        success = True
+
         try:
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
             fabric_workspace_obj.endpoint.invoke(
                 method="POST",
                 url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
                 body=shortcut,
             )
             logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
+
         except Exception as e:
+            success = False
+            error_msg = str(e)
+
             if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
                 logger.warning(
                     f"Failed to publish '{shortcut['name']}'. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
                 logger.info("The publish process will continue with the other items.")
                 continue
+
             msg = f"Failed to publish '{shortcut['name']}' for lakehouse {item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger) from e
+
+        finally:
+            end_time = datetime.now()
+
+            # Add log entry for publish attempt
+            fabric_workspace_obj.publish_log_entries.append(
+                DeploymentLogEntry(
+                    name=f"{item_obj.name}/{shortcut['name']}",
+                    item_type="Shortcut",
+                    success=success,
+                    error=error_msg,
+                    start_time=start_time,
+                    end_time=end_time,
+                    guid=f"{item_obj.guid}/shortcut/{shortcut['name']}",
+                )
+            )
 
 
 def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
