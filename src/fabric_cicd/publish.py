@@ -318,6 +318,7 @@ def unpublish_all_orphan_items(
         "Lakehouse": "enable_lakehouse_unpublish",
         "SQLDatabase": "enable_sqldatabase_unpublish",
         "Warehouse": "enable_warehouse_unpublish",
+        "Eventhouse": "enable_eventhouse_unpublish",
     }
 
     # Define order to unpublish items
@@ -348,6 +349,11 @@ def unpublish_all_orphan_items(
             # Append item_type if no feature flag is required or the corresponding flag is enabled
             if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
                 unpublish_order.append(item_type)
+            elif unpublish_flag and unpublish_flag not in constants.FEATURE_FLAG:
+                # Log warning when unpublish is skipped due to missing feature flag
+                logger.warning(
+                    f"Skipping unpublish for {item_type} items because the '{unpublish_flag}' feature flag is not enabled."
+                )
 
     try:
         for item_type in unpublish_order:
