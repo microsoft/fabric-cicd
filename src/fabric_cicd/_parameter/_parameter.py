@@ -46,7 +46,7 @@ class Parameter:
 
     def __init__(
         self,
-        repository_directory: str,
+        repository_directory: Path,
         item_type_in_scope: list[str],
         environment: str,
         parameter_file_name: str = "parameter.yml",
@@ -233,7 +233,7 @@ class Parameter:
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
 
             # Check if replacement will be skipped for a given find value
-            is_valid_env = self._validate_environment(parameter_dict["replace_value"])
+            is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
             log_func = logger.debug if param_name == "key_value_replace" else logger.warning
 
@@ -244,8 +244,14 @@ class Parameter:
                 else "find value"
             )
 
-            # Replacement skipped if target environment is not present
             if self.environment != "N/A" and not is_valid_env:
+                # Return validation error for invalid _ALL_ case (_ALL_ used with other envs)
+                if env_type.lower() == "_all_":
+                    return False, constants.PARAMETER_MSGS["other target env"].format(
+                        env_type, parameter_dict["replace_value"]
+                    )
+
+                # Otherwise, replacement skipped if target environment is not present
                 skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
                 log_func(
                     constants.PARAMETER_MSGS["skip"].format(
@@ -253,6 +259,12 @@ class Parameter:
                     )
                 )
                 continue
+
+            # Log if _ALL_ environment is present in replace_value
+            if env_type.lower() == "_all_":
+                logger.warning(
+                    constants.PARAMETER_MSGS["all target env"].format(parameter_dict["replace_value"][env_type])
+                )
 
             # Replacement skipped if optional filter values don't match
             if msg == "no match" and not is_valid_optional_val:
@@ -416,11 +428,15 @@ class Parameter:
                 # Validate specific optional values and check for matches
                 if check_match and param in validation_methods:
                     values = value if isinstance(value, list) else [value]
-                    for item in values:
-                        is_valid, msg = validation_methods[param](item)
-                        if not is_valid:
-                            logger.debug(msg)
-                            return False, "no match"
+                    if param == "file_path":
+                        is_valid, msg = validation_methods[param](values)
+                    else:
+                        for item in values:
+                            is_valid, msg = validation_methods[param](item)
+
+                    if not is_valid:
+                        logger.debug(msg)
+                        return False, "no match"
 
         return True, constants.PARAMETER_MSGS["valid optional"].format(param_name)
 
@@ -440,9 +456,24 @@ class Parameter:
 
         return True, "Data type is valid"
 
-    def _validate_environment(self, replace_value: dict) -> bool:
-        """Check the target environment exists as a key in the replace_value dictionary."""
-        return self.environment in replace_value
+    def _validate_environment(self, replace_value: dict) -> tuple[bool, str]:
+        """
+        Check the target environment exists as a key in the replace_value dictionary.
+        If "_ALL_" (case insensitive) is present, it must be the only key.
+        """
+        # Check for _ALL_ in any case variation
+        all_key = None
+        for key in replace_value:
+            if key.lower() == "_all_":
+                logger.warning(f"Found the reserved environment key '{key}'")
+                all_key = key
+                break
+        if all_key:
+            # If _ALL_ is present, it must be the only key
+            return len(replace_value) == 1, all_key
+
+        # If _ALL_ is not present, check if target environment is present
+        return self.environment in replace_value, "env"
 
     def _validate_item_type(self, input_type: str) -> tuple[bool, str]:
         """Validate the item type is in scope."""
@@ -473,13 +504,18 @@ class Parameter:
 
         return True, "Valid item name"
 
-    def _validate_file_path(self, input_path: str) -> tuple[bool, str]:
-        """Validate the file path exists."""
-        # Convert input path to Path object
-        input_path_new = process_input_path(self.repository_directory, input_path)
+    def _validate_file_path(self, input_path: list[str]) -> tuple[bool, str]:
+        """Validate that the file paths exist within the repository directory."""
+        # Convert input path to Path objects, returned as a list of valid paths
+        valid_paths = process_input_path(self.repository_directory, input_path, validation_flag=True)
 
-        # Check if the file path exists
-        if not input_path_new.exists():
-            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path)
+        # If list of paths is empty, all paths were invalid
+        if not valid_paths:
+            return False, constants.PARAMETER_MSGS["no valid file path"].format(input_path)
+
+        # Check for some invalid paths
+        path_diff = len(input_path) - len(valid_paths)
+        if path_diff > 0:
+            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"

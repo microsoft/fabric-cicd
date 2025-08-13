@@ -124,7 +124,6 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
             handle_retry(
                 attempt=iteration,
                 base_delay=5,
-                max_retries=20,
                 response_retry_after=120,
                 prepend_message=f"{constants.INDENT}Operation in progress.",
             )
@@ -146,6 +145,8 @@ def _update_compute_settings(
         item_guid: The GUID of the environment item.
         item_name: Name of the environment item.
     """
+    from fabric_cicd._parameter._utils import process_environment_key
+
     # Read compute settings from YAML file
     with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
         yaml_body = yaml.safe_load(f)
@@ -157,7 +158,7 @@ def _update_compute_settings(
                 parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
                 for key in parameter_dict:
                     instance_pool_id = key["instance_pool_id"]
-                    replace_value = key["replace_value"]
+                    replace_value = process_environment_key(fabric_workspace_obj, key["replace_value"])
                     input_name = key.get("item_name")
                     if instance_pool_id == pool_id and (input_name == item_name or not input_name):
                         # replace any found references with specified environment value

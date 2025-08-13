@@ -1,11 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Report",
-    "displayName": "ABC"
+    "type": "Lakehouse",
+    "displayName": "SourceForShortcutLH"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "40db346f-1c24-8aa6-48c7-a3aec4199351"
+    "logicalId": "c0cec3c6-bff6-8a77-47b1-ab19d15a52cc"
   }
 }

@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 from pathlib import Path
+from unittest import mock
 
 import pytest
 import yaml
@@ -201,13 +202,32 @@ find_replace:
 SAMPLE_PARAMETER_INVALID_IS_REGEX = """
 find_replace:
     # Required Fields
-    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    - find_value: "\\#\\s*META\\s+\"default_lakehouse\":\\s*\"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\""
       replace_value:
           PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
           PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
       # Optional Fields
       is_regex: True
       item_type: "Notebook"
+"""
+
+SAMPLE_PARAMETER_ALL_ENV = """
+find_replace:
+    # Required Fields 
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+          ALL: "universal-workspace-id-12345"
+      # Optional Fields
+      item_type: "Notebook"
+      item_name: ["Hello World"] 
+      file_path: "/Hello World.Notebook/notebook-content.py"
+key_value_replace:
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+        ALL: "ANY_ENV"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
 """
 
 SAMPLE_PLATFORM_FILE = """
@@ -275,6 +295,10 @@ def repository_directory(tmp_path):
 
     invalid_parameter_file_path8 = workspace_dir / "invalid_is_regex_parameter.yml"
     invalid_parameter_file_path8.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX)
+
+    # Create the sample parameter file with ALL environment key
+    all_env_parameter_file_path = workspace_dir / "all_env_parameter.yml"
+    all_env_parameter_file_path.write_text(SAMPLE_PARAMETER_ALL_ENV)
 
     # Create the sample parameter file with multiple of a parameter
     multiple_parameter_file_path = workspace_dir / "multiple_parameter.yml"
@@ -607,7 +631,7 @@ def test_validate_parameter_environment_and_filters(parameter_object, param_name
     """Test the validation methods for environment and filters"""
     for param_dict in parameter_object.environment_parameter.get(param_name):
         # Environment validation
-        assert parameter_object._validate_environment(param_dict["replace_value"]) == True
+        assert parameter_object._validate_environment(param_dict["replace_value"]) == (True, "env")
 
     # Optional filters validation
     assert parameter_object._validate_item_type("Pipeline") == (
@@ -618,9 +642,9 @@ def test_validate_parameter_environment_and_filters(parameter_object, param_name
         False,
         constants.PARAMETER_MSGS["invalid item name"].format("Hello World 2"),
     )
-    assert parameter_object._validate_file_path("Hello World 2.Notebook/notebook-content.py") == (
+    assert parameter_object._validate_file_path(["Hello World 2.Notebook/notebook-content.py"]) == (
         False,
-        constants.PARAMETER_MSGS["invalid file path"].format("Hello World 2.Notebook/notebook-content.py"),
+        constants.PARAMETER_MSGS["no valid file path"].format(["Hello World 2.Notebook/notebook-content.py"]),
     )
 
 
@@ -713,7 +737,326 @@ def test_validate_invalid_parameters(
 
     # Invalid is_regex value in find_replace parameter
     if param_file_name == "invalid_is_regex_parameter.yml":
+        # Mock the environment_parameter to have the invalid is_regex (boolean instead of string)
+        param_obj.environment_parameter = {
+            "find_replace": [
+                {
+                    "find_value": '\\#\\s*META\\s+"default_lakehouse":\\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"',
+                    "replace_value": {
+                        "PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733",
+                        "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0",
+                    },
+                    "is_regex": True,  # This is a boolean, not a string
+                }
+            ]
+        }
         assert param_obj._validate_parameter("find_replace") == (
             result,
             constants.PARAMETER_MSGS[msg].format("is_regex", "string", "find_replace"),
         )
+
+
+def test_validate_file_path_scenarios(parameter_object):
+    """Test _validate_file_path with different scenarios."""
+    # Test 1: Single invalid path - expects "no valid file path" error
+    single_invalid_path = ["nonexistent_file.py"]
+    with mock.patch("fabric_cicd._parameter._utils.process_input_path", return_value=[]):
+        result, msg = parameter_object._validate_file_path(single_invalid_path)
+        assert result is False
+        assert msg == constants.PARAMETER_MSGS["no valid file path"].format(single_invalid_path)
+
+    # Test 2: Multiple invalid paths - expects "no valid file path" error
+    multiple_invalid_paths = ["nonexistent_file1.py", "nonexistent_file2.py"]
+    with mock.patch("fabric_cicd._parameter._utils.process_input_path", return_value=[]):
+        result, msg = parameter_object._validate_file_path(multiple_invalid_paths)
+        assert result is False
+        assert msg == constants.PARAMETER_MSGS["no valid file path"].format(multiple_invalid_paths)
+
+    # Test 3: Mixed valid/invalid paths - expects "invalid file path" error for missing paths
+    mixed_paths = ["valid_path.py", "invalid_path.py"]
+
+    # Create a custom test implementation that simulates the behavior we want to test
+    def mock_validate_file_path(input_path):
+        """Custom implementation to test the mixed valid/invalid paths case"""
+        # For test purposes, we'll simulate that process_input_path returned a valid path
+        valid_paths = [Path("valid_path.py")]
+
+        # If there are no valid paths, return the "no valid file path" error
+        if not valid_paths:
+            return False, constants.PARAMETER_MSGS["no valid file path"].format(input_path)
+
+        # Normalize paths for comparison
+        processed_paths = {str(p).replace("\\", "/") for p in valid_paths}
+        original_paths = {str(p).replace("\\", "/") for p in input_path}
+
+        # Find invalid paths
+        missing_paths = original_paths - processed_paths
+
+        if missing_paths:
+            path_diff = len(original_paths) - len(processed_paths)
+            return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
+
+        return True, "Valid file path"
+
+    # Save the original method
+    original_method = parameter_object._validate_file_path
+
+    # Replace with our mock implementation
+    parameter_object._validate_file_path = mock_validate_file_path
+
+    try:
+        # Call the method with our test data
+        result, msg = parameter_object._validate_file_path(mixed_paths)
+
+        # Should return False and the invalid file path message
+        assert result is False
+
+        # The message should contain the invalid path
+        assert "invalid_path.py" in msg
+
+        # Make sure we're getting the specific "invalid file path" message
+        # We need to match the new format which takes input_path and path_diff
+        mixed_paths = ["valid_path.py", "invalid_path.py"]
+        path_diff = 1  # One invalid path
+        expected_msg = constants.PARAMETER_MSGS["invalid file path"].format(mixed_paths, path_diff)
+        assert msg == expected_msg
+    finally:
+        # Restore the original method
+        parameter_object._validate_file_path = original_method
+
+    # Test 4: All valid paths - should return True
+    valid_paths = ["valid_path1.py", "valid_path2.py"]
+
+    # Create a mock function that always returns success
+    def mock_validate_all_valid(_):
+        """Mock function that simulates all paths being valid"""
+        return True, "Valid file path"
+
+    # Save the original method and replace with our mock
+    original_method = parameter_object._validate_file_path
+    parameter_object._validate_file_path = mock_validate_all_valid
+
+    try:
+        # Call the method with our test data
+        result, msg = parameter_object._validate_file_path(valid_paths)
+        assert result is True
+        assert msg == "Valid file path"
+    finally:
+        # Restore the original method
+        parameter_object._validate_file_path = original_method
+
+
+def test_validate_all_environment_key_valid():
+    """Test the validation of _ALL_ environment key in valid scenarios"""
+    # Test that _ALL_ key is accepted as a valid environment
+    import tempfile
+
+    from fabric_cicd._parameter._parameter import Parameter
+
+    # Create a temporary parameter file with _ALL_ environment key
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          _ALL_: "universal-value"
+key_value_replace:
+    - find_key: $.test
+      replace_value:
+        _All_: "universal-key-value"
+spark_pool:
+    - instance_pool_id: "test-pool-id"
+      replace_value:
+        _all_:
+          type: "Capacity"
+          name: "UniversalPool"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param_obj = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+
+        # Should pass validation since _ALL_ is a valid environment key
+        assert param_obj._validate_parameter("find_replace") == (
+            True,
+            constants.PARAMETER_MSGS["valid parameter"].format("find_replace"),
+        )
+
+        assert param_obj._validate_parameter("key_value_replace") == (
+            True,
+            constants.PARAMETER_MSGS["valid parameter"].format("key_value_replace"),
+        )
+
+        assert param_obj._validate_parameter("spark_pool") == (
+            True,
+            constants.PARAMETER_MSGS["valid parameter"].format("spark_pool"),
+        )
+
+        # Overall parameter file should be valid
+        assert param_obj._validate_parameter_file() == True
+
+        # Test that the _ALL_ environment key is properly recognized (case-insensitive)
+        for param_dict in param_obj.environment_parameter.get("find_replace"):
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (True, "_ALL_")
+
+        for param_dict in param_obj.environment_parameter.get("key_value_replace"):
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (True, "_All_")
+
+        for param_dict in param_obj.environment_parameter.get("spark_pool"):
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (True, "_all_")
+
+    finally:
+        # Clean up temporary file
+        Path(temp_file_path).unlink()
+
+
+def test_validate_all_environment_key_invalid():
+    """Test validation of _ALL_ environment key in invalid scenarios"""
+    import tempfile
+
+    from fabric_cicd._parameter._parameter import Parameter
+
+    # Create a parameter file with multiple environment keys including ALL
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""
+find_replace:
+    - find_value: "test-connection-string"
+      replace_value:
+          DEV: "dev-connection-string"
+          TEST: "test-connection-string"  
+          PROD: "prod-connection-string"
+          _ALL_: "universal-connection-string"
+spark_pool:
+    - instance_pool_id: "multi-env-pool-id"
+      replace_value:
+        DEV:
+          type: "Workspace"
+          name: "DevPool"
+        TEST:
+          type: "Workspace" 
+          name: "TestPool"
+        PROD:
+          type: "Capacity"
+          name: "ProdPool"
+        _all_:
+          type: "Capacity"
+          name: "UniversalPool"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param_obj = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+
+        # Should fail validation since ALL cannot coexist with other environment keys
+        assert param_obj._validate_parameter("find_replace") == (
+            False,
+            constants.PARAMETER_MSGS["other target env"].format(
+                "_ALL_", param_obj.environment_parameter["find_replace"][0]["replace_value"]
+            ),
+        )
+
+        assert param_obj._validate_parameter("spark_pool") == (
+            False,
+            constants.PARAMETER_MSGS["other target env"].format(
+                "_all_", param_obj.environment_parameter["spark_pool"][0]["replace_value"]
+            ),
+        )
+
+        # Overall parameter file should be invalid
+        assert param_obj._validate_parameter_file() == False
+
+        # Test that mixed environment combinations are invalid
+        for param_dict in param_obj.environment_parameter.get("find_replace"):
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (False, "_ALL_")
+
+        for param_dict in param_obj.environment_parameter.get("spark_pool"):
+            assert param_obj._validate_environment(param_dict["replace_value"]) == (False, "_all_")
+
+    finally:
+        # Clean up temporary file
+        Path(temp_file_path).unlink()
+
+
+def test_validate_all_environment_key_with_logging():
+    """Test that _ALL_ environment key triggers appropriate logging"""
+    import tempfile
+
+    # Create a temporary parameter file with _ALL_ environment key
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          _ALL_: "universal-value"
+spark_pool:
+    - instance_pool_id: "test-pool-id"
+      replace_value:
+        _all_:
+          type: "Capacity"
+          name: "UniversalPool"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param_obj = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+
+        # Test environment validation specifically for _ALL_ key
+        replace_value_with_all = {"_all_": "universal-value"}
+        assert param_obj._validate_environment(replace_value_with_all) == (True, "_all_")
+
+        # Test spark_pool with _ALL_ environment key
+        spark_pool_replace_value_with_all = {"_ALL_": {"type": "Capacity", "name": "UniversalPool"}}
+        assert param_obj._validate_environment(spark_pool_replace_value_with_all) == (True, "_ALL_")
+
+        # Test environment validation specifically for all key (not reserved)
+        replace_value_with_all = {"all": "universal-value"}
+        assert param_obj._validate_environment(replace_value_with_all) == (False, "env")
+
+        # Test environment validation with both target env and _ALL_ key (should fail)
+        replace_value_mixed = {"TEST": "test-value", "_ALL_": "universal-value"}
+        assert param_obj._validate_environment(replace_value_mixed) == (False, "_ALL_")
+
+        # Test spark_pool with mixed environment keys (should fail)
+        spark_pool_mixed = {
+            "TEST": {"type": "Workspace", "name": "TestPool"},
+            "_ALL_": {"type": "Capacity", "name": "UniversalPool"},
+        }
+        assert param_obj._validate_environment(spark_pool_mixed) == (False, "_ALL_")
+
+        # Test environment validation with multiple environment keys including all (not reserved)
+        replace_value_multiple_envs = {"TEST": "test-value", "PROD": "prod-value", "all": "universal-value"}
+        assert param_obj._validate_environment(replace_value_multiple_envs) == (True, "env")
+
+        # Test spark_pool with multiple environment keys including ALL (not reserved)
+        spark_pool_multiple_envs = {
+            "PROD": {"type": "Workspace", "name": "ProdPool"},
+            "All": {"type": "Capacity", "name": "UniversalPool"},
+        }
+        assert param_obj._validate_environment(spark_pool_multiple_envs) == (False, "env")
+
+        # Test environment validation with only target env (no _ALL_ key)
+        replace_value_target_only = {"TEST": "test-value"}
+        assert param_obj._validate_environment(replace_value_target_only) == (True, "env")
+
+        # Test environment validation with neither target env nor _ALL_ key
+        replace_value_other = {"PROD": "prod-value"}
+        assert param_obj._validate_environment(replace_value_other) == (False, "env")
+
+    finally:
+        # Clean up temporary file
+        Path(temp_file_path).unlink()

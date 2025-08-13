@@ -3,7 +3,7 @@
 
 from fabric_cicd._items._activator import publish_activators
 from fabric_cicd._items._copyjob import publish_copyjobs
-from fabric_cicd._items._dataflowgen2 import find_referenced_dataflows, publish_dataflows
+from fabric_cicd._items._dataflowgen2 import publish_dataflows
 from fabric_cicd._items._datapipeline import find_referenced_datapipelines, publish_datapipelines
 from fabric_cicd._items._environment import check_environment_publish_state, publish_environments
 from fabric_cicd._items._eventhouse import publish_eventhouses
@@ -25,7 +25,6 @@ from fabric_cicd._items._warehouse import publish_warehouses
 
 __all__ = [
     "check_environment_publish_state",
-    "find_referenced_dataflows",
     "find_referenced_datapipelines",
     "publish_activators",
     "publish_copyjobs",
