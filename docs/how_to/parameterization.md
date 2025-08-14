@@ -44,10 +44,10 @@ spark_pool:
       replace_value:
           PPE:
               type: "Capacity"
-              name: "PPE-Pool"
+              name: "PPE-Pool-name"
           PROD:
               type: "Capacity"
-              name: "PROD-Pool"
+              name: "PROD-Pool-name"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
