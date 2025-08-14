@@ -24,7 +24,7 @@ C:/dev/workspace
     /parameter.yml
 ```
 
-Example of basic parameter.yml content:
+Example of parameter.yml file content:
 
 ```yaml
 find_replace:
@@ -32,14 +32,12 @@ find_replace:
       replace_value:
           PPE: "ppe-lakehouse-id"
           PROD: "prod-lakehouse-id"
-      item_type: "Notebook"
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="Environment")].value
       replace_value:
           PPE: "PPE"
           PROD: "PROD"
-      item_type: "VariableLibrary"
 
 spark_pool:
     - instance_pool_id: "your-dev-pool-instance-id"
@@ -50,7 +48,6 @@ spark_pool:
           PROD:
               type: "Capacity"
               name: "PROD-Pool"
-      item_name: "Environment"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
