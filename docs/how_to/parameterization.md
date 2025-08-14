@@ -40,6 +40,17 @@ key_value_replace:
           PPE: "PPE"
           PROD: "PROD"
       item_type: "VariableLibrary"
+
+spark_pool:
+    - instance_pool_id: "your-dev-pool-instance-id"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "PPE-Pool"
+          PROD:
+              type: "Capacity"
+              name: "PROD-Pool"
+      item_name: "Environment"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
