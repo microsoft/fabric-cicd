@@ -24,6 +24,24 @@ C:/dev/workspace
     /parameter.yml
 ```
 
+Example of basic parameter.yml content:
+
+```yaml
+find_replace:
+    - find_value: "your-dev-lakehouse-id"
+      replace_value:
+          PPE: "ppe-lakehouse-id"
+          PROD: "prod-lakehouse-id"
+      item_type: "Notebook"
+
+key_value_replace:
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+          PPE: "PPE"
+          PROD: "PROD"
+      item_type: "VariableLibrary"
+```
+
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
 
 ## Parameter Inputs
