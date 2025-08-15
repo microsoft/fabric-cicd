@@ -1,7 +1,7 @@
 # Sample configuration file for fabric-cicd deployment
 # This file demonstrates the YAML configuration structure for simplified deployment workflow
 
-core:
+core: # Core configurations
   # Either workspace or workspace_id must be provided
   workspace: # Workspace names by environment
     dev: Fabric-Dev-Engineering
@@ -13,7 +13,7 @@ core:
     test: 2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b
     prod: 7c3e1f8b-2d4a-4b9e-8f2c-1a6c3b7d8e2f
 
-  repository_directory: "sample/workspace"  # Path to workspace items directory (required)
+  repository_directory: "sample/workspace"  # Path to workspace items directory
 
   item_types_in_scope:  # Item types to include in deployment (optional)
     - VariableLibrary
@@ -22,7 +22,7 @@ core:
     - Notebook
     - Environment
 
-publish:
+publish: # Publish configuration (optional)
   exclude_regex: "^DONT_DEPLOY.*"  # Regex pattern to exclude items from publishing
   #items_to_include:  # Optional list of specific items to publish (requires feature flags)
   #   - "Hello World.Notebook"
@@ -33,7 +33,7 @@ publish:
     test: false # Enable publishing in test environment
     prod: false # Enable publishing in prod environment
 
-unpublish:
+unpublish: # Unpublish configuration (optional)
   exclude_regex: "^DEBUG.*"  # Regex pattern to exclude items from unpublishing
   # items_to_include:  # Optional list of specific items to unpublish (requires feature flags)
 
@@ -42,8 +42,8 @@ unpublish:
     test: false # Enable unpublishing in test environment
     prod: false # Enable unpublishing in prod environment
 
-features:  # Feature flags to enable
+features:  # Feature flags to enable (optional)
   - enable_shortcut_publish
 
-constants:  # Global constants to override
+constants:  # Global constants to override (optional)
   DEFAULT_API_ROOT_URL: "https://msitapi.fabric.microsoft.com"
