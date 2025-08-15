@@ -17,6 +17,7 @@ from fabric_cicd._common._config_utils import (
     extract_workspace_settings,
     load_config_file,
 )
+from fabric_cicd._common._config_validator import ConfigValidationError
 from fabric_cicd._common._exceptions import InputError
 
 
@@ -39,8 +40,8 @@ class TestConfigFileLoading:
         assert result == config_data
 
     def test_load_nonexistent_config_file(self):
-        """Test loading a non-existent config file raises FileNotFoundError."""
-        with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+        """Test loading a non-existent config file raises ConfigValidationError."""
+        with pytest.raises(ConfigValidationError, match="Configuration file not found"):
             load_config_file("nonexistent.yml")
 
     def test_load_invalid_yaml_syntax(self, tmp_path):
@@ -56,7 +57,7 @@ class TestConfigFileLoading:
         config_file = tmp_path / "list.yml"
         config_file.write_text("- item1\n- item2")
 
-        with pytest.raises(InputError, match="must contain a YAML dictionary"):
+        with pytest.raises(ConfigValidationError, match="Configuration must be a YAML dictionary"):
             load_config_file(str(config_file))
 
     def test_load_config_missing_core_section(self, tmp_path):
@@ -66,7 +67,7 @@ class TestConfigFileLoading:
         with open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
-        with pytest.raises(InputError, match="must contain a 'core' section"):
+        with pytest.raises(ConfigValidationError, match="must contain a 'core' section"):
             load_config_file(str(config_file))
 
 
@@ -99,17 +100,20 @@ class TestWorkspaceSettingsExtraction:
         assert settings["workspace_name"] == "dev-workspace"
         assert settings["repository_directory"] == "test/path"
 
-    def test_extract_single_workspace_id(self):
-        """Test extracting single workspace ID (not environment-specific)."""
-        config = {
+    def test_extract_single_workspace_id(self, tmp_path):
+        """Test error when using single workspace ID (not environment-specific)."""
+        config_data = {
             "core": {
                 "workspace_id": "single-id",
                 "repository_directory": "test/path",
             }
         }
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(yaml.dump(config_data))
 
-        settings = extract_workspace_settings(config, "dev")
-        assert settings["workspace_id"] == "single-id"
+        # Now single workspace IDs are not allowed - must be environment mapping
+        with pytest.raises(ConfigValidationError, match="must be an environment mapping dictionary"):
+            load_config_file(str(config_file))
 
     def test_extract_missing_environment(self):
         """Test error when environment not found in workspace mappings."""
@@ -123,27 +127,31 @@ class TestWorkspaceSettingsExtraction:
         with pytest.raises(InputError, match="Environment 'prod' not found in workspace_id mappings"):
             extract_workspace_settings(config, "prod")
 
-    def test_extract_missing_workspace_config(self):
+    def test_extract_missing_workspace_config(self, tmp_path):
         """Test error when neither workspace_id nor workspace is provided."""
-        config = {
+        config_data = {
             "core": {
                 "repository_directory": "test/path",
             }
         }
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(yaml.dump(config_data))
 
-        with pytest.raises(InputError, match="must specify either 'workspace_id' or 'workspace'"):
-            extract_workspace_settings(config, "dev")
+        with pytest.raises(ConfigValidationError, match="must specify either 'workspace_id' or 'workspace'"):
+            load_config_file(str(config_file))
 
-    def test_extract_missing_repository_directory(self):
+    def test_extract_missing_repository_directory(self, tmp_path):
         """Test error when repository_directory is missing."""
-        config = {
+        config_data = {
             "core": {
-                "workspace_id": "test-id",
+                "workspace_id": {"dev": "test-id"},
             }
         }
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(yaml.dump(config_data))
 
-        with pytest.raises(InputError, match="must specify 'repository_directory'"):
-            extract_workspace_settings(config, "dev")
+        with pytest.raises(ConfigValidationError, match="must specify 'repository_directory'"):
+            load_config_file(str(config_file))
 
     def test_extract_optional_item_types(self):
         """Test extracting optional item_types_in_scope."""
@@ -331,7 +339,7 @@ class TestDeployWithConfig:
         # Create test config file with skip flags
         config_data = {
             "core": {
-                "workspace_id": "test-workspace-id",
+                "workspace_id": {"dev": "test-workspace-id"},
                 "repository_directory": "test/path",
             },
             "publish": {
@@ -362,7 +370,7 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     def test_deploy_with_config_missing_file(self, _mock_workspace):
         """Test deployment with missing config file."""
-        with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+        with pytest.raises(ConfigValidationError, match="Configuration file not found"):
             deploy_with_config("nonexistent.yml", "dev")
 
     @patch("fabric_cicd.publish.FabricWorkspace")
@@ -373,7 +381,7 @@ class TestDeployWithConfig:
         # Create test config file
         config_data = {
             "core": {
-                "workspace_id": "test-workspace-id",
+                "workspace_id": {"dev": "test-workspace-id"},
                 "repository_directory": "test/path",
             },
         }
