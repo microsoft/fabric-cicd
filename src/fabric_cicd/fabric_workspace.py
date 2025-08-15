@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -17,7 +16,7 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
-from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry
+from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry, log_operation
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
@@ -497,12 +496,8 @@ class FabricWorkspace:
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
-        # Capture the start time for structured logging
-        start_time = datetime.now()
-        error_msg = None
-        success = True
-
-        try:
+        # Log the publish operation
+        with log_operation(self, "publish", item_name, item_type, item_guid) as context:
             metadata_body = {"displayName": item_name, "type": item_type}
 
             # Only shell deployment, no definition support
@@ -542,6 +537,7 @@ class FabricWorkspace:
                 )
                 item_guid = item_create_response["body"]["id"]
                 self.repository_items[item_type][item_name].guid = item_guid
+                context["item_guid"] = item_guid
 
             elif is_deployed and not shell_only_publish:
                 # Update the item's definition if full publish is required
@@ -581,28 +577,6 @@ class FabricWorkspace:
             if not kwargs.get("skip_publish_logging", False):
                 logger.info(f"{constants.INDENT}Published")
 
-        except Exception as e:
-            success = False
-            error_msg = str(e)
-            logger.error(f"Failed to publish {item_type} '{item_name}': {e}", exc_info=True)
-
-        finally:
-            # Capture end time and create log entry
-            end_time = datetime.now()
-
-            # Add structured log entry
-            self.publish_log_entries.append(
-                DeploymentLogEntry(
-                    name=item_name,
-                    item_type=item_type,
-                    success=success,
-                    error=error_msg,
-                    start_time=start_time,
-                    end_time=end_time,
-                    guid=item_guid,
-                )
-            )
-
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
@@ -628,41 +602,14 @@ class FabricWorkspace:
                 logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
-        # Capture the start time for structured logging
-        start_time = datetime.now()
-        error_msg = None
-        success = True
-
-        try:
+        # Log the unpublish operation
+        with log_operation(self, "unpublish", item_name, item_type, item_guid):
             logger.info(f"Unpublishing {item_type} '{item_name}'")
 
             # Delete the item from the workspace
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
             logger.info(f"{constants.INDENT}Unpublished")
-
-        except Exception as e:
-            success = False
-            error_msg = str(e)
-            logger.error(f"Failed to unpublish {item_type} '{item_name}': {e}", exc_info=True)
-
-        finally:
-            # Capture end time and create log entry
-            end_time = datetime.now()
-
-            # Add structured log entry
-            self.unpublish_log_entries.append(
-                DeploymentLogEntry(
-                    name=item_name,
-                    item_type=item_type,
-                    success=success,
-                    error=error_msg,
-                    start_time=start_time,
-                    end_time=end_time,
-                    guid=item_guid,
-                    operation_type="unpublish",
-                )
-            )
 
     def _refresh_deployed_folders(self) -> None:
         """

@@ -376,7 +376,7 @@ def test_publish_all_items_deployment_log_entries(mock_endpoint):
             workspace = FabricWorkspace(
                 workspace_id="12345678-1234-5678-abcd-1234567890ab",
                 repository_directory=str(temp_path),
-                item_type_in_scope=["Notebook"],  # Only test notebooks to avoid complexity
+                item_type_in_scope=["Notebook"],
             )
 
             # Test publish_all_items returns list of DeploymentLogEntry objects
@@ -384,7 +384,7 @@ def test_publish_all_items_deployment_log_entries(mock_endpoint):
 
             # Verify return type
             assert isinstance(result, list)
-            assert len(result) >= 1  # Should have at least one entry
+            assert len(result) >= 1
 
             # Verify all entries are DeploymentLogEntry objects
             for entry in result:
@@ -398,6 +398,66 @@ def test_publish_all_items_deployment_log_entries(mock_endpoint):
                 assert entry.duration_seconds >= 0
 
 
+def test_publish_all_items_with_failures_logs_correctly(mock_endpoint):
+    """Test that publish_all_items logs failed operations correctly via structured logging."""
+    from fabric_cicd._common._exceptions import DeploymentError
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a notebook with proper .platform metadata
+        notebook_dir = temp_path / "Notebook_1.Notebook"
+        notebook_dir.mkdir(parents=True)
+        (notebook_dir / "notebook-content.py").write_text("print('test')")
+
+        platform_file = notebook_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "Notebook_1",
+                "description": "Test notebook",
+            },
+            "config": {"logicalId": "notebook-1-id"},
+        }
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        # Mock endpoint to fail on specific calls
+        mock_endpoint.invoke.side_effect = [
+            {"body": {"value": [], "capacityId": "test-capacity"}, "header": {}},  # Initial capacity check
+            {"body": {"value": []}, "header": {}},  # Deployed items check
+            {"body": {"value": []}, "header": {}},  # Deployed folders check
+            Exception("API Error: Failed to publish"),  # Fail on actual publish
+        ]
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook"],
+            )
+
+            # Test that DeploymentError is raised for system failures
+            with pytest.raises(DeploymentError, match="An error occurred during publishing"):
+                publish.publish_all_items(workspace)
+
+            # But structured logs should still be accessible
+            log_entries = workspace.publish_log_entries
+
+            # Should have one failed entry
+            assert len(log_entries) == 1
+            entry = log_entries[0]
+            assert isinstance(entry, DeploymentLogEntry)
+            assert entry.operation_type == "publish"
+            assert entry.name == "Notebook_1"
+            assert entry.item_type == "Notebook"
+            assert entry.success is False
+            assert "API Error: Failed to publish" in entry.error
+            assert entry.start_time is not None
+            assert entry.end_time is not None
+            assert entry.duration_seconds >= 0
+
+
 def test_unpublish_all_orphan_items_deployment_log_entries(mock_endpoint):
     """Test that unpublish_all_orphan_items returns list of DeploymentLogEntry objects."""
 
@@ -405,8 +465,21 @@ def test_unpublish_all_orphan_items_deployment_log_entries(mock_endpoint):
         temp_path = Path(temp_dir)
 
         # Create a notebook in the repository (so it's not orphaned)
-        (temp_path / "Notebook_1.Notebook").mkdir(parents=True)
-        (temp_path / "Notebook_1.Notebook" / "notebook-content.py").write_text("print('test')")
+        notebook_dir = temp_path / "Notebook_1.Notebook"
+        notebook_dir.mkdir(parents=True)
+        (notebook_dir / "notebook-content.py").write_text("print('test')")
+
+        platform_file = notebook_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "Notebook_1",
+                "description": "Test notebook",
+            },
+            "config": {"logicalId": "notebook-1-id"},
+        }
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
 
         # Mock deployed items - include orphaned items that aren't in repository
         deployed_items = [
@@ -431,7 +504,10 @@ def test_unpublish_all_orphan_items_deployment_log_entries(mock_endpoint):
         ]
 
         # Override the default return value for this test
-        mock_endpoint.invoke.return_value = {"body": {"value": deployed_items, "capacityId": "test-capacity"}}
+        mock_endpoint.invoke.return_value = {
+            "body": {"value": deployed_items, "capacityId": "test-capacity"},
+            "header": {},
+        }
 
         with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
             workspace = FabricWorkspace(
@@ -443,20 +519,82 @@ def test_unpublish_all_orphan_items_deployment_log_entries(mock_endpoint):
             # Test unpublish_all_orphan_items returns list of DeploymentLogEntry objects
             result = publish.unpublish_all_orphan_items(workspace)
 
-            # Verify return type - it might include more items due to test setup
+            # Verify return type
             assert isinstance(result, list)
-            assert len(result) >= 2  # Should have at least entries for orphaned items
+            assert len(result) >= 2
 
             # Verify all entries are DeploymentLogEntry objects
             for entry in result:
                 assert isinstance(entry, DeploymentLogEntry)
                 assert entry.operation_type == "unpublish"
-                assert entry.name in ["Notebook_1", "OrphanedNotebook", "OrphanedEnvironment"]
+                assert entry.name in ["OrphanedNotebook", "OrphanedEnvironment"]
                 assert entry.item_type in ["Notebook", "Environment"]
                 assert isinstance(entry.success, bool)
                 assert entry.start_time is not None
                 assert entry.end_time is not None
                 assert entry.duration_seconds >= 0
+
+
+def test_unpublish_all_orphan_items_with_failures_logs_correctly(mock_endpoint):
+    """Test that unpublish_all_orphan_items logs failed operations correctly."""
+    from fabric_cicd._common._exceptions import DeploymentError
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Mock deployed items with orphaned item
+        deployed_items = [
+            {
+                "displayName": "OrphanedNotebook",
+                "type": "Notebook",
+                "id": "22222222-2222-2222-2222-222222222222",
+                "description": "Orphaned notebook",
+            }
+        ]
+
+        # Mock endpoint to fail on DELETE call
+        # Need to handle all the API calls made during workspace init and unpublish operations
+        def mock_invoke_side_effect(method, url, body=None):  # noqa: ARG001
+            if "capacityId" in str(url):
+                return {"body": {"value": [], "capacityId": "test-capacity"}, "header": {}}
+            if "items" in str(url) and method == "GET":
+                return {"body": {"value": deployed_items}, "header": {}}
+            if "folders" in str(url):
+                return {"body": {"value": []}, "header": {}}
+            if method == "DELETE":
+                # This is the actual delete operation that should fail
+                msg = "API Error: Failed to delete item"
+                raise Exception(msg)
+            return {"body": {}, "header": {}}
+
+        mock_endpoint.invoke.side_effect = mock_invoke_side_effect
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook"],
+            )
+
+            # Test that DeploymentError is raised for system failures
+            with pytest.raises(DeploymentError, match="An error occurred during unpublishing"):
+                publish.unpublish_all_orphan_items(workspace)
+
+            # But structured logs should still be accessible
+            log_entries = workspace.unpublish_log_entries
+
+            # Should have one failed entry
+            assert len(log_entries) == 1
+            entry = log_entries[0]
+            assert isinstance(entry, DeploymentLogEntry)
+            assert entry.operation_type == "unpublish"
+            assert entry.name == "OrphanedNotebook"
+            assert entry.item_type == "Notebook"
+            assert entry.success is False
+            assert "API Error: Failed to delete item" in entry.error
+            assert entry.start_time is not None
+            assert entry.end_time is not None
+            assert entry.duration_seconds >= 0
 
 
 def test_unpublish_all_orphan_items_returns_empty_list(mock_endpoint):
@@ -510,3 +648,75 @@ def test_unpublish_all_orphan_items_returns_empty_list(mock_endpoint):
             # Verify return type
             assert isinstance(result, list)
             assert len(result) == 0
+
+
+def test_structured_logging_captures_success_and_failure_mixed(mock_endpoint):
+    """Test that structured logging captures both successful and failed operations in mixed scenarios."""
+    from fabric_cicd._common._exceptions import DeploymentError
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create two notebooks
+        for i in [1, 2]:
+            notebook_dir = temp_path / f"Notebook_{i}.Notebook"
+            notebook_dir.mkdir(parents=True)
+            (notebook_dir / "notebook-content.py").write_text("print('test')")
+
+            platform_file = notebook_dir / ".platform"
+            metadata = {
+                "metadata": {
+                    "type": "Notebook",
+                    "displayName": f"Notebook_{i}",
+                    "description": f"Test notebook {i}",
+                },
+                "config": {"logicalId": f"notebook-{i}-id"},
+            }
+            with platform_file.open("w", encoding="utf-8") as f:
+                json.dump(metadata, f)
+
+        # Mock successful response for first notebook, failure for second
+        def mock_invoke_side_effect(method, url, body=None):  # noqa: ARG001
+            if ("workspaces" in str(url) and method == "GET") and not ("items" in str(url)):
+                # Workspace details call for capacity check
+                return {"body": {"capacityId": "test-capacity"}, "header": {}}
+            if ("items" in str(url) and method == "GET") or ("folders" in str(url)):
+                return {"body": {"value": []}, "header": {}}
+            if method == "POST" and "items" in str(url):
+                # First call succeeds, second fails
+                if not hasattr(mock_invoke_side_effect, "call_count"):
+                    mock_invoke_side_effect.call_count = 0
+                mock_invoke_side_effect.call_count += 1
+
+                if mock_invoke_side_effect.call_count == 1:
+                    return {"body": {"id": "test-item-id-1"}, "header": {}}
+                msg = "API Error: Second notebook failed"
+                raise Exception(msg)
+            return {"body": {}, "header": {}}
+
+        mock_endpoint.invoke.side_effect = mock_invoke_side_effect
+
+        with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook"],
+            )
+
+        with pytest.raises(DeploymentError, match="An error occurred during publishing"):
+            publish.publish_all_items(workspace)
+
+        # Check structured logs captured both operations
+        log_entries = workspace.publish_log_entries
+        assert len(log_entries) == 2
+
+        # First notebook should be successful
+        successful_entries = [e for e in log_entries if e.success]
+        failed_entries = [e for e in log_entries if not e.success]
+
+        assert len(successful_entries) == 1
+        assert len(failed_entries) == 1
+
+        assert successful_entries[0].name == "Notebook_1"
+        assert failed_entries[0].name == "Notebook_2"
+        assert "API Error: Second notebook failed" in failed_entries[0].error

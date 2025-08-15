@@ -14,6 +14,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_eventhouse_unpublish`             | Set to enable the deletion of Eventhouses                          |              |
 | `disable_print_identity`                  | Set to disable printing the executing identity name                |              |
 | `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the lakehouse               |              |
+| `continue_on_shortcut_failure`            | Set to enable deploying when shortcuts fail to publish             |              |
 | `enable_environment_variable_replacement` | Set to enable the use of pipeline variables                        |              |
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                     |              |
 | `enable_experimental_features`            | Set to enable experimental features, such as selective deployments |              |

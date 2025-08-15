@@ -12,7 +12,7 @@ import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
+from fabric_cicd._common._exceptions import DeploymentError, FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_fabric_workspace_obj,
@@ -146,73 +146,68 @@ def publish_all_items(
             item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.repository_items
         )
 
-    try:
-        if _should_publish_item_type("VariableLibrary"):
-            print_header("Publishing Variable Libraries")
-            items.publish_variablelibraries(fabric_workspace_obj)
-        if _should_publish_item_type("Warehouse"):
-            print_header("Publishing Warehouses")
-            items.publish_warehouses(fabric_workspace_obj)
-        if _should_publish_item_type("Lakehouse"):
-            print_header("Publishing Lakehouses")
-            items.publish_lakehouses(fabric_workspace_obj)
-        if _should_publish_item_type("SQLDatabase"):
-            print_header("Publishing SQL Databases")
-            items.publish_sqldatabases(fabric_workspace_obj)
-        if _should_publish_item_type("MirroredDatabase"):
-            print_header("Publishing Mirrored Databases")
-            items.publish_mirroreddatabase(fabric_workspace_obj)
-        if _should_publish_item_type("Environment"):
-            print_header("Publishing Environments")
-            items.publish_environments(fabric_workspace_obj)
-        if _should_publish_item_type("Notebook"):
-            print_header("Publishing Notebooks")
-            items.publish_notebooks(fabric_workspace_obj)
-        if _should_publish_item_type("SemanticModel"):
-            print_header("Publishing Semantic Models")
-            items.publish_semanticmodels(fabric_workspace_obj)
-        if _should_publish_item_type("Report"):
-            print_header("Publishing Reports")
-            items.publish_reports(fabric_workspace_obj)
-        if _should_publish_item_type("CopyJob"):
-            print_header("Publishing Copy Jobs")
-            items.publish_copyjobs(fabric_workspace_obj)
-        if _should_publish_item_type("Eventhouse"):
-            print_header("Publishing Eventhouses")
-            items.publish_eventhouses(fabric_workspace_obj)
-        if _should_publish_item_type("KQLDatabase"):
-            print_header("Publishing KQL Databases")
-            items.publish_kqldatabases(fabric_workspace_obj)
-        if _should_publish_item_type("KQLQueryset"):
-            print_header("Publishing KQL Querysets")
-            items.publish_kqlquerysets(fabric_workspace_obj)
-        if _should_publish_item_type("Reflex"):
-            print_header("Publishing Activators")
-            items.publish_activators(fabric_workspace_obj)
-        if _should_publish_item_type("Eventstream"):
-            print_header("Publishing Eventstreams")
-            items.publish_eventstreams(fabric_workspace_obj)
-        if _should_publish_item_type("KQLDashboard"):
-            print_header("Publishing KQL Dashboards")
-            items.publish_kqldashboard(fabric_workspace_obj)
-        if _should_publish_item_type("Dataflow"):
-            print_header("Publishing Dataflows")
-            items.publish_dataflows(fabric_workspace_obj)
-        if _should_publish_item_type("DataPipeline"):
-            print_header("Publishing Data Pipelines")
-            items.publish_datapipelines(fabric_workspace_obj)
-        if _should_publish_item_type("GraphQLApi"):
-            print_header("Publishing GraphQL APIs")
-            items.publish_graphqlapis(fabric_workspace_obj)
+    if _should_publish_item_type("VariableLibrary"):
+        print_header("Publishing Variable Libraries")
+        items.publish_variablelibraries(fabric_workspace_obj)
+    if _should_publish_item_type("Warehouse"):
+        print_header("Publishing Warehouses")
+        items.publish_warehouses(fabric_workspace_obj)
+    if _should_publish_item_type("Lakehouse"):
+        print_header("Publishing Lakehouses")
+        items.publish_lakehouses(fabric_workspace_obj)
+    if _should_publish_item_type("SQLDatabase"):
+        print_header("Publishing SQL Databases")
+        items.publish_sqldatabases(fabric_workspace_obj)
+    if _should_publish_item_type("MirroredDatabase"):
+        print_header("Publishing Mirrored Databases")
+        items.publish_mirroreddatabase(fabric_workspace_obj)
+    if _should_publish_item_type("Environment"):
+        print_header("Publishing Environments")
+        items.publish_environments(fabric_workspace_obj)
+    if _should_publish_item_type("Notebook"):
+        print_header("Publishing Notebooks")
+        items.publish_notebooks(fabric_workspace_obj)
+    if _should_publish_item_type("SemanticModel"):
+        print_header("Publishing Semantic Models")
+        items.publish_semanticmodels(fabric_workspace_obj)
+    if _should_publish_item_type("Report"):
+        print_header("Publishing Reports")
+        items.publish_reports(fabric_workspace_obj)
+    if _should_publish_item_type("CopyJob"):
+        print_header("Publishing Copy Jobs")
+        items.publish_copyjobs(fabric_workspace_obj)
+    if _should_publish_item_type("Eventhouse"):
+        print_header("Publishing Eventhouses")
+        items.publish_eventhouses(fabric_workspace_obj)
+    if _should_publish_item_type("KQLDatabase"):
+        print_header("Publishing KQL Databases")
+        items.publish_kqldatabases(fabric_workspace_obj)
+    if _should_publish_item_type("KQLQueryset"):
+        print_header("Publishing KQL Querysets")
+        items.publish_kqlquerysets(fabric_workspace_obj)
+    if _should_publish_item_type("Reflex"):
+        print_header("Publishing Activators")
+        items.publish_activators(fabric_workspace_obj)
+    if _should_publish_item_type("Eventstream"):
+        print_header("Publishing Eventstreams")
+        items.publish_eventstreams(fabric_workspace_obj)
+    if _should_publish_item_type("KQLDashboard"):
+        print_header("Publishing KQL Dashboards")
+        items.publish_kqldashboard(fabric_workspace_obj)
+    if _should_publish_item_type("Dataflow"):
+        print_header("Publishing Dataflows")
+        items.publish_dataflows(fabric_workspace_obj)
+    if _should_publish_item_type("DataPipeline"):
+        print_header("Publishing Data Pipelines")
+        items.publish_datapipelines(fabric_workspace_obj)
+    if _should_publish_item_type("GraphQLApi"):
+        print_header("Publishing GraphQL APIs")
+        items.publish_graphqlapis(fabric_workspace_obj)
 
-        # Check Environment Publish
-        if _should_publish_item_type("Environment"):
-            print_header("Checking Environment Publish State")
-            items.check_environment_publish_state(fabric_workspace_obj)
-
-    except Exception as e:
-        logger.error(f"An error occurred during publishing: {e}", exc_info=True)
-        return fabric_workspace_obj.publish_log_entries
+    # Check Environment Publish
+    if _should_publish_item_type("Environment"):
+        print_header("Checking Environment Publish State")
+        items.check_environment_publish_state(fabric_workspace_obj)
 
     return fabric_workspace_obj.publish_log_entries
 
@@ -380,7 +375,7 @@ def unpublish_all_orphan_items(
             fabric_workspace_obj._unpublish_folders()
 
     except Exception as e:
-        logger.error(f"An error occurred during unpublishing: {e}", exc_info=True)
-        return fabric_workspace_obj.unpublish_log_entries
+        msg = f"An error occurred during unpublishing: {e}"
+        raise DeploymentError(msg, logger) from e
 
     return fabric_workspace_obj.unpublish_log_entries
