@@ -1,0 +1,49 @@
+# Sample configuration file for fabric-cicd deployment
+# This file demonstrates the YAML configuration structure for simplified deployment workflow
+
+core:
+  # Either workspace or workspace_id must be provided
+  workspace: # Workspace names by environment
+    dev: Fabric-Dev-Engineering
+    test: Fabric-Test-Engineering
+    prod: Fabric-Prod-Engineering
+
+  workspace_id: # Workspace IDs by environment (takes precedence over workspace if both are provided)
+    dev: 8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b
+    test: 2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b
+    prod: 7c3e1f8b-2d4a-4b9e-8f2c-1a6c3b7d8e2f
+
+  repository_directory: "sample/workspace"  # Path to workspace items directory (required)
+
+  item_types_in_scope:  # Item types to include in deployment (optional)
+    - VariableLibrary
+    - Dataflow
+    - DataPipeline
+    - Notebook
+    - Environment
+
+publish:
+  exclude_regex: "^DONT_DEPLOY.*"  # Regex pattern to exclude items from publishing
+  #items_to_include:  # Optional list of specific items to publish (requires feature flags)
+  #   - "Hello World.Notebook"
+  #   - "Run Hello World.DataPipeline"
+
+  skip:  # Skip publishing for specific environments
+    dev: true   # Skip publishing in dev environment
+    test: false # Enable publishing in test environment
+    prod: false # Enable publishing in prod environment
+
+unpublish:
+  exclude_regex: "^DEBUG.*"  # Regex pattern to exclude items from unpublishing
+  # items_to_include:  # Optional list of specific items to unpublish (requires feature flags)
+
+  skip:  # Skip unpublishing for specific environments
+    dev: true   # Skip unpublishing in dev environment
+    test: false # Enable unpublishing in test environment
+    prod: false # Enable unpublishing in prod environment
+
+features:  # Feature flags to enable
+  - enable_shortcut_publish
+
+constants:  # Global constants to override
+  DEFAULT_API_ROOT_URL: "https://msitapi.fabric.microsoft.com"
