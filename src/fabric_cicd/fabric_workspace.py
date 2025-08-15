@@ -16,6 +16,7 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._deployment_log_entry import DeploymentLogEntry, log_operation
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
@@ -135,6 +136,11 @@ class FabricWorkspace:
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
+
+        # Initialize a list to hold publish log entries
+        self.publish_log_entries: list[DeploymentLogEntry] = []
+        # Initialize a list to hold unpublish log entries
+        self.unpublish_log_entries: list[DeploymentLogEntry] = []
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
@@ -465,6 +471,8 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
+        item_guid = item.guid
+        item_files = item.item_files
 
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
@@ -488,85 +496,87 @@ class FabricWorkspace:
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
-        item_guid = item.guid
-        item_files = item.item_files
+        # Log the publish operation
+        with log_operation(self, "publish", item_name, item_type, item_guid) as context:
+            metadata_body = {"displayName": item_name, "type": item_type}
 
-        metadata_body = {"displayName": item_name, "type": item_type}
+            # Only shell deployment, no definition support
+            shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
 
-        # Only shell deployment, no definition support
-        shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
+            if kwargs.get("creation_payload"):
+                creation_payload = {"creationPayload": kwargs["creation_payload"]}
+                combined_body = {**metadata_body, **creation_payload}
+            elif shell_only_publish:
+                combined_body = metadata_body
+            else:
+                item_payload = []
+                for file in item_files:
+                    if not re.match(exclude_path, file.relative_path):
+                        if file.type == "text" and not str(file.file_path).endswith(".platform"):
+                            file.contents = func_process_file(self, item, file) if func_process_file else file.contents
+                            file.contents = self._replace_logical_ids(file.contents)
+                            file.contents = self._replace_parameters(file, item)
+                            file.contents = self._replace_workspace_ids(file.contents)
 
-        if kwargs.get("creation_payload"):
-            creation_payload = {"creationPayload": kwargs["creation_payload"]}
-            combined_body = {**metadata_body, **creation_payload}
-        elif shell_only_publish:
-            combined_body = metadata_body
-        else:
-            item_payload = []
-            for file in item_files:
-                if not re.match(exclude_path, file.relative_path):
-                    if file.type == "text" and not str(file.file_path).endswith(".platform"):
-                        file.contents = func_process_file(self, item, file) if func_process_file else file.contents
-                        file.contents = self._replace_logical_ids(file.contents)
-                        file.contents = self._replace_parameters(file, item)
-                        file.contents = self._replace_workspace_ids(file.contents)
+                        item_payload.append(file.base64_payload)
 
-                    item_payload.append(file.base64_payload)
+                definition_body = {"definition": {"parts": item_payload}}
+                combined_body = {**metadata_body, **definition_body}
 
-            definition_body = {"definition": {"parts": item_payload}}
-            combined_body = {**metadata_body, **definition_body}
+            logger.info(f"Publishing {item_type} '{item_name}'")
 
-        logger.info(f"Publishing {item_type} '{item_name}'")
+            is_deployed = bool(item_guid)
 
-        is_deployed = bool(item_guid)
+            if not is_deployed:
+                combined_body = {**combined_body, **{"folderId": item.folder_id}}
 
-        if not is_deployed:
-            combined_body = {**combined_body, **{"folderId": item.folder_id}}
+                # Create a new item if it does not exist
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
+                item_create_response = self.endpoint.invoke(
+                    method="POST", url=f"{self.base_api_url}/items", body=combined_body
+                )
+                item_guid = item_create_response["body"]["id"]
+                self.repository_items[item_type][item_name].guid = item_guid
+                context["item_guid"] = item_guid
 
-            # Create a new item if it does not exist
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
-            item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body
-            )
-            item_guid = item_create_response["body"]["id"]
-            self.repository_items[item_type][item_name].guid = item_guid
-
-        elif is_deployed and not shell_only_publish:
-            # Update the item's definition if full publish is required
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-            self.endpoint.invoke(
-                method="POST",
-                url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
-                body=definition_body,
-            )
-        elif is_deployed and shell_only_publish:
-            # Remove the 'type' key as it's not supported in the update-item API
-            metadata_body.pop("type", None)
-
-            # Update the item's metadata
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
-                method="PATCH",
-                url=f"{self.base_api_url}/items/{item_guid}",
-                body=metadata_body,
-            )
-
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
-            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
-                # Move the item to the correct folder if it has been moved
-                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+            elif is_deployed and not shell_only_publish:
+                # Update the item's definition if full publish is required
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
                 self.endpoint.invoke(
                     method="POST",
-                    url=f"{self.base_api_url}/items/{item_guid}/move",
-                    body={"targetFolderId": f"{item.folder_id}"},
-                )
-                logger.debug(
-                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                    url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
+                    body=definition_body,
                 )
 
-        # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
-        if not kwargs.get("skip_publish_logging", False):
-            logger.info(f"{constants.INDENT}Published")
+            elif is_deployed and shell_only_publish:
+                # Remove the 'type' key as it's not supported in the update-item API
+                metadata_body.pop("type", None)
+
+                # Update the item's metadata
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
+                self.endpoint.invoke(
+                    method="PATCH",
+                    url=f"{self.base_api_url}/items/{item_guid}",
+                    body=metadata_body,
+                )
+
+            if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
+                if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+                    # Move the item to the correct folder if it has been moved
+                    # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+                    self.endpoint.invoke(
+                        method="POST",
+                        url=f"{self.base_api_url}/items/{item_guid}/move",
+                        body={"targetFolderId": f"{item.folder_id}"},
+                    )
+                    logger.debug(
+                        f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                    )
+
+            # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
+            if not kwargs.get("skip_publish_logging", False):
+                logger.info(f"{constants.INDENT}Published")
+
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
@@ -592,15 +602,14 @@ class FabricWorkspace:
                 logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
                 return
 
-        logger.info(f"Unpublishing {item_type} '{item_name}'")
+        # Log the unpublish operation
+        with log_operation(self, "unpublish", item_name, item_type, item_guid):
+            logger.info(f"Unpublishing {item_type} '{item_name}'")
 
-        # Delete the item from the workspace
-        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
-        try:
+            # Delete the item from the workspace
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
             logger.info(f"{constants.INDENT}Unpublished")
-        except Exception as e:
-            logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
 
     def _refresh_deployed_folders(self) -> None:
         """
