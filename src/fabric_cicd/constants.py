@@ -56,6 +56,7 @@ PROPERTY_PATH_MAPPING = {
     "Lakehouse": "body/properties/sqlEndpointProperties/connectionString",
     "Warehouse": "body/properties/connectionString",
     "Eventhouse": "body/properties/queryServiceUri",
+    "SQLDatabase": "body/properties/connectionString",
 }
 
 # Parameter file configs
