@@ -6,6 +6,18 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.25
+
+<span class="md-h2-subheader">Release Date: 2025-08-19</span>
+
+-   ✨ New experimental feature flag to enable selective deployment ([#384](https://github.com/microsoft/fabric-cicd/issues/384))
+-   ✨ Support "ALL" environment concept in parameterization ([#320](https://github.com/microsoft/fabric-cicd/issues/320))
+-   📝 Enhance Overview section in Parameterization docs ([#495](https://github.com/microsoft/fabric-cicd/issues/495))
+-   ⚡ Add feature flags and warnings for Warehouse, SQL Database, and Eventhouse unpublish operations
+-   ⚡ Eliminate ACCEPTED_ITEM_TYPES_NON_UPN constant and unify with ACCEPTED_ITEM_TYPES, removing unnecessary upn_auth parameter
+-   ⚡ Add comprehensive GitHub Copilot instructions for effective codebase development
+-   🔧 Fix code formatting inconsistencies in fabric_workspace unit test
+
 ## Version 0.1.24
 
 <span class="md-h2-subheader">Release Date: 2025-08-04</span>
