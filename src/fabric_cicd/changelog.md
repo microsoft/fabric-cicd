@@ -10,12 +10,14 @@ The following contains all major, minor, and patch version release notes.
 
 <span class="md-h2-subheader">Release Date: 2025-08-19</span>
 
+-   💥 Modify the default for item_types_in_scope and add thorough validation ([#464](https://github.com/microsoft/fabric-cicd/issues/464))
 -   ✨ New experimental feature flag to enable selective deployment ([#384](https://github.com/microsoft/fabric-cicd/issues/384))
 -   ✨ Support "ALL" environment concept in parameterization ([#320](https://github.com/microsoft/fabric-cicd/issues/320))
 -   📝 Enhance Overview section in Parameterization docs ([#495](https://github.com/microsoft/fabric-cicd/issues/495))
 -   ⚡ Add feature flags and warnings for Warehouse, SQL Database, and Eventhouse unpublish operations
 -   ⚡ Eliminate ACCEPTED_ITEM_TYPES_NON_UPN constant and unify with ACCEPTED_ITEM_TYPES, removing unnecessary upn_auth parameter
 -   ⚡ Add comprehensive GitHub Copilot instructions for effective codebase development
+-   🔧 Fix KeyError when deploying Reports with Semantic Model dependencies in Report-only scope case ([#278](https://github.com/microsoft/fabric-cicd/issues/278))
 -   🔧 Fix code formatting inconsistencies in fabric_workspace unit test
 
 ## Version 0.1.24
