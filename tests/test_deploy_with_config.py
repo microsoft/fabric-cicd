@@ -33,7 +33,7 @@ class TestConfigFileLoading:
             }
         }
         config_file = tmp_path / "config.yml"
-        with open(config_file, "w") as f:
+        with Path.open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
         result = load_config_file(str(config_file))
@@ -64,7 +64,7 @@ class TestConfigFileLoading:
         """Test loading a config file without required 'core' section."""
         config_data = {"publish": {"skip": {"dev": True}}}
         config_file = tmp_path / "no_core.yml"
-        with open(config_file, "w") as f:
+        with Path.open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
         with pytest.raises(ConfigValidationError, match="must contain a 'core' section"):
@@ -299,7 +299,7 @@ class TestDeployWithConfig:
             },
         }
         config_file = tmp_path / "config.yml"
-        with open(config_file, "w") as f:
+        with Path.open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
         # Mock workspace instance
@@ -350,7 +350,7 @@ class TestDeployWithConfig:
             },
         }
         config_file = tmp_path / "config.yml"
-        with open(config_file, "w") as f:
+        with Path.open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
         # Mock workspace instance
@@ -386,7 +386,7 @@ class TestDeployWithConfig:
             },
         }
         config_file = tmp_path / "config.yml"
-        with open(config_file, "w") as f:
+        with Path.open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
         # Mock workspace instance and token credential
@@ -454,7 +454,7 @@ class TestConfigIntegration:
         }
 
         config_file = tmp_path / "comprehensive_config.yml"
-        with open(config_file, "w") as f:
+        with Path.open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
         # Test loading and parsing
