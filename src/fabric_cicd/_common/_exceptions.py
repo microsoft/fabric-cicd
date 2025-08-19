@@ -52,3 +52,7 @@ class ParameterFileError(BaseCustomError):
 
 class FailedPublishedItemStatusError(BaseCustomError):
     pass
+
+
+class DeploymentError(BaseCustomError):
+    pass

@@ -9,6 +9,7 @@ import logging
 import dpath
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._deployment_log_entry import log_operation
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
@@ -140,23 +141,35 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
         shortcut_dict: The dict of shortcuts to publish
     """
     for shortcut in shortcut_dict.values():
-        # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
-        try:
-            fabric_workspace_obj.endpoint.invoke(
-                method="POST",
-                url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
-                body=shortcut,
-            )
-            logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
-        except Exception as e:
-            if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
-                logger.warning(
-                    f"Failed to publish '{shortcut['name']}'. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
+        with log_operation(
+            fabric_workspace_obj,
+            "publish",
+            f"{item_obj.name}/{shortcut['name']}",
+            "Shortcut",
+            f"{item_obj.guid}/shortcut/{shortcut['name']}",
+        ) as context:
+            try:
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
+                fabric_workspace_obj.endpoint.invoke(
+                    method="POST",
+                    url=f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
+                    body=shortcut,
                 )
-                logger.info("The publish process will continue with the other items.")
-                continue
-            msg = f"Failed to publish '{shortcut['name']}' for lakehouse {item_obj.name}"
-            raise FailedPublishedItemStatusError(msg, logger) from e
+                logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
+
+            except Exception as e:
+                if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
+                    context["success"] = False
+                    context["error_msg"] = str(e)
+
+                    logger.warning(
+                        f"Failed to publish '{shortcut['name']}'. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
+                    )
+                    logger.info("The publish process will continue with the other items.")
+                    continue
+
+                msg = f"Failed to publish '{shortcut['name']}' for lakehouse {item_obj.name}"
+                raise FailedPublishedItemStatusError(msg, logger) from e
 
 
 def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
