@@ -372,8 +372,15 @@ class TestDeployWithConfig:
         with pytest.raises(ConfigValidationError, match="Configuration file not found"):
             deploy_with_config("nonexistent.yml", "dev")
 
-    def test_deploy_with_config_with_token_credential(self, mock_workspace, tmp_path):
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_with_token_credential(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with custom token credential."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
         # Create test config file
         config_data = {
             "core": {
