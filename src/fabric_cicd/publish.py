@@ -331,7 +331,7 @@ def unpublish_all_orphan_items(
 
 
 def deploy_with_config(
-    config_file: str,
+    config_file_path: str,
     environment: str,
     token_credential: Optional[TokenCredential] = None,
 ) -> None:
@@ -343,7 +343,7 @@ def deploy_with_config(
     and handles publish/unpublish operations according to the configuration.
 
     Args:
-        config_file: Path to the YAML configuration file.
+        config_file_path: Path to the YAML configuration file as a string.
         environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod').
         token_credential: Optional Azure token credential for authentication.
 
@@ -355,7 +355,7 @@ def deploy_with_config(
         Basic usage
         >>> from fabric_cicd import deploy_with_config
         >>> deploy_with_config(
-        ...     config_file="config.yml",
+        ...     config_file_path="workspace/config.yml",
         ...     environment="dev"
         ... )
         With custom authentication
@@ -363,16 +363,16 @@ def deploy_with_config(
         >>> from azure.identity import ClientSecretCredential
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
         >>> deploy_with_config(
-        ...     config_file="config.yml",
+        ...     config_file_path="workspace/config.yml",
         ...     environment="prod",
         ...     token_credential=credential
         ... )
     """
     print_header("Config-Based Deployment")
-    logger.info(f"Loading configuration from {config_file} for environment '{environment}'")
+    logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
     # Load and validate configuration file
-    config = load_config_file(config_file)
+    config = load_config_file(config_file_path)
 
     # Extract environment-specific settings
     workspace_settings = extract_workspace_settings(config, environment)
