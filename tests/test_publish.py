@@ -340,3 +340,95 @@ def test_unpublish_with_feature_flags_enabled(mock_endpoint, caplog):
             # Restore original feature flags
             constants.FEATURE_FLAG.clear()
             constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_mirrored_database_published_before_lakehouse(mock_endpoint):
+    """Test that MirroredDatabase items are published before Lakehouse items to enable shortcuts."""
+    import json
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    # Track the order of function calls
+    call_order = []
+
+    def mock_publish_lakehouses(_workspace):
+        call_order.append("Lakehouse")
+
+    def mock_publish_mirroreddatabase(_workspace):
+        call_order.append("MirroredDatabase")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a Lakehouse item
+        lakehouse_dir = temp_path / "TestLakehouse.Lakehouse"
+        lakehouse_dir.mkdir(parents=True, exist_ok=True)
+
+        lakehouse_platform_file = lakehouse_dir / ".platform"
+        lakehouse_metadata = {
+            "metadata": {
+                "type": "Lakehouse",
+                "displayName": "Test Lakehouse",
+                "description": "Test lakehouse",
+            },
+            "config": {"logicalId": "test-lakehouse-id"},
+        }
+
+        with lakehouse_platform_file.open("w", encoding="utf-8") as f:
+            json.dump(lakehouse_metadata, f)
+
+        with (lakehouse_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create a MirroredDatabase item
+        mirrored_db_dir = temp_path / "TestMirroredDB.MirroredDatabase"
+        mirrored_db_dir.mkdir(parents=True, exist_ok=True)
+
+        mirrored_db_platform_file = mirrored_db_dir / ".platform"
+        mirrored_db_metadata = {
+            "metadata": {
+                "type": "MirroredDatabase",
+                "displayName": "Test Mirrored Database",
+                "description": "Test mirrored database",
+            },
+            "config": {"logicalId": "test-mirrored-db-id"},
+        }
+
+        with mirrored_db_platform_file.open("w", encoding="utf-8") as f:
+            json.dump(mirrored_db_metadata, f)
+
+        with (mirrored_db_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+            patch("fabric_cicd._items.publish_lakehouses", side_effect=mock_publish_lakehouses),
+            patch("fabric_cicd._items.publish_mirroreddatabase", side_effect=mock_publish_mirroreddatabase),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Lakehouse", "MirroredDatabase"],
+            )
+
+            # Call publish_all_items
+            publish.publish_all_items(workspace)
+
+            # Verify that both item types were processed
+            assert len(call_order) == 2
+            assert "MirroredDatabase" in call_order
+            assert "Lakehouse" in call_order
+
+            # Verify that MirroredDatabase was published before Lakehouse
+            mirrored_db_index = call_order.index("MirroredDatabase")
+            lakehouse_index = call_order.index("Lakehouse")
+            assert mirrored_db_index < lakehouse_index, (
+                f"MirroredDatabase should be published before Lakehouse, but got order: {call_order}"
+            )
