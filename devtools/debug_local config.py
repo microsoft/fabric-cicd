@@ -19,4 +19,4 @@ from fabric_cicd import change_log_level, deploy_with_config
 # In this example, the config file sits within the root/sample/workspace directory
 config_file = str(root_directory / "sample" / "workspace" / "config.yml")
 
-deploy_with_config(config_file=config_file, environment="dev")
+deploy_with_config(config_file_path=config_file, environment="dev")

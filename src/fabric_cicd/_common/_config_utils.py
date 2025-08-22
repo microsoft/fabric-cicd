@@ -6,22 +6,19 @@
 import logging
 
 from fabric_cicd import constants
-from fabric_cicd._common._config_validator import ConfigValidator, validate_config_for_environment
+from fabric_cicd._common._config_validator import ConfigValidator
 
 logger = logging.getLogger(__name__)
 
 
-def load_config_file(config_file: str) -> dict:
+def load_config_file(config_file_path: str, environment: str) -> dict:
     """Load and validate YAML configuration file."""
     validator = ConfigValidator()
-    return validator.validate_config_file(config_file)
+    return validator.validate_config_file(config_file_path, environment)
 
 
 def extract_workspace_settings(config: dict, environment: str) -> dict:
     """Extract workspace-specific settings from config for the given environment."""
-    # Validate environment-specific requirements
-    validate_config_for_environment(config, environment)
-
     environment = environment.strip()
     core = config["core"]
     settings = {}
@@ -33,17 +30,28 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
         else:
             settings["workspace_id"] = core["workspace_id"]
 
-    if "workspace" in core:
+        logger.info(f"Using workspace ID '{settings['workspace_id']}'")
+
+    elif "workspace" in core:
         if isinstance(core["workspace"], dict):
             settings["workspace_name"] = core["workspace"][environment]
         else:
             settings["workspace_name"] = core["workspace"]
 
+        logger.info(f"Using workspace '{settings['workspace_name']}'")
+
     # Extract other settings
-    settings["repository_directory"] = core["repository_directory"]
+    if "repository_directory" in core:
+        if isinstance(core["repository_directory"], dict):
+            settings["repository_directory"] = core["repository_directory"][environment]
+        else:
+            settings["repository_directory"] = core["repository_directory"]
 
     if "item_types_in_scope" in core:
-        settings["item_types_in_scope"] = core["item_types_in_scope"]
+        if isinstance(core["item_types_in_scope"], dict):
+            settings["item_types_in_scope"] = core["item_types_in_scope"][environment]
+        else:
+            settings["item_types_in_scope"] = core["item_types_in_scope"]
 
     return settings
 
@@ -56,10 +64,16 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
         publish_config = config["publish"]
 
         if "exclude_regex" in publish_config:
-            settings["exclude_regex"] = publish_config["exclude_regex"]
+            if isinstance(publish_config["exclude_regex"], dict):
+                settings["exclude_regex"] = publish_config["exclude_regex"][environment]
+            else:
+                settings["exclude_regex"] = publish_config["exclude_regex"]
 
         if "items_to_include" in publish_config:
-            settings["items_to_include"] = publish_config["items_to_include"]
+            if isinstance(publish_config["items_to_include"], dict):
+                settings["items_to_include"] = publish_config["items_to_include"][environment]
+            else:
+                settings["items_to_include"] = publish_config["items_to_include"]
 
         if "skip" in publish_config:
             if isinstance(publish_config["skip"], dict):
@@ -78,10 +92,16 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
         unpublish_config = config["unpublish"]
 
         if "exclude_regex" in unpublish_config:
-            settings["exclude_regex"] = unpublish_config["exclude_regex"]
+            if isinstance(unpublish_config["exclude_regex"], dict):
+                settings["exclude_regex"] = unpublish_config["exclude_regex"][environment]
+            else:
+                settings["exclude_regex"] = unpublish_config["exclude_regex"]
 
         if "items_to_include" in unpublish_config:
-            settings["items_to_include"] = unpublish_config["items_to_include"]
+            if isinstance(unpublish_config["items_to_include"], dict):
+                settings["items_to_include"] = unpublish_config["items_to_include"][environment]
+            else:
+                settings["items_to_include"] = unpublish_config["items_to_include"]
 
         if "skip" in unpublish_config:
             if isinstance(unpublish_config["skip"], dict):
@@ -92,15 +112,25 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
     return settings
 
 
-def apply_config_overrides(config: dict) -> None:
+def apply_config_overrides(config: dict, environment: str) -> None:
     """Apply feature flags and constants overrides from config."""
-    if "features" in config and isinstance(config["features"], list):
-        for feature in config["features"]:
+    if "features" in config:
+        features = config["features"]
+        features_list = features.get(environment, []) if isinstance(features, dict) else features
+
+        for feature in features_list:
             constants.FEATURE_FLAG.add(feature)
             logger.info(f"Enabled feature flag: {feature}")
 
-    if "constants" in config and isinstance(config["constants"], dict):
-        for key, value in config["constants"].items():
+    if "constants" in config:
+        constants_section = config["constants"]
+        # Check if it's an environment mapping (all values are dicts)
+        if all(isinstance(v, dict) for v in constants_section.values()):
+            constants_dict = constants_section.get(environment, {})
+        else:
+            constants_dict = constants_section
+
+        for key, value in constants_dict.items():
             if hasattr(constants, key):
                 setattr(constants, key, value)
                 logger.info(f"Override constant {key} = {value}")

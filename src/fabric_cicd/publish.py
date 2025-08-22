@@ -22,6 +22,7 @@ from fabric_cicd._common._config_utils import (
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
+    validate_environment,
     validate_fabric_workspace_obj,
 )
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -332,7 +333,7 @@ def unpublish_all_orphan_items(
 
 def deploy_with_config(
     config_file_path: str,
-    environment: str,
+    environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
 ) -> None:
     """
@@ -344,7 +345,7 @@ def deploy_with_config(
 
     Args:
         config_file_path: Path to the YAML configuration file as a string.
-        environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod').
+        environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod'), if missing defaults to 'N/A'.
         token_credential: Optional Azure token credential for authentication.
 
     Raises:
@@ -371,8 +372,11 @@ def deploy_with_config(
     print_header("Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
+    # Validate environment
+    environment = validate_environment(environment)
+
     # Load and validate configuration file
-    config = load_config_file(config_file_path)
+    config = load_config_file(config_file_path, environment)
 
     # Extract environment-specific settings
     workspace_settings = extract_workspace_settings(config, environment)
@@ -380,7 +384,7 @@ def deploy_with_config(
     unpublish_settings = extract_unpublish_settings(config, environment)
 
     # Apply feature flags and constants if specified
-    apply_config_overrides(config)
+    apply_config_overrides(config, environment)
 
     # Create FabricWorkspace object with extracted settings
     workspace = FabricWorkspace(
