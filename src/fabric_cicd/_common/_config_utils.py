@@ -12,7 +12,15 @@ logger = logging.getLogger(__name__)
 
 
 def load_config_file(config_file_path: str, environment: str) -> dict:
-    """Load and validate YAML configuration file."""
+    """Load and validate YAML configuration file.
+
+    Args:
+        config_file_path: Path to the YAML config file
+        environment: Target environment for deployment
+
+    Returns:
+        Parsed and validated configuration dictionary
+    """
     validator = ConfigValidator()
     return validator.validate_config_file(config_file_path, environment)
 
@@ -113,7 +121,12 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
 
 
 def apply_config_overrides(config: dict, environment: str) -> None:
-    """Apply feature flags and constants overrides from config."""
+    """Apply feature flags and constants overrides from config.
+
+    Args:
+        config: Configuration dictionary
+        environment: Target environment for deployment
+    """
     if "features" in config:
         features = config["features"]
         features_list = features.get(environment, []) if isinstance(features, dict) else features
