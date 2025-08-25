@@ -136,15 +136,15 @@ def publish_all_items(
     if _should_publish_item_type("Warehouse"):
         print_header("Publishing Warehouses")
         items.publish_warehouses(fabric_workspace_obj)
+    if _should_publish_item_type("MirroredDatabase"):
+        print_header("Publishing Mirrored Databases")
+        items.publish_mirroreddatabase(fabric_workspace_obj)
     if _should_publish_item_type("Lakehouse"):
         print_header("Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
     if _should_publish_item_type("SQLDatabase"):
         print_header("Publishing SQL Databases")
         items.publish_sqldatabases(fabric_workspace_obj)
-    if _should_publish_item_type("MirroredDatabase"):
-        print_header("Publishing Mirrored Databases")
-        items.publish_mirroreddatabase(fabric_workspace_obj)
     if _should_publish_item_type("Environment"):
         print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
