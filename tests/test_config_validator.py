@@ -142,21 +142,65 @@ class TestConfigValidator:
 
     def test_validate_workspace_field_valid_string(self):
         """Test _validate_workspace_field with valid string."""
-        core = {"workspace_id": "test-id"}
+        core = {"workspace": "test-workspace"}
+
+        result = self.validator._validate_workspace_field(core, "workspace")
+
+        assert result is True
+        assert self.validator.errors == []
+
+    def test_validate_workspace_field_valid_workspace_id_guid(self):
+        """Test _validate_workspace_field with valid workspace_id GUID."""
+        core = {"workspace_id": "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"}
 
         result = self.validator._validate_workspace_field(core, "workspace_id")
 
         assert result is True
         assert self.validator.errors == []
+
+    def test_validate_workspace_field_invalid_workspace_id_guid(self):
+        """Test _validate_workspace_field with invalid workspace_id GUID format."""
+        core = {"workspace_id": "invalid-guid-format"}
+
+        result = self.validator._validate_workspace_field(core, "workspace_id")
+
+        assert result is False
+        assert len(self.validator.errors) == 1
+        assert "must be a valid GUID format" in self.validator.errors[0]
 
     def test_validate_workspace_field_valid_dict(self):
         """Test _validate_workspace_field with valid environment mapping."""
-        core = {"workspace_id": {"dev": "dev-id", "prod": "prod-id"}}
+        core = {"workspace": {"dev": "dev-workspace", "prod": "prod-workspace"}}
+
+        result = self.validator._validate_workspace_field(core, "workspace")
+
+        assert result is True
+        assert self.validator.errors == []
+
+    def test_validate_workspace_field_valid_workspace_id_dict(self):
+        """Test _validate_workspace_field with valid workspace_id environment mapping."""
+        core = {
+            "workspace_id": {
+                "dev": "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b",
+                "prod": "2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b",
+            }
+        }
 
         result = self.validator._validate_workspace_field(core, "workspace_id")
 
         assert result is True
         assert self.validator.errors == []
+
+    def test_validate_workspace_field_invalid_workspace_id_dict(self):
+        """Test _validate_workspace_field with invalid workspace_id GUID in environment mapping."""
+        core = {"workspace_id": {"dev": "valid-8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b", "prod": "invalid-guid"}}
+
+        result = self.validator._validate_workspace_field(core, "workspace_id")
+
+        assert result is False
+        assert len(self.validator.errors) == 2  # One for each invalid GUID
+        assert "must be a valid GUID format" in self.validator.errors[0]
+        assert "must be a valid GUID format" in self.validator.errors[1]
 
     def test_validate_workspace_field_missing(self):
         """Test _validate_workspace_field with missing field."""
@@ -320,6 +364,38 @@ class TestConfigValidator:
         assert len(self.validator.errors) == 1
         assert "is not a valid regex pattern" in self.validator.errors[0]
 
+    def test_validate_guid_format_valid(self):
+        """Test _validate_guid_format with valid GUID."""
+        valid_guid = "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"
+
+        result = self.validator._validate_guid_format(valid_guid)
+
+        assert result is True
+
+    def test_validate_guid_format_valid_uppercase(self):
+        """Test _validate_guid_format with valid uppercase GUID."""
+        valid_guid = "8B6E2C7A-4C1F-4E3A-9B2E-7D8F2E1A6C3B"
+
+        result = self.validator._validate_guid_format(valid_guid)
+
+        assert result is True
+
+    def test_validate_guid_format_invalid_format(self):
+        """Test _validate_guid_format with invalid GUID format."""
+        invalid_guid = "invalid-guid-format"
+
+        result = self.validator._validate_guid_format(invalid_guid)
+
+        assert result is False
+
+    def test_validate_guid_format_invalid_length(self):
+        """Test _validate_guid_format with invalid GUID length."""
+        invalid_guid = "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3"  # Missing one character
+
+        result = self.validator._validate_guid_format(invalid_guid)
+
+        assert result is False
+
     def test_validate_items_list_valid(self):
         """Test _validate_items_list with valid items."""
         items_list = ["item1.Notebook", "item2.DataPipeline"]
@@ -407,6 +483,18 @@ class TestConfigValidator:
 
         assert len(self.validator.errors) == 1
         assert "Unknown constant 'UNKNOWN_CONSTANT'" in self.validator.errors[0]
+
+    def test_validate_constants_dict_valid_various_types(self):
+        """Test _validate_constants_dict with valid constants of various types."""
+        constants_dict = {
+            "DEFAULT_API_ROOT_URL": "https://api.example.com",  # string
+            "ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"],  # can override with different types
+            "FEATURE_FLAG": {"flag1", "flag2"},  # can override with different types
+        }
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert self.validator.errors == []
 
     def test_resolve_repository_path_absolute_path(self, tmp_path):
         """Test _resolve_repository_path with absolute path."""
@@ -532,7 +620,7 @@ class TestConfigValidatorIntegration:
 
         config_data = {
             "core": {
-                "workspace_id": {"dev": "dev-id"},
+                "workspace_id": {"dev": "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"},
                 "repository_directory": "workspace",
                 "item_types_in_scope": ["Notebook", "DataPipeline"],
             },
@@ -591,6 +679,38 @@ class TestConfigValidatorIntegration:
         assert len(exc_info.value.validation_errors) == 1
         assert "Invalid YAML syntax:" in exc_info.value.validation_errors[0]
 
+    def test_validate_config_file_catches_guid_and_constants_errors(self, tmp_path):
+        """Test validate_config_file catches GUID format and unknown constants errors."""
+        config_data = {
+            "core": {
+                "workspace_id": {
+                    "dev": "invalid-guid-format",  # Invalid GUID
+                    "prod": "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b",  # Valid GUID
+                },
+                "repository_directory": "workspace",
+                "item_types_in_scope": ["Notebook"],
+            },
+            "constants": {
+                "UNKNOWN_CONSTANT": "some_value",  # Unknown constant
+                "DEFAULT_API_ROOT_URL": "https://api.example.com",  # Known constant with any type
+            },
+        }
+
+        config_file = tmp_path / "config.yaml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        validator = ConfigValidator()
+
+        with pytest.raises(ConfigValidationError) as exc_info:
+            validator.validate_config_file(str(config_file), "dev")
+
+        # Should catch both GUID format error and unknown constant error
+        assert len(exc_info.value.validation_errors) >= 2
+        error_messages = " ".join(exc_info.value.validation_errors)
+        assert "must be a valid GUID format" in error_messages
+        assert "Unknown constant 'UNKNOWN_CONSTANT'" in error_messages
+
 
 class TestConfigSectionValidation:
     """Tests for section validation - required vs optional sections."""
@@ -619,7 +739,9 @@ class TestConfigSectionValidation:
 
     def test_validate_config_sections_core_only(self):
         """Test _validate_config_sections with only required core section."""
-        self.validator.config = {"core": {"workspace_id": "test-id", "repository_directory": "/path/to/repo"}}
+        self.validator.config = {
+            "core": {"workspace_id": "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b", "repository_directory": "/path/to/repo"}
+        }
 
         self.validator._validate_config_sections()
 
@@ -628,7 +750,7 @@ class TestConfigSectionValidation:
     def test_validate_config_sections_with_optional_sections(self):
         """Test _validate_config_sections with optional sections present."""
         self.validator.config = {
-            "core": {"workspace_id": "test-id", "repository_directory": "/path/to/repo"},
+            "core": {"workspace_id": "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b", "repository_directory": "/path/to/repo"},
             "publish": {"skip": False},
             "unpublish": {"skip": True},
             "features": ["enable_shortcut_publish"],

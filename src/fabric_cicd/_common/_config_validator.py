@@ -261,16 +261,34 @@ class ConfigValidator:
             if not field_value.strip():
                 self.errors.append(f"'{field_name}' cannot be empty")
                 return False
-            return True
+
+            return self._validate_workspace_value(field_value, field_name, field_name)
 
         if isinstance(field_value, dict):
-            return self._validate_environment_mapping(field_value, field_name, str)
+            valid = self._validate_environment_mapping(field_value, field_name, str)
+
+            # Apply field-specific validation to each environment value
+            if valid:
+                for env, value in field_value.items():
+                    if isinstance(value, str) and not self._validate_workspace_value(
+                        value, field_name, f"{field_name}.{env}"
+                    ):
+                        valid = False
+
+            return valid
 
         err_str = "workspace_name" if field_name == "workspace" else "workspace_id"
         self.errors.append(
             f"'{field_name}' must be either a string or environment mapping dictionary (e.g., {{dev: {err_str}, prod: {err_str}}}), got type {type(field_value).__name__}"
         )
         return False
+
+    def _validate_workspace_value(self, value: str, field_name: str, context: str) -> bool:
+        """Validate a workspace value (applies GUID validation for workspace_id)."""
+        if field_name == "workspace_id" and not self._validate_guid_format(value):
+            self.errors.append(f"'{context}' must be a valid GUID format: {value}")
+            return False
+        return True
 
     def _validate_repository_directory(self, core: dict[str, Any]) -> None:
         """Validate repository_directory field."""
@@ -504,6 +522,10 @@ class ConfigValidator:
             re.compile(regex)
         except re.error as e:
             self.errors.append(f"'{regex}' in {section_name} is not a valid regex pattern: {e}")
+
+    def _validate_guid_format(self, guid: str) -> bool:
+        """Validate GUID format using the pattern from constants."""
+        return bool(re.match(constants.VALID_GUID_REGEX, guid))
 
     def _validate_items_list(self, items_list: list, context: str) -> None:
         """Validate a list of items with proper context for error messages."""
