@@ -5,6 +5,8 @@ on:
     pull_request:
         branches: ["main"]
         types: [opened, edited, synchronize, ready_for_review]
+    push:
+        branches: ["main"]
 
 jobs:
     unit_test:
@@ -24,4 +26,4 @@ jobs:
                   python -m pip install --upgrade pip
                   pip install uv
                   uv sync --dev
-                  uv run pytest -v -s || exit 1  # Fail the job if any tests fail
+                  uv run pytest -v || exit 1  # Fail the job if any tests fail
