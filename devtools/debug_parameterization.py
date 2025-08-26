@@ -37,7 +37,7 @@ validate_parameter_file(
     environment=environment,
     # Uncomment to use a different parameter file name within the repository directory (default name: parameter.yml)
     # Assign to the constant in constants.py or pass in a string directly
-    parameter_file_name="parameter_old.yml",  # constants.PARAMETER_FILE_NAME,
+    # parameter_file_name=constants.PARAMETER_FILE_NAME,
     # Uncomment to use a parameter file from outside the repository (takes precedence over parameter_file_name)
     # parameter_file_path=parameter_file_path,
     # Uncomment to use SPN auth
