@@ -366,33 +366,41 @@ class TestConfigValidator:
 
     def test_validate_guid_format_valid(self):
         """Test _validate_guid_format with valid GUID."""
+        from fabric_cicd._common._config_validator import _validate_guid_format
+
         valid_guid = "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"
 
-        result = self.validator._validate_guid_format(valid_guid)
+        result = _validate_guid_format(valid_guid)
 
         assert result is True
 
     def test_validate_guid_format_valid_uppercase(self):
         """Test _validate_guid_format with valid uppercase GUID."""
+        from fabric_cicd._common._config_validator import _validate_guid_format
+
         valid_guid = "8B6E2C7A-4C1F-4E3A-9B2E-7D8F2E1A6C3B"
 
-        result = self.validator._validate_guid_format(valid_guid)
+        result = _validate_guid_format(valid_guid)
 
         assert result is True
 
     def test_validate_guid_format_invalid_format(self):
         """Test _validate_guid_format with invalid GUID format."""
+        from fabric_cicd._common._config_validator import _validate_guid_format
+
         invalid_guid = "invalid-guid-format"
 
-        result = self.validator._validate_guid_format(invalid_guid)
+        result = _validate_guid_format(invalid_guid)
 
         assert result is False
 
     def test_validate_guid_format_invalid_length(self):
         """Test _validate_guid_format with invalid GUID length."""
+        from fabric_cicd._common._config_validator import _validate_guid_format
+
         invalid_guid = "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3"  # Missing one character
 
-        result = self.validator._validate_guid_format(invalid_guid)
+        result = _validate_guid_format(invalid_guid)
 
         assert result is False
 
@@ -496,6 +504,72 @@ class TestConfigValidator:
 
         assert self.validator.errors == []
 
+    def test_validate_workspace_value_workspace_name_valid(self):
+        """Test _validate_workspace_value with valid workspace name."""
+        result = self.validator._validate_workspace_value("valid-workspace-name", "workspace", "workspace")
+
+        assert result is True
+        assert self.validator.errors == []
+
+    def test_validate_workspace_value_workspace_id_valid_guid(self):
+        """Test _validate_workspace_value with valid workspace_id GUID."""
+        result = self.validator._validate_workspace_value(
+            "12345678-1234-1234-1234-123456789abc", "workspace_id", "workspace_id"
+        )
+
+        assert result is True
+        assert self.validator.errors == []
+
+    def test_validate_workspace_value_workspace_id_invalid_guid(self):
+        """Test _validate_workspace_value with invalid workspace_id GUID."""
+        result = self.validator._validate_workspace_value("invalid-guid", "workspace_id", "workspace_id")
+
+        assert result is False
+        assert len(self.validator.errors) == 1
+        assert "must be a valid GUID format" in self.validator.errors[0]
+
+    def test_validate_item_types_in_scope_valid_list(self):
+        """Test _validate_item_types_in_scope with valid list."""
+        core = {"item_types_in_scope": ["Notebook", "DataPipeline"]}
+
+        self.validator._validate_item_types_in_scope(core)
+
+        assert self.validator.errors == []
+
+    def test_validate_item_types_in_scope_empty_list(self):
+        """Test _validate_item_types_in_scope with empty list."""
+        core = {"item_types_in_scope": []}
+
+        self.validator._validate_item_types_in_scope(core)
+
+        assert len(self.validator.errors) == 1
+        assert "'item_types_in_scope' cannot be empty if specified" in self.validator.errors[0]
+
+    def test_validate_item_types_in_scope_environment_mapping(self):
+        """Test _validate_item_types_in_scope with environment mapping."""
+        core = {"item_types_in_scope": {"dev": ["Notebook"], "prod": ["DataPipeline", "Notebook"]}}
+
+        self.validator._validate_item_types_in_scope(core)
+
+        assert self.validator.errors == []
+
+    def test_validate_item_types_in_scope_invalid_type(self):
+        """Test _validate_item_types_in_scope with invalid type."""
+        core = {"item_types_in_scope": "invalid"}
+
+        self.validator._validate_item_types_in_scope(core)
+
+        assert len(self.validator.errors) == 1
+        assert "must be either a list or environment mapping dictionary" in self.validator.errors[0]
+
+    def test_validate_item_types_in_scope_missing_field(self):
+        """Test _validate_item_types_in_scope with missing field (should be okay)."""
+        core = {"workspace_id": "12345678-1234-1234-1234-123456789abc"}
+
+        self.validator._validate_item_types_in_scope(core)
+
+        assert self.validator.errors == []
+
     def test_resolve_repository_path_absolute_path(self, tmp_path):
         """Test _resolve_repository_path with absolute path."""
         # Create actual directory
@@ -536,7 +610,7 @@ class TestConfigValidator:
         self.validator._resolve_repository_path()
 
         assert len(self.validator.errors) == 1
-        assert "Repository directory not found at resolved path" in self.validator.errors[0]
+        assert "repository_directory not found at resolved path" in self.validator.errors[0]
 
     def test_resolve_repository_path_file_instead_of_directory(self, tmp_path):
         """Test _resolve_repository_path with file instead of directory."""
@@ -550,7 +624,7 @@ class TestConfigValidator:
         self.validator._resolve_repository_path()
 
         assert len(self.validator.errors) == 1
-        assert "Repository path exists but is not a directory" in self.validator.errors[0]
+        assert "repository_directory path exists but is not a directory" in self.validator.errors[0]
 
     def test_resolve_repository_path_environment_mapping(self, tmp_path):
         """Test _resolve_repository_path with environment mapping."""
@@ -569,6 +643,157 @@ class TestConfigValidator:
         repo_dirs = self.validator.config["core"]["repository_directory"]
         assert Path(repo_dirs["dev"]).is_absolute()
         assert Path(repo_dirs["prod"]).is_absolute()
+
+    def test_validate_parameter_field_valid_configurations(self):
+        """Test parameter field validation with valid string and environment mapping."""
+        # Test valid string
+        core_string = {"parameter": "parameter.yml"}
+        self.validator._validate_parameter_field(core_string)
+        assert self.validator.errors == []
+
+        # Reset for next test
+        self.validator.errors = []
+
+        # Test valid environment mapping
+        core_mapping = {"parameter": {"dev": "dev-parameter.yml", "prod": "prod-parameter.yml"}}
+        self.validator._validate_parameter_field(core_mapping)
+        assert self.validator.errors == []
+
+    def test_validate_parameter_field_invalid_configurations(self):
+        """Test parameter field validation with invalid configurations."""
+        # Test empty string
+        core_empty = {"parameter": ""}
+        self.validator._validate_parameter_field(core_empty)
+        assert len(self.validator.errors) == 1
+        assert "'parameter' cannot be empty" in self.validator.errors[0]
+
+        # Reset for next test
+        self.validator.errors = []
+
+        # Test invalid type
+        core_invalid_type = {"parameter": 123}
+        self.validator._validate_parameter_field(core_invalid_type)
+        assert len(self.validator.errors) == 1
+        assert "'parameter' must be either a string or environment mapping dictionary" in self.validator.errors[0]
+
+    def test_resolve_parameter_path_basic_functionality(self, tmp_path):
+        """Test basic parameter path resolution functionality."""
+        # Create parameter file
+        param_file = tmp_path / "parameter.yml"
+        param_file.write_text("find_replace: []")
+
+        self.validator.config = {
+            "core": {
+                "workspace_id": "12345678-1234-1234-1234-123456789abc",
+                "repository_directory": "workspace",
+                "parameter": "parameter.yml",
+            }
+        }
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_parameter_path()
+
+        assert self.validator.errors == []
+        resolved_path = Path(self.validator.config["core"]["parameter"])
+        assert resolved_path.is_absolute()
+        assert resolved_path.exists()
+        assert resolved_path.name == "parameter.yml"
+
+    def test_resolve_path_field_directory_relative_path(self, tmp_path):
+        """Test _resolve_path_field with relative directory path."""
+        # Create directory
+        test_dir = tmp_path / "test_dir"
+        test_dir.mkdir()
+
+        self.validator.config = {"test_section": {"test_field": "test_dir"}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_path_field("test_dir", "test_field", "test_section", "directory")
+
+        assert self.validator.errors == []
+        resolved_path = Path(self.validator.config["test_section"]["test_field"])
+        assert resolved_path.is_absolute()
+        assert resolved_path.exists()
+        assert resolved_path.is_dir()
+
+    def test_resolve_path_field_file_absolute_path(self, tmp_path):
+        """Test _resolve_path_field with absolute file path."""
+        # Create file
+        test_file = tmp_path / "test_file.txt"
+        test_file.write_text("test content")
+
+        self.validator.config = {"test_section": {"test_field": str(test_file)}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_path_field(str(test_file), "test_field", "test_section", "file")
+
+        assert self.validator.errors == []
+        resolved_path = Path(self.validator.config["test_section"]["test_field"])
+        assert resolved_path.is_absolute()
+        assert resolved_path.exists()
+        assert resolved_path.is_file()
+
+    def test_resolve_path_field_environment_mapping(self, tmp_path):
+        """Test _resolve_path_field with environment mapping."""
+        self.validator.environment = "DEV"
+
+        # Create directories for different environments
+        dev_dir = tmp_path / "dev_dir"
+        prod_dir = tmp_path / "prod_dir"
+        dev_dir.mkdir()
+        prod_dir.mkdir()
+
+        field_value = {"DEV": "dev_dir", "PROD": "prod_dir"}
+
+        self.validator.config = {"test_section": {"test_field": field_value}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_path_field(field_value, "test_field", "test_section", "directory")
+
+        assert self.validator.errors == []
+        # Only DEV environment should be resolved since that's the target environment
+        resolved_path = Path(self.validator.config["test_section"]["test_field"]["DEV"])
+        assert resolved_path.is_absolute()
+        assert resolved_path.exists()
+        assert resolved_path.is_dir()
+        # PROD should remain unchanged since it wasn't the target environment
+        assert self.validator.config["test_section"]["test_field"]["PROD"] == "prod_dir"
+
+    def test_resolve_path_field_nonexistent_path(self, tmp_path):
+        """Test _resolve_path_field with nonexistent path."""
+        self.validator.config = {"test_section": {"test_field": "nonexistent_dir"}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_path_field("nonexistent_dir", "test_field", "test_section", "directory")
+
+        assert len(self.validator.errors) == 1
+        assert "test_field not found at resolved path" in self.validator.errors[0]
+
+    def test_resolve_path_field_wrong_type_file_vs_directory(self, tmp_path):
+        """Test _resolve_path_field when path exists but is wrong type."""
+        # Create a file but try to resolve it as a directory
+        test_file = tmp_path / "test_file.txt"
+        test_file.write_text("test content")
+
+        self.validator.config = {"test_section": {"test_field": "test_file.txt"}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_path_field("test_file.txt", "test_field", "test_section", "directory")
+
+        assert len(self.validator.errors) == 1
+        assert "test_field path exists but is not a directory" in self.validator.errors[0]
+
+    def test_resolve_path_field_no_config_path(self):
+        """Test _resolve_path_field when config_path is None (validation failed)."""
+        self.validator.config_path = None  # Simulate config validation failure
+
+        self.validator.config = {"test_section": {"test_field": "test_dir"}}
+
+        self.validator._resolve_path_field("test_dir", "test_field", "test_section", "directory")
+
+        # Should skip resolution and not add any errors
+        assert self.validator.errors == []
+        assert self.validator.config["test_section"]["test_field"] == "test_dir"  # Unchanged
 
     def test_environment_exists_valid(self):
         """Test _validate_environment_exists with valid environment."""
@@ -607,6 +832,129 @@ class TestConfigValidator:
         self.validator._validate_environment_exists()
 
         assert self.validator.errors == []
+
+
+# Tests for utility functions
+class TestConfigValidatorUtilityFunctions:
+    """Tests for standalone utility functions in the config validator module."""
+
+    def test_find_git_root_with_git_repo(self, tmp_path):
+        """Test _find_git_root when path is in a git repository."""
+        from fabric_cicd._common._config_validator import _find_git_root
+
+        # Create a fake git repo structure
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+
+        # Test from root
+        result = _find_git_root(tmp_path)
+        assert result == tmp_path
+
+        # Test from subdirectory
+        sub_dir = tmp_path / "subdir" / "deep"
+        sub_dir.mkdir(parents=True)
+        result = _find_git_root(sub_dir)
+        assert result == tmp_path
+
+    def test_find_git_root_no_git_repo(self, tmp_path):
+        """Test _find_git_root when path is not in a git repository."""
+        from fabric_cicd._common._config_validator import _find_git_root
+
+        result = _find_git_root(tmp_path)
+        assert result is None
+
+    def test_validate_guid_format_valid(self):
+        """Test _validate_guid_format with valid GUIDs."""
+        from fabric_cicd._common._config_validator import _validate_guid_format
+
+        valid_guids = [
+            "12345678-1234-1234-1234-123456789abc",
+            "ABCDEF12-3456-7890-ABCD-EF1234567890",
+            "00000000-0000-0000-0000-000000000000",
+        ]
+
+        for guid in valid_guids:
+            assert _validate_guid_format(guid) is True
+
+    def test_validate_guid_format_invalid(self):
+        """Test _validate_guid_format with invalid GUIDs."""
+        from fabric_cicd._common._config_validator import _validate_guid_format
+
+        invalid_guids = [
+            "invalid-guid",
+            "12345678-1234-1234-1234",  # too short
+            "12345678-1234-1234-1234-123456789abcd",  # too long
+            "12345678_1234_1234_1234_123456789abc",  # wrong separators
+            "",
+            "not-a-guid-at-all",
+        ]
+
+        for guid in invalid_guids:
+            assert _validate_guid_format(guid) is False
+
+    def test_get_config_fields_complete_config(self):
+        """Test _get_config_fields with complete configuration."""
+        from fabric_cicd._common._config_validator import _get_config_fields
+
+        config = {
+            "core": {
+                "workspace_id": "test-id",
+                "workspace": "test-workspace",
+                "repository_directory": "/path",
+                "item_types_in_scope": ["Notebook"],
+                "parameter": "param.yml",
+            },
+            "publish": {"exclude_regex": ".*_test", "items_to_include": ["item1"], "skip": False},
+            "unpublish": {"exclude_regex": ".*_old", "items_to_include": ["item2"], "skip": True},
+            "features": ["feature1"],
+            "constants": {"KEY": "value"},
+        }
+
+        fields = _get_config_fields(config)
+
+        # Should return all fields from all sections
+        assert len(fields) == 13
+
+        # Check some specific fields
+        field_names = [field[1] for field in fields]
+        assert "workspace_id" in field_names
+        assert "repository_directory" in field_names
+        assert "parameter" in field_names
+        assert "features" in field_names
+        assert "constants" in field_names
+
+    def test_is_regular_constants_dict_regular(self):
+        """Test _is_regular_constants_dict with regular constants dictionary."""
+        from fabric_cicd._common._config_validator import _is_regular_constants_dict
+
+        regular_dict = {"API_URL": "https://api.example.com", "TIMEOUT": 30, "FEATURES": ["feat1", "feat2"]}
+
+        assert _is_regular_constants_dict(regular_dict) is True
+
+    def test_is_regular_constants_dict_environment_mapping(self):
+        """Test _is_regular_constants_dict with environment mapping."""
+        from fabric_cicd._common._config_validator import _is_regular_constants_dict
+
+        env_mapping = {"dev": {"API_URL": "https://dev.api.com"}, "prod": {"API_URL": "https://prod.api.com"}}
+
+        assert _is_regular_constants_dict(env_mapping) is False
+
+    def test_is_regular_constants_dict_mixed(self):
+        """Test _is_regular_constants_dict with mixed values."""
+        from fabric_cicd._common._config_validator import _is_regular_constants_dict
+
+        mixed_dict = {
+            "API_URL": "https://api.example.com",  # string value
+            "dev": {"TIMEOUT": 30},  # dict value (makes it NOT all dicts)
+        }
+
+        assert _is_regular_constants_dict(mixed_dict) is True
+
+    def test_is_regular_constants_dict_empty(self):
+        """Test _is_regular_constants_dict with empty dictionary."""
+        from fabric_cicd._common._config_validator import _is_regular_constants_dict
+
+        assert _is_regular_constants_dict({}) is True
 
 
 class TestConfigValidatorIntegration:

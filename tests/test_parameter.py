@@ -1060,3 +1060,175 @@ spark_pool:
     finally:
         # Clean up temporary file
         Path(temp_file_path).unlink()
+
+
+def test_parameter_file_path_absolute():
+    """Test that Parameter class accepts absolute parameter_file_path."""
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          TEST: "test-replacement"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param_obj = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=temp_file_path,
+        )
+
+        # Should work without errors
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_parameter_file_path_relative():
+    """Test that Parameter class rejects relative parameter_file_path."""
+    from fabric_cicd._common._exceptions import InputError
+
+    with pytest.raises(InputError, match="parameter_file_path must be an absolute path"):
+        Parameter(
+            repository_directory=Path.cwd(),
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path="relative/path/parameters.yml",
+        )
+
+
+def test_parameter_file_path_none():
+    """Test that Parameter class accepts None for parameter_file_path (uses parameter_file_name)."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        param_file = temp_dir_path / "parameters.yml"
+        param_file.write_text("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          TEST: "test-replacement"
+""")
+
+        param_obj = Parameter(
+            repository_directory=temp_dir_path,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",
+            parameter_file_path=None,
+        )
+
+        # Should work with parameter_file_name fallback
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+
+
+def test_parameter_file_path_and_name_inputs():
+    """Test that parameter_file_path takes precedence over parameter_file_name."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+
+        # Create file referenced by parameter_file_name
+        fallback_file = temp_dir_path / "parameters.yml"
+        fallback_file.write_text("""
+find_replace:
+    - find_value: "fallback-value"
+      replace_value:
+          TEST: "fallback-replacement"
+""")
+
+        # Create file referenced by parameter_file_path
+        primary_file = temp_dir_path / "primary_parameters.yml"
+        primary_file.write_text("""
+find_replace:
+    - find_value: "primary-value"
+      replace_value:
+          TEST: "primary-replacement"
+""")
+
+        param_obj = Parameter(
+            repository_directory=temp_dir_path,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",  # This should be ignored
+            parameter_file_path=str(primary_file),  # This should be used
+        )
+
+        # Should use primary_file content
+        assert param_obj.environment == "TEST"
+        # Check that the primary file was used by examining parameter content
+        assert "find_replace" in param_obj.environment_parameter
+        assert len(param_obj.environment_parameter["find_replace"]) == 1
+        assert param_obj.environment_parameter["find_replace"][0]["find_value"] == "primary-value"
+
+
+def test_no_provided_parameter_file_path():
+    """Test that default behavior without parameter_file_path remains unchanged."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        param_file = temp_dir_path / "parameters.yml"
+        param_file.write_text("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          TEST: "test-replacement"
+""")
+
+        # Original behavior - no parameter_file_path specified
+        param_obj = Parameter(
+            repository_directory=temp_dir_path,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",
+        )
+
+        # Should work exactly as before
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+        assert "find_replace" in param_obj.environment_parameter
+        assert len(param_obj.environment_parameter["find_replace"]) == 1
+
+
+def test_parameter_file_path_nonexistent():
+    """Test behavior when parameter_file_path points to nonexistent file."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        nonexistent_path = str(Path(temp_dir) / "nonexistent" / "parameters.yml")
+
+        # Should not raise error during initialization (file existence checked during parameter loading)
+        param_obj = Parameter(
+            repository_directory=Path.cwd(),
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=nonexistent_path,
+        )
+
+        # Basic properties should be set correctly
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+        # Parameters should be empty since file doesn't exist
+        assert param_obj.environment_parameter == {}
+
+
+def test_parameter_file_path_invalid_type():
+    """Test that Parameter class rejects invalid types for parameter_file_path."""
+    with pytest.raises(TypeError):
+        Parameter(
+            repository_directory=Path.cwd(),
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=123,  # Invalid type
+        )

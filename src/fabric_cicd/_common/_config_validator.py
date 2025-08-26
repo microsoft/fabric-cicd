@@ -72,6 +72,7 @@ class ConfigValidator:
             # Step 5: Resolve paths after environment validation passes
             if not self.errors:
                 self._resolve_repository_path()
+                self._resolve_parameter_path()
 
         # If there are validation errors, raise them all at once
         if self.errors:
@@ -102,7 +103,7 @@ class ConfigValidator:
         self.config_path = config_path
         return config_path
 
-    def _validate_yaml_content(self, config_path: Optional[Path]) -> Optional[dict[str, Any]]:
+    def _validate_yaml_content(self, config_path: Optional[Path]) -> Optional[dict]:
         """Validate YAML syntax and basic structure."""
         if config_path is None:
             return None
@@ -168,6 +169,9 @@ class ConfigValidator:
 
         # Validate optional item_types_in_scope
         self._validate_item_types_in_scope(core)
+
+        # Validate optional parameter field
+        self._validate_parameter_field(core)
 
         # Validate optional sections
         # publish section
@@ -249,7 +253,7 @@ class ConfigValidator:
 
         return valid
 
-    def _validate_workspace_field(self, core: dict[str, Any], field_name: str) -> bool:
+    def _validate_workspace_field(self, core: dict, field_name: str) -> bool:
         """Validate workspace_id or workspace field."""
         if field_name not in core:
             return False
@@ -285,12 +289,12 @@ class ConfigValidator:
 
     def _validate_workspace_value(self, value: str, field_name: str, context: str) -> bool:
         """Validate a workspace value (applies GUID validation for workspace_id)."""
-        if field_name == "workspace_id" and not self._validate_guid_format(value):
+        if field_name == "workspace_id" and not _validate_guid_format(value):
             self.errors.append(f"'{context}' must be a valid GUID format: {value}")
             return False
         return True
 
-    def _validate_repository_directory(self, core: dict[str, Any]) -> None:
+    def _validate_repository_directory(self, core: dict) -> None:
         """Validate repository_directory field."""
         if "repository_directory" not in core:
             self.errors.append("Configuration must specify 'repository_directory' in core section")
@@ -313,81 +317,6 @@ class ConfigValidator:
                 f"'repository_directory' must be either a string or environment mapping dictionary (e.g., {{dev: 'path/dev', prod: 'path/prod'}}), got type {type(repository_directory).__name__}"
             )
             return
-
-    def _resolve_repository_path(self) -> None:
-        """Resolve repository directory paths after environment validation."""
-        core = self.config["core"]
-        repository_directory = core["repository_directory"]
-
-        # Prepare repo_dirs for path resolution
-        if isinstance(repository_directory, str):
-            repo_dirs = {"_default": repository_directory}
-        else:  # isinstance(repository_directory, dict) - already validated
-            repo_dirs = repository_directory
-
-        # Resolve and validate paths
-        if not self.config_path:
-            logger.debug("Skipping repository directory path resolution due to config file validation failure")
-            return
-
-        # If environment mapping is used and target environment is provided, only process that environment
-        if self.environment and self.environment != "N/A" and isinstance(repository_directory, dict):
-            repo_dirs = {self.environment: repo_dirs[self.environment]}
-
-        for env_key, repo_dir in repo_dirs.items():
-            try:
-                repo_path = Path(repo_dir)
-
-                # Use absolute path if provided
-                if repo_path.is_absolute():
-                    resolved_repo_path = repo_path
-                    logger.info(f"Using absolute repository directory path for {env_key}: '{resolved_repo_path}'")
-
-                    # Validate the absolute path exists in the same repository as config file
-                    config_repo_root = _find_git_root(self.config_path.parent)
-                    items_repo_root = _find_git_root(resolved_repo_path)
-
-                    if config_repo_root and items_repo_root and config_repo_root != items_repo_root:
-                        env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
-                        self.errors.append(
-                            f"Repository directory{env_desc} must be in the same git repository as the configuration file. "
-                            f"Config repository: {config_repo_root}, Items repository: {items_repo_root}"
-                        )
-                        continue
-                else:
-                    # Resolve relative to config path location
-                    config_dir = self.config_path.parent
-                    resolved_repo_path = (config_dir / repo_dir).resolve()
-                    env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
-                    logger.info(
-                        f"Repository directory '{repo_dir}' resolved relative to config path{env_desc}: '{resolved_repo_path}'"
-                    )
-
-                # Validate the resolved directory exists
-                if not resolved_repo_path.exists():
-                    env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
-                    self.errors.append(
-                        f"Repository directory not found at resolved path{env_desc}: '{resolved_repo_path}'"
-                    )
-                    continue
-
-                if not resolved_repo_path.is_dir():
-                    env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
-                    self.errors.append(
-                        f"Repository path exists but is not a directory{env_desc}: '{resolved_repo_path}'"
-                    )
-                    continue
-
-                # Store the resolved path back
-                if isinstance(repository_directory, str):
-                    core["repository_directory"] = str(resolved_repo_path)
-                else:
-                    core["repository_directory"][env_key] = str(resolved_repo_path)
-
-            except (OSError, ValueError) as e:
-                env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
-                self.errors.append(f"Invalid repository_directory path '{repo_dir}'{env_desc}: {e}")
-                continue
 
     def _validate_item_types_in_scope(self, core: dict[str, Any]) -> None:
         """Validate item_types_in_scope field if present."""
@@ -438,6 +367,116 @@ class ConfigValidator:
                     msg = f"Invalid item type '{item_type}'. Available types: {available_types}"
 
                 self.errors.append(msg)
+
+    def _validate_parameter_field(self, core: dict) -> None:
+        """Validate parameter field if present."""
+        if "parameter" not in core:
+            return  # Optional field
+
+        parameter_value = core["parameter"]
+
+        # Support both string values and environment mappings
+        if isinstance(parameter_value, str):
+            if not parameter_value.strip():
+                self.errors.append("'parameter' cannot be empty")
+                return
+        elif isinstance(parameter_value, dict):
+            if not self._validate_environment_mapping(parameter_value, "parameter", str):
+                return
+        else:
+            self.errors.append(
+                f"'parameter' must be either a string or environment mapping dictionary (e.g., {{dev: 'dev/parameter.yml', prod: 'prod/parameter.yml'}}), got type {type(parameter_value).__name__}"
+            )
+
+    def _resolve_path_field(
+        self, field_value: str | dict, field_name: str, section_name: str, path_type: str = "directory"
+    ) -> None:
+        """Path resolution for configuration "path" fields (e.g, repository_directory, parameter)."""
+        # Prepare paths for resolution
+        paths_to_resolve = {"_default": field_value} if isinstance(field_value, str) else field_value
+
+        # Skip resolution if config validation failed
+        if not self.config_path:
+            logger.debug(f"Skipping {field_name} path resolution due to config file validation failure")
+            return
+
+        # If environment mapping is used and target environment is provided, only process that environment path
+        if self.environment and self.environment != "N/A" and isinstance(field_value, dict):
+            paths_to_resolve = {self.environment: paths_to_resolve[self.environment]}
+
+        for env_key, path_str in paths_to_resolve.items():
+            try:
+                path = Path(path_str)
+                env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
+
+                if path.is_absolute():
+                    resolved_path = path
+                    logger.info(f"Using absolute {field_name} path{env_desc}: '{resolved_path}'")
+
+                    # Validate absolute paths are in the same git repository as config file
+                    config_repo_root = _find_git_root(self.config_path.parent)
+                    path_repo_root = _find_git_root(resolved_path.parent if path_type == "file" else resolved_path)
+
+                    if config_repo_root and path_repo_root and config_repo_root != path_repo_root:
+                        self.errors.append(
+                            f"{field_name}{env_desc} must be in the same git repository as the configuration file. "
+                            f"Config repository: {config_repo_root}, {field_name} repository: {path_repo_root}"
+                        )
+                        continue
+                else:
+                    # Resolve relative to config path location
+                    config_dir = self.config_path.parent
+                    resolved_path = (config_dir / path_str).resolve()
+                    logger.info(
+                        f"{field_name} '{path_str}' resolved relative to config path{env_desc}: '{resolved_path}'"
+                    )
+
+                # Validate the resolved path exists
+                if not resolved_path.exists():
+                    self.errors.append(f"{field_name} not found at resolved path{env_desc}: '{resolved_path}'")
+                    continue
+
+                # Path type-specific validation
+                if path_type == "directory":
+                    if not resolved_path.is_dir():
+                        self.errors.append(
+                            f"{field_name} path exists but is not a directory{env_desc}: '{resolved_path}'"
+                        )
+                        continue
+
+                elif path_type == "file" and not resolved_path.is_file():
+                    self.errors.append(f"{field_name} path exists but is not a file{env_desc}: '{resolved_path}'")
+                    continue
+
+                # Store the resolved path back in config
+                if isinstance(field_value, str):
+                    if section_name:
+                        self.config[section_name][field_name] = str(resolved_path)
+                    else:
+                        self.config[field_name] = str(resolved_path)
+                else:
+                    if section_name:
+                        self.config[section_name][field_name][env_key] = str(resolved_path)
+                    else:
+                        self.config[field_name][env_key] = str(resolved_path)
+
+            except (OSError, ValueError) as e:
+                self.errors.append(f"Invalid {field_name} path '{path_str}'{env_desc}: {e}")
+
+    def _resolve_repository_path(self) -> None:
+        """Resolve repository directory paths after environment validation."""
+        core = self.config["core"]
+        repository_directory = core["repository_directory"]
+        self._resolve_path_field(repository_directory, "repository_directory", "core", "directory")
+
+    def _resolve_parameter_path(self) -> None:
+        """Resolve parameter file paths after environment validation."""
+        core = self.config["core"]
+        if "parameter" not in core:
+            return  # Optional field
+
+        parameter_value = core["parameter"]
+        self._resolve_path_field(parameter_value, "parameter", "core", "file")
 
     def _validate_operation_section(self, section: dict[str, Any], section_name: str) -> None:
         """Validate publish/unpublish section structure."""
@@ -522,10 +561,6 @@ class ConfigValidator:
             re.compile(regex)
         except re.error as e:
             self.errors.append(f"'{regex}' in {section_name} is not a valid regex pattern: {e}")
-
-    def _validate_guid_format(self, guid: str) -> bool:
-        """Validate GUID format using the pattern from constants."""
-        return bool(re.match(constants.VALID_GUID_REGEX, guid))
 
     def _validate_items_list(self, items_list: list, context: str) -> None:
         """Validate a list of items with proper context for error messages."""
@@ -614,6 +649,7 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str]]:
         (config.get("core", {}), "workspace", "core.workspace"),
         (config.get("core", {}), "repository_directory", "core.repository_directory"),
         (config.get("core", {}), "item_types_in_scope", "core.item_types_in_scope"),
+        (config.get("core", {}), "parameter", "core.parameter"),
         # Publish section fields
         (config.get("publish", {}), "exclude_regex", "publish.exclude_regex"),
         (config.get("publish", {}), "items_to_include", "publish.items_to_include"),
@@ -644,3 +680,8 @@ def _find_git_root(path: Path) -> Optional[Path]:
             return current
         current = current.parent
     return None
+
+
+def _validate_guid_format(guid: str) -> bool:
+    """Validate GUID format using the pattern from constants."""
+    return bool(re.match(constants.VALID_GUID_REGEX, guid))

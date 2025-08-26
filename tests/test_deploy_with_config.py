@@ -32,7 +32,7 @@ class TestConfigFileLoading:
 
         config_data = {
             "core": {
-                "workspace_id": {"dev": "test-id"},
+                "workspace_id": {"dev": "12345678-1234-1234-1234-123456789abc"},
                 "repository_directory": "test/path",
             }
         }
@@ -88,13 +88,16 @@ class TestWorkspaceSettingsExtraction:
         """Test extracting workspace ID based on environment."""
         config = {
             "core": {
-                "workspace_id": {"dev": "dev-id", "prod": "prod-id"},
+                "workspace_id": {
+                    "dev": "11111111-1111-1111-1111-111111111111",
+                    "prod": "22222222-2222-2222-2222-222222222222",
+                },
                 "repository_directory": "test/path",
             }
         }
 
         settings = extract_workspace_settings(config, "dev")
-        assert settings["workspace_id"] == "dev-id"
+        assert settings["workspace_id"] == "11111111-1111-1111-1111-111111111111"
         assert settings["repository_directory"] == "test/path"
 
     def test_extract_workspace_name_by_environment(self):
@@ -118,7 +121,7 @@ class TestWorkspaceSettingsExtraction:
 
         config_data = {
             "core": {
-                "workspace_id": "single-id",
+                "workspace_id": "33333333-3333-3333-3333-333333333333",
                 "repository_directory": "test/path",
             }
         }
@@ -127,13 +130,13 @@ class TestWorkspaceSettingsExtraction:
 
         # Single workspace IDs are supported
         config = load_config_file(str(config_file), "N/A")
-        assert config["core"]["workspace_id"] == "single-id"
+        assert config["core"]["workspace_id"] == "33333333-3333-3333-3333-333333333333"
 
     def test_extract_missing_environment(self, tmp_path):
         """Test error when environment not found in workspace mappings during config loading."""
         config_data = {
             "core": {
-                "workspace_id": {"dev": "dev-id"},
+                "workspace_id": {"dev": "44444444-4444-4444-4444-444444444444"},
                 "repository_directory": "test/path",
             }
         }
@@ -161,7 +164,7 @@ class TestWorkspaceSettingsExtraction:
         """Test error when repository_directory is missing."""
         config_data = {
             "core": {
-                "workspace_id": {"dev": "test-id"},
+                "workspace_id": {"dev": "55555555-5555-5555-5555-555555555555"},
             }
         }
         config_file = tmp_path / "config.yml"
@@ -174,7 +177,7 @@ class TestWorkspaceSettingsExtraction:
         """Test extracting optional item_types_in_scope."""
         config = {
             "core": {
-                "workspace_id": "test-id",
+                "workspace_id": "66666666-6666-6666-6666-666666666666",
                 "repository_directory": "test/path",
                 "item_types_in_scope": ["Notebook", "DataPipeline"],
             }
@@ -182,6 +185,50 @@ class TestWorkspaceSettingsExtraction:
 
         settings = extract_workspace_settings(config, "dev")
         assert settings["item_types_in_scope"] == ["Notebook", "DataPipeline"]
+
+    def test_extract_parameter_file_path_string(self):
+        """Test extracting parameter file path as string."""
+        config = {
+            "core": {
+                "workspace_id": "12345678-1234-1234-1234-123456789abc",
+                "repository_directory": "test/path",
+                "parameter": "parameter.yml",
+            }
+        }
+
+        settings = extract_workspace_settings(config, "dev")
+        assert settings["parameter_file_path"] == "parameter.yml"
+
+    def test_extract_parameter_file_path_environment_mapping(self):
+        """Test extracting parameter file path from environment mapping."""
+        config = {
+            "core": {
+                "workspace_id": {
+                    "dev": "11111111-1111-1111-1111-111111111111",
+                    "prod": "22222222-2222-2222-2222-222222222222",
+                },
+                "repository_directory": "test/path",
+                "parameter": {"dev": "dev-parameter.yml", "prod": "prod-parameter.yml"},
+            }
+        }
+
+        settings = extract_workspace_settings(config, "dev")
+        assert settings["parameter_file_path"] == "dev-parameter.yml"
+
+        settings_prod = extract_workspace_settings(config, "prod")
+        assert settings_prod["parameter_file_path"] == "prod-parameter.yml"
+
+    def test_extract_parameter_file_path_missing(self):
+        """Test extracting workspace settings when parameter field is missing."""
+        config = {
+            "core": {
+                "workspace_id": "33333333-3333-3333-3333-333333333333",
+                "repository_directory": "test/path",
+            }
+        }
+
+        settings = extract_workspace_settings(config, "dev")
+        assert "parameter_file_path" not in settings
 
 
 class TestPublishSettingsExtraction:
@@ -306,7 +353,7 @@ class TestDeployWithConfig:
         # Create test config file
         config_data = {
             "core": {
-                "workspace_id": {"dev": "dev-workspace-id"},
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
                 "repository_directory": "test/path",
                 "item_types_in_scope": ["Notebook", "DataPipeline"],
             },
@@ -333,7 +380,7 @@ class TestDeployWithConfig:
         # Verify workspace creation
         # Note: repository_directory will be resolved to absolute path during validation
         call_args = mock_workspace.call_args[1]
-        assert call_args["workspace_id"] == "dev-workspace-id"
+        assert call_args["workspace_id"] == "77777777-7777-7777-7777-777777777777"
         assert call_args["workspace_name"] is None
         assert "test" in call_args["repository_directory"]  # Path will be resolved to absolute
         assert "path" in call_args["repository_directory"]
@@ -365,7 +412,7 @@ class TestDeployWithConfig:
         # Create test config file with skip flags
         config_data = {
             "core": {
-                "workspace_id": {"dev": "test-workspace-id"},
+                "workspace_id": {"dev": "88888888-8888-8888-8888-888888888888"},
                 "repository_directory": "test/path",
             },
             "publish": {
@@ -414,7 +461,7 @@ class TestDeployWithConfig:
         # Create test config file
         config_data = {
             "core": {
-                "workspace_id": {"dev": "test-workspace-id"},
+                "workspace_id": {"dev": "99999999-9999-9999-9999-999999999999"},
                 "repository_directory": "test/path",
             },
         }
@@ -433,7 +480,7 @@ class TestDeployWithConfig:
         # Verify workspace creation with token credential
         # Note: repository_directory will be resolved to absolute path during validation
         call_args = mock_workspace.call_args[1]
-        assert call_args["workspace_id"] == "test-workspace-id"
+        assert call_args["workspace_id"] == "99999999-9999-9999-9999-999999999999"
         assert call_args["workspace_name"] is None
         assert "test" in call_args["repository_directory"]  # Path will be resolved to absolute
         assert "path" in call_args["repository_directory"]
@@ -485,7 +532,11 @@ class TestConfigIntegration:
 
         config_data = {
             "core": {
-                "workspace_id": {"dev": "dev-id", "test": "test-id", "prod": "prod-id"},
+                "workspace_id": {
+                    "dev": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "test": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    "prod": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                },
                 "repository_directory": "sample/workspace",
                 "item_types_in_scope": ["Environment", "Notebook", "DataPipeline"],
             },

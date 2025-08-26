@@ -388,11 +388,12 @@ def deploy_with_config(
 
     # Create FabricWorkspace object with extracted settings
     workspace = FabricWorkspace(
-        workspace_id=workspace_settings.get("workspace_id"),
-        workspace_name=workspace_settings.get("workspace_name"),
         repository_directory=workspace_settings["repository_directory"],
         item_type_in_scope=workspace_settings.get("item_types_in_scope"),
         environment=environment,
+        workspace_id=workspace_settings.get("workspace_id"),
+        workspace_name=workspace_settings.get("workspace_name"),
+        parameter_file_path=workspace_settings.get("parameter_file_path"),
         token_credential=token_credential,
     )
 

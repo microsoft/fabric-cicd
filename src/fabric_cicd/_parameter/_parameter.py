@@ -8,11 +8,12 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 import yaml
 
 import fabric_cicd.constants as constants
+from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._parameter._utils import (
     is_valid_structure,
     process_input_path,
@@ -50,6 +51,7 @@ class Parameter:
         item_type_in_scope: list[str],
         environment: str,
         parameter_file_name: str = "parameter.yml",
+        parameter_file_path: Optional[str] = None,
     ) -> None:
         """
         Initializes the Parameter instance.
@@ -59,6 +61,7 @@ class Parameter:
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
             parameter_file_name: The name of the parameter file, default is "parameter.yml".
+            parameter_file_path: The path to the parameter file, if different from the default.
         """
         # Set class variables
         self.repository_directory = repository_directory
@@ -66,8 +69,32 @@ class Parameter:
         self.environment = environment
         self.parameter_file_name = parameter_file_name
 
-        # Initialize the parameter file path and load parameters
-        self.parameter_file_path = Path(self.repository_directory, parameter_file_name)
+        # Initialize the parameter file path
+        if parameter_file_path:
+            param_path = Path(parameter_file_path)
+
+            # Require absolute paths for parameter file path
+            if not param_path.is_absolute():
+                msg = (
+                    "parameter_file_path must be an absolute path. "
+                    f"Got relative path: '{parameter_file_path}'. "
+                    "Use an absolute path like '/full/path/to/parameter.yml'"
+                )
+                raise InputError(msg, logger)
+
+            self.parameter_file_path = param_path.resolve()
+            logger.debug(f"Using parameter file path: '{self.parameter_file_path}'")
+        else:
+            # Use default path (backward compatibility)
+            self.parameter_file_path = Path(self.repository_directory, parameter_file_name)
+            logger.debug(f"Using default parameter file path: '{self.parameter_file_path}'")
+
+        if parameter_file_path and parameter_file_name != "parameter.yml":
+            logger.warning(
+                f"Both parameter_file_name: '{parameter_file_name}' and parameter_file_path: "
+                f"'{parameter_file_path}' were provided. Using parameter_file_path"
+            )
+
         self._refresh_parameter_file()
 
     def _refresh_parameter_file(self) -> None:

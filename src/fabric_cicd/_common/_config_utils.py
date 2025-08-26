@@ -61,6 +61,12 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
         else:
             settings["item_types_in_scope"] = core["item_types_in_scope"]
 
+    if "parameter" in core:
+        if isinstance(core["parameter"], dict):
+            settings["parameter_file_path"] = core["parameter"][environment]
+        else:
+            settings["parameter_file_path"] = core["parameter"]
+
     return settings
 
 
