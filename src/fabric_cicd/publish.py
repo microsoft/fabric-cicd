@@ -335,6 +335,7 @@ def deploy_with_config(
     config_file_path: str,
     environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
+    config_override: Optional[dict] = None,
 ) -> None:
     """
     Deploy items using YAML configuration file with environment-specific settings.
@@ -347,6 +348,7 @@ def deploy_with_config(
         config_file_path: Path to the YAML configuration file as a string.
         environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod'), if missing defaults to 'N/A'.
         token_credential: Optional Azure token credential for authentication.
+        config_override: Optional dictionary to override specific configuration values.
 
     Raises:
         InputError: If configuration file is invalid or environment not found.
@@ -368,7 +370,33 @@ def deploy_with_config(
         ...     environment="prod",
         ...     token_credential=credential
         ... )
+        With override configuration
+        >>> from fabric_cicd import deploy_with_config
+        >>> from azure.identity import ClientSecretCredential
+        >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
+        >>> deploy_with_config(
+        ...     config_file_path="workspace/config.yml",
+        ...     environment="prod",
+        ...     config_override={
+        ...         "core": {
+        ...             "item_types_in_scope": ["Notebook"]
+        ...         },
+        ...         "publish": {
+        ...             "skip": {
+        ...                 "prod": False
+        ...             }
+        ...         }
+        ...     }
+        ... )
     """
+    # Experimental feature flags required to enable
+    if (
+        "enable_experimental_features" not in constants.FEATURE_FLAG
+        or "enable_config_deploy" not in constants.FEATURE_FLAG
+    ):
+        msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
+        raise InputError(msg, logger)
+
     print_header("Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
@@ -376,7 +404,7 @@ def deploy_with_config(
     environment = validate_environment(environment)
 
     # Load and validate configuration file
-    config = load_config_file(config_file_path, environment)
+    config = load_config_file(config_file_path, environment, config_override)
 
     # Extract environment-specific settings
     workspace_settings = extract_workspace_settings(config, environment)

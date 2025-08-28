@@ -4,6 +4,7 @@
 """Configuration utilities for YAML-based deployment configuration."""
 
 import logging
+from typing import Optional
 
 from fabric_cicd import constants
 from fabric_cicd._common._config_validator import ConfigValidator
@@ -11,18 +12,19 @@ from fabric_cicd._common._config_validator import ConfigValidator
 logger = logging.getLogger(__name__)
 
 
-def load_config_file(config_file_path: str, environment: str) -> dict:
+def load_config_file(config_file_path: str, environment: str, config_override: Optional[dict] = None) -> dict:
     """Load and validate YAML configuration file.
 
     Args:
         config_file_path: Path to the YAML config file
         environment: Target environment for deployment
+        config_override: Optional dictionary to override specific configuration values
 
     Returns:
         Parsed and validated configuration dictionary
     """
     validator = ConfigValidator()
-    return validator.validate_config_file(config_file_path, environment)
+    return validator.validate_config_file(config_file_path, environment, config_override)
 
 
 def extract_workspace_settings(config: dict, environment: str) -> dict:

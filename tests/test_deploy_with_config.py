@@ -49,6 +49,41 @@ class TestConfigFileLoading:
         assert resolved_path.exists()
         assert resolved_path.is_dir()
 
+    def test_load_config_file_with_override(self, tmp_path):
+        """Test loading a YAML config file with overrides."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "12345678-1234-1234-1234-123456789abc"},
+                "repository_directory": "test/path",
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Define override values
+        config_override = {
+            "core": {"workspace_id": {"dev": "87654321-4321-4321-4321-123456789abc"}},
+            "publish": {"skip": False, "exclude_regex": "^TEST.*"},
+        }
+
+        result = load_config_file(str(config_file), "dev", config_override)
+
+        # Verify the overridden values
+        assert result["core"]["workspace_id"]["dev"] == "87654321-4321-4321-4321-123456789abc"
+        assert result["publish"]["skip"] == False
+        assert result["publish"]["exclude_regex"] == "^TEST.*"
+
+        # Verify path was still resolved to absolute path and exists
+        resolved_path = Path(result["core"]["repository_directory"])
+        assert resolved_path.is_absolute()
+        assert resolved_path.exists()
+        assert resolved_path.is_dir()
+
     def test_load_nonexistent_config_file(self):
         """Test loading a non-existent config file raises ConfigValidationError."""
         with pytest.raises(ConfigValidationError, match="Configuration file not found"):
@@ -344,6 +379,7 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_full_deployment(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test full deployment with config file."""
         # Create the actual directory structure that the config references
@@ -403,6 +439,7 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_skip_operations(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with skip flags enabled."""
         # Create the actual directory structure that the config references
@@ -440,6 +477,7 @@ class TestDeployWithConfig:
         mock_publish.assert_not_called()
         mock_unpublish.assert_not_called()
 
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_missing_file(self):
         """Test deployment with missing config file."""
         with pytest.raises(ConfigValidationError, match="Configuration file not found"):
@@ -448,6 +486,7 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_with_token_credential(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with custom token credential."""
         # Mark unused mocks to avoid linting warnings
@@ -487,6 +526,53 @@ class TestDeployWithConfig:
         assert call_args["item_type_in_scope"] is None
         assert call_args["environment"] == "dev"
         assert call_args["token_credential"] == mock_credential
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_with_config_override(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test deployment with config override."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file with default publish.skip = True to skip publishing
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "12345678-1234-1234-1234-123456789abc"},
+                "repository_directory": "test/path",
+            },
+            "publish": {
+                "skip": {"dev": True},
+            },
+            "unpublish": {
+                "skip": {"dev": True},
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Define config override to override the skip flags
+        config_override = {
+            "publish": {"skip": {"dev": False}},  # Override to NOT skip publish
+            "unpublish": {"skip": {"dev": False}},  # Override to NOT skip unpublish
+        }
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment with config override
+        deploy_with_config(str(config_file), "dev", config_override=config_override)
+
+        # Verify workspace creation
+        mock_workspace.assert_called_once()
+
+        # Verify that publish and unpublish ARE called because the override turns off the skip flags
+        mock_publish.assert_called_once()
+        mock_unpublish.assert_called_once()
 
 
 class TestConfigIntegration:

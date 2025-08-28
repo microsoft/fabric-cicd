@@ -43,7 +43,9 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert "Configuration file not found" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["file"]["not_found"].format("nonexistent.yaml") in self.validator.errors[0]
+        )
 
     def test_validate_file_existence_empty_path(self):
         """Test _validate_file_existence with empty path."""
@@ -51,7 +53,7 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert "must be a non-empty string" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["path_empty"] in self.validator.errors[0]
 
     def test_validate_file_existence_none_path(self):
         """Test _validate_file_existence with None path."""
@@ -59,7 +61,7 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert "must be a non-empty string" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["path_empty"] in self.validator.errors[0]
 
     def test_validate_file_existence_directory_instead_of_file(self, tmp_path):
         """Test _validate_file_existence with directory instead of file."""
@@ -67,7 +69,7 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert "Path is not a file" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["not_a_file"].format(str(tmp_path)) in self.validator.errors[0]
 
     def test_validate_yaml_content_valid_yaml(self, tmp_path):
         """Test _validate_yaml_content with valid YAML."""
@@ -91,7 +93,8 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert "Invalid YAML syntax:" in self.validator.errors[0]
+        # We can't test the exact error message as it includes the specific parse error
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["yaml_syntax"].split(":")[0] in self.validator.errors[0]
 
     def test_validate_yaml_content_non_dict_yaml(self, tmp_path):
         """Test _validate_yaml_content with non-dictionary YAML."""
@@ -103,7 +106,7 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert "Configuration must be a YAML dictionary" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["not_dict"].format("list") in self.validator.errors[0]
 
     def test_validate_yaml_content_none_path(self):
         """Test _validate_yaml_content with None path."""
@@ -665,7 +668,7 @@ class TestConfigValidator:
         core_empty = {"parameter": ""}
         self.validator._validate_parameter_field(core_empty)
         assert len(self.validator.errors) == 1
-        assert "'parameter' cannot be empty" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format("parameter") in self.validator.errors[0]
 
         # Reset for next test
         self.validator.errors = []
@@ -674,7 +677,7 @@ class TestConfigValidator:
         core_invalid_type = {"parameter": 123}
         self.validator._validate_parameter_field(core_invalid_type)
         assert len(self.validator.errors) == 1
-        assert "'parameter' must be either a string or environment mapping dictionary" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["field"]["parameter_type"].format("int") in self.validator.errors[0]
 
     def test_resolve_parameter_path_basic_functionality(self, tmp_path):
         """Test basic parameter path resolution functionality."""
@@ -832,6 +835,447 @@ class TestConfigValidator:
         self.validator._validate_environment_exists()
 
         assert self.validator.errors == []
+
+    # Config Override Tests
+    @pytest.mark.parametrize(
+        ("section", "value", "expected_result", "expected_error_msg"),
+        [
+            # Valid cases - expect True with no errors
+            ("core", {"workspace_id": "new-id"}, True, None),
+            ("features", ["feature1", "feature2"], True, None),
+            ("features", {"dev": ["feature1"], "prod": ["feature2"]}, True, None),
+            # Publish/Unpublish section cases
+            ("publish", {"skip": False}, True, None),
+            ("publish", {"exclude_regex": "^TEST.*"}, True, None),
+            ("publish", {"items_to_include": ["item1.Notebook"]}, True, None),
+            ("unpublish", {"skip": True}, True, None),
+            ("unpublish", {"exclude_regex": "^OLD.*", "skip": False}, True, None),
+            # Basic validation only - these pass but would be validated later
+            ("features", ["feature1", 123], True, None),  # Contains non-string
+            ("constants", {123: "value"}, True, None),  # Invalid key
+            ("constants", {"UNKNOWN_CONSTANT": "value"}, True, None),  # Unknown constant
+            # Invalid cases - expect False with errors
+            (
+                "invalid_section",
+                {"field": "value"},
+                False,
+                "Cannot override unsupported config section: 'invalid_section'",
+            ),
+            ("core", "invalid_type", False, "Override section 'core' must be a dict, got str"),
+            ("core", {"invalid_setting": "value"}, False, "Cannot override unsupported setting 'core.invalid_setting'"),
+            ("publish", "invalid_type", False, "Override section 'publish' must be a dict, got str"),
+            ("unpublish", "invalid_type", False, "Override section 'unpublish' must be a dict, got str"),
+            (
+                "publish",
+                {"invalid_setting": "value"},
+                False,
+                "Cannot override unsupported setting 'publish.invalid_setting'",
+            ),
+            (
+                "unpublish",
+                {"invalid_setting": "value"},
+                False,
+                "Cannot override unsupported setting 'unpublish.invalid_setting'",
+            ),
+        ],
+    )
+    def test_valid_override_section(self, section, value, expected_result, expected_error_msg):
+        """Test _valid_override_section with various inputs."""
+        # Reset errors before each test case
+        self.validator.errors = []
+
+        result = self.validator._valid_override_section(section, value)
+
+        assert result is expected_result
+
+        if expected_error_msg:
+            assert len(self.validator.errors) == 1
+            assert expected_error_msg in self.validator.errors[0]
+        else:
+            assert self.validator.errors == []
+
+    @pytest.mark.parametrize(
+        ("section", "initial_config", "override_value", "expected_result"),
+        [
+            # Features replacement
+            (
+                "features",
+                {"features": ["existing_feature"]},
+                ["new_feature1", "new_feature2"],
+                {"features": ["new_feature1", "new_feature2"]},
+            ),
+            # Constants merge
+            (
+                "constants",
+                {"constants": {"EXISTING_CONST": "existing_value"}},
+                {"NEW_CONST": "new_value"},
+                {"constants": {"EXISTING_CONST": "existing_value", "NEW_CONST": "new_value"}},
+            ),
+            # Constants create section
+            (
+                "constants",
+                {"core": {"workspace_id": "test"}},
+                {"NEW_CONST": "new_value"},
+                {"core": {"workspace_id": "test"}, "constants": {"NEW_CONST": "new_value"}},
+            ),
+            # Publish section overrides
+            (
+                "publish",
+                {"publish": {"skip": True, "exclude_regex": "^OLD.*"}},
+                {"skip": False},
+                {"publish": {"skip": False, "exclude_regex": "^OLD.*"}},
+            ),
+            # Unpublish section overrides
+            (
+                "unpublish",
+                {"unpublish": {"skip": False}},
+                {"skip": True, "exclude_regex": "^TEST.*"},
+                {"unpublish": {"skip": True, "exclude_regex": "^TEST.*"}},
+            ),
+            # Create publish section with multiple settings
+            (
+                "publish",
+                {"core": {"workspace_id": "test-id"}},
+                {"skip": False, "exclude_regex": "^TEST.*", "items_to_include": ["item1.Notebook"]},
+                {
+                    "core": {"workspace_id": "test-id"},
+                    "publish": {"skip": False, "exclude_regex": "^TEST.*", "items_to_include": ["item1.Notebook"]},
+                },
+            ),
+            # Create unpublish section
+            (
+                "unpublish",
+                {"core": {"workspace_id": "test-id"}},
+                {"skip": True},
+                {"core": {"workspace_id": "test-id"}, "unpublish": {"skip": True}},
+            ),
+        ],
+    )
+    def test_merge_overrides_basic_sections(self, section, initial_config, override_value, expected_result):
+        """Test _merge_overrides with various basic section operations."""
+        self.validator.config = initial_config.copy()
+        self.validator.errors = []
+
+        self.validator._merge_overrides(section, override_value)
+
+        assert self.validator.errors == []
+        assert self.validator.config == expected_result
+
+    @pytest.mark.parametrize(
+        ("initial_config", "override_value", "expected_config", "expected_error", "test_description"),
+        [
+            # Direct value override
+            (
+                {"core": {"workspace_id": "original-id", "repository_directory": "/original/path"}},
+                {"workspace_id": "new-id"},
+                {"core": {"workspace_id": "new-id", "repository_directory": "/original/path"}},
+                None,
+                "Direct value override",
+            ),
+            # Environment-specific override
+            (
+                {"core": {"workspace_id": {"dev": "original-dev-id", "prod": "prod-id"}}},
+                {"workspace_id": {"dev": "new-dev-id"}},
+                {"core": {"workspace_id": {"dev": "new-dev-id", "prod": "prod-id"}}},
+                None,
+                "Environment-specific override",
+            ),
+            # Create environment mapping from simple value
+            (
+                {"core": {"workspace_id": "simple-id"}},
+                {"workspace_id": {"dev": "new-dev-id"}},
+                {"core": {"workspace_id": {"dev": "new-dev-id"}}},
+                None,
+                "Create environment mapping",
+            ),
+            # Add new optional field
+            (
+                {"core": {"workspace_id": "test-id"}},
+                {"item_types_in_scope": ["Notebook"]},
+                {"core": {"workspace_id": "test-id", "item_types_in_scope": ["Notebook"]}},
+                None,
+                "Add new optional field",
+            ),
+            # Create new publish section
+            (
+                {"core": {"workspace_id": "test-id"}},
+                {"skip": False},
+                {"core": {"workspace_id": "test-id"}, "publish": {"skip": False}},
+                None,
+                "Create new section",
+            ),
+            # Environment-specific publish section
+            (
+                {"core": {"workspace_id": "test-id"}},
+                {"skip": {"dev": False}},
+                {"core": {"workspace_id": "test-id"}, "publish": {"skip": {"dev": False}}},
+                None,
+                "Environment-specific publish setting",
+            ),
+            # Environment-specific unpublish section
+            (
+                {"core": {"workspace_id": "test-id"}},
+                {"exclude_regex": {"dev": "^TEST_DEV.*"}},
+                {"core": {"workspace_id": "test-id"}, "unpublish": {"exclude_regex": {"dev": "^TEST_DEV.*"}}},
+                None,
+                "Environment-specific unpublish setting",
+            ),
+            # Cannot create core section
+            (
+                {"features": ["test"]},
+                {"workspace_id": "test-id"},
+                {"features": ["test"]},  # Unchanged
+                "Cannot create 'core' section",
+                "Prevent creating core section",
+            ),
+            # Cannot create required repository_directory
+            (
+                {"core": {"workspace_id": "test-id"}},
+                {"repository_directory": "/new/path"},
+                {"core": {"workspace_id": "test-id"}},  # Unchanged
+                "Cannot create required field 'core.repository_directory'",
+                "Prevent creating required field",
+            ),
+            # Can override existing repository_directory
+            (
+                {"core": {"workspace_id": "test-id", "repository_directory": "/original/path"}},
+                {"repository_directory": "/new/path"},
+                {"core": {"workspace_id": "test-id", "repository_directory": "/new/path"}},
+                None,
+                "Allow overriding existing required field",
+            ),
+        ],
+    )
+    def test_merge_overrides_core_section(
+        self, initial_config, override_value, expected_config, expected_error, test_description
+    ):
+        """Test _merge_overrides with core section operations."""
+        # Set environment for environment mapping tests
+        if "environment" in test_description.lower():
+            self.validator.environment = "dev"
+        else:
+            self.validator.environment = "N/A"
+
+        self.validator.config = initial_config.copy()
+        self.validator.errors = []
+
+        section = "publish" if "publish" in str(expected_config) else "core"
+        section = "unpublish" if "unpublish" in str(expected_config) else section
+        self.validator._merge_overrides(section, override_value)
+
+        if expected_error:
+            assert len(self.validator.errors) == 1
+            assert expected_error in self.validator.errors[0]
+        else:
+            assert self.validator.errors == []
+
+        assert self.validator.config == expected_config
+
+    @pytest.mark.parametrize(
+        ("initial_config", "override_value", "expected_result", "expected_error"),
+        [
+            # Cannot create workspace_id without existing workspace
+            (
+                {"core": {"repository_directory": "/path"}},
+                {"workspace_id": "new-id"},
+                {"core": {"repository_directory": "/path"}},
+                "Cannot create workspace identifier 'core.workspace_id'",
+            ),
+            # Cannot create workspace without existing workspace_id
+            (
+                {"core": {"repository_directory": "/path"}},
+                {"workspace": "new-workspace"},
+                {"core": {"repository_directory": "/path"}},
+                "Cannot create workspace identifier 'core.workspace'",
+            ),
+            # Can create workspace_id when workspace already exists
+            (
+                {"core": {"workspace": "existing-workspace", "repository_directory": "/path"}},
+                {"workspace_id": "new-id"},
+                {
+                    "core": {
+                        "workspace": "existing-workspace",
+                        "repository_directory": "/path",
+                        "workspace_id": "new-id",
+                    }
+                },
+                None,
+            ),
+            # Can create workspace when workspace_id already exists
+            (
+                {"core": {"workspace_id": "existing-id", "repository_directory": "/path"}},
+                {"workspace": "new-workspace"},
+                {
+                    "core": {
+                        "workspace_id": "existing-id",
+                        "repository_directory": "/path",
+                        "workspace": "new-workspace",
+                    }
+                },
+                None,
+            ),
+            # Can override existing workspace identifiers
+            (
+                {
+                    "core": {
+                        "workspace_id": "original-id",
+                        "workspace": "original-workspace",
+                        "repository_directory": "/path",
+                    }
+                },
+                {"workspace_id": "new-id", "workspace": "new-workspace"},
+                {"core": {"workspace_id": "new-id", "workspace": "new-workspace", "repository_directory": "/path"}},
+                None,
+            ),
+        ],
+    )
+    def test_merge_overrides_workspace_identifiers(
+        self, initial_config, override_value, expected_result, expected_error
+    ):
+        """Test _merge_overrides with workspace identifier operations."""
+        self.validator.config = initial_config.copy()
+        self.validator.errors = []
+
+        self.validator._merge_overrides("core", override_value)
+
+        if expected_error:
+            assert len(self.validator.errors) == 1
+            assert expected_error in self.validator.errors[0]
+        else:
+            assert self.validator.errors == []
+
+        assert self.validator.config == expected_result
+
+    @pytest.mark.parametrize(
+        ("initial_config", "config_override", "expected_config", "expected_error", "mock_side_effect"),
+        [
+            # Successful override
+            (
+                {"core": {"workspace_id": "original-id"}},
+                {"core": {"workspace_id": "new-id"}, "constants": {"DEFAULT_API_ROOT_URL": "https://api.test.com"}},
+                {"core": {"workspace_id": "new-id"}, "constants": {"DEFAULT_API_ROOT_URL": "https://api.test.com"}},
+                None,
+                None,
+            ),
+            # Publish and unpublish sections
+            (
+                {"core": {"workspace_id": "original-id"}},
+                {
+                    "publish": {"skip": False, "exclude_regex": "^TEST.*"},
+                    "unpublish": {"skip": True, "items_to_include": ["item1.Notebook"]},
+                },
+                {
+                    "core": {"workspace_id": "original-id"},
+                    "publish": {"skip": False, "exclude_regex": "^TEST.*"},
+                    "unpublish": {"skip": True, "items_to_include": ["item1.Notebook"]},
+                },
+                None,
+                None,
+            ),
+            # Empty publish section (should be rejected in real validation)
+            (
+                {"core": {"workspace_id": "original-id"}},
+                {"publish": {}},
+                {"core": {"workspace_id": "original-id"}, "publish": {}},
+                None,  # No error at override level, but would fail in section validation
+                None,
+            ),
+            # Validation failure
+            (
+                {"core": {"workspace_id": "original-id"}},
+                {"core": {"invalid_setting": "value"}},
+                {"core": {"workspace_id": "original-id"}},  # Config remains unchanged
+                "Cannot override unsupported setting 'core.invalid_setting'",
+                None,
+            ),
+            # Exception handling
+            (
+                {"core": {"workspace_id": "original-id"}},
+                {"core": {"workspace_id": "new-id"}},
+                {"core": {"workspace_id": "original-id"}},  # Config remains unchanged
+                "Failed to apply config override for section 'core': Test exception",
+                Exception("Test exception"),
+            ),
+            # No overrides
+            (
+                {"core": {"workspace_id": "original-id"}},
+                None,
+                {"core": {"workspace_id": "original-id"}},  # Config remains unchanged
+                None,
+                None,
+            ),
+        ],
+    )
+    def test_apply_and_validate_overrides(
+        self, initial_config, config_override, expected_config, expected_error, mock_side_effect
+    ):
+        """Test _apply_and_validate_overrides with various scenarios."""
+        self.validator.config = initial_config.copy()
+        self.validator.config_override = config_override
+        self.validator.errors = []
+
+        if mock_side_effect:
+            with patch.object(self.validator, "_merge_overrides", side_effect=mock_side_effect):
+                self.validator._apply_and_validate_overrides()
+        else:
+            self.validator._apply_and_validate_overrides()
+
+        if expected_error:
+            assert len(self.validator.errors) == 1
+            assert expected_error in self.validator.errors[0]
+        else:
+            assert self.validator.errors == []
+
+        assert self.validator.config == expected_config
+
+    def test_validate_config_file_with_overrides_integration(self, tmp_path):
+        """Integration test for validate_config_file with config overrides."""
+        # Create a valid config file
+        config_content = """
+core:
+  workspace_id: "12345678-1234-1234-1234-123456789abc"
+  repository_directory: "workspace"
+constants:
+  DEFAULT_API_ROOT_URL: "https://api.fabric.microsoft.com"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        # Create workspace directory
+        workspace_dir = tmp_path / "workspace"
+        workspace_dir.mkdir()
+
+        config_override = {
+            "core": {"workspace_id": "87654321-4321-4321-4321-123456789abc"},
+            "constants": {"DEFAULT_API_ROOT_URL": "https://api.override.com"},
+        }
+
+        result = self.validator.validate_config_file(str(config_file), "DEV", config_override)
+
+        assert result["core"]["workspace_id"] == "87654321-4321-4321-4321-123456789abc"
+        assert result["constants"]["DEFAULT_API_ROOT_URL"] == "https://api.override.com"
+
+    def test_validate_config_file_with_invalid_overrides_integration(self, tmp_path):
+        """Integration test for validate_config_file with invalid overrides."""
+        # Create a valid config file
+        config_content = """
+core:
+  workspace_id: "12345678-1234-1234-1234-123456789abc"
+  repository_directory: "workspace"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        # Create workspace directory
+        workspace_dir = tmp_path / "workspace"
+        workspace_dir.mkdir()
+
+        config_override = {"core": {"invalid_field": "value"}}
+
+        with pytest.raises(ConfigValidationError) as exc_info:
+            self.validator.validate_config_file(str(config_file), "DEV", config_override)
+
+        assert "Cannot override unsupported setting 'core.invalid_field'" in str(exc_info.value)
 
 
 # Tests for utility functions
@@ -1232,7 +1676,12 @@ class TestOperationSectionValidation:
         self.validator._validate_operation_section(section, "unpublish")
 
         assert len(self.validator.errors) == 1
-        assert "must be either a boolean or environment mapping dictionary" in self.validator.errors[0]
+        modified_msg = (
+            constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"]
+            .format("unpublish.skip", "str")
+            .replace("a string", "a boolean")
+        )
+        assert modified_msg in self.validator.errors[0]
 
 
 class TestFeaturesSectionValidation:
@@ -1274,7 +1723,7 @@ class TestFeaturesSectionValidation:
         self.validator._validate_features_section(features)
 
         assert len(self.validator.errors) == 1
-        assert "'features' section must be either a list or environment mapping dictionary" in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["operation"]["features_type"].format("str") in self.validator.errors[0]
 
 
 class TestConstantsSectionValidation:

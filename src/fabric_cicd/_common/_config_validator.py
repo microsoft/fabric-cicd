@@ -37,23 +37,28 @@ class ConfigValidator:
         self.config: dict = None
         self.config_path: Path = None
         self.environment: str = None
+        self.config_override: Optional[dict] = None
 
-    def validate_config_file(self, config_file_path: str, environment: str) -> dict[str, Any]:
+    def validate_config_file(
+        self, config_file_path: str, environment: str, config_override: Optional[dict] = None
+    ) -> dict[str, Any]:
         """
         Validate configuration file and return parsed config if valid.
 
         Args:
             config_file_path: String path to the configuration file
             environment: The target environment for the deployment
+            config_override: Optional dictionary to override specific configuration values
 
         Returns:
-            Parsed configuration dictionary
+            Parsed configuration dictionary (includes overrides, if any)
 
         Raises:
             ConfigValidationError: If validation fails
         """
         self.errors = []
         self.environment = environment
+        self.config_override = config_override
 
         # Step 1: Validate file existence and accessibility
         config_path = self._validate_file_existence(config_file_path)
@@ -61,15 +66,19 @@ class ConfigValidator:
         # Step 2: Validate file content and YAML syntax
         self.config = self._validate_yaml_content(config_path)
 
-        # Step 3: Validate configuration structure and required fields
+        # Step 3: Apply and validate config overrides
+        if self.config is not None and self.config_override is not None:
+            self._apply_and_validate_overrides()
+
+        # Step 4: Validate configuration structure and required fields
         if self.config is not None:
             self._validate_config_structure()
             self._validate_config_sections()
 
-            # Step 4: Validate environment-specific mapping
+            # Step 5: Validate environment-specific mapping
             self._validate_environment_exists()
 
-            # Step 5: Resolve paths after environment validation passes
+            # Step 6: Resolve paths after environment validation passes
             if not self.errors:
                 self._resolve_repository_path()
                 self._resolve_parameter_path()
@@ -83,21 +92,21 @@ class ConfigValidator:
     def _validate_file_existence(self, config_file_path: str) -> Path:
         """Validate file path and existence."""
         if not config_file_path or not isinstance(config_file_path, str):
-            self.errors.append("Configuration file path must be a non-empty string")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["path_empty"])
             return None
 
         try:
             config_path = Path(config_file_path).resolve()
         except (OSError, RuntimeError) as e:
-            self.errors.append(f"Invalid file path '{config_file_path}': {e}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["invalid_path"].format(config_file_path, e))
             return None
 
         if not config_path.exists():
-            self.errors.append(f"Configuration file not found: {config_file_path}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["not_found"].format(config_file_path))
             return None
 
         if not config_path.is_file():
-            self.errors.append(f"Path is not a file: {config_file_path}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["not_a_file"].format(config_file_path))
             return None
 
         self.config_path = config_path
@@ -112,28 +121,167 @@ class ConfigValidator:
             with config_path.open(encoding="utf-8") as f:
                 config = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            self.errors.append(f"Invalid YAML syntax: {e}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["yaml_syntax"].format(e))
             return None
         except UnicodeDecodeError as e:
-            self.errors.append(f"File encoding error (expected UTF-8): {e}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["encoding_error"].format(e))
             return None
         except PermissionError as e:
-            self.errors.append(f"Permission denied reading file: {e}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["permission_denied"].format(e))
             return None
         except Exception as e:
-            self.errors.append(f"Unexpected error reading file: {e}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["unexpected_error"].format(e))
             return None
 
         # Handle empty file case
         if config is None:
-            self.errors.append("Configuration file is empty or contains only comments")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["empty_file"])
             return None
 
         if not isinstance(config, dict):
-            self.errors.append(f"Configuration must be a YAML dictionary, got {type(config).__name__}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["not_dict"].format(type(config).__name__))
             return None
 
         return config
+
+    def _apply_and_validate_overrides(self) -> None:
+        """Apply and validate config overrides."""
+        if not self.config_override:
+            return
+
+        # logger.info(f"Applying {len(self.config_override)} config override section(s)")
+        for section, value in self.config_override.items():
+            try:
+                # Validate the section
+                if not self._valid_override_section(section, value):
+                    continue
+
+                # Merge overrides into config
+                self._merge_overrides(section, value)
+
+            except Exception as e:
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["override"]["apply_failed"].format(section, e))
+
+    def _valid_override_section(self, section: str, value: any) -> bool:
+        """Validates the override section and structure are correct."""
+        # Check section is supported
+        if section not in constants.CONFIG_SECTIONS:
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["override"]["unsupported_section"].format(
+                    section, list(constants.CONFIG_SECTIONS.keys())
+                )
+            )
+            return False
+
+        # Check type is valid
+        expected_types = constants.CONFIG_SECTIONS[section]["type"]
+        if not isinstance(value, expected_types):
+            type_names = (
+                " or ".join(t.__name__ for t in expected_types)
+                if isinstance(expected_types, tuple)
+                else expected_types.__name__
+            )
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["override"]["wrong_type"].format(
+                    section, type_names, type(value).__name__
+                )
+            )
+            return False
+
+        # Check setting is supported for applicable sections
+        if isinstance(value, dict) and section in ["core", "publish", "unpublish"]:
+            supported = constants.CONFIG_SECTIONS[section]["settings"]
+            for setting in value:
+                if setting not in supported:
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["override"]["unsupported_setting"].format(
+                            section, setting, supported
+                        )
+                    )
+                    return False
+
+        return True
+
+    def _merge_overrides(self, section: str, value: dict | list) -> None:
+        """Merge section and setting overrides into config file."""
+        # Special handling for features and constants sections
+        if section == "features":
+            action = "added" if not self.config.get("features") else "updated"
+            self.config["features"] = value
+            logger.warning(constants.CONFIG_VALIDATION_MSGS["log"]["override_section"].format(action, section, value))
+            return
+
+        if section == "constants":
+            if "constants" not in self.config:
+                self.config["constants"] = {}
+                action = "added"
+            else:
+                action = "updated"
+
+            self.config["constants"].update(value)
+            logger.warning(constants.CONFIG_VALIDATION_MSGS["log"]["override_section"].format(action, section, value))
+            return
+
+        # Add section if it doesn't already exist (publish, unpublish only)
+        if section not in self.config:
+            if section == "core":
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["override"]["cannot_create_core"])
+                return
+
+            self.config[section] = {}
+            logger.warning(constants.CONFIG_VALIDATION_MSGS["log"]["override_added_section"].format(section))
+
+        # Process field by field for other sections (core, publish, unpublish)
+        for setting, setting_value in value.items():
+            exists = setting in self.config[section]
+
+            # Validate required fields can only be overridden, not added
+            if not exists and section == "core":
+                if setting == "repository_directory":
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["override"]["cannot_create_required"].format(setting)
+                    )
+                    continue
+                if setting in ["workspace_id", "workspace"]:
+                    # Check if the other workspace identifier exists
+                    other_workspace_field = "workspace" if setting == "workspace_id" else "workspace_id"
+                    if other_workspace_field not in self.config[section]:
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["override"]["cannot_create_workspace_id"].format(setting)
+                        )
+                        continue
+
+            # Handle environment specific override
+            if isinstance(setting_value, dict) and self.environment in setting_value:
+                env_value = setting_value[self.environment]
+
+                # Replace existing environment value with override value
+                if exists and isinstance(self.config[section][setting], dict):
+                    self.config[section][setting][self.environment] = env_value
+                    logger.warning(
+                        constants.CONFIG_VALIDATION_MSGS["log"]["override_env_specific"].format(
+                            section, setting, self.environment, env_value
+                        )
+                    )
+
+                # Otherwise, add new environment value
+                else:
+                    self.config[section][setting] = {self.environment: env_value}
+                    logger.warning(
+                        constants.CONFIG_VALIDATION_MSGS["log"]["override_env_mapping"].format(
+                            section, setting, self.environment, env_value
+                        )
+                    )
+
+            # Otherwise, handle direct value override
+            else:
+                self.config[section][setting] = setting_value
+                action = "updated" if exists else "added"
+                logger.warning(
+                    constants.CONFIG_VALIDATION_MSGS["log"]["override_setting"].format(
+                        action, section, setting, setting_value
+                    )
+                )
 
     def _validate_config_structure(self) -> None:
         """Validate top-level configuration structure."""
@@ -142,17 +290,21 @@ class ConfigValidator:
 
         # Check for required top-level sections
         if "core" not in self.config:
-            self.errors.append("Configuration must contain a 'core' section")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["structure"]["missing_core"])
             return
 
         if not isinstance(self.config["core"], dict):
-            self.errors.append(f"'core' section must be a dictionary, got {type(self.config['core']).__name__}")
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["structure"]["core_not_dict"].format(
+                    type(self.config["core"]).__name__
+                )
+            )
 
     def _validate_config_sections(self) -> None:
         """Validate the configuration sections"""
         # Validate core section (required)
         if "core" not in self.config or not isinstance(self.config["core"], dict):
-            self.errors.append("Configuration must contain a 'core' section")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["structure"]["missing_core"])
             return
 
         core = self.config["core"]
@@ -162,7 +314,7 @@ class ConfigValidator:
         has_workspace_name = self._validate_workspace_field(core, "workspace")
 
         if not has_workspace_id and not has_workspace_name:
-            self.errors.append("Configuration must specify either 'workspace_id' or 'workspace' in core section")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["structure"]["missing_workspace_id"])
 
         # Validate repository_directory
         self._validate_repository_directory(core)
@@ -199,10 +351,7 @@ class ConfigValidator:
                 for section, field_name, _ in _get_config_fields(self.config)
                 if not (field_name == "constants" and _is_regular_constants_dict(section.get(field_name, {})))
             ):
-                self.errors.append(
-                    "Configuration contains environment mappings but no environment was provided. "
-                    "Please specify an environment or remove environment mappings."
-                )
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["no_env_with_mappings"])
             return
 
         # Check each field for target environment presence
@@ -217,20 +366,26 @@ class ConfigValidator:
                 if isinstance(field_value, dict) and self.environment not in field_value:
                     available_envs = list(field_value.keys())
                     self.errors.append(
-                        f"Environment '{self.environment}' not found in '{display_name}' mappings. Available: {available_envs}"
+                        constants.CONFIG_VALIDATION_MSGS["environment"]["env_not_found"].format(
+                            self.environment, display_name, available_envs
+                        )
                     )
 
     def _validate_environment_mapping(self, field_value: dict, field_name: str, accepted_type: type) -> bool:
         """Validate field with environment mapping."""
         if not field_value:
-            self.errors.append(f"'{field_name}' environment mapping cannot be empty")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["empty_mapping"].format(field_name))
             return False
 
         valid = True
         for env, value in field_value.items():
             # Validate environment key
             if not isinstance(env, str) or not env.strip():
-                self.errors.append(f"Environment key in '{field_name}' must be a non-empty string")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format(
+                        field_name, type(env).__name__
+                    )
+                )
                 valid = False
                 continue
 
@@ -245,11 +400,17 @@ class ConfigValidator:
             # Validate environment value content (type-specific)
             if accepted_type == str:
                 if not value.strip():
-                    self.errors.append(f"'{field_name}' value for environment '{env}' cannot be empty")
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["environment"]["empty_env_value"].format(field_name, env)
+                    )
                     valid = False
             elif accepted_type == list and not value:
-                self.errors.append(f"'{field_name}' value for environment '{env}' cannot be empty")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["environment"]["empty_env_value"].format(field_name, env)
+                )
                 valid = False
+
+        return valid
 
         return valid
 
@@ -263,7 +424,7 @@ class ConfigValidator:
         # Support both string values and environment mappings
         if isinstance(field_value, str):
             if not field_value.strip():
-                self.errors.append(f"'{field_name}' cannot be empty")
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(field_name))
                 return False
 
             return self._validate_workspace_value(field_value, field_name, field_name)
@@ -281,23 +442,23 @@ class ConfigValidator:
 
             return valid
 
-        err_str = "workspace_name" if field_name == "workspace" else "workspace_id"
+        msg_key = "workspace_name_type" if field_name == "workspace" else "workspace_id_type"
         self.errors.append(
-            f"'{field_name}' must be either a string or environment mapping dictionary (e.g., {{dev: {err_str}, prod: {err_str}}}), got type {type(field_value).__name__}"
+            constants.CONFIG_VALIDATION_MSGS["field"][msg_key].format(field_name, type(field_value).__name__)
         )
         return False
 
     def _validate_workspace_value(self, value: str, field_name: str, context: str) -> bool:
         """Validate a workspace value (applies GUID validation for workspace_id)."""
         if field_name == "workspace_id" and not _validate_guid_format(value):
-            self.errors.append(f"'{context}' must be a valid GUID format: {value}")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["field"]["invalid_guid"].format(context, value))
             return False
         return True
 
     def _validate_repository_directory(self, core: dict) -> None:
         """Validate repository_directory field."""
         if "repository_directory" not in core:
-            self.errors.append("Configuration must specify 'repository_directory' in core section")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["structure"]["missing_repository_dir"])
             return
 
         repository_directory = core["repository_directory"]
@@ -305,7 +466,9 @@ class ConfigValidator:
         # Support both string values and environment mappings
         if isinstance(repository_directory, str):
             if not repository_directory.strip():
-                self.errors.append("'repository_directory' cannot be empty")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format("repository_directory")
+                )
                 return
 
         elif isinstance(repository_directory, dict):
@@ -314,7 +477,9 @@ class ConfigValidator:
 
         else:
             self.errors.append(
-                f"'repository_directory' must be either a string or environment mapping dictionary (e.g., {{dev: 'path/dev', prod: 'path/prod'}}), got type {type(repository_directory).__name__}"
+                constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"].format(
+                    "repository_directory", type(repository_directory).__name__
+                )
             )
             return
 
@@ -327,7 +492,9 @@ class ConfigValidator:
 
         if isinstance(item_types, list):
             if not item_types:
-                self.errors.append("'item_types_in_scope' cannot be empty if specified")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format("item_types_in_scope")
+                )
                 return
 
             self._validate_item_types(item_types)
@@ -344,29 +511,39 @@ class ConfigValidator:
             return
 
         self.errors.append(
-            f"'item_types_in_scope' must be either a list or environment mapping dictionary (e.g., {{dev: ['Notebook'], prod: ['DataPipeline']}}), got type {type(item_types).__name__}"
+            constants.CONFIG_VALIDATION_MSGS["field"]["item_types_type"].format(type(item_types).__name__)
         )
 
     def _validate_item_types(self, item_types: list, env_context: Optional[str] = None) -> None:
         """Validate a list of item types."""
         if not item_types:
-            self.errors.append("'item_types_in_scope' cannot be empty if specified")
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format("item_types_in_scope"))
             return
 
         # Validate each item type
         for item_type in item_types:
             if not isinstance(item_type, str):
-                self.errors.append(f"Item type must be a string, got {type(item_type).__name__}: {item_type}")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["invalid_item_type"].format(
+                        type(item_type).__name__, item_type
+                    )
+                )
                 continue
 
             if item_type not in constants.ACCEPTED_ITEM_TYPES:
                 available_types = ", ".join(sorted(constants.ACCEPTED_ITEM_TYPES))
                 if env_context:
-                    msg = f"Invalid item type '{item_type}' in environment '{env_context}'. Available types: {available_types}"
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["unsupported_item_type"].format(
+                            item_type, env_context, available_types
+                        )
+                    )
                 else:
-                    msg = f"Invalid item type '{item_type}'. Available types: {available_types}"
-
-                self.errors.append(msg)
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["unsupported_item_type_no_env"].format(
+                            item_type, available_types
+                        )
+                    )
 
     def _validate_parameter_field(self, core: dict) -> None:
         """Validate parameter field if present."""
@@ -378,14 +555,14 @@ class ConfigValidator:
         # Support both string values and environment mappings
         if isinstance(parameter_value, str):
             if not parameter_value.strip():
-                self.errors.append("'parameter' cannot be empty")
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format("parameter"))
                 return
         elif isinstance(parameter_value, dict):
             if not self._validate_environment_mapping(parameter_value, "parameter", str):
                 return
         else:
             self.errors.append(
-                f"'parameter' must be either a string or environment mapping dictionary (e.g., {{dev: 'dev/parameter.yml', prod: 'prod/parameter.yml'}}), got type {type(parameter_value).__name__}"
+                constants.CONFIG_VALIDATION_MSGS["field"]["parameter_type"].format(type(parameter_value).__name__)
             )
 
     def _resolve_path_field(
@@ -397,7 +574,7 @@ class ConfigValidator:
 
         # Skip resolution if config validation failed
         if not self.config_path:
-            logger.debug(f"Skipping {field_name} path resolution due to config file validation failure")
+            logger.debug(constants.CONFIG_VALIDATION_MSGS["path"]["skipping_resolution"].format(field_name))
             return
 
         # If environment mapping is used and target environment is provided, only process that environment path
@@ -411,7 +588,11 @@ class ConfigValidator:
 
                 if path.is_absolute():
                     resolved_path = path
-                    logger.info(f"Using absolute {field_name} path{env_desc}: '{resolved_path}'")
+                    logger.info(
+                        constants.CONFIG_VALIDATION_MSGS["path"]["using_absolute"].format(
+                            field_name, env_desc, resolved_path
+                        )
+                    )
 
                     # Validate absolute paths are in the same git repository as config file
                     config_repo_root = _find_git_root(self.config_path.parent)
@@ -419,8 +600,9 @@ class ConfigValidator:
 
                     if config_repo_root and path_repo_root and config_repo_root != path_repo_root:
                         self.errors.append(
-                            f"{field_name}{env_desc} must be in the same git repository as the configuration file. "
-                            f"Config repository: {config_repo_root}, {field_name} repository: {path_repo_root}"
+                            constants.CONFIG_VALIDATION_MSGS["path"]["different_repo"].format(
+                                field_name, env_desc, config_repo_root, field_name, path_repo_root
+                            )
                         )
                         continue
                 else:
@@ -428,24 +610,36 @@ class ConfigValidator:
                     config_dir = self.config_path.parent
                     resolved_path = (config_dir / path_str).resolve()
                     logger.info(
-                        f"{field_name} '{path_str}' resolved relative to config path{env_desc}: '{resolved_path}'"
+                        constants.CONFIG_VALIDATION_MSGS["path"]["path_resolved"].format(
+                            field_name, path_str, env_desc, resolved_path
+                        )
                     )
 
                 # Validate the resolved path exists
                 if not resolved_path.exists():
-                    self.errors.append(f"{field_name} not found at resolved path{env_desc}: '{resolved_path}'")
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["path"]["not_found"].format(
+                            field_name, env_desc, resolved_path
+                        )
+                    )
                     continue
 
                 # Path type-specific validation
                 if path_type == "directory":
                     if not resolved_path.is_dir():
                         self.errors.append(
-                            f"{field_name} path exists but is not a directory{env_desc}: '{resolved_path}'"
+                            constants.CONFIG_VALIDATION_MSGS["path"]["not_a_directory"].format(
+                                field_name, env_desc, resolved_path
+                            )
                         )
                         continue
 
                 elif path_type == "file" and not resolved_path.is_file():
-                    self.errors.append(f"{field_name} path exists but is not a file{env_desc}: '{resolved_path}'")
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["path"]["not_a_file"].format(
+                            field_name, env_desc, resolved_path
+                        )
+                    )
                     continue
 
                 # Store the resolved path back in config
@@ -461,7 +655,9 @@ class ConfigValidator:
                         self.config[field_name][env_key] = str(resolved_path)
 
             except (OSError, ValueError) as e:
-                self.errors.append(f"Invalid {field_name} path '{path_str}'{env_desc}: {e}")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["path"]["invalid_path"].format(field_name, path_str, env_desc, e)
+                )
 
     def _resolve_repository_path(self) -> None:
         """Resolve repository directory paths after environment validation."""
@@ -481,7 +677,9 @@ class ConfigValidator:
     def _validate_operation_section(self, section: dict[str, Any], section_name: str) -> None:
         """Validate publish/unpublish section structure."""
         if not isinstance(section, dict):
-            self.errors.append(f"'{section_name}' section must be a dictionary, got {type(section).__name__}")
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["operation"]["not_dict"].format(section_name, type(section).__name__)
+            )
             return
 
         # Validate exclude_regex if present
@@ -489,7 +687,11 @@ class ConfigValidator:
             exclude_regex = section["exclude_regex"]
             if isinstance(exclude_regex, str):
                 if not exclude_regex.strip():
-                    self.errors.append(f"'{section_name}.exclude_regex' cannot be empty")
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["exclude_regex_empty"].format(
+                            f"{section_name}.exclude_regex"
+                        )
+                    )
                 else:
                     self._validate_regex(exclude_regex, section_name)
 
@@ -501,13 +703,19 @@ class ConfigValidator:
                 # Validate each environment's regex pattern
                 for env, regex_pattern in exclude_regex.items():
                     if not regex_pattern.strip():
-                        self.errors.append(f"'{section_name}.exclude_regex.{env}' cannot be empty")
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["operation"]["exclude_regex_empty"].format(
+                                f"{section_name}.exclude_regex.{env}"
+                            )
+                        )
                         continue
 
                     self._validate_regex(regex_pattern, f"{section_name}.exclude_regex.{env}")
             else:
                 self.errors.append(
-                    f"'{section_name}.exclude_regex' must be either a string or environment mapping dictionary (e.g., {{dev: 'pattern1', prod: 'pattern2'}}), got type {type(exclude_regex).__name__}"
+                    constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"].format(
+                        f"{section_name}.exclude_regex", type(exclude_regex).__name__
+                    )
                 )
 
         # Validate items_to_include if present
@@ -516,7 +724,11 @@ class ConfigValidator:
 
             if isinstance(items, list):
                 if not items:
-                    self.errors.append(f"'{section_name}.items_to_include' cannot be empty if specified")
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format(
+                            f"{section_name}.items_to_include"
+                        )
+                    )
                 else:
                     self._validate_items_list(items, f"{section_name}.items_to_include")
 
@@ -528,13 +740,17 @@ class ConfigValidator:
                 # Validate each environment's items list
                 for env, items_list in items.items():
                     if not items_list:
-                        self.errors.append(f"'{section_name}.items_to_include.{env}' cannot be empty if specified")
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format(
+                                f"{section_name}.items_to_include.{env}"
+                            )
+                        )
                         continue
                     self._validate_items_list(items_list, f"{section_name}.items_to_include.{env}")
 
             else:
                 self.errors.append(
-                    f"'{section_name}.items_to_include' must be either a list or environment mapping dictionary (e.g., {{dev: ['item1'], prod: ['item2']}}), got type {type(items).__name__}"
+                    constants.CONFIG_VALIDATION_MSGS["field"]["item_types_type"].format(type(items).__name__)
                 )
 
         # Validate skip if present
@@ -552,7 +768,9 @@ class ConfigValidator:
 
             else:
                 self.errors.append(
-                    f"'{section_name}.skip' must be either a boolean or environment mapping dictionary (e.g., {{dev: true, prod: false}}), got type {type(skip_value).__name__}"
+                    constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"]
+                    .format(f"{section_name}.skip", type(skip_value).__name__)
+                    .replace("a string", "a boolean")
                 )
 
     def _validate_regex(self, regex: str, section_name: str) -> None:
@@ -560,13 +778,21 @@ class ConfigValidator:
         try:
             re.compile(regex)
         except re.error as e:
-            self.errors.append(f"'{regex}' in {section_name} is not a valid regex pattern: {e}")
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_regex"].format(regex, section_name, e)
+            )
 
     def _validate_items_list(self, items_list: list, context: str) -> None:
         """Validate a list of items with proper context for error messages."""
         for i, item in enumerate(items_list):
             if not isinstance(item, str):
-                self.errors.append(f"'{context}[{i}]' must be a string, got {type(item).__name__}")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_type"].format(
+                        context, i, type(item).__name__
+                    )
+                )
+            elif not item.strip():
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
             elif not item.strip():
                 self.errors.append(f"'{context}[{i}]' cannot be empty")
 
@@ -574,7 +800,7 @@ class ConfigValidator:
         """Validate features section."""
         if isinstance(features, list):
             if not features:
-                self.errors.append("'features' section cannot be empty if specified")
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section"].format("features"))
                 return
 
             self._validate_features_list(features, "features")
@@ -588,27 +814,33 @@ class ConfigValidator:
             # Validate each environment's features list
             for env, features_list in features.items():
                 if not features_list:
-                    self.errors.append(f"'features.{env}' cannot be empty if specified")
+                    self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["empty_features_env"].format(env))
                     continue
                 self._validate_features_list(features_list, f"features.{env}")
             return
 
         self.errors.append(
-            f"'features' section must be either a list or environment mapping dictionary (e.g., {{dev: ['feature1'], prod: ['feature2']}}), got type {type(features).__name__}"
+            constants.CONFIG_VALIDATION_MSGS["operation"]["features_type"].format(type(features).__name__)
         )
 
     def _validate_features_list(self, features_list: list, context: str) -> None:
         """Validate a list of features with proper context for error messages."""
         for i, feature in enumerate(features_list):
             if not isinstance(feature, str):
-                self.errors.append(f"'{context}[{i}]' must be a string, got {type(feature).__name__}")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_type"].format(
+                        context, i, type(feature).__name__
+                    )
+                )
             elif not feature.strip():
-                self.errors.append(f"'{context}[{i}]' cannot be empty")
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
 
     def _validate_constants_section(self, constants_section: any) -> None:
         """Validate constants section."""
         if not isinstance(constants_section, dict):
-            self.errors.append(f"'constants' section must be a dictionary, got {type(constants_section).__name__}")
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["operation"]["constants_type"].format(type(constants_section).__name__)
+            )
             return
 
         # Check if all values are dictionaries (contains environment mapping)
@@ -620,7 +852,7 @@ class ConfigValidator:
             # Validate each environment's constants dictionary
             for env, env_constants in constants_section.items():
                 if not env_constants:
-                    self.errors.append(f"'constants.{env}' cannot be empty if specified")
+                    self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["empty_constants_env"].format(env))
                     continue
                 self._validate_constants_dict(env_constants, f"constants.{env}")
         else:
@@ -631,13 +863,15 @@ class ConfigValidator:
         """Validate a constants dictionary with proper context for error messages."""
         for key, _ in constants_dict.items():
             if not isinstance(key, str) or not key.strip():
-                self.errors.append(f"Constant key in '{context}' must be a non-empty string, got: {key}")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_constant_key"].format(context, key)
+                )
                 continue
 
             # Validate that the constant exists in the constants module
             if not hasattr(constants, key):
                 self.errors.append(
-                    f"Unknown constant '{key}' in '{context}' - this constant does not exist in fabric_cicd.constants"
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, context)
                 )
 
 

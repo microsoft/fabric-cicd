@@ -122,3 +122,105 @@ WILDCARD_PATH_VALIDATIONS = [
 
 
 INDENT = "->"
+
+
+# Define supported sections and settings for config file
+CONFIG_SECTIONS = {
+    "core": {
+        "type": dict,
+        "settings": ["workspace_id", "workspace", "repository_directory", "item_types_in_scope", "parameter"],
+    },
+    "publish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
+    "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
+    "features": {"type": (list, dict), "settings": []},
+    "constants": {"type": dict, "settings": []},
+}
+
+# Config deployment validation messages
+CONFIG_VALIDATION_MSGS = {
+    # File validation
+    "file": {
+        "path_empty": "Configuration file path must be a non-empty string",
+        "invalid_path": "Invalid file path '{}': {}",
+        "not_found": "Configuration file not found: {}",
+        "not_a_file": "Path is not a file: {}",
+        "yaml_syntax": "Invalid YAML syntax: {}",
+        "encoding_error": "File encoding error (expected UTF-8): {}",
+        "permission_denied": "Permission denied reading file: {}",
+        "unexpected_error": "Unexpected error reading file: {}",
+        "empty_file": "Configuration file is empty or contains only comments",
+        "not_dict": "Configuration must be a YAML dictionary, got {}",
+    },
+    # Override validation
+    "override": {
+        "apply_failed": "Failed to apply config override for section '{}': {}",
+        "unsupported_section": "Cannot override unsupported config section: '{}'. Supported: {}",
+        "wrong_type": "Override section '{}' must be a {}, got {}",
+        "unsupported_setting": "Cannot override unsupported setting '{}.{}'. Supported: {}",
+        "cannot_create_core": "Cannot create 'core' section - required section must exist in the config file to override",
+        "cannot_create_required": "Cannot create required field 'core.{}'",
+        "cannot_create_workspace_id": "Cannot create workspace identifier 'core.{}'",
+    },
+    # Structure validation
+    "structure": {
+        "missing_core": "Configuration must contain a 'core' section",
+        "core_not_dict": "'core' section must be a dictionary, got {}",
+        "missing_workspace_id": "Configuration must specify either 'workspace_id' or 'workspace' in core section",
+        "missing_repository_dir": "Configuration must specify 'repository_directory' in core section",
+    },
+    # Environment validation
+    "environment": {
+        "no_env_with_mappings": "Configuration contains environment mappings but no environment was provided. Please specify an environment or remove environment mappings.",
+        "env_not_found": "Environment '{}' not found in '{}' mappings. Available: {}",
+        "empty_mapping": "'{}' environment mapping cannot be empty",
+        "invalid_env_key": "Environment key in '{}' must be a non-empty string, got: {}",
+        "empty_env_value": "'{}' value for environment '{}' cannot be empty",
+    },
+    # Field validation
+    "field": {
+        "workspace_id_type": "'{}' must be either a string or environment mapping dictionary (e.g., {{dev: workspace_id, prod: workspace_id}}), got type {}",
+        "workspace_name_type": "'{}' must be either a string or environment mapping dictionary (e.g., {{dev: workspace_name, prod: workspace_name}}), got type {}",
+        "empty_value": "'{}' cannot be empty",
+        "invalid_guid": "'{}' must be a valid GUID format: {}",
+        "item_types_type": "'item_types_in_scope' must be either a list or environment mapping dictionary (e.g., {{dev: ['Notebook'], prod: ['DataPipeline']}}), got type {}",
+        "parameter_type": "'parameter' must be either a string or environment mapping dictionary (e.g., {{dev: 'parameter.yml', prod: 'parameter.prod.yml'}}), got type {}",
+        "empty_list": "'{}' cannot be empty if specified",
+        "invalid_item_type": "Item type must be a string, got {}: {}",
+        "unsupported_item_type": "Invalid item type '{}' in environment '{}'. Available types: {}",
+        "unsupported_item_type_no_env": "Invalid item type '{}'. Available types: {}",
+    },
+    # Path validation
+    "path": {
+        "skipping_resolution": "Skipping {} path resolution due to config file validation failure",
+        "using_absolute": "Using absolute {} path{}: '{}'",
+        "different_repo": "{}{} must be in the same git repository as the configuration file. Config repository: {}, {} repository: {}",
+        "path_resolved": "{} '{}' resolved relative to config path{}: '{}'",
+        "not_found": "{} not found at resolved path{}: '{}'",
+        "not_a_directory": "{} path exists but is not a directory{}: '{}'",
+        "not_a_file": "{} path exists but is not a file{}: '{}'",
+        "invalid_path": "Invalid {} path '{}'{}: {}",
+    },
+    # Operation section validation
+    "operation": {
+        "not_dict": "'{}' section must be a dictionary, got {}",
+        "exclude_regex_empty": "'{}' cannot be empty",
+        "invalid_regex": "'{}' in {} is not a valid regex pattern: {}",
+        "items_list_type": "'{}[{}]' must be a string, got {}",
+        "items_list_empty": "'{}[{}]' cannot be empty",
+        "features_type": "'features' section must be either a list or environment mapping dictionary, got {}",
+        "constants_type": "'constants' section must be a dictionary, got {}",
+        "empty_section": "'{}' section cannot be empty if specified",
+        "empty_features_env": "'features.{}' cannot be empty if specified",
+        "empty_constants_env": "'constants.{}' cannot be empty if specified",
+        "invalid_constant_key": "Constant key in '{}' must be a non-empty string, got: {}",
+        "unknown_constant": "Unknown constant '{}' in '{}' - this constant does not exist in fabric_cicd.constants",
+    },
+    # Log messages
+    "log": {
+        "override_section": "Override: {} '{}' section with value: '{}'",
+        "override_setting": "Override: {} {}.{} with value: '{}'",
+        "override_env_specific": "Override: updated {}.{}.{} with value: '{}'",
+        "override_env_mapping": "Override: {}.{} added with environment mapping, with {} value: '{}'",
+        "override_added_section": "Override: added '{}' section",
+    },
+}
