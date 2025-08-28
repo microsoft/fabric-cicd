@@ -862,7 +862,6 @@ def test_fabric_workspace_with_none_item_types_defaults_to_all(
 
 def test_parameter_file_path_types(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test different path types for parameter_file_path in FabricWorkspace."""
-    from fabric_cicd._common._exceptions import InputError
 
     # Absolute path - accepted
     param_file = temp_workspace_dir / "parameters.yml"
@@ -881,13 +880,18 @@ find_replace:
 
     assert workspace.parameter_file_path == str(param_file)
 
-    # Relative path - rejected
-    with pytest.raises(InputError, match="parameter_file_path must be an absolute path"):
-        patched_fabric_workspace(
-            workspace_id=valid_workspace_id,
-            repository_directory=str(temp_workspace_dir),
-            parameter_file_path="relative/path/parameters.yml",
-        )
+    # Relative path - now resolved against repository directory but file doesn't exist
+    # This should not raise an exception now, it's handled gracefully
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path="relative/path/parameters.yml",
+    )
+
+    # The workspace should be created successfully but with empty parameters
+    assert workspace is not None
+    assert hasattr(workspace, "environment_parameter")
+    assert not workspace.environment_parameter
 
 
 def test_parameter_file_path_none(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
@@ -970,10 +974,16 @@ find_replace:
 
 
 def test_parameter_file_path_invalid_type_rejected(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
-    """Test that FabricWorkspace rejects invalid types for parameter_file_path."""
-    with pytest.raises(TypeError):
-        patched_fabric_workspace(
-            workspace_id=valid_workspace_id,
-            repository_directory=str(temp_workspace_dir),
-            parameter_file_path=123,  # Invalid type
-        )
+    """Test that FabricWorkspace handles invalid types for parameter_file_path."""
+    # This should not raise an exception now since Parameter handles the error internally
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=123,  # Invalid type
+    )
+
+    # The workspace should be created, but parameter loading should fail silently
+    assert workspace is not None
+    assert hasattr(workspace, "environment_parameter")
+    # Environment parameter should be empty since the parameter file path was invalid
+    assert not workspace.environment_parameter

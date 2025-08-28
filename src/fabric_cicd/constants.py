@@ -76,6 +76,7 @@ PARAMETER_MSGS = {
     "terminate": "Validation terminated: {}",
     "found": f"Found {PARAMETER_FILE_NAME} file",
     "not found": "Parameter file not found with path: {}",
+    "not set": "Parameter file path is not set",
     "invalid content": INVALID_YAML,
     "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
     "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "{}",
@@ -104,6 +105,19 @@ PARAMETER_MSGS = {
     "all target env": "The replace value: '{}' will be applied for any target environment",
     "other target env": "The '{}' environment key can only be used alone. Other environment keys found in replace_value: '{}'",
     "no filter match": "unmatched optional filters",
+    # Path resolution messages
+    "resolving_relative_path": "Resolving path '{}' to be relative to repository directory",
+    "using_param_file_path": "Using parameter file path: '{}'",
+    "using_default_param_file_path": "Using default parameter file path: '{}'",
+    "param_file_not_found": "Parameter file path not found at: '{}'. The path was resolved from: '{}' relative to repository directory: '{}'",
+    "param_path_not_file": "The specified parameter path '{}' exists but is not a file.",
+    "both_param_path_and_name": "Both parameter_file_name: '{}' and parameter_file_path: '{}' were provided. Using parameter_file_path",
+    # Parameter validation messages
+    "param_not_found": "The {} parameter was not found",
+    "param_found": "Found the {} parameter",
+    "param_count": "{} {} parameters found",
+    "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
+    "validation_complete": "Parameter file validation passed",
 }
 
 # Wildcard path support validations

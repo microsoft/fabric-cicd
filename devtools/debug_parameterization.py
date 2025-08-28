@@ -28,7 +28,10 @@ item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel"
 environment = "PPE"
 
 # Uncomment to use a parameter file in a different location (default location is within repository directory)
+# Use absolute path
 # parameter_file_path = str(root_directory / "sample" / "config" / "parameter.yml")
+# or use relative path
+# parameter_file_path = "../config/parameter.yml"
 
 validate_parameter_file(
     repository_directory=repository_directory,

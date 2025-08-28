@@ -13,7 +13,6 @@ from typing import ClassVar, Optional
 import yaml
 
 import fabric_cicd.constants as constants
-from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._parameter._utils import (
     is_valid_structure,
     process_input_path,
@@ -68,39 +67,60 @@ class Parameter:
         self.item_type_in_scope = item_type_in_scope
         self.environment = environment
         self.parameter_file_name = parameter_file_name
+        self.parameter_file_path = parameter_file_path
 
-        # Initialize the parameter file path
-        if parameter_file_path:
-            param_path = Path(parameter_file_path)
-
-            # Require absolute paths for parameter file path
-            if not param_path.is_absolute():
-                msg = (
-                    "parameter_file_path must be an absolute path. "
-                    f"Got relative path: '{parameter_file_path}'. "
-                    "Use an absolute path like '/full/path/to/parameter.yml'"
-                )
-                raise InputError(msg, logger)
-
-            self.parameter_file_path = param_path.resolve()
-            logger.debug(f"Using parameter file path: '{self.parameter_file_path}'")
-        else:
-            # Use default path (backward compatibility)
-            self.parameter_file_path = Path(self.repository_directory, parameter_file_name)
-            logger.debug(f"Using default parameter file path: '{self.parameter_file_path}'")
-
-        if parameter_file_path and parameter_file_name != "parameter.yml":
-            logger.warning(
-                f"Both parameter_file_name: '{parameter_file_name}' and parameter_file_path: "
-                f"'{parameter_file_path}' were provided. Using parameter_file_path"
-            )
-
+        self._set_parameter_file_path()
         self._refresh_parameter_file()
+
+    def _set_parameter_file_path(self) -> None:
+        """Set the parameter file path based on the provided path or default name."""
+        is_param_path = False
+
+        # Determine which input to use for parameter file path
+        if self.parameter_file_path is not None:
+            if self.parameter_file_name != "parameter.yml":
+                is_param_path = True
+                logger.warning(
+                    constants.PARAMETER_MSGS["both_param_path_and_name"].format(
+                        self.parameter_file_name, self.parameter_file_path
+                    )
+                )
+            else:
+                is_param_path = True
+
+        try:
+            # Resolve parameter file path, if provided
+            if is_param_path:
+                try:
+                    param_path = Path(self.parameter_file_path)
+                    # Handle relative path (must be relative to repository_directory)
+                    if not param_path.is_absolute():
+                        logger.debug(
+                            constants.PARAMETER_MSGS["resolving_relative_path"].format(self.parameter_file_path)
+                        )
+                        param_path = Path(self.repository_directory, self.parameter_file_path)
+
+                    self.parameter_file_path = param_path.resolve()
+                    logger.debug(constants.PARAMETER_MSGS["using_param_file_path"].format(self.parameter_file_path))
+
+                except (TypeError, ValueError) as e:
+                    logger.error(f"Error setting parameter file path: {e}")
+                    is_param_path = False
+
+            # Otherwise, resolve with default path
+            if not is_param_path:
+                self.parameter_file_path = Path(self.repository_directory, self.parameter_file_name).resolve()
+                logger.debug(constants.PARAMETER_MSGS["using_default_param_file_path"].format(self.parameter_file_path))
+
+        except Exception as e:
+            logger.error(f"Unexpected error setting parameter file path: {e}")
+            self.parameter_file_path = None
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
         self.environment_parameter = {}
 
+        # Only proceed if the parameter file exists
         if self._validate_parameter_file_exists():
             is_valid, environment_parameter = self._validate_load_parameters_to_dict()
             if is_valid:
@@ -108,6 +128,9 @@ class Parameter:
 
     def _validate_parameter_file_exists(self) -> bool:
         """Validate the parameter file exists."""
+        if self.parameter_file_path is None:
+            return False
+
         return self.parameter_file_path.is_file()
 
     def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
@@ -165,7 +188,11 @@ class Parameter:
 
     def _validate_parameter_load(self) -> tuple[bool, str]:
         """Validate the parameter file load."""
+        if self.parameter_file_path is None:
+            return False, "not set"
+
         if not self.environment_parameter:
+            # Check if the file exists
             if not self._validate_parameter_file_exists():
                 logger.warning(constants.PARAMETER_MSGS["not found"].format(self.parameter_file_path))
                 return False, "not found"
@@ -204,7 +231,7 @@ class Parameter:
             logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
 
         # Return True if all validation steps pass
-        logger.info("Parameter file validation passed")
+        logger.info(constants.PARAMETER_MSGS["validation_complete"])
         return True
 
     def _validate_parameter_structure(self) -> tuple[bool, str]:
@@ -226,14 +253,14 @@ class Parameter:
     def _validate_parameter(self, param_name: str) -> tuple[bool, str]:
         """Validate the specified parameter."""
         if param_name not in self.environment_parameter:
-            logger.debug(f"The {param_name} parameter was not found")
+            logger.debug(constants.PARAMETER_MSGS["param_not_found"].format(param_name))
             return False, "parameter not found"
 
-        logger.debug(f"Found the {param_name} parameter")
+        logger.debug(constants.PARAMETER_MSGS["param_found"].format(param_name))
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
-            logger.debug(f"{param_count} {param_name} parameters found")
+            logger.debug(constants.PARAMETER_MSGS["param_count"].format(param_count, param_name))
 
         validation_steps = [
             ("keys", lambda param_dict: self._validate_parameter_keys(param_name, list(param_dict.keys()))),
@@ -350,7 +377,7 @@ class Parameter:
 
         # Skip regex validation if is_regex is not set to true
         if param_dict["is_regex"].lower() != "true":
-            logger.warning("The provided is_regex value is not set to 'true', regex matching will be ignored.")
+            logger.warning(constants.PARAMETER_MSGS["regex_ignored"])
             return True, "Skip regex validation"
 
         # Validate the find_value is a valid regex

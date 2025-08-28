@@ -149,7 +149,6 @@ class ConfigValidator:
         if not self.config_override:
             return
 
-        # logger.info(f"Applying {len(self.config_override)} config override section(s)")
         for section, value in self.config_override.items():
             try:
                 # Validate the section
