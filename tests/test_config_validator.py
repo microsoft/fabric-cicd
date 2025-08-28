@@ -69,7 +69,7 @@ class TestConfigValidator:
 
         assert result is None
         assert len(self.validator.errors) == 1
-        assert constants.CONFIG_VALIDATION_MSGS["file"]["not_a_file"].format(str(tmp_path)) in self.validator.errors[0]
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["not_file"].format(str(tmp_path)) in self.validator.errors[0]
 
     def test_validate_yaml_content_valid_yaml(self, tmp_path):
         """Test _validate_yaml_content with valid YAML."""
@@ -677,7 +677,10 @@ class TestConfigValidator:
         core_invalid_type = {"parameter": 123}
         self.validator._validate_parameter_field(core_invalid_type)
         assert len(self.validator.errors) == 1
-        assert constants.CONFIG_VALIDATION_MSGS["field"]["parameter_type"].format("int") in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format("parameter", "int")
+            in self.validator.errors[0]
+        )
 
     def test_resolve_parameter_path_basic_functionality(self, tmp_path):
         """Test basic parameter path resolution functionality."""
@@ -909,7 +912,7 @@ class TestConfigValidator:
                 "constants",
                 {"constants": {"EXISTING_CONST": "existing_value"}},
                 {"NEW_CONST": "new_value"},
-                {"constants": {"EXISTING_CONST": "existing_value", "NEW_CONST": "new_value"}},
+                {"constants": {"NEW_CONST": "new_value"}},
             ),
             # Constants create section
             (
@@ -1677,7 +1680,7 @@ class TestOperationSectionValidation:
 
         assert len(self.validator.errors) == 1
         modified_msg = (
-            constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"]
+            constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"]
             .format("unpublish.skip", "str")
             .replace("a string", "a boolean")
         )

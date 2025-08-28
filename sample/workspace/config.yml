@@ -13,7 +13,7 @@ core: # Core configurations
     test: 2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b
     prod: 7c3e1f8b-2d4a-4b9e-8f2c-1a6c3b7d8e2f
 
-  repository_directory: "."  # Path to workspace items directory (relative to config.yml location)
+  repository_directory: "."  # Path to workspace items directory (relative to config.yml location) (required)
 
   item_types_in_scope:  # Item types to include in deployment (optional)
     - VariableLibrary

@@ -106,7 +106,7 @@ class ConfigValidator:
             return None
 
         if not config_path.is_file():
-            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["not_a_file"].format(config_file_path))
+            self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["not_file"].format(config_file_path))
             return None
 
         self.config_path = config_path
@@ -211,13 +211,8 @@ class ConfigValidator:
             return
 
         if section == "constants":
-            if "constants" not in self.config:
-                self.config["constants"] = {}
-                action = "added"
-            else:
-                action = "updated"
-
-            self.config["constants"].update(value)
+            action = "added" if "constants" not in self.config else "updated"
+            self.config["constants"] = value
             logger.warning(constants.CONFIG_VALIDATION_MSGS["log"]["override_section"].format(action, section, value))
             return
 
@@ -441,9 +436,8 @@ class ConfigValidator:
 
             return valid
 
-        msg_key = "workspace_name_type" if field_name == "workspace" else "workspace_id_type"
         self.errors.append(
-            constants.CONFIG_VALIDATION_MSGS["field"][msg_key].format(field_name, type(field_value).__name__)
+            constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(field_name, type(field_value).__name__)
         )
         return False
 
@@ -476,7 +470,7 @@ class ConfigValidator:
 
         else:
             self.errors.append(
-                constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"].format(
+                constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
                     "repository_directory", type(repository_directory).__name__
                 )
             )
@@ -510,7 +504,7 @@ class ConfigValidator:
             return
 
         self.errors.append(
-            constants.CONFIG_VALIDATION_MSGS["field"]["item_types_type"].format(type(item_types).__name__)
+            constants.CONFIG_VALIDATION_MSGS["field"]["item_types_list_or_dict"].format(type(item_types).__name__)
         )
 
     def _validate_item_types(self, item_types: list, env_context: Optional[str] = None) -> None:
@@ -533,13 +527,13 @@ class ConfigValidator:
                 available_types = ", ".join(sorted(constants.ACCEPTED_ITEM_TYPES))
                 if env_context:
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["unsupported_item_type"].format(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["unsupported_item_type_env"].format(
                             item_type, env_context, available_types
                         )
                     )
                 else:
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["unsupported_item_type_no_env"].format(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["unsupported_item_type"].format(
                             item_type, available_types
                         )
                     )
@@ -561,7 +555,9 @@ class ConfigValidator:
                 return
         else:
             self.errors.append(
-                constants.CONFIG_VALIDATION_MSGS["field"]["parameter_type"].format(type(parameter_value).__name__)
+                constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
+                    "parameter", type(parameter_value).__name__
+                )
             )
 
     def _resolve_path_field(
@@ -573,7 +569,7 @@ class ConfigValidator:
 
         # Skip resolution if config validation failed
         if not self.config_path:
-            logger.debug(constants.CONFIG_VALIDATION_MSGS["path"]["skipping_resolution"].format(field_name))
+            logger.debug(constants.CONFIG_VALIDATION_MSGS["path"]["skip"].format(field_name))
             return
 
         # If environment mapping is used and target environment is provided, only process that environment path
@@ -588,9 +584,7 @@ class ConfigValidator:
                 if path.is_absolute():
                     resolved_path = path
                     logger.info(
-                        constants.CONFIG_VALIDATION_MSGS["path"]["using_absolute"].format(
-                            field_name, env_desc, resolved_path
-                        )
+                        constants.CONFIG_VALIDATION_MSGS["path"]["absolute"].format(field_name, env_desc, resolved_path)
                     )
 
                     # Validate absolute paths are in the same git repository as config file
@@ -599,7 +593,7 @@ class ConfigValidator:
 
                     if config_repo_root and path_repo_root and config_repo_root != path_repo_root:
                         self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["path"]["different_repo"].format(
+                            constants.CONFIG_VALIDATION_MSGS["path"]["git_repo"].format(
                                 field_name, env_desc, config_repo_root, field_name, path_repo_root
                             )
                         )
@@ -609,7 +603,7 @@ class ConfigValidator:
                     config_dir = self.config_path.parent
                     resolved_path = (config_dir / path_str).resolve()
                     logger.info(
-                        constants.CONFIG_VALIDATION_MSGS["path"]["path_resolved"].format(
+                        constants.CONFIG_VALIDATION_MSGS["path"]["resolved"].format(
                             field_name, path_str, env_desc, resolved_path
                         )
                     )
@@ -627,7 +621,7 @@ class ConfigValidator:
                 if path_type == "directory":
                     if not resolved_path.is_dir():
                         self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["path"]["not_a_directory"].format(
+                            constants.CONFIG_VALIDATION_MSGS["path"]["not_directory"].format(
                                 field_name, env_desc, resolved_path
                             )
                         )
@@ -635,9 +629,7 @@ class ConfigValidator:
 
                 elif path_type == "file" and not resolved_path.is_file():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["path"]["not_a_file"].format(
-                            field_name, env_desc, resolved_path
-                        )
+                        constants.CONFIG_VALIDATION_MSGS["path"]["not_file"].format(field_name, env_desc, resolved_path)
                     )
                     continue
 
@@ -655,7 +647,7 @@ class ConfigValidator:
 
             except (OSError, ValueError) as e:
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["path"]["invalid_path"].format(field_name, path_str, env_desc, e)
+                    constants.CONFIG_VALIDATION_MSGS["path"]["invalid"].format(field_name, path_str, env_desc, e)
                 )
 
     def _resolve_repository_path(self) -> None:
@@ -687,9 +679,7 @@ class ConfigValidator:
             if isinstance(exclude_regex, str):
                 if not exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["operation"]["exclude_regex_empty"].format(
-                            f"{section_name}.exclude_regex"
-                        )
+                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(f"{section_name}.exclude_regex")
                     )
                 else:
                     self._validate_regex(exclude_regex, section_name)
@@ -703,7 +693,7 @@ class ConfigValidator:
                 for env, regex_pattern in exclude_regex.items():
                     if not regex_pattern.strip():
                         self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["operation"]["exclude_regex_empty"].format(
+                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
                                 f"{section_name}.exclude_regex.{env}"
                             )
                         )
@@ -712,7 +702,7 @@ class ConfigValidator:
                     self._validate_regex(regex_pattern, f"{section_name}.exclude_regex.{env}")
             else:
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"].format(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
                         f"{section_name}.exclude_regex", type(exclude_regex).__name__
                     )
                 )
@@ -749,7 +739,7 @@ class ConfigValidator:
 
             else:
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["field"]["item_types_type"].format(type(items).__name__)
+                    constants.CONFIG_VALIDATION_MSGS["field"]["item_types_list_or_dict"].format(type(items).__name__)
                 )
 
         # Validate skip if present
@@ -767,7 +757,7 @@ class ConfigValidator:
 
             else:
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["field"]["workspace_id_type"]
+                    constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"]
                     .format(f"{section_name}.skip", type(skip_value).__name__)
                     .replace("a string", "a boolean")
                 )
@@ -813,7 +803,9 @@ class ConfigValidator:
             # Validate each environment's features list
             for env, features_list in features.items():
                 if not features_list:
-                    self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["empty_features_env"].format(env))
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section_env"].format("features", env)
+                    )
                     continue
                 self._validate_features_list(features_list, f"features.{env}")
             return
@@ -838,7 +830,9 @@ class ConfigValidator:
         """Validate constants section."""
         if not isinstance(constants_section, dict):
             self.errors.append(
-                constants.CONFIG_VALIDATION_MSGS["operation"]["constants_type"].format(type(constants_section).__name__)
+                constants.CONFIG_VALIDATION_MSGS["operation"]["not_dict"].format(
+                    "constants", type(constants_section).__name__
+                )
             )
             return
 
@@ -851,7 +845,9 @@ class ConfigValidator:
             # Validate each environment's constants dictionary
             for env, env_constants in constants_section.items():
                 if not env_constants:
-                    self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["empty_constants_env"].format(env))
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section_env"].format("constants", env)
+                    )
                     continue
                 self._validate_constants_dict(env_constants, f"constants.{env}")
         else:

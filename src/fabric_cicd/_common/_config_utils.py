@@ -154,4 +154,4 @@ def apply_config_overrides(config: dict, environment: str) -> None:
         for key, value in constants_dict.items():
             if hasattr(constants, key):
                 setattr(constants, key, value)
-                logger.info(f"Override constant {key} = {value}")
+                logger.warning(f"Override constant {key} = {value}")

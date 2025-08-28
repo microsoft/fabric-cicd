@@ -102,7 +102,7 @@ class TestConfigFileLoading:
         config_file = tmp_path / "list.yml"
         config_file.write_text("- item1\n- item2")
 
-        with pytest.raises(ConfigValidationError, match="Configuration must be a YAML dictionary"):
+        with pytest.raises(ConfigValidationError, match="Configuration must be a dictionary"):
             load_config_file(str(config_file), "N/A")
 
     def test_load_config_missing_core_section(self, tmp_path):
