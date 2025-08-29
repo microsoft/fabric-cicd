@@ -104,11 +104,14 @@ unpublish_all_orphan_items(workspace)
   - All other commands: 60+ seconds
 
 ### Pull Request Requirements
-- MUST be linked to an issue using "Fixes #123 - Short Description" format in PR title
+- **PR Title MUST follow this exact format**: "Fixes #123 - Short Description" where #123 is the issue number
+  - Use "Fixes" for bug fixes, "Closes" for features, "Resolves" for other changes
+  - Example: "Fixes #520 - Add Python version requirements to documentation"
+  - Version bump PRs are an exception: title must be "vX.X.X" format only
 - PR description should be a copilot generated summary
 - MUST pass ruff formatting and linting checks
 - MUST pass all tests
-- Version bump PRs must follow specific format (title: vX.X.X, only change constants.py and changelog.md)
+- All PRs must be linked to a valid GitHub issue - no PRs without associated issues
 
 ### Common Troubleshooting
 - **Import errors**: Use `uv run python` instead of direct `python` to ensure virtual environment
