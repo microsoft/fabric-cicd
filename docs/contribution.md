@@ -14,7 +14,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 Before you begin, ensure you have the following installed:
 
--   [Python](https://www.python.org/downloads/) (version 3.10 or higher)
+-   [Python](https://www.python.org/downloads/) (version 3.9 to 3.12)
 -   [PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
 -   [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows) or [Az.Accounts PowerShell module](https://www.powershellgallery.com/packages/Az.Accounts/2.2.3)
 -   [Visual Studio Code (VS Code)](https://code.visualstudio.com/)

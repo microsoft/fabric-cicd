@@ -26,6 +26,8 @@ Section Overview:
 
 ## Installation
 
+**Requirements**: Python 3.9 to 3.12
+
 To install fabric-cicd, run:
 
 ```bash
