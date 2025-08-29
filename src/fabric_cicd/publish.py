@@ -359,7 +359,7 @@ def deploy_with_config(
         >>> from fabric_cicd import deploy_with_config
         >>> deploy_with_config(
         ...     config_file_path="workspace/config.yml",
-        ...     environment="dev"
+        ...     environment="prod"
         ... )
         With custom authentication
         >>> from fabric_cicd import deploy_with_config

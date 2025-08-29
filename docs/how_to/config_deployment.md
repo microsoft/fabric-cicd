@@ -2,225 +2,322 @@
 
 ## Overview
 
-Configuration-based deployment provides a simplified, consistent way to manage Microsoft Fabric deployments across multiple environments. Instead of writing custom deployment scripts for each environment, you can define all your deployment settings in a single YAML configuration file that works across your development, testing, and production environments.
+Configuration-based deployment provides an alternative way to manage the deployment of Fabric items across multiple environments. Instead of using the traditional approach of defining a workspace object with various parameters and then running the publish/unpublish functions, this approach centralizes all deployment settings in a single YAML configuration file and simplifies the deployment into one function call.
 
-This approach allows you to:
+Configuration file location (supports any location in git repository):
 
--   Define environment-specific workspace settings
--   Control which items are published and unpublished
--   Configure feature flags and constants
--   Apply environment-specific parameter substitutions
--   Maintain consistent deployment processes across environments
+```
+C:/dev/workspace
+    /HelloWorld.Notebook
+        ...
+    /GoodbyeWorld.Notebook
+        ...
+    /config.yml
+```
+
+Basic example of configuration-based deployment:
+
+```python
+from fabric_cicd import deploy_with_config
+
+# Deploy using a config file
+deploy_with_config(
+    config_file_path="C:/dev/workspace/config.yml",
+    environment="dev"
+)
+```
+
+**IMPORTANT:** Configuration-based deployment is currently a preview feature and requires feature flags `enable_experimental_features` and `enable_config_deploy` to be set.
 
 ## Configuration File Structure
 
-The configuration file is organized into several sections, each controlling different aspects of the deployment process:
+The configuration file includes several sections, with configurable settings for different aspects of the deployment process. **Note**: Single value or environment-mapped values are supported for any field.
 
-### Required Sections
+### `core` Section (Required)
 
-#### `core` Section (Required)
-
-The core section defines the fundamental settings for your deployment:
+The core section defines the fundamental settings for the deployment, most importantly the **target workspace** and **repository directory**. Other optional settings can be configured within the `core` section, which include **item types in scope** and **parameter**.
 
 ```yaml
 core:
-    # At least one of these is required (workspace_id takes precedence if both are present)
+    # Only one workspace identifier field is required
+    workspace: <workspace_name>
+
+    workspace_id: <workspace_id>
+
+    # Required - path to the directory containing Fabric items
+    repository_directory: <rel_or_abs_path_of_repo_dir>
+
+    # Optional - specific item types to include in deployment
+    item_types_in_scope:
+        - <item_type_1>
+        - <item_type_2>
+        - <item_type..>
+
+    # Optional - path to parameter file
+    parameter: <rel_or_abs_path_of_param_file>
+```
+
+With environment mapping:
+
+```yaml
+core:
+    # Only one workspace identifier field is required
     workspace:
-        dev: "Fabric-Dev-Workspace"
-        test: "Fabric-Test-Workspace"
-        prod: "Fabric-Prod-Workspace"
+        <env_1>: <env_1_workspace_name>
+        <env..>: <env.._workspace_name>
+
+    workspace_id:
+        <env_1>: <env_1_workspace_id>
+        <env..>: <env.._workspace_id>
+
+    # Required - path to the directory containing Fabric items
+    repository_directory:
+        <env_1>: <rel_or_abs_path_of_repo_dir_1>
+        <env..>: <rel_or_abs_path_of_repo_dir..>
+
+    # Optional - specific item types to include in deployment
+    item_types_in_scope:
+        <env_1>:
+            - <item_type_1>
+            - <item_type..>
+        <env..>:
+            - <item_type_1>
+            - <item_type..>
+
+    # Optional - path to parameter file
+    parameter:
+        <env_1>: <rel_or_abs_path_of_param_file_1>
+        <env..>: <rel_or_abs_path_of_param_file..>
+```
+
+<span class="md-h4-nonanchor">Required Fields:</span>
+
+-   Workspace Identifier:
+    -   `workspace_id` takes precedence over workspace name when both are provided.
+    -   `workspace_id` must be a valid string GUID.
+-   Repository Directory Path:
+    -   Supports relative or absolute path.
+    -   Relative path must be relative to the `config.yml` file location.
+
+<span class="md-h4-nonanchor">Optional Fields:</span>
+
+-   Item Types in Scope:
+    -   If `item_types_in_scope` is not specified, all item types will be included.
+    -   Item types must be provided as a list, use `-` or `[]` notation.
+    -   Only accepts supported item types.
+-   Parameter Path:
+    -   Supports relative or absolute path.
+    -   Relative path must be relative to the `config.yml` file location.
+
+### `publish` Section (Optional)
+
+Controls item publishing behavior with various optional settings to enable/disable publishing operations or selectively publish items.
+
+```yaml
+publish:
+    # Optional - pattern to exclude items from publishing
+    exclude_regex: <regex_pattern_string>
+
+    # Optional - specific items to publish (requires feature flags)
+    items_to_include:
+        - <item_name.item_type_1>
+        - <item_name.item_type..>
+
+    # Optional - control publishing by environment
+    skip: <bool_value>
+```
+
+With environment mapping:
+
+```yaml
+publish:
+    # Optional - pattern to exclude items from publishing
+    exclude_regex:
+        <env_1>: <regex_pattern_string_1>
+        <env..>: <regex_pattern_string..>
+
+    # Optional - specific items to publish (requires feature flags)
+    items_to_include:
+        - <item_name.item_type_1>
+        - <item_name.item_type..>
+
+    # Optional - control publishing by environment
+    skip:
+        <env_1>: <bool_value>
+        <env..>: <bool_value>
+```
+
+### `unpublish` Section (Optional)
+
+Controls item unpublishing behavior with various optional settings to enable/disable unpublishing or selectively unpublish items.
+
+```yaml
+unpublish:
+    # Optional - pattern to exclude items from unpublishing
+    exclude_regex: <regex_pattern_string>
+
+    # Optional - specific items to unpublish (requires feature flags)
+    items_to_include:
+        - <item_name.item_type_1>
+        - <item_name.item_type..>
+
+    # Optional - control unpublishing by environment
+    skip: <bool_value>
+```
+
+With environment mapping:
+
+```yaml
+unpublish:
+    # Optional - pattern to exclude items from unpublishing
+    exclude_regex:
+        <env_1>: <regex_pattern_string_1>
+        <env..>: <regex_pattern_string..>
+
+    # Optional - specific items to unpublish (requires feature flags)
+    items_to_include:
+        <env_1>:
+            - <item_name.item_type_1>
+        <env..>:
+            - <item_name.item_type..>
+
+    # Optional - control unpublishing by environment
+    skip:
+        <env_1>: <bool_value>
+        <env..>: <bool_value>
+```
+
+**Warning:** While selective deployment is supported in `fabric-cicd` it is not recommended due to potential issues with dependency management.
+
+### `features` Section (Optional)
+
+Set a list of specific feature flags.
+
+```yaml
+features:
+    - <feature_flag_1>
+    - <feature_flag..>
+```
+
+With environment mapping:
+
+```yaml
+features:
+    <env_1>:
+        - <feature_flag_1>
+    <env..>:
+        - <feature_flag..>
+```
+
+### `constants` Section (Optional)
+
+Override supported library constants.
+
+```yaml
+constants:
+    CONSTANT_NAME: <constant_value>
+```
+
+With environment mapping:
+
+```yaml
+constants:
+    CONSTANT_NAME:
+        <env_1>: <constant_value_1>
+        <env..>: <constant_value..>
+```
+
+## Sample Configuration File
+
+```yaml
+core:
+    workspace:
+        dev: "Fabric-Dev-Engineering"
+        test: "Fabric-Test-Engineering"
+        prod: "Fabric-Prod-Engineering"
 
     workspace_id:
         dev: "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"
         test: "2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b"
         prod: "7c3e1f8b-2d4a-4b9e-8f2c-1a6c3b7d8e2f"
 
-    # Required - path to the directory containing your Fabric items
-    repository_directory: "./workspace"
-```
+    repository_directory: "." # relative path
 
-Required fields:
-
--   Either `workspace` or `workspace_id` (environment-mapped)
--   `repository_directory`: Path to the directory containing your Fabric items
-
-### Optional Sections
-
-#### Additional `core` Options (Optional)
-
-```yaml
-core:
-    # ... required fields ...
-
-    # Optional - specific item types to include in deployment
     item_types_in_scope:
         - Notebook
         - DataPipeline
         - Environment
         - Lakehouse
 
-    # Optional - path to parameter file for substitutions
-    parameter: "parameter.yml"
-```
+    parameter: "parameter.yml" # relative path
 
-#### `publish` Section (Optional)
-
-Controls item publishing behavior:
-
-```yaml
 publish:
-    # Optional - pattern to exclude items from publishing
+    # Don't publish items matching this pattern
     exclude_regex: "^DONT_DEPLOY.*"
 
-    # Optional - specific items to publish (requires feature flags)
     items_to_include:
         - "Hello World.Notebook"
-        - "Run Pipeline.DataPipeline"
+        - "Run Hello World.DataPipeline"
 
-    # Optional - control publishing by environment
     skip:
-        dev: true # Skip publishing in dev
-        test: false # Enable publishing in test
-        prod: false # Enable publishing in prod
-```
-
-#### `unpublish` Section (Optional)
-
-Controls orphan item unpublishing behavior:
-
-```yaml
-unpublish:
-    # Optional - pattern to exclude items from unpublishing
-    exclude_regex: "^DEBUG.*"
-
-    # Optional - specific items to unpublish (requires feature flags)
-    items_to_include:
-        - "Old Item.Notebook"
-
-    # Optional - control unpublishing by environment
-    skip:
-        dev: true # Skip unpublishing in dev
-        test: false # Enable unpublishing in test
-        prod: false # Enable unpublishing in prod
-```
-
-#### `features` Section (Optional)
-
-Enable specific feature flags:
-
-```yaml
-features:
-    - enable_shortcut_publish
-    - enable_parameter_environment_variables
-```
-
-#### `constants` Section (Optional)
-
-Override library constants:
-
-```yaml
-constants:
-    DEFAULT_API_ROOT_URL: "https://msitapi.fabric.microsoft.com"
-    LAKEHOUSE_WAIT_TIMEOUT: 300
-```
-
-## Environment Mapping
-
-The configuration file supports two approaches for environment-specific settings:
-
-### 1. Environment Mapping (Recommended)
-
-Define values for each environment:
-
-```yaml
-workspace_id:
-    dev: "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"
-    test: "2f4b9e8d-1a7c-4d3e-b8e2-5c9f7a2d4e1b"
-    prod: "7c3e1f8b-2d4a-4b9e-8f2c-1a6c3b7d8e2f"
-```
-
-### 2. Single Value (No Mapping)
-
-Use the same value for all environments:
-
-```yaml
-repository_directory: "./workspace"
-```
-
-## Path Handling
-
-The configuration file supports both absolute and relative paths:
-
-### Absolute Paths
-
-Full paths to resources:
-
-```yaml
-repository_directory: "C:/Projects/MyFabricProject/workspace"
-parameter: "C:/Projects/MyFabricProject/parameters/dev-params.yml"
-```
-
-### Relative Paths
-
-Paths relative to the configuration file location:
-
-```yaml
-repository_directory: "./workspace"
-parameter: "./parameters/dev-params.yml"
-```
-
-## Complete Configuration Example
-
-```yaml
-# config.yml - Fabric CICD Deployment Configuration
-core:
-    # Workspace information by environment
-    workspace:
-        dev: "Fabric-Dev-Engineering"
-        test: "Fabric-Test-Engineering"
-        prod: "Fabric-Prod-Engineering"
-
-    # Repository and item scope
-    repository_directory: "./workspace"
-    item_types_in_scope:
-        - Notebook
-        - DataPipeline
-        - Environment
-        - Lakehouse
-        - SQLDatabase
-
-    # Parameter file for substitutions
-    parameter: "parameter.yml"
-
-publish:
-    # Exclude certain items from publishing
-    exclude_regex: "^DRAFT_|^WIP_"
-
-    # Environment-specific publishing settings
-    skip:
-        dev: false
+        dev: true
         test: false
         prod: false
 
 unpublish:
     # Don't unpublish items matching this pattern
-    exclude_regex: "^KEEP_|^LOCKED_"
+    exclude_regex: "^DEBUG.*"
 
-    # Environment-specific unpublishing settings
     skip:
         dev: false
-        test: true # Never unpublish in test
-        prod: true # Never unpublish in prod
+        test: false
+        prod: true
 
 features:
     - enable_shortcut_publish
-    - enable_parameter_environment_variables
+    - enable_experimental_features
+    - enable_items_to_include
 
 constants:
-    LAKEHOUSE_WAIT_TIMEOUT: 300
+    DEFAULT_API_ROOT_URL: "https://api.fabric.microsoft.com"
 ```
 
-## Using the Config File for Deployment
+## Configuration Override
+
+The `config_override` parameter in `deploy_with_config()` allows you to dynamically modify configuration values at runtime without changing the base configuration file. This is particularly useful for debugging or temporary deployment adjustments.
+
+```python
+from fabric_cicd import deploy_with_config
+
+config_override_dict = {
+    "core": {
+        "item_types_in_scope": ["Notebook", "DataPipeline"]
+    },
+    "publish": {
+        "skip": {
+            "dev": False
+        }
+    }
+}
+
+# Deploy with configuration override
+deploy_with_config(
+    config_file_path="path/to/config.yml",
+    environment="dev",
+    config_override=config_override_dict
+)
+```
+
+Important Considerations:
+
+-   **Caution:** Exercise caution when overriding configuration values for _production_ environments.
+-   **Support:** Configuration overrides are supported for all sections and settings in the configuration file.
+-   **Rules:**
+    -   Existing values can be overridden for any field in the configuration.
+    -   New values can only be added for optional fields that aren't present in the original configuration.
+    -   Required fields must exist in the original configuration in order to override.
+
+## Applying Config File Deployment
 
 ### Basic Usage
 
@@ -229,8 +326,8 @@ from fabric_cicd import deploy_with_config
 
 # Deploy using a config file
 deploy_with_config(
-    config_file_path="path/to/config.yml",
-    environment="dev"
+    config_file_path="path/to/config.yml", # required
+    environment="dev" # optional (recommended)
 )
 ```
 
@@ -262,86 +359,35 @@ You can override specific configuration values at runtime:
 ```python
 from fabric_cicd import deploy_with_config
 
+config_override_dict = {
+    "core": {
+        "item_types_in_scope": ["Notebook", "DataPipeline"]
+    },
+    "publish": {
+        "skip": {
+            "test": False  # Override to enable publishing
+        }
+    }
+}
+
 # Deploy with configuration override
 deploy_with_config(
     config_file_path="path/to/config.yml",
     environment="test",
-    config_override={
-        "core": {
-            "item_types_in_scope": ["Notebook", "DataPipeline"]
-        },
-        "publish": {
-            "skip": {
-                "test": False  # Override to enable publishing
-            }
-        }
-    }
+    config_override=config_override_dict
 )
 ```
 
-## Benefits of Config-Based Deployment
+## Troubleshooting Guide
 
-1. **Environment Consistency**: Use the same configuration file across all environments with environment-specific values.
+The configuration file undergoes validation prior to reaching the deployment phase. Please note some common issues that may occur:
 
-2. **Simplified CI/CD Integration**: Easy to integrate with CI/CD pipelines by simply changing the environment parameter.
+1. **File Not Found**: Ensure the configuration file path is correct and accessible (must be an absolute path).
 
-3. **Centralized Configuration**: All deployment settings in one place for easier maintenance.
+2. **Invalid YAML**: Check YAML syntax for errors (indentation, missing quotes, etc.).
 
-4. **Version Control**: Track configuration changes alongside your code.
+3. **Missing Required Fields**: Ensure `core` section is present and contains the required fields (workspace identifier, repository directory path).
 
-5. **Reduced Duplication**: No need to maintain separate deployment scripts for each environment.
+4. **Path Resolution Errors**: Relative paths are resolved relative to the `config.yml` file location. Check path inputs are valid and accessible.
 
-6. **Flexible Overrides**: Override configuration at runtime for special deployment scenarios.
-
-7. **Controlled Rollout**: Easily control which items are published and unpublished in each environment.
-
-## Best Practices
-
-1. **Version Control**: Keep your configuration file in version control with your code.
-
-2. **Environment Validation**: Include all target environments in your configuration.
-
-3. **Path Management**: Use relative paths for portability across different systems.
-
-4. **Exclusion Patterns**: Use careful regex patterns to exclude items from publishing/unpublishing.
-
-5. **Feature Flags**: Be cautious with enabling experimental features in production.
-
-6. **Secrets Management**: Never store credentials in the configuration file - use `token_credential` parameter instead.
-
-7. **Configuration Review**: Review configuration changes before deployment, especially for production environments.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **File Not Found**: Ensure the config file path is correct and accessible.
-
-2. **Environment Not Found**: Verify the environment name exists in the configuration mappings.
-
-3. **Invalid YAML**: Check YAML syntax for errors (indentation, missing quotes, etc.).
-
-4. **Missing Required Fields**: Ensure `core` section contains required fields.
-
-5. **Path Resolution Errors**: Check that paths are valid and accessible.
-
-6. **Feature Flag Requirements**: Confirm required feature flags are enabled when using experimental features.
-
-### Validation Process
-
-The configuration file undergoes several validation checks:
-
-1. File existence and accessibility
-2. YAML syntax validation
-3. Required section and field validation
-4. Environment existence validation
-5. Path resolution and validation
-6. Feature flag compatibility validation
-
-## Important Notes
-
--   Config-based deployment requires feature flags `enable_experimental_features` and `enable_config_deploy` to be set.
--   Workspace ID takes precedence over workspace name when both are provided.
--   The `environment` parameter must match one of the environments defined in your mappings.
--   Relative paths are resolved relative to the configuration file location.
--   If `item_types_in_scope` is not specified, all item types will be included.
+5. **Environment Not Found**: The `environment` parameter must match one of the environment keys (like "dev", "test", "prod") used in the configuration mappings.
