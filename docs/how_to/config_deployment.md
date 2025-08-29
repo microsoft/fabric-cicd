@@ -37,7 +37,7 @@ The configuration file includes several sections, with configurable settings for
 
 ### `core` Section
 
-The core section is required as it defines the fundamental settings for the deployment, most importantly the **target workspace** and **repository directory**. Other optional settings can be configured within the `core` section, which include **item types in scope** and **parameter**.
+The `core` section is **required** as it defines the fundamental settings for the deployment, most importantly the **target workspace** and **repository directory**. Other optional settings can be configured within the `core` section, which include **item types in scope** and **parameter**.
 
 ```yaml
 core:
