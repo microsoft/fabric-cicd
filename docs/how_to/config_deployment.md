@@ -31,11 +31,13 @@ deploy_with_config(
 
 ## Configuration File Structure
 
-The configuration file includes several sections, with configurable settings for different aspects of the deployment process. **Note**: Single value or environment-mapped values are supported for any field.
+The configuration file includes several sections, with configurable settings for different aspects of the deployment process.
 
-### `core` Section (Required)
+**Note**: Configuration values can be specified in two ways: as a single value (applied to any environment provided) or as an environment mapping. Both approaches can be used within the same configuration file - for example, using environment mappings for workspace IDs while keeping a single value for repository directory.
 
-The core section defines the fundamental settings for the deployment, most importantly the **target workspace** and **repository directory**. Other optional settings can be configured within the `core` section, which include **item types in scope** and **parameter**.
+### `core` Section
+
+The core section is required as it defines the fundamental settings for the deployment, most importantly the **target workspace** and **repository directory**. Other optional settings can be configured within the `core` section, which include **item types in scope** and **parameter**.
 
 ```yaml
 core:
@@ -57,7 +59,7 @@ core:
     parameter: <rel_or_abs_path_of_param_file>
 ```
 
-With environment mapping:
+<span class="md-h4-nonanchor">With environment mapping:</span>
 
 ```yaml
 core:
@@ -109,9 +111,9 @@ core:
     -   Supports relative or absolute path.
     -   Relative path must be relative to the `config.yml` file location.
 
-### `publish` Section (Optional)
+### `publish` Section
 
-Controls item publishing behavior with various optional settings to enable/disable publishing operations or selectively publish items.
+`publish` is an optional section which controls item publishing behavior. It includes various optional settings to enable/disable publishing operations or selectively publish items.
 
 ```yaml
 publish:
@@ -127,7 +129,7 @@ publish:
     skip: <bool_value>
 ```
 
-With environment mapping:
+<span class="md-h4-nonanchor">With environment mapping:</span>
 
 ```yaml
 publish:
@@ -147,9 +149,9 @@ publish:
         <env..>: <bool_value>
 ```
 
-### `unpublish` Section (Optional)
+### `unpublish` Section
 
-Controls item unpublishing behavior with various optional settings to enable/disable unpublishing or selectively unpublish items.
+`unpublish` is an optional section which controls item unpublishing behavior. It includes various optional settings to enable/disable unpublishing or selectively unpublish items.
 
 ```yaml
 unpublish:
@@ -165,7 +167,7 @@ unpublish:
     skip: <bool_value>
 ```
 
-With environment mapping:
+<span class="md-h4-nonanchor">With environment mapping:</span>
 
 ```yaml
 unpublish:
@@ -189,9 +191,9 @@ unpublish:
 
 **Warning:** While selective deployment is supported in `fabric-cicd` it is not recommended due to potential issues with dependency management.
 
-### `features` Section (Optional)
+### `features` Section
 
-Set a list of specific feature flags.
+`features` is an optional section to set a list of specific feature flags.
 
 ```yaml
 features:
@@ -199,7 +201,7 @@ features:
     - <feature_flag..>
 ```
 
-With environment mapping:
+<span class="md-h4-nonanchor">With environment mapping:</span>
 
 ```yaml
 features:
@@ -209,9 +211,9 @@ features:
         - <feature_flag..>
 ```
 
-### `constants` Section (Optional)
+### `constants` Section
 
-Override supported library constants.
+`constants` is an optional section to override supported library constants.
 
 ```yaml
 constants:
@@ -284,7 +286,7 @@ constants:
 
 ## Configuration Override
 
-The `config_override` parameter in `deploy_with_config()` allows you to dynamically modify configuration values at runtime without changing the base configuration file. This is particularly useful for debugging or temporary deployment adjustments.
+The `config_override` parameter in `deploy_with_config()` allows you to dynamically modify configuration values at runtime without changing the base configuration file. This is particularly useful for debugging or making temporary deployment adjustments.
 
 ```python
 from fabric_cicd import deploy_with_config
@@ -308,7 +310,7 @@ deploy_with_config(
 )
 ```
 
-Important Considerations:
+**Important Considerations:**
 
 -   **Caution:** Exercise caution when overriding configuration values for _production_ environments.
 -   **Support:** Configuration overrides are supported for all sections and settings in the configuration file.
@@ -382,12 +384,12 @@ deploy_with_config(
 
 The configuration file undergoes validation prior to reaching the deployment phase. Please note some common issues that may occur:
 
-1. **File Not Found**: Ensure the configuration file path is correct and accessible (must be an absolute path).
+**1. File Not Found**: Ensure the configuration file path is correct and accessible (must be an absolute path).
 
-2. **Invalid YAML**: Check YAML syntax for errors (indentation, missing quotes, etc.).
+**2. Invalid YAML**: Check YAML syntax for errors (indentation, missing quotes, etc.).
 
-3. **Missing Required Fields**: Ensure `core` section is present and contains the required fields (workspace identifier, repository directory path).
+**3. Missing Required Fields**: Ensure `core` section is present and contains the required fields (workspace identifier, repository directory path).
 
-4. **Path Resolution Errors**: Relative paths are resolved relative to the `config.yml` file location. Check path inputs are valid and accessible.
+**4. Path Resolution Errors**: Relative paths are resolved relative to the `config.yml` file location. Check path inputs are valid and accessible.
 
-5. **Environment Not Found**: The `environment` parameter must match one of the environment keys (like "dev", "test", "prod") used in the configuration mappings.
+**5. Environment Not Found**: The `environment` parameter must match one of the environment keys (like "dev", "test", "prod") used in the configuration mappings.
