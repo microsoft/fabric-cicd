@@ -14,7 +14,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 
 Before you begin, ensure you have the following installed:
 
--   [Python](https://www.python.org/downloads/) (version 3.10 or higher)
+-   [Python](https://www.python.org/downloads/) (see [Installation](index.md#installation) for version requirements)
 -   [PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
 -   [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows) or [Az.Accounts PowerShell module](https://www.powershellgallery.com/packages/Az.Accounts/2.2.3)
 -   [Visual Studio Code (VS Code)](https://code.visualstudio.com/)
@@ -80,12 +80,13 @@ Before you begin, ensure you have the following installed:
 ### Pull Request Requirements
 
 -   **All pull requests must be linked to an issue.** This ensures proper tracking and context for changes.
+-   **PR Title MUST follow this exact format**: "Fixes #123 - Short Description" where #123 is the issue number
+    - Use "Fixes" for bug fixes, "Closes" for features, "Resolves" for other changes
+    - Example: "Fixes #520 - Add Python version requirements to documentation"
+    - Version bump PRs are an exception: title must be "vX.X.X" format only
 -   Before creating a pull request:
     1. **Create or identify an existing issue** that describes the problem, feature request, or change you're addressing.
-    2. **Reference the issue** in your pull request description using one of these formats:
-        - `Fixes #123` - for bug fixes
-        - `Closes #456` - for implementing features  
-        - `Resolves #789` - for other changes
+    2. **Use the proper PR title format** as specified above to link to the issue.
     3. You can also reference issues in commit messages using the same format.
 -   **GitHub Actions will automatically check** that your PR is linked to a valid issue and will fail if no valid reference is found.
 -   If you need to create an issue, use the appropriate template:
