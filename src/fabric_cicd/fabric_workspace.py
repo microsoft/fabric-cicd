@@ -136,14 +136,8 @@ class FabricWorkspace:
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
-        # temporarily support base_api_url until deprecated
+        # Support for dynamic base_api_url value
         if "base_api_url" in kwargs:
-            logger.warning(
-                f"""Constant DEFAULT_API_ROOT_URL will be replaced with:
-                >>> import fabric_cicd.constants
-                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n
-                >>> using base_api_url = {kwargs['base_api_url']} instead"""
-            )
             self.base_api_url = f"{kwargs['base_api_url']}"
         else:
             self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}"
