@@ -6,63 +6,11 @@ except ImportError:
 from pathlib import Path
 
 
-def extract_python_version_range(requires_python_str):
-    """
-    Extract Python version range from requires-python string.
-    
-    Args:
-        requires_python_str: String like ">=3.9,<3.13"
-        
-    Returns:
-        Tuple of (min_version, max_version_exclusive) like ("3.9", "3.13")
-    """
-    # Extract minimum version (>=X.Y)
-    min_match = re.search(r'>=(\d+\.\d+)', requires_python_str)
-    min_version = min_match.group(1) if min_match else None
-    
-    # Extract maximum version (<X.Y)
-    max_match = re.search(r'<(\d+\.\d+)', requires_python_str)
-    max_version_exclusive = max_match.group(1) if max_match else None
-    
-    return min_version, max_version_exclusive
-
-
-def format_python_version_range(min_version, max_version_exclusive):
-    """
-    Format Python version range for user display.
-    
-    Args:
-        min_version: String like "3.9"
-        max_version_exclusive: String like "3.13"
-        
-    Returns:
-        String like "3.9 to 3.12"
-    """
-    if not min_version:
-        return "Version not specified"
-    
-    if not max_version_exclusive:
-        return f"{min_version} or higher"
-    
-    # Convert exclusive max to inclusive max (e.g., <3.13 means up to 3.12)
-    max_parts = max_version_exclusive.split('.')
-    max_major = int(max_parts[0])
-    max_minor = int(max_parts[1])
-    
-    # Decrement minor version for inclusive range
-    if max_minor > 0:
-        max_inclusive = f"{max_major}.{max_minor - 1}"
-    else:
-        max_inclusive = f"{max_major - 1}.99"  # Edge case, unlikely
-    
-    return f"{min_version} to {max_inclusive}"
-
-
 def on_page_markdown(markdown, **kwargs):
     """
-    Replace Python version placeholder with dynamic version from pyproject.toml
+    Replace Python version placeholders with versions from pyproject.toml
     """
-    if "<!--PYTHON-VERSION-REQUIREMENTS-->" in markdown:
+    if "<!--MIN-PYTHON-VERSION-->" in markdown or "<!--MAX-PYTHON-VERSION-->" in markdown:
         # Get pyproject.toml path (4 levels up from this file)
         root_directory = Path(__file__).resolve().parent.parent.parent.parent
         pyproject_path = root_directory / "pyproject.toml"
@@ -81,18 +29,31 @@ def on_page_markdown(markdown, **kwargs):
             # Extract requires-python
             requires_python = pyproject_data.get('project', {}).get('requires-python', '')
             
+            # Extract min and max versions
+            min_version = "3.9"  # fallback
+            max_version = "3.12"  # fallback
+            
             if requires_python:
-                min_version, max_version_exclusive = extract_python_version_range(requires_python)
-                version_display = format_python_version_range(min_version, max_version_exclusive)
-                replacement = f"**Requirements**: Python {version_display}"
-            else:
-                replacement = "**Requirements**: Python version not specified"
+                min_match = re.search(r'>=(\d+\.\d+)', requires_python)
+                max_match = re.search(r'<(\d+\.\d+)', requires_python)
                 
-        except Exception as e:
-            # Fallback if something goes wrong
-            replacement = "**Requirements**: Python (see pyproject.toml for details)"
+                if min_match:
+                    min_version = min_match.group(1)
+                if max_match:
+                    # Convert exclusive max to inclusive (e.g., <3.13 means up to 3.12)
+                    max_parts = max_match.group(1).split('.')
+                    max_major = int(max_parts[0])
+                    max_minor = int(max_parts[1])
+                    if max_minor > 0:
+                        max_version = f"{max_major}.{max_minor - 1}"
+                
+        except Exception:
+            # Use fallback values
+            min_version = "3.9"
+            max_version = "3.12"
         
-        # Replace the placeholder
-        markdown = markdown.replace("<!--PYTHON-VERSION-REQUIREMENTS-->", replacement)
+        # Replace placeholders
+        markdown = markdown.replace("<!--MIN-PYTHON-VERSION-->", min_version)
+        markdown = markdown.replace("<!--MAX-PYTHON-VERSION-->", max_version)
     
     return markdown
