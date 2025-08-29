@@ -18,6 +18,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                     |              |
 | `enable_experimental_features`            | Set to enable experimental features, such as selective deployments |              |
 | `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items           | ☑️           |
+| `enable_config_deploy`                    | Set to enable config file-based deployment                         | ☑️           |
 
 <span class="md-h3-nonanchor">Example</span>
 

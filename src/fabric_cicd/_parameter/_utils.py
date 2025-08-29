@@ -259,6 +259,7 @@ def validate_parameter_file(
     item_type_in_scope: list,
     environment: str = "N/A",
     parameter_file_name: str = "parameter.yml",
+    parameter_file_path: Optional[str] = None,
     token_credential: TokenCredential = None,
 ) -> bool:
     """
@@ -270,6 +271,7 @@ def validate_parameter_file(
         item_type_in_scope: A list of item types to validate.
         environment: The target environment.
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
+        parameter_file_path: The path to the parameter file, if different from the default.
         token_credential: The token credential to use for authentication, use for SPN auth.
     """
     from azure.identity import DefaultAzureCredential
@@ -297,6 +299,7 @@ def validate_parameter_file(
         item_type_in_scope=validate_item_type_in_scope(item_type_in_scope),
         environment=validate_environment(environment),
         parameter_file_name=parameter_file_name,
+        parameter_file_path=parameter_file_path,
     )
     # Validate with _validate_parameter_file() method
     return parameter_obj._validate_parameter_file()
