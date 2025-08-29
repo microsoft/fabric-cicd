@@ -2,6 +2,7 @@
 
 [![Language](https://img.shields.io/badge/language-Python-blue.svg)](https://www.python.org/)
 [![PyPi version](https://badgen.net/pypi/v/fabric-cicd/)](https://pypi.org/project/fabric-cicd)
+[![Python version](https://img.shields.io/pypi/pyversions/fabric-cicd)](https://pypi.org/project/fabric-cicd)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/charliermarsh/ruff)
 [![Tests](https://img.shields.io/github/actions/workflow/status/microsoft/fabric-cicd/test.yml?logo=github&label=tests&branch=main)](https://github.com/microsoft/fabric-cicd/actions/workflows/test.yml)
 
@@ -25,8 +26,6 @@ Section Overview:
 -   [About](https://microsoft.github.io/fabric-cicd/latest/help/) - Inclusive of Support & Security Policies
 
 ## Installation
-
-**Requirements**: Python 3.9 to 3.12
 
 To install fabric-cicd, run:
 

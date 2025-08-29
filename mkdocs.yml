@@ -57,6 +57,7 @@ extra_css:
 hooks:
     - docs/config/pre-build/update_item_types.py
     - docs/config/pre-build/section_toc.py
+    - docs/config/pre-build/update_python_version.py
 
 plugins:
     - search:
