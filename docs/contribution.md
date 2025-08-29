@@ -94,3 +94,23 @@ Before you begin, ensure you have the following installed:
     - [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
     - [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
     - [Technical Debt](https://github.com/microsoft/fabric-cicd/issues/new?template=5-tech-debt.yml)
+
+## Maintaining Documentation
+
+### Dynamic Python Version Requirements
+
+Python version requirements in the documentation are automatically synchronized with the `requires-python` field in `pyproject.toml`. This ensures consistency across all documentation and eliminates the need for manual updates when Python version support changes.
+
+**How it works:**
+
+-   **mkdocs hook**: Documentation built with `mkdocs` (e.g., `docs/index.md`, `docs/contribution.md`) automatically gets updated during the build process via a hook that reads from `pyproject.toml`
+-   **Manual update script**: For files outside the mkdocs build (like `README.md`), run the update script:
+    ```bash
+    python3 devtools/update_python_version.py
+    ```
+
+**When to update:**
+
+-   Python version requirements are automatically kept in sync when the documentation is built
+-   If you change the `requires-python` field in `pyproject.toml`, run the update script to sync `README.md`
+-   The script is safe to run multiple times and will only update files if changes are needed
