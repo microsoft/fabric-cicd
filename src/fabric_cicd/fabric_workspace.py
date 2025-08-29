@@ -139,20 +139,21 @@ class FabricWorkspace:
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
             logger.warning(
-                """Setting base_api_url will be deprecated in a future version, please use the below moving forward:
+                f"""Constant DEFAULT_API_ROOT_URL will be replaced with:
                 >>> import fabric_cicd.constants
-                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
+                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n
+                >>> using base_api_url = {kwargs['base_api_url']} instead"""
             )
-            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{self.workspace_id}"
+            self.base_api_url = f"{kwargs['base_api_url']}"
         else:
-            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
+            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}"
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
 
     def _resolve_workspace_id(self, workspace_name: str) -> str:
         """Resolve workspace ID based on the workspace name given."""
-        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces")
+        response = self.endpoint.invoke(method="GET", url=f"{self.base_api_url}/v1/workspaces")
         for workspace in response["body"]["value"]:
             if workspace["displayName"] == workspace_name:
                 return workspace["id"]
@@ -269,7 +270,7 @@ class FabricWorkspace:
         """Refreshes the deployed_items dictionary by querying the Fabric workspace items API."""
         # Get all items in workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item
-        response = self.endpoint.invoke(method="GET", url=f"{self.base_api_url}/items")
+        response = self.endpoint.invoke(method="GET", url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/items")
 
         self.deployed_items = {}
         self.workspace_items = {}
@@ -293,7 +294,7 @@ class FabricWorkspace:
             # Get additional properties based on item type
             if item_type in ["Lakehouse", "Warehouse", "Eventhouse"]:
                 # Construct the endpoint URL and set the property path based on item type
-                endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+                endpoint_url = f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/{item_type.lower()}s/{item_guid}"
                 response = self.endpoint.invoke(method="GET", url=endpoint_url)
                 # Use dpath.get for safe nested property access
                 property_path = constants.PROPERTY_PATH_MAPPING[item_type]
@@ -526,7 +527,7 @@ class FabricWorkspace:
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
             item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body
+                method="POST", url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/items", body=combined_body
             )
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
@@ -536,7 +537,7 @@ class FabricWorkspace:
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
             self.endpoint.invoke(
                 method="POST",
-                url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
+                url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
             )
         elif is_deployed and shell_only_publish:
@@ -547,7 +548,7 @@ class FabricWorkspace:
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
             self.endpoint.invoke(
                 method="PATCH",
-                url=f"{self.base_api_url}/items/{item_guid}",
+                url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/items/{item_guid}",
                 body=metadata_body,
             )
 
@@ -557,7 +558,7 @@ class FabricWorkspace:
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
                 self.endpoint.invoke(
                     method="POST",
-                    url=f"{self.base_api_url}/items/{item_guid}/move",
+                    url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
                 )
                 logger.debug(
@@ -597,7 +598,7 @@ class FabricWorkspace:
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
-            self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
+            self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/items/{item_guid}")
             logger.info(f"{constants.INDENT}Unpublished")
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
@@ -615,7 +616,7 @@ class FabricWorkspace:
 
         """
         self.deployed_folders = {}
-        request_url = f"{self.base_api_url}/folders"
+        request_url = f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/folders"
         folders = []
 
         while request_url:
@@ -711,7 +712,7 @@ class FabricWorkspace:
             if folder_parent_id:
                 request_body["parentFolderId"] = folder_parent_id
 
-            request_url = f"{self.base_api_url}/folders"
+            request_url = f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/folders"
             response = self.endpoint.invoke(method="POST", url=request_url, body=request_body)
 
             # Update local hierarchy with the new folder ID
@@ -777,7 +778,7 @@ class FabricWorkspace:
                 # Delete the folder from the workspace
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/folders/delete-folder
                 try:
-                    self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/folders/{folder_id}")
+                    self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/v1/workspaces/{self.workspace_id}/folders/{folder_id}")
                     logger.debug(f"Unpublished folder: {folder_id}")
                 except Exception as e:
                     logger.warning(f"Failed to unpublish folder {folder_id}.  Raw exception: {e}")

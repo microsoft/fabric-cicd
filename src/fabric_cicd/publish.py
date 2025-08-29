@@ -76,7 +76,7 @@ def publish_all_items(
     has_assigned_capacity = None
 
     response_state = fabric_workspace_obj.endpoint.invoke(
-        method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
+        method="GET", url=f"{fabric_workspace_obj.base_api_url}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
     )
 
     has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
