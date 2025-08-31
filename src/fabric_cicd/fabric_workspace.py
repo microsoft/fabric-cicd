@@ -15,7 +15,7 @@ from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
-from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._check_utils import check_regex, check_valid_json_content
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
@@ -371,8 +371,8 @@ class FabricWorkspace:
                 input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
-                # Perform replacement if condition is met
-                if filter_match and ".json" in file_path.suffix:
+                # Perform replacement if condition is met and file contains valid JSON
+                if filter_match and check_valid_json_content(raw_file):
                     raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:

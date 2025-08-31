@@ -3,6 +3,7 @@
 
 """Utility functions for checking file types and versions."""
 
+import json
 import logging
 import re
 from pathlib import Path
@@ -125,3 +126,35 @@ def check_regex(regex: str) -> re.Pattern:
         msg = f"An error occurred with the regex provided: {e}"
         raise ValueError(msg) from e
     return regex_pattern
+
+
+def check_valid_json(file_path: Path) -> bool:
+    """
+    Check if a file contains valid JSON content.
+
+    Args:
+        file_path: The path to the file to check.
+    """
+    try:
+        with file_path.open(encoding="utf-8") as file:
+            json.load(file)
+        return True
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return False
+
+
+def check_valid_json_content(content: str) -> bool:
+    """
+    Check if the given string content is valid JSON.
+
+    Args:
+        content: The string content to validate as JSON.
+
+    Returns:
+        bool: True if the content is valid JSON, False otherwise.
+    """
+    try:
+        json.loads(content)
+        return True
+    except json.JSONDecodeError:
+        return False
