@@ -95,6 +95,7 @@ def publish_all_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
+    fabric_workspace_obj.publish_log_entries = []
 
     if item_name_exclude_regex:
         logger.warning(
@@ -183,6 +184,8 @@ def publish_all_items(
     if _should_publish_item_type("Environment"):
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
+    
+    return fabric_workspace_obj.publish_log_entries
 
 
 def unpublish_all_orphan_items(
