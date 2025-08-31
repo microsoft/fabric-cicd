@@ -437,6 +437,81 @@ def test_validate_find_replace_replace_value(parameter_object, replace_value, re
 
 
 @pytest.mark.parametrize(
+    ("replace_value", "result", "msg"),
+    [
+        # Valid cases - all values are same type
+        (
+            {"PPE": "string_value", "PROD": "another_string"},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": True, "PROD": False},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": 123, "PROD": 456},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": 1.5, "PROD": 2.7},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": ["item1", "item2"], "PROD": ["item3", "item4"]},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": {"key": "value1"}, "PROD": {"key": "value2"}},
+            True,
+            "valid replace value",
+        ),
+        # Invalid cases - missing values
+        (
+            {"PPE": "value", "PROD": None},
+            False,
+            "missing replace value",
+        ),
+        # Invalid cases - mixed types
+        (
+            {"PPE": "string_value", "PROD": 123},
+            False,
+            "mixed types",
+        ),
+        (
+            {"PPE": True, "PROD": "false"},
+            False,
+            "mixed types",
+        ),
+        (
+            {"PPE": 123, "PROD": 45.6},
+            False,
+            "mixed types",
+        ),
+    ],
+)
+def test_validate_key_value_replace_replace_value(parameter_object, replace_value, result, msg):
+    """Test the _validate_key_value_replace_replace_value method."""
+    is_valid, actual_msg = parameter_object._validate_key_value_replace_replace_value(replace_value)
+
+    if msg == "valid replace value":
+        expected_msg = constants.PARAMETER_MSGS[msg].format("key_value_replace")
+        assert (is_valid, actual_msg) == (result, expected_msg)
+    elif msg == "missing replace value":
+        # For missing replace value, check that the message contains the expected format
+        assert is_valid == result
+        assert "key_value_replace is missing a replace value for" in actual_msg
+    elif msg == "mixed types":
+        # For mixed types, check that the message contains the expected content
+        assert is_valid == result
+        assert "Inconsistent data types in key_value_replace replace_value" in actual_msg
+
+
+@pytest.mark.parametrize(
     ("replace_value", "result", "msg", "desc"),
     [
         (

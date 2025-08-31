@@ -74,6 +74,12 @@ key_value_replace:
       file_path: Vars.VariableLibrary/valueSets/PROD.json
       item_type: "VariableLibrary"
       item_name: "Vars"
+    - find_key: $.schedules[?(@.jobType=="Execute")].enabled
+      replace_value:
+        PPE: false
+        PROD: true
+      item_type: "DataPipeline"
+      file_path: "**/.schedules"
 
 spark_pool:
     # CapacityPool_Large
