@@ -20,6 +20,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, Inpu
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._publish_log_entry import PublishLogEntry
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,7 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+        self.publish_log_entries: list[PublishLogEntry] = []
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
@@ -567,6 +569,20 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published")
+
+        # Add structured log entry
+        end_time = datetime.now()
+        self.publish_log_entries.append(
+            PublishLogEntry(
+                name=item_name,
+                item_type=item_type,
+                success=success,
+                error=error_message,
+                start_time=start_time,
+                end_time=end_time,
+                guid=item_guid
+            )
+        )
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
