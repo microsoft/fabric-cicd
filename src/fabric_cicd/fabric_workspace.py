@@ -468,6 +468,11 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
+        
+        # Capture start time for structured logging
+        start_time = datetime.now()
+        error_message = None
+        success = True
 
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
