@@ -128,21 +128,6 @@ def check_regex(regex: str) -> re.Pattern:
     return regex_pattern
 
 
-def check_valid_json(file_path: Path) -> bool:
-    """
-    Check if a file contains valid JSON content.
-
-    Args:
-        file_path: The path to the file to check.
-    """
-    try:
-        with file_path.open(encoding="utf-8") as file:
-            json.load(file)
-        return True
-    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
-        return False
-
-
 def check_valid_json_content(content: str) -> bool:
     """
     Check if the given string content is valid JSON.

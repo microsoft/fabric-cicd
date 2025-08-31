@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from fabric_cicd._common._check_utils import check_file_type, check_valid_json, check_valid_json_content
+from fabric_cicd._common._check_utils import check_file_type, check_valid_json_content
 
 
 @pytest.fixture
@@ -44,62 +44,6 @@ def test_check_file_type_image(image_file):
 
 
 @pytest.fixture
-def json_file(tmp_path):
-    file_path = tmp_path / "test.json"
-    file_path.write_text('{"key": "value", "number": 123}')
-    return file_path
-
-
-@pytest.fixture
-def schedules_like_file(tmp_path):
-    """Create a file like .schedules with JSON content but no .json extension."""
-    file_path = tmp_path / ".schedules"
-    schedules_content = {"schedules": [{"jobType": "Execute", "enabled": True, "cronExpression": "0 0 12 * * ?"}]}
-    file_path.write_text(json.dumps(schedules_content))
-    return file_path
-
-
-@pytest.fixture
-def invalid_json_file(tmp_path):
-    file_path = tmp_path / "invalid.json"
-    file_path.write_text('{"key": "value" invalid json}')
-    return file_path
-
-
-@pytest.fixture
-def text_file_no_json(tmp_path):
-    file_path = tmp_path / "test.py"
-    file_path.write_text('print("Hello World")')
-    return file_path
-
-
-def test_check_valid_json_with_json_file(json_file):
-    """Test check_valid_json with a standard .json file."""
-    assert check_valid_json(json_file) is True
-
-
-def test_check_valid_json_with_schedules_file(schedules_like_file):
-    """Test check_valid_json with .schedules file (JSON content, no .json extension)."""
-    assert check_valid_json(schedules_like_file) is True
-
-
-def test_check_valid_json_with_invalid_json(invalid_json_file):
-    """Test check_valid_json with invalid JSON content."""
-    assert check_valid_json(invalid_json_file) is False
-
-
-def test_check_valid_json_with_non_json_file(text_file_no_json):
-    """Test check_valid_json with non-JSON text file."""
-    assert check_valid_json(text_file_no_json) is False
-
-
-def test_check_valid_json_with_nonexistent_file(tmp_path):
-    """Test check_valid_json with nonexistent file."""
-    nonexistent_file = tmp_path / "nonexistent.json"
-    assert check_valid_json(nonexistent_file) is False
-
-
-@pytest.fixture
 def real_schedules_file(tmp_path):
     """Create a realistic .schedules file with exact structure like fabric-cicd uses."""
     # Create a DataPipeline directory structure
@@ -131,11 +75,11 @@ def real_schedules_file(tmp_path):
 
 def test_schedules_file_json_validation_and_structure(real_schedules_file):
     """Test that .schedules files are properly validated and contain expected structure."""
-    # Test that check_valid_json correctly identifies .schedules as valid JSON
-    assert check_valid_json(real_schedules_file) is True
+    # Test that check_valid_json_content correctly identifies .schedules content as valid JSON
+    content = real_schedules_file.read_text(encoding="utf-8")
+    assert check_valid_json_content(content) is True
 
     # Verify the file has the expected structure for key_value_replace
-    content = real_schedules_file.read_text(encoding="utf-8")
     data = json.loads(content)
 
     # Verify the structure matches what the JSONPath expression expects
@@ -193,11 +137,11 @@ def test_real_sample_schedules_file():
     if not schedules_file.exists():
         pytest.skip("Sample .schedules file not found")
 
-    # Test that our function works with the real file
-    assert check_valid_json(schedules_file) is True
+    # Test that our function works with the real file content
+    content = schedules_file.read_text(encoding="utf-8")
+    assert check_valid_json_content(content) is True
 
     # Verify the structure contains what we expect
-    content = schedules_file.read_text(encoding="utf-8")
     data = json.loads(content)
 
     assert "schedules" in data
