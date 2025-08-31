@@ -143,7 +143,6 @@ def test_real_sample_schedules_file():
     assert "schedules" in data
     assert isinstance(data["schedules"], list)
 
-    print(f"✓ Real sample .schedules file is valid JSON with {len(data['schedules'])} schedules")
 
 
 def test_check_valid_json_content_with_valid_json():
