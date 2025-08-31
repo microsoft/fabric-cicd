@@ -123,10 +123,6 @@ def test_schedules_file_jsonpath_compatibility(real_schedules_file):
     first_match = matches[0]
     assert first_match is True  # Our test data has enabled=True
 
-    print(f"✓ JSONPath found {len(matches)} enabled values: {matches}")
-    print("✓ .schedules file is compatible with key_value_replace parameter")
-
-
 def test_real_sample_schedules_file():
     """Test that the actual sample .schedules file works with our function."""
     from pathlib import Path
