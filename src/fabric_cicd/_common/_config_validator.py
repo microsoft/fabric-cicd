@@ -406,8 +406,6 @@ class ConfigValidator:
 
         return valid
 
-        return valid
-
     def _validate_workspace_field(self, core: dict, field_name: str) -> bool:
         """Validate workspace_id or workspace field."""
         if field_name not in core:
@@ -782,8 +780,6 @@ class ConfigValidator:
                 )
             elif not item.strip():
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
-            elif not item.strip():
-                self.errors.append(f"'{context}[{i}]' cannot be empty")
 
     def _validate_features_section(self, features: any) -> None:
         """Validate features section."""

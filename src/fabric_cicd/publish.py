@@ -421,9 +421,11 @@ def deploy_with_config(
         environment=environment,
         workspace_id=workspace_settings.get("workspace_id"),
         workspace_name=workspace_settings.get("workspace_name"),
-        parameter_file_path=workspace_settings.get("parameter_file_path"),
         token_credential=token_credential,
     )
+
+    # Add the parameter file path
+    workspace.parameter_file_path = workspace_settings.get("parameter_file_path")
 
     # Execute deployment operations based on skip settings
     if not publish_settings.get("skip", False):

@@ -34,7 +34,6 @@ class FabricWorkspace:
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
-        parameter_file_path: Optional[str] = None,
         token_credential: TokenCredential = None,
         **kwargs,
     ) -> None:
@@ -47,7 +46,6 @@ class FabricWorkspace:
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace. If omitted, defaults to all available item types.
             environment: The environment to be used for parameterization.
-            parameter_file_path: The path to the parameter file to use for deployment.
             token_credential: The token credential to use for API requests.
             kwargs: Additional keyword arguments.
 
@@ -128,7 +126,7 @@ class FabricWorkspace:
         else:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
-        self.parameter_file_path = parameter_file_path
+        self.parameter_file_path = None
         self.publish_item_name_exclude_regex = None
         self.items_to_include = None
         self.repository_folders = {}
@@ -175,7 +173,7 @@ class FabricWorkspace:
             item_type_in_scope=self.item_type_in_scope,
             environment=self.environment,
             parameter_file_name=constants.PARAMETER_FILE_NAME,
-            parameter_file_path=self.parameter_file_path if self.parameter_file_path else None,
+            parameter_file_path=self.parameter_file_path,
         )
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:

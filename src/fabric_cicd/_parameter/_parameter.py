@@ -60,7 +60,7 @@ class Parameter:
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
             parameter_file_name: The name of the parameter file, default is "parameter.yml".
-            parameter_file_path: The path to the parameter file, if different from the default.
+            parameter_file_path: The path to the parameter file, if not using the default.
         """
         # Set class variables
         self.repository_directory = repository_directory
@@ -75,14 +75,16 @@ class Parameter:
     def _set_parameter_file_path(self) -> None:
         """Set the parameter file path based on the provided path or default name."""
         is_param_path = False
+        original_param_path = None
 
         # Determine which input to use for parameter file path
-        if self.parameter_file_path is not None:
+        if self.parameter_file_path and isinstance(self.parameter_file_path, str):
+            original_param_path = self.parameter_file_path
             if self.parameter_file_name != "parameter.yml":
                 is_param_path = True
                 logger.warning(
                     constants.PARAMETER_MSGS["both_param_path_and_name"].format(
-                        self.parameter_file_name, self.parameter_file_path
+                        self.parameter_file_name, original_param_path
                     )
                 )
             else:
@@ -90,15 +92,13 @@ class Parameter:
 
         try:
             # Resolve parameter file path, if provided
-            if is_param_path:
+            if is_param_path and original_param_path:
                 try:
-                    param_path = Path(self.parameter_file_path)
+                    param_path = Path(original_param_path)
                     # Handle relative path (must be relative to repository_directory)
                     if not param_path.is_absolute():
-                        logger.debug(
-                            constants.PARAMETER_MSGS["resolving_relative_path"].format(self.parameter_file_path)
-                        )
-                        param_path = Path(self.repository_directory, self.parameter_file_path)
+                        logger.debug(constants.PARAMETER_MSGS["resolving_relative_path"].format(original_param_path))
+                        param_path = Path(self.repository_directory, original_param_path)
 
                     self.parameter_file_path = param_path.resolve()
                     logger.debug(constants.PARAMETER_MSGS["using_param_file_path"].format(self.parameter_file_path))
