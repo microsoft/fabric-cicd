@@ -1016,4 +1016,3 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
         # Verify the error message contains the expected text
         assert "base_api_url is no longer supported" in str(exc_info.value)
         assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)
-
