@@ -31,7 +31,8 @@ def publish_all_items(
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-        item_name_exclude_regex: Regex pattern to exclude specific items from being published.
+        item_name_exclude_regex: Regex pattern to exclude specific items from being published. 
+            The pattern is matched against both item names and folder paths within the repository.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
 
@@ -58,6 +59,16 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> exclude_regex = ".*_do_not_publish"
+        >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+
+        With folder exclusion (e.g., exclude items in 'legacy' folder)
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> exclude_regex = "^legacy/"
         >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With items to include

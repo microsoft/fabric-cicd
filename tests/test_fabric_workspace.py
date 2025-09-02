@@ -871,7 +871,7 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
     platform_content = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
         "metadata": {"type": "Notebook", "displayName": "Test Notebook"},
-        "config": {"version": "2.0", "logicalId": "12345678-1234-5678-abcd-1234567890ab"}
+        "config": {"version": "2.0", "logicalId": "12345678-1234-5678-abcd-1234567890ab"},
     }
 
     with platform_file.open("w", encoding="utf-8") as f:
@@ -883,9 +883,9 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
             FabricWorkspace(
                 workspace_id=valid_workspace_id,
                 repository_directory=str(temp_workspace_dir),
-                base_api_url="https://custom.api.url"
+                base_api_url="https://custom.api.url",
             )
-    
+
         # Verify the error message contains the expected text
         assert "base_api_url is no longer supported" in str(exc_info.value)
         assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)

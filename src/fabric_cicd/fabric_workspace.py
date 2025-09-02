@@ -472,9 +472,19 @@ class FabricWorkspace:
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
             regex_pattern = check_regex(self.publish_item_name_exclude_regex)
+
+            # Check if the item name matches the exclusion regex
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
+            # Check if the item's folder path matches the exclusion regex
+            relative_path = item.path.relative_to(Path(self.repository_directory))
+            relative_path_str = relative_path.as_posix()
+            if regex_pattern.search(relative_path_str):
+                item.skip_publish = True
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
                 return
 
         # Skip publishing if the item is not in the include list
