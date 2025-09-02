@@ -31,7 +31,7 @@ def publish_all_items(
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-        item_name_exclude_regex: Regex pattern to exclude specific items from being published. 
+        item_name_exclude_regex: Regex pattern to exclude specific items from being published.
             The pattern is matched against both item names and folder paths within the repository.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
