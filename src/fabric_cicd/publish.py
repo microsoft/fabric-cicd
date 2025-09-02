@@ -341,7 +341,7 @@ def deploy_with_config(
     Deploy items using YAML configuration file with environment-specific settings.
     This function provides a simplified deployment interface that loads configuration
     from a YAML file and executes deployment operations based on environment-specific
-    skip settings. It constructs the necessary FabricWorkspace object internally
+    settings. It constructs the necessary FabricWorkspace object internally
     and handles publish/unpublish operations according to the configuration.
 
     Args:
@@ -361,6 +361,7 @@ def deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod"
         ... )
+
         With custom authentication
         >>> from fabric_cicd import deploy_with_config
         >>> from azure.identity import ClientSecretCredential
@@ -370,6 +371,7 @@ def deploy_with_config(
         ...     environment="prod",
         ...     token_credential=credential
         ... )
+
         With override configuration
         >>> from fabric_cicd import deploy_with_config
         >>> from azure.identity import ClientSecretCredential

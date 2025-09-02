@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Configuration utilities for YAML-based deployment configuration."""
+"""Utilities for YAML-based deployment configuration."""
 
 import logging
 from typing import Optional

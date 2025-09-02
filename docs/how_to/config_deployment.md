@@ -27,7 +27,7 @@ deploy_with_config(
 )
 ```
 
-**IMPORTANT:** Configuration-based deployment is currently a preview feature and requires feature flags `enable_experimental_features` and `enable_config_deploy` to be set.
+**IMPORTANT:** Configuration-based deployment is currently an experimental feature and requires feature flags `enable_experimental_features` and `enable_config_deploy` to be set.
 
 ## Configuration File Structure
 
