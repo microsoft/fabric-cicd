@@ -859,7 +859,6 @@ def test_fabric_workspace_with_none_item_types_defaults_to_all(
     assert "Notebook" in workspace.repository_items
     assert "Test Notebook" in workspace.repository_items["Notebook"]
 
-
 def test_parameter_file_path_types(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test different path types for parameter_file_path in FabricWorkspace."""
 
@@ -987,3 +986,34 @@ def test_parameter_file_path_invalid_type_rejected(temp_workspace_dir, patched_f
     assert hasattr(workspace, "environment_parameter")
     # Environment parameter should be empty since the parameter file path was invalid
     assert not workspace.environment_parameter
+
+def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id):
+    """Test that passing base_api_url as kwarg raises an error."""
+    from fabric_cicd._common._exceptions import InputError
+
+    # Create a simple platform file
+    notebook_dir = temp_workspace_dir / "Test Notebook"
+    notebook_dir.mkdir()
+    platform_file = notebook_dir / ".platform"
+    platform_content = {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+        "metadata": {"type": "Notebook", "displayName": "Test Notebook"},
+        "config": {"version": "2.0", "logicalId": "12345678-1234-5678-abcd-1234567890ab"}
+    }
+
+    with platform_file.open("w", encoding="utf-8") as f:
+        json.dump(platform_content, f)
+
+    # Test that base_api_url kwarg raises InputError
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint"):
+        with pytest.raises(InputError) as exc_info:
+            FabricWorkspace(
+                workspace_id=valid_workspace_id,
+                repository_directory=str(temp_workspace_dir),
+                base_api_url="https://custom.api.url"
+            )
+    
+        # Verify the error message contains the expected text
+        assert "base_api_url is no longer supported" in str(exc_info.value)
+        assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)
+

@@ -139,19 +139,22 @@ class FabricWorkspace:
         # Get parameter_file_path from kwargs
         self.parameter_file_path = kwargs.get("parameter_file_path")
 
-        # temporarily support base_api_url until deprecated
+        # base_api_url is no longer supported - raise error if provided
         if "base_api_url" in kwargs:
-            logger.warning(
-                """Setting base_api_url will be deprecated in a future version, please use the below moving forward:
-                >>> import fabric_cicd.constants
-                >>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'\n"""
+            msg = (
+                "Setting base_api_url is no longer supported. Please use the following instead:\n"
+                ">>> import fabric_cicd.constants\n"
+                ">>> constants.DEFAULT_API_ROOT_URL = '<your_base_api_url>'"
             )
-            self.base_api_url = f"{kwargs['base_api_url']}/v1/workspaces/{self.workspace_id}"
-        else:
-            self.base_api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
+            raise InputError(msg, logger)
 
         # Initialize dictionaries to store repository and deployed items
         self._refresh_parameter_file()
+
+    @property
+    def base_api_url(self) -> str:
+        """Construct the base API URL using constants."""
+        return f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
 
     def _resolve_workspace_id(self, workspace_name: str) -> str:
         """Resolve workspace ID based on the workspace name given."""
