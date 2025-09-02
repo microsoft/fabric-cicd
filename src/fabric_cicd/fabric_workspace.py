@@ -126,7 +126,6 @@ class FabricWorkspace:
         else:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
-        self.parameter_file_path = None
         self.publish_item_name_exclude_regex = None
         self.items_to_include = None
         self.repository_folders = {}
@@ -136,6 +135,9 @@ class FabricWorkspace:
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
+
+        # Get parameter_file_path from kwargs
+        self.parameter_file_path = kwargs.get("parameter_file_path")
 
         # temporarily support base_api_url until deprecated
         if "base_api_url" in kwargs:
