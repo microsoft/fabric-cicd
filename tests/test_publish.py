@@ -447,7 +447,7 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint):
 
 
 def test_folder_exclusion_with_regex(mock_endpoint):
-    """Test that item_name_exclude_regex can exclude entire folders of items."""
+    """Test that folder_path_exclude_regex can exclude entire folders of items."""
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -546,9 +546,9 @@ def test_folder_exclusion_with_regex(mock_endpoint):
                 item_type_in_scope=["Notebook", "SemanticModel"],
             )
 
-            # Test: Exclude items in 'legacy' folder using regex pattern
+            # Test: Exclude items in 'legacy' folder using folder path regex pattern
             exclude_regex = r".*legacy.*"
-            publish.publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+            publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
 
             # Verify that repository_items are populated correctly
             assert "Notebook" in workspace.repository_items
@@ -716,9 +716,9 @@ def test_legacy_folder_exclusion_example(mock_endpoint):
                 item_type_in_scope=["Notebook", "SemanticModel"],
             )
 
-            # Test: Exclude all items in 'legacy' folder using the regex pattern
+            # Test: Exclude all items in 'legacy' folder using the folder path regex pattern
             exclude_regex = r"^legacy/"  # Match items that start with 'legacy/'
-            publish.publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+            publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
 
             # Verify that legacy items were excluded
             assert workspace.repository_items["Notebook"]["FabricNotebook"].skip_publish is True

@@ -859,6 +859,7 @@ def test_fabric_workspace_with_none_item_types_defaults_to_all(
     assert "Notebook" in workspace.repository_items
     assert "Test Notebook" in workspace.repository_items["Notebook"]
 
+
 def test_parameter_file_path_types(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test different path types for parameter_file_path in FabricWorkspace."""
 
@@ -986,6 +987,7 @@ def test_parameter_file_path_invalid_type_rejected(temp_workspace_dir, patched_f
     assert hasattr(workspace, "environment_parameter")
     # Environment parameter should be empty since the parameter file path was invalid
     assert not workspace.environment_parameter
+
 
 def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id):
     """Test that passing base_api_url as kwarg raises an error."""

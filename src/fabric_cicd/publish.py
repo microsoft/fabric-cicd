@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 def publish_all_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: Optional[str] = None,
+    folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
 ) -> None:
     """
@@ -41,7 +42,9 @@ def publish_all_items(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-            The pattern is matched against both item names and folder paths within the repository.
+            The pattern is matched against item names only.
+        folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
+            The pattern is matched against the relative path from the repository root.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
 
@@ -77,8 +80,8 @@ def publish_all_items(
         ...     repository_directory="/path/to/repo",
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
-        >>> exclude_regex = "^legacy/"
-        >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+        >>> folder_exclude_regex = "^legacy/"
+        >>> publish_all_items(workspace, folder_path_exclude_regex=folder_exclude_regex)
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -121,6 +124,12 @@ def publish_all_items(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+
+    if folder_path_exclude_regex:
+        logger.warning(
+            "Using folder_path_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
     if items_to_include:
         if "enable_experimental_features" not in constants.FEATURE_FLAG:
