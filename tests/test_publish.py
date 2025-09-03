@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import fabric_cicd.publish as publish
+from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -540,27 +541,38 @@ def test_folder_exclusion_with_regex(mock_endpoint):
                 FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
             ),
         ):
-            workspace = FabricWorkspace(
-                workspace_id="12345678-1234-5678-abcd-1234567890ab",
-                repository_directory=str(temp_path),
-                item_type_in_scope=["Notebook", "SemanticModel"],
-            )
+            # Enable experimental feature flags for folder exclusion
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
 
-            # Test: Exclude items in 'legacy' folder using folder path regex pattern
-            exclude_regex = r".*legacy.*"
-            publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook", "SemanticModel"],
+                )
 
-            # Verify that repository_items are populated correctly
-            assert "Notebook" in workspace.repository_items
-            assert "SemanticModel" in workspace.repository_items
+                # Test: Exclude items in 'legacy' folder using folder path regex pattern
+                exclude_regex = r".*legacy.*"
+                publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
 
-            # Check that legacy items were marked for exclusion (skip_publish = True)
-            assert workspace.repository_items["Notebook"]["LegacyNotebook"].skip_publish is True
-            assert workspace.repository_items["SemanticModel"]["LegacyModel"].skip_publish is True
+                # Verify that repository_items are populated correctly
+                assert "Notebook" in workspace.repository_items
+                assert "SemanticModel" in workspace.repository_items
 
-            # Check that current and root items were NOT marked for exclusion (skip_publish = False)
-            assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
-            assert workspace.repository_items["Notebook"]["RootNotebook"].skip_publish is False
+                # Check that legacy items were marked for exclusion (skip_publish = True)
+                assert workspace.repository_items["Notebook"]["LegacyNotebook"].skip_publish is True
+                assert workspace.repository_items["SemanticModel"]["LegacyModel"].skip_publish is True
+
+                # Check that current and root items were NOT marked for exclusion (skip_publish = False)
+                assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
+                assert workspace.repository_items["Notebook"]["RootNotebook"].skip_publish is False
+
+            finally:
+                # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
 
 
 def test_item_name_exclusion_still_works(mock_endpoint):
@@ -710,19 +722,133 @@ def test_legacy_folder_exclusion_example(mock_endpoint):
                 FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
             ),
         ):
-            workspace = FabricWorkspace(
-                workspace_id="12345678-1234-5678-abcd-1234567890ab",
-                repository_directory=str(temp_path),
-                item_type_in_scope=["Notebook", "SemanticModel"],
-            )
+            # Enable experimental feature flags for folder exclusion
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
 
-            # Test: Exclude all items in 'legacy' folder using the folder path regex pattern
-            exclude_regex = r"^legacy/"  # Match items that start with 'legacy/'
-            publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook", "SemanticModel"],
+                )
 
-            # Verify that legacy items were excluded
-            assert workspace.repository_items["Notebook"]["FabricNotebook"].skip_publish is True
-            assert workspace.repository_items["SemanticModel"]["Model"].skip_publish is True
+                # Test: Exclude all items in 'legacy' folder using the folder path regex pattern
+                exclude_regex = r"^legacy/"  # Match items that start with 'legacy/'
+                publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
 
-            # Verify that current items were NOT excluded
-            assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
+                # Verify that legacy items were excluded
+                assert workspace.repository_items["Notebook"]["FabricNotebook"].skip_publish is True
+                assert workspace.repository_items["SemanticModel"]["Model"].skip_publish is True
+
+                # Verify that current items were NOT excluded
+                assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
+
+            finally:
+                # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_unpublish_folder_exclusion_with_regex(mock_endpoint):
+    """Test that folder_path_exclude_regex can exclude items from unpublishing based on folder path."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create repository items in 'legacy' folder
+        legacy_notebook_dir = temp_path / "legacy" / "LegacyNotebook.Notebook"
+        legacy_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_notebook_platform = legacy_notebook_dir / ".platform"
+        legacy_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "LegacyNotebook",
+                "description": "Legacy notebook",
+            },
+            "config": {"logicalId": "legacy-notebook-id"},
+        }
+
+        with legacy_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(legacy_notebook_metadata, f)
+
+        with (legacy_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create repository items in 'current' folder
+        current_notebook_dir = temp_path / "current" / "CurrentNotebook.Notebook"
+        current_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        current_notebook_platform = current_notebook_dir / ".platform"
+        current_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "CurrentNotebook",
+                "description": "Current notebook",
+            },
+            "config": {"logicalId": "current-notebook-id"},
+        }
+
+        with current_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(current_notebook_metadata, f)
+
+        with (current_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Mock deployed items - include both legacy and current items, plus an orphaned item
+        deployed_items = {
+            "Notebook": {
+                "LegacyNotebook": MagicMock(guid="legacy-guid"),
+                "CurrentNotebook": MagicMock(guid="current-guid"),
+                "OrphanedNotebook": MagicMock(guid="orphaned-guid"),  # This one exists in workspace but not in repo
+            }
+        }
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace,
+                "_refresh_deployed_items",
+                new=lambda self: setattr(self, "deployed_items", deployed_items),
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            # Enable experimental feature flags for folder exclusion
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook"],
+                )
+
+                # Test: Exclude items from 'legacy' folder from being unpublished
+                exclude_regex = r"^legacy/"
+                publish.unpublish_all_orphan_items(workspace, folder_path_exclude_regex=exclude_regex)
+
+                # Verify the mock was called correctly
+                # OrphanedNotebook should be unpublished (it's truly orphaned)
+                # LegacyNotebook should NOT be unpublished (it exists in repo but in excluded folder)
+                # CurrentNotebook should NOT be unpublished (it exists in repo and not in excluded folder)
+
+                # Check that the endpoint was called to delete only the OrphanedNotebook
+                delete_calls = [
+                    call for call in mock_endpoint.invoke.call_args_list if call[1].get("method") == "DELETE"
+                ]
+
+                # Should only have one DELETE call for the orphaned item
+                assert len(delete_calls) == 1
+                # The DELETE URL should contain the orphaned-guid
+                assert "orphaned-guid" in delete_calls[0][1]["url"]
+
+            finally:
+                # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)

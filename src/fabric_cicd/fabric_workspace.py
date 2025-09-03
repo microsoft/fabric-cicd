@@ -769,16 +769,16 @@ class FabricWorkspace:
                 # Get the folder path
                 folder_path = folder_id_to_path_mapping[folder_id]
 
-            # Move up the folder hierarchy and add all ancestor folders
-            current_folder_path = folder_path
-            while current_folder_path != "/":
-                # Get the parent folder path
-                current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
+                # Move up the folder hierarchy and add all ancestor folders
+                current_folder_path = folder_path
+                while current_folder_path != "/":
+                    # Get the parent folder path
+                    current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
 
-                # Get the folder_id for this path and add to the unorphaned_folder set
-                parent_folder_id = self.deployed_folders.get(current_folder_path)
-                if parent_folder_id:
-                    unorphaned_folders.add(parent_folder_id)
+                    # Get the folder_id for this path and add to the unorphaned_folder set
+                    parent_folder_id = self.deployed_folders.get(current_folder_path)
+                    if parent_folder_id:
+                        unorphaned_folders.add(parent_folder_id)
 
         # Check if deletion can be skipped after update to unorphaned_folder set
         if unorphaned_folders == set(sorted_folder_ids):
