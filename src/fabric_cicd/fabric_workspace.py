@@ -136,6 +136,9 @@ class FabricWorkspace:
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
+        # Get parameter_file_path from kwargs
+        self.parameter_file_path = kwargs.get("parameter_file_path")
+
         # base_api_url is no longer supported - raise error if provided
         if "base_api_url" in kwargs:
             msg = (
@@ -175,6 +178,7 @@ class FabricWorkspace:
             item_type_in_scope=self.item_type_in_scope,
             environment=self.environment,
             parameter_file_name=constants.PARAMETER_FILE_NAME,
+            parameter_file_path=self.parameter_file_path,
         )
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:

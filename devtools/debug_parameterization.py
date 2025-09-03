@@ -27,14 +27,22 @@ item_type_in_scope = ["DataPipeline", "Notebook", "Environment", "SemanticModel"
 # Set target environment
 environment = "PPE"
 
+# Uncomment to use a parameter file in a different location (default location is within repository directory)
+# Use absolute path
+# parameter_file_path = str(root_directory / "sample" / "config" / "parameter.yml")
+# or use relative path
+# parameter_file_path = "../config/parameter.yml"
+
 validate_parameter_file(
     repository_directory=repository_directory,
     item_type_in_scope=item_type_in_scope,
     # Comment to exclude target environment in validation
     environment=environment,
-    # Uncomment to pass in an alternative parameter file name
+    # Uncomment to use a different parameter file name within the repository directory (default name: parameter.yml)
     # Assign to the constant in constants.py or pass in a string directly
     # parameter_file_name=constants.PARAMETER_FILE_NAME,
+    # Uncomment to use a parameter file from outside the repository (takes precedence over parameter_file_name)
+    # parameter_file_path=parameter_file_path,
     # Uncomment to use SPN auth
     # token_credential=token_credential,
 )

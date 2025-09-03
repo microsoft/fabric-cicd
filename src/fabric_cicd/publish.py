@@ -7,13 +7,22 @@ import logging
 from typing import Optional
 
 import dpath.util as dpath
+from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex
+from fabric_cicd._common._config_utils import (
+    apply_config_overrides,
+    extract_publish_settings,
+    extract_unpublish_settings,
+    extract_workspace_settings,
+    load_config_file,
+)
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
+    validate_environment,
     validate_fabric_workspace_obj,
 )
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -331,3 +340,120 @@ def unpublish_all_orphan_items(
     fabric_workspace_obj._refresh_deployed_folders()
     if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
         fabric_workspace_obj._unpublish_folders()
+
+
+def deploy_with_config(
+    config_file_path: str,
+    environment: str = "N/A",
+    token_credential: Optional[TokenCredential] = None,
+    config_override: Optional[dict] = None,
+) -> None:
+    """
+    Deploy items using YAML configuration file with environment-specific settings.
+    This function provides a simplified deployment interface that loads configuration
+    from a YAML file and executes deployment operations based on environment-specific
+    settings. It constructs the necessary FabricWorkspace object internally
+    and handles publish/unpublish operations according to the configuration.
+
+    Args:
+        config_file_path: Path to the YAML configuration file as a string.
+        environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod'), if missing defaults to 'N/A'.
+        token_credential: Optional Azure token credential for authentication.
+        config_override: Optional dictionary to override specific configuration values.
+
+    Raises:
+        InputError: If configuration file is invalid or environment not found.
+        FileNotFoundError: If configuration file doesn't exist.
+
+    Examples:
+        Basic usage
+        >>> from fabric_cicd import deploy_with_config
+        >>> deploy_with_config(
+        ...     config_file_path="workspace/config.yml",
+        ...     environment="prod"
+        ... )
+
+        With custom authentication
+        >>> from fabric_cicd import deploy_with_config
+        >>> from azure.identity import ClientSecretCredential
+        >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
+        >>> deploy_with_config(
+        ...     config_file_path="workspace/config.yml",
+        ...     environment="prod",
+        ...     token_credential=credential
+        ... )
+
+        With override configuration
+        >>> from fabric_cicd import deploy_with_config
+        >>> from azure.identity import ClientSecretCredential
+        >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
+        >>> deploy_with_config(
+        ...     config_file_path="workspace/config.yml",
+        ...     environment="prod",
+        ...     config_override={
+        ...         "core": {
+        ...             "item_types_in_scope": ["Notebook"]
+        ...         },
+        ...         "publish": {
+        ...             "skip": {
+        ...                 "prod": False
+        ...             }
+        ...         }
+        ...     }
+        ... )
+    """
+    # Experimental feature flags required to enable
+    if (
+        "enable_experimental_features" not in constants.FEATURE_FLAG
+        or "enable_config_deploy" not in constants.FEATURE_FLAG
+    ):
+        msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
+        raise InputError(msg, logger)
+
+    print_header("Config-Based Deployment")
+    logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
+
+    # Validate environment
+    environment = validate_environment(environment)
+
+    # Load and validate configuration file
+    config = load_config_file(config_file_path, environment, config_override)
+
+    # Extract environment-specific settings
+    workspace_settings = extract_workspace_settings(config, environment)
+    publish_settings = extract_publish_settings(config, environment)
+    unpublish_settings = extract_unpublish_settings(config, environment)
+
+    # Apply feature flags and constants if specified
+    apply_config_overrides(config, environment)
+
+    # Create FabricWorkspace object with extracted settings
+    workspace = FabricWorkspace(
+        repository_directory=workspace_settings["repository_directory"],
+        item_type_in_scope=workspace_settings.get("item_types_in_scope"),
+        environment=environment,
+        workspace_id=workspace_settings.get("workspace_id"),
+        workspace_name=workspace_settings.get("workspace_name"),
+        token_credential=token_credential,
+        parameter_file_path=workspace_settings.get("parameter_file_path"),
+    )
+    # Execute deployment operations based on skip settings
+    if not publish_settings.get("skip", False):
+        publish_all_items(
+            workspace,
+            item_name_exclude_regex=publish_settings.get("exclude_regex"),
+            items_to_include=publish_settings.get("items_to_include"),
+        )
+    else:
+        logger.info(f"Skipping publish operation for environment '{environment}'")
+
+    if not unpublish_settings.get("skip", False):
+        unpublish_all_orphan_items(
+            workspace,
+            item_name_exclude_regex=unpublish_settings.get("exclude_regex"),
+            items_to_include=unpublish_settings.get("items_to_include"),
+        )
+    else:
+        logger.info(f"Skipping unpublish operation for environment '{environment}'")
+
+    logger.info("Config-based deployment completed successfully")
