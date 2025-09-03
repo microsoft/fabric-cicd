@@ -395,7 +395,7 @@ class Parameter:
             is_valid, msg = self._validate_find_replace_replace_value(replace_value)
 
         if param_name == "key_value_replace":
-            is_valid, msg = self._validate_find_replace_replace_value(replace_value)
+            is_valid, msg = self._validate_key_value_replace_replace_value(replace_value)
 
         if param_name == "spark_pool":
             is_valid, msg = self._validate_spark_pool_replace_value(replace_value)
@@ -406,7 +406,7 @@ class Parameter:
         return True, msg
 
     def _validate_find_replace_replace_value(self, replace_value: dict) -> tuple[bool, str]:
-        """Validate the replace_value dictionary values in find_replace and key_value_replace parameters."""
+        """Validate the replace_value dictionary values in find_replace parameters."""
         for environment in replace_value:
             if not replace_value[environment]:
                 return False, constants.PARAMETER_MSGS["missing replace value"].format("find_replace", environment)
@@ -417,6 +417,39 @@ class Parameter:
                 return False, msg
 
         return True, constants.PARAMETER_MSGS["valid replace value"].format("find_replace")
+
+    def _validate_key_value_replace_replace_value(self, replace_value: dict) -> tuple[bool, str]:
+        """Validate the replace_value dictionary values in key_value_replace parameters.
+
+        For key_value_replace, we allow any data type but all values should be of the same type
+        to ensure consistency when replacing values in JSON/YAML files.
+        """
+        if not replace_value:
+            return False, constants.PARAMETER_MSGS["missing replace value"].format("key_value_replace", "any")
+
+        # Get the first value to determine the expected type
+        first_env = next(iter(replace_value))
+        first_value = replace_value[first_env]
+        expected_type = type(first_value)
+
+        for environment in replace_value:
+            value = replace_value[environment]
+
+            # Check if value is None/empty (not allowed)
+            if value is None:
+                return False, constants.PARAMETER_MSGS["missing replace value"].format("key_value_replace", environment)
+
+            # Check type consistency across all environments
+            if type(value) != expected_type:
+                return (
+                    False,
+                    f"Inconsistent data types in key_value_replace replace_value: "
+                    f"'{first_env}' has type {expected_type.__name__} but "
+                    f"'{environment}' has type {type(value).__name__}. "
+                    f"All values must be of the same type.",
+                )
+
+        return True, constants.PARAMETER_MSGS["valid replace value"].format("key_value_replace")
 
     def _validate_spark_pool_replace_value(self, replace_value: dict) -> tuple[bool, str]:
         """Validate the replace_value dictionary values in spark_pool parameter."""
