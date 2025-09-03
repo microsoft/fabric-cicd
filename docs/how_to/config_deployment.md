@@ -1,4 +1,4 @@
-# Configuration File Deployment
+# Configuration Deployment
 
 ## Overview
 
@@ -29,13 +29,15 @@ deploy_with_config(
 
 **IMPORTANT:** Configuration-based deployment is currently an experimental feature and requires feature flags `enable_experimental_features` and `enable_config_deploy` to be set.
 
-## Configuration File Structure
+Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional capabilities or a [bug report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml) for issues.
 
-The configuration file includes several sections, with configurable settings for different aspects of the deployment process.
+## Configuration File Setup
+
+The configuration file includes several sections with configurable settings for different aspects of the deployment process.
 
 **Note**: Configuration values can be specified in two ways: as a single value (applied to any environment provided) or as an environment mapping. Both approaches can be used within the same configuration file - for example, using environment mappings for workspace IDs while keeping a single value for repository directory.
 
-### `core` Section
+### Core Settings
 
 The `core` section is **required** as it defines the fundamental settings for the deployment, most importantly the **target workspace** and **repository directory**. Other optional settings can be configured within the `core` section, which include **item types in scope** and **parameter**.
 
@@ -95,7 +97,7 @@ core:
 <span class="md-h4-nonanchor">Required Fields:</span>
 
 -   Workspace Identifier:
-    -   `workspace_id` takes precedence over workspace name when both are provided.
+    -   Workspace ID takes precedence over workspace name when both are provided.
     -   `workspace_id` must be a valid string GUID.
 -   Repository Directory Path:
     -   Supports relative or absolute path.
@@ -104,16 +106,16 @@ core:
 <span class="md-h4-nonanchor">Optional Fields:</span>
 
 -   Item Types in Scope:
-    -   If `item_types_in_scope` is not specified, all item types will be included.
+    -   If `item_types_in_scope` is not specified, all item types will be included by default.
     -   Item types must be provided as a list, use `-` or `[]` notation.
     -   Only accepts supported item types.
 -   Parameter Path:
     -   Supports relative or absolute path.
     -   Relative path must be relative to the `config.yml` file location.
 
-### `publish` Section
+### Publish Settings
 
-`publish` is an optional section which controls item publishing behavior. It includes various optional settings to enable/disable publishing operations or selectively publish items.
+`publish` is optional and can be used to control item publishing behavior. It includes various optional settings to enable/disable publishing operations or selectively publish items.
 
 ```yaml
 publish:
@@ -149,9 +151,9 @@ publish:
         <env..>: <bool_value>
 ```
 
-### `unpublish` Section
+### Unpublish Settings
 
-`unpublish` is an optional section which controls item unpublishing behavior. It includes various optional settings to enable/disable unpublishing or selectively unpublish items.
+`unpublish` is optional and can be used to control item unpublishing behavior. It includes various optional settings to enable/disable unpublishing or selectively unpublish items.
 
 ```yaml
 unpublish:
@@ -191,9 +193,9 @@ unpublish:
 
 **Warning:** While selective deployment is supported in `fabric-cicd` it is not recommended due to potential issues with dependency management.
 
-### `features` Section
+### Features Setting
 
-`features` is an optional section to set a list of specific feature flags.
+`features` is optional and can be used to set a list of specific feature flags.
 
 ```yaml
 features:
@@ -211,9 +213,9 @@ features:
         - <feature_flag..>
 ```
 
-### `constants` Section
+### Constants Setting
 
-`constants` is an optional section to override supported library constants.
+`constants` is optional and can be used to override supported library constants.
 
 ```yaml
 constants:
@@ -229,7 +231,7 @@ constants:
         <env..>: <constant_value..>
 ```
 
-## Sample Configuration File
+### Sample Configuration File
 
 ```yaml
 core:
@@ -284,7 +286,42 @@ constants:
     DEFAULT_API_ROOT_URL: "https://api.fabric.microsoft.com"
 ```
 
-## Configuration Override
+## Configuration File Deployment
+
+### Basic Usage
+
+```python
+from fabric_cicd import deploy_with_config
+
+# Deploy using a config file
+deploy_with_config(
+    config_file_path="path/to/config.yml", # required
+    environment="dev" # optional (recommended)
+)
+```
+
+### Custom Authentication
+
+```python
+from fabric_cicd import deploy_with_config
+from azure.identity import ClientSecretCredential
+
+# Create a credential
+credential = ClientSecretCredential(
+    tenant_id="your-tenant-id",
+    client_id="your-client-id",
+    client_secret="your-client-secret"
+)
+
+# Deploy with custom credential
+deploy_with_config(
+    config_file_path="path/to/config.yml",
+    environment="prod",
+    token_credential=credential
+)
+```
+
+### Configuration Override
 
 The `config_override` parameter in `deploy_with_config()` allows you to dynamically modify configuration values at runtime without changing the base configuration file. This is particularly useful for debugging or making temporary deployment adjustments.
 
@@ -318,67 +355,6 @@ deploy_with_config(
     -   Existing values can be overridden for any field in the configuration.
     -   New values can only be added for optional fields that aren't present in the original configuration.
     -   Required fields must exist in the original configuration in order to override.
-
-## Applying Config File Deployment
-
-### Basic Usage
-
-```python
-from fabric_cicd import deploy_with_config
-
-# Deploy using a config file
-deploy_with_config(
-    config_file_path="path/to/config.yml", # required
-    environment="dev" # optional (recommended)
-)
-```
-
-### With Custom Authentication
-
-```python
-from fabric_cicd import deploy_with_config
-from azure.identity import ClientSecretCredential
-
-# Create a credential
-credential = ClientSecretCredential(
-    tenant_id="your-tenant-id",
-    client_id="your-client-id",
-    client_secret="your-client-secret"
-)
-
-# Deploy with custom credential
-deploy_with_config(
-    config_file_path="path/to/config.yml",
-    environment="prod",
-    token_credential=credential
-)
-```
-
-### With Configuration Override
-
-You can override specific configuration values at runtime:
-
-```python
-from fabric_cicd import deploy_with_config
-
-config_override_dict = {
-    "core": {
-        "item_types_in_scope": ["Notebook", "DataPipeline"]
-    },
-    "publish": {
-        "skip": {
-            "test": False  # Override to enable publishing
-        }
-    }
-}
-
-# Deploy with configuration override
-deploy_with_config(
-    config_file_path="path/to/config.yml",
-    environment="test",
-    config_override=config_override_dict
-)
-```
 
 ## Troubleshooting Guide
 

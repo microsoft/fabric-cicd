@@ -12,6 +12,7 @@ nav:
           - How To: how_to/index.md
           - Getting Started: how_to/getting_started.md
           - Item Types: how_to/item_types.md
+          - Configuration Deployment: how_to/config_deployment.md
           - Parameterization: how_to/parameterization.md
           - Optional Features: how_to/optional_feature.md
     - Examples:
