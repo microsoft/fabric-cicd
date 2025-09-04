@@ -6,6 +6,18 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.26
+
+<span class="md-h2-subheader">Release Date: 2025-09-05</span>
+
+-   💥 Deprecate Base API URL kwarg in Fabric Workspace ([#529](https://github.com/microsoft/fabric-cicd/issues/529))
+-   ✨ Support Schedules parameterization ([#508](https://github.com/microsoft/fabric-cicd/issues/508))
+-   ✨ Support YAML configuration file-based deployment ([#470](https://github.com/microsoft/fabric-cicd/issues/470))
+-   📝 Add dynamically generated Python version requirements to documentation ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
+-   ⚡ Enhance pytest output to limit console verbosity ([#514](https://github.com/microsoft/fabric-cicd/issues/514))
+-   🔧 Fix Report item schema handling ([#518](https://github.com/microsoft/fabric-cicd/issues/518))
+-   🔧 Fix deployment order to publish Mirrored Database before Lakehouse ([#482](https://github.com/microsoft/fabric-cicd/issues/482))
+
 ## Version 0.1.25
 
 <span class="md-h2-subheader">Release Date: 2025-08-19</span>
