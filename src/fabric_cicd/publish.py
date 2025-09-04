@@ -4,7 +4,6 @@
 """Module for publishing and unpublishing Fabric workspace items."""
 
 import logging
-from pathlib import Path
 from typing import Optional
 
 import dpath.util as dpath
@@ -225,7 +224,6 @@ def publish_all_items(
 def unpublish_all_orphan_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: str = "^$",
-    folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
 ) -> None:
     """
@@ -234,16 +232,10 @@ def unpublish_all_orphan_items(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished. Default is '^$' which will exclude nothing.
-        folder_path_exclude_regex: Regex pattern to exclude deployed items that would have originated from specific folder paths.
-            The pattern is matched against the relative path from the repository root where the item would be located.
         items_to_include: List of items in the format "item_name.item_type" that should be unpublished.
 
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing is not recommended due to item dependencies.
-        To enable this feature, see How To -> Optional Features for information on which flags to enable.
-
-    folder_path_exclude_regex:
-        This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing based on folder paths may interfere with item dependencies.
         To enable this feature, see How To -> Optional Features for information on which flags to enable.
 
     Examples:
@@ -267,17 +259,6 @@ def unpublish_all_orphan_items(
         >>> publish_all_items(workspace)
         >>> exclude_regex = ".*_do_not_delete"
         >>> unpublish_orphaned_items(workspace, item_name_exclude_regex=exclude_regex)
-
-        With folder exclusion (e.g., don't unpublish items that would be in 'legacy' folder)
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
-        >>> workspace = FabricWorkspace(
-        ...     workspace_id="your-workspace-id",
-        ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
-        ... )
-        >>> publish_all_items(workspace)
-        >>> folder_exclude_regex = "^legacy/"
-        >>> unpublish_orphaned_items(workspace, folder_path_exclude_regex=folder_exclude_regex)
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
@@ -310,18 +291,6 @@ def unpublish_all_orphan_items(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
         fabric_workspace_obj.items_to_include = items_to_include
-
-    if folder_path_exclude_regex:
-        if "enable_experimental_features" not in constants.FEATURE_FLAG:
-            msg = "A folder path exclusion regex was provided, but the 'enable_experimental_features' feature flag is not set."
-            raise InputError(msg, logger)
-        if "enable_exclude_folder" not in constants.FEATURE_FLAG:
-            msg = "Experimental features are enabled but the 'enable_exclude_folder' feature flag is not set."
-            raise InputError(msg, logger)
-        logger.warning("Folder path exclusion is enabled for unpublishing.")
-        logger.warning(
-            "Using folder_path_exclude_regex for unpublishing is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
-        )
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
@@ -371,26 +340,6 @@ def unpublish_all_orphan_items(
 
         to_delete_set = deployed_names - repository_names
         to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
-
-        # Apply folder path exclusion if specified
-        if folder_path_exclude_regex:
-            folder_regex_pattern = check_regex(folder_path_exclude_regex)
-            # Check all repository items (including those in excluded folders) to see if any match deployed items
-            all_repo_items = fabric_workspace_obj.repository_items.get(item_type, {})
-            excluded_by_folder = set()
-
-            for repo_item_name, repo_item in all_repo_items.items():
-                relative_path = repo_item.path.relative_to(Path(fabric_workspace_obj.repository_directory))
-                relative_path_str = relative_path.as_posix()
-                if folder_regex_pattern.search(relative_path_str) and repo_item_name in deployed_names:
-                    # If this repository item is in an excluded folder and there's a deployed item with the same name
-                    excluded_by_folder.add(repo_item_name)
-                    logger.info(
-                        f"Excluding {item_type} '{repo_item_name}' from unpublishing due to folder path exclusion regex."
-                    )
-
-            # Remove items that would be excluded by folder pattern from the delete list
-            to_delete_list = [name for name in to_delete_list if name not in excluded_by_folder]
 
         if item_type == "DataPipeline":
             find_referenced_items_func = items.find_referenced_datapipelines
@@ -519,7 +468,6 @@ def deploy_with_config(
         unpublish_all_orphan_items(
             workspace,
             item_name_exclude_regex=unpublish_settings.get("exclude_regex"),
-            folder_path_exclude_regex=unpublish_settings.get("folder_exclude_regex"),
             items_to_include=unpublish_settings.get("items_to_include"),
         )
     else:

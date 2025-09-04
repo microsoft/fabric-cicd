@@ -434,7 +434,6 @@ class TestDeployWithConfig:
         mock_unpublish.assert_called_once_with(
             mock_workspace_instance,
             item_name_exclude_regex="^DEBUG.*",
-            folder_path_exclude_regex=None,
             items_to_include=None,
         )
 

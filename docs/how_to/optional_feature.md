@@ -18,7 +18,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                     |              |
 | `enable_experimental_features`            | Set to enable experimental features, such as selective deployments |              |
 | `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items           | ☑️           |
-| `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish/unpublish      | ☑️           |
+| `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish operations     | ☑️           |
 | `enable_config_deploy`                    | Set to enable config file-based deployment                         | ☑️           |
 
 <span class="md-h3-nonanchor">Example</span>
@@ -37,7 +37,7 @@ append_feature_flag("enable_exclude_folder")
 
 <span class="md-h3-nonanchor">Experimental Features</span>
 
-To use experimental features, such as selective deployments (e.g., specifying a list of items to publish/unpublish) or folder-based exclusions, you must enable both the `enable_experimental_features` flag and the flag specific to the feature, such as `enable_items_to_include` or `enable_exclude_folder`.
+To use experimental features, such as selective deployments (e.g., specifying a list of items to publish/unpublish) or folder-based exclusions during publishing, you must enable both the `enable_experimental_features` flag and the flag specific to the feature, such as `enable_items_to_include` or `enable_exclude_folder`.
 
 ## Debugging
 
