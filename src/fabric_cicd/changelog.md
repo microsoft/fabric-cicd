@@ -6,6 +6,12 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.27
+
+<span class="md-h2-subheader">Release Date: 2025-09-05</span>
+
+-   🔧 Fix traliing comma in report schema ([#534](https://github.com/microsoft/fabric-cicd/issues/534))
+
 ## Version 0.1.26
 
 <span class="md-h2-subheader">Release Date: 2025-09-05</span>
