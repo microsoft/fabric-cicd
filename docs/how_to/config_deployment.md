@@ -122,6 +122,9 @@ publish:
     # Optional - pattern to exclude items from publishing
     exclude_regex: <regex_pattern_string>
 
+    # Optional - pattern to exclude items in specific folders from publishing
+    folder_exclude_regex: <regex_pattern_string>
+
     # Optional - specific items to publish (requires feature flags)
     items_to_include:
         - <item_name.item_type_1>
@@ -137,6 +140,11 @@ publish:
 publish:
     # Optional - pattern to exclude items from publishing
     exclude_regex:
+        <env_1>: <regex_pattern_string_1>
+        <env..>: <regex_pattern_string..>
+
+    # Optional - pattern to exclude items in specific folders from publishing
+    folder_exclude_regex:
         <env_1>: <regex_pattern_string_1>
         <env..>: <regex_pattern_string..>
 
@@ -231,7 +239,7 @@ constants:
         <env..>: <constant_value..>
 ```
 
-### Sample Configuration File
+### Sample `config.yml` File
 
 ```yaml
 core:
@@ -258,6 +266,8 @@ core:
 publish:
     # Don't publish items matching this pattern
     exclude_regex: "^DONT_DEPLOY.*"
+
+    folder_exclude_regex: "^DONT_DEPLOY_FOLDER/"
 
     items_to_include:
         - "Hello World.Notebook"

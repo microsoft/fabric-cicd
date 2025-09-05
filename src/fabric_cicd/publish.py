@@ -42,11 +42,13 @@ def publish_all_items(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
-            The pattern is matched against item names only.
         folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
-            The pattern is matched against the relative path from the repository root.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
+    folder_path_exclude_regex:
+        This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
+        not recommended due to item dependencies. To enable this feature, see How To -> Optional Features
+        for information on which flags to enable.
 
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -73,7 +75,7 @@ def publish_all_items(
         >>> exclude_regex = ".*_do_not_publish"
         >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
 
-        With folder exclusion (e.g., exclude items in 'legacy' folder)
+        With folder exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
@@ -126,11 +128,11 @@ def publish_all_items(
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     if folder_path_exclude_regex:
-        if "enable_experimental_features" not in constants.FEATURE_FLAG:
-            msg = "A folder path exclusion regex was provided, but the 'enable_experimental_features' feature flag is not set."
-            raise InputError(msg, logger)
-        if "enable_exclude_folder" not in constants.FEATURE_FLAG:
-            msg = "Experimental features are enabled but the 'enable_exclude_folder' feature flag is not set."
+        if (
+            "enable_experimental_features" not in constants.FEATURE_FLAG
+            or "enable_exclude_folder" not in constants.FEATURE_FLAG
+        ):
+            msg = "Feature flags 'enable_experimental_features' and 'enable_exclude_folder' must be set."
             raise InputError(msg, logger)
         logger.warning("Folder path exclusion is enabled.")
         logger.warning(
@@ -139,11 +141,11 @@ def publish_all_items(
         fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
     if items_to_include:
-        if "enable_experimental_features" not in constants.FEATURE_FLAG:
-            msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
-            raise InputError(msg, logger)
-        if "enable_items_to_include" not in constants.FEATURE_FLAG:
-            msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
+        if (
+            "enable_experimental_features" not in constants.FEATURE_FLAG
+            or "enable_items_to_include" not in constants.FEATURE_FLAG
+        ):
+            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
             raise InputError(msg, logger)
         logger.warning("Selective deployment is enabled.")
         logger.warning(
@@ -280,11 +282,11 @@ def unpublish_all_orphan_items(
     print_header("Unpublishing Orphaned Items")
 
     if items_to_include:
-        if "enable_experimental_features" not in constants.FEATURE_FLAG:
-            msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
-            raise InputError(msg, logger)
-        if "enable_items_to_include" not in constants.FEATURE_FLAG:
-            msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
+        if (
+            "enable_experimental_features" not in constants.FEATURE_FLAG
+            or "enable_items_to_include" not in constants.FEATURE_FLAG
+        ):
+            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
             raise InputError(msg, logger)
         logger.warning("Selective unpublish is enabled.")
         logger.warning(

@@ -29,15 +29,11 @@ append_feature_flag("enable_lakehouse_unpublish")
 append_feature_flag("enable_warehouse_unpublish")
 append_feature_flag("disable_print_identity")
 append_feature_flag("enable_environment_variable_replacement")
-
-# To enable folder exclusion (experimental feature)
-append_feature_flag("enable_experimental_features")
-append_feature_flag("enable_exclude_folder")
 ```
 
 <span class="md-h3-nonanchor">Experimental Features</span>
 
-To use experimental features, such as selective deployments (e.g., specifying a list of items to publish/unpublish) or folder-based exclusions during publishing, you must enable both the `enable_experimental_features` flag and the flag specific to the feature, such as `enable_items_to_include` or `enable_exclude_folder`.
+To use experimental features, such as selective deployments (e.g., specifying a list of items to publish/unpublish) or folder exclusions during publishing, you must enable both the `enable_experimental_features` flag and the flag specific to the feature, such as `enable_items_to_include` or `enable_exclude_folder`.
 
 ## Debugging
 

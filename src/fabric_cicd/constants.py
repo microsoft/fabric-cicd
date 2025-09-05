@@ -145,7 +145,7 @@ CONFIG_SECTIONS = {
         "settings": ["workspace_id", "workspace", "repository_directory", "item_types_in_scope", "parameter"],
     },
     "publish": {"type": dict, "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "skip"]},
-    "unpublish": {"type": dict, "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "skip"]},
+    "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
     "features": {"type": (list, dict), "settings": []},
     "constants": {"type": dict, "settings": []},
 }
