@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import fabric_cicd.publish as publish
+from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -19,7 +20,19 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 def mock_endpoint():
     """Mock FabricEndpoint to avoid real API calls."""
     mock = MagicMock()
-    mock.invoke.return_value = {"body": {"value": [], "capacityId": "test-capacity"}}
+
+    def mock_invoke(method, url, **_kwargs):
+        if method == "GET" and "workspaces" in url and not url.endswith("/items"):
+            return {"body": {"value": [], "capacityId": "test-capacity"}}
+        if method == "GET" and url.endswith("/items"):
+            return {"body": {"value": []}}
+        if method == "POST" and url.endswith("/folders"):
+            return {"body": {"id": "mock-folder-id"}}
+        if method == "POST" and url.endswith("/items"):
+            return {"body": {"id": "mock-item-id", "workspaceId": "mock-workspace-id"}}
+        return {"body": {"value": [], "capacityId": "test-capacity"}}
+
+    mock.invoke.side_effect = mock_invoke
     mock.upn_auth = True
     return mock
 
@@ -432,3 +445,307 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint):
             assert mirrored_db_index < lakehouse_index, (
                 f"MirroredDatabase should be published before Lakehouse, but got order: {call_order}"
             )
+
+
+def test_folder_exclusion_with_regex(mock_endpoint):
+    """Test that folder_path_exclude_regex can exclude entire folders of items."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create items in 'legacy' folder (should be excluded)
+        legacy_notebook_dir = temp_path / "legacy" / "LegacyNotebook.Notebook"
+        legacy_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_notebook_platform = legacy_notebook_dir / ".platform"
+        legacy_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "LegacyNotebook",
+                "description": "Legacy notebook to be excluded",
+            },
+            "config": {"logicalId": "legacy-notebook-id"},
+        }
+
+        with legacy_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(legacy_notebook_metadata, f)
+
+        with (legacy_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        legacy_model_dir = temp_path / "legacy" / "LegacyModel.SemanticModel"
+        legacy_model_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_model_platform = legacy_model_dir / ".platform"
+        legacy_model_metadata = {
+            "metadata": {
+                "type": "SemanticModel",
+                "displayName": "LegacyModel",
+                "description": "Legacy semantic model to be excluded",
+            },
+            "config": {"logicalId": "legacy-model-id"},
+        }
+
+        with legacy_model_platform.open("w", encoding="utf-8") as f:
+            json.dump(legacy_model_metadata, f)
+
+        with (legacy_model_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create items in 'current' folder (should be included)
+        current_notebook_dir = temp_path / "current" / "CurrentNotebook.Notebook"
+        current_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        current_notebook_platform = current_notebook_dir / ".platform"
+        current_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "CurrentNotebook",
+                "description": "Current notebook to be included",
+            },
+            "config": {"logicalId": "current-notebook-id"},
+        }
+
+        with current_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(current_notebook_metadata, f)
+
+        with (current_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create root-level item (should be included)
+        root_notebook_dir = temp_path / "RootNotebook.Notebook"
+        root_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        root_notebook_platform = root_notebook_dir / ".platform"
+        root_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "RootNotebook",
+                "description": "Root level notebook to be included",
+            },
+            "config": {"logicalId": "root-notebook-id"},
+        }
+
+        with root_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(root_notebook_metadata, f)
+
+        with (root_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            # Enable experimental feature flags for folder exclusion
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook", "SemanticModel"],
+                )
+
+                # Test: Exclude items in 'legacy' folder using folder path regex pattern
+                exclude_regex = r".*legacy.*"
+                publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
+
+                # Verify that repository_items are populated correctly
+                assert "Notebook" in workspace.repository_items
+                assert "SemanticModel" in workspace.repository_items
+
+                # Check that legacy items were marked for exclusion (skip_publish = True)
+                assert workspace.repository_items["Notebook"]["LegacyNotebook"].skip_publish is True
+                assert workspace.repository_items["SemanticModel"]["LegacyModel"].skip_publish is True
+
+                # Check that current and root items were NOT marked for exclusion (skip_publish = False)
+                assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
+                assert workspace.repository_items["Notebook"]["RootNotebook"].skip_publish is False
+
+            finally:
+                # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_item_name_exclusion_still_works(mock_endpoint):
+    """Test that existing item name exclusion still works with the new folder exclusion feature."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create items with specific names to test name-based exclusion
+        test_notebook_dir = temp_path / "TestNotebook.Notebook"
+        test_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        test_notebook_platform = test_notebook_dir / ".platform"
+        test_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "TestNotebook",
+                "description": "Test notebook to be included",
+            },
+            "config": {"logicalId": "test-notebook-id"},
+        }
+
+        with test_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(test_notebook_metadata, f)
+
+        with (test_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        excluded_notebook_dir = temp_path / "DoNotPublish.Notebook"
+        excluded_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        excluded_notebook_platform = excluded_notebook_dir / ".platform"
+        excluded_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "DoNotPublish",
+                "description": "Notebook to be excluded by name",
+            },
+            "config": {"logicalId": "excluded-notebook-id"},
+        }
+
+        with excluded_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(excluded_notebook_metadata, f)
+
+        with (excluded_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Notebook"],
+            )
+
+            # Test: Exclude items with "DoNotPublish" in the name
+            exclude_regex = r".*DoNotPublish.*"
+            publish.publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+
+            # Verify that the excluded item was marked for exclusion
+            assert workspace.repository_items["Notebook"]["DoNotPublish"].skip_publish is True
+
+            # Verify that the regular item was NOT marked for exclusion
+            assert workspace.repository_items["Notebook"]["TestNotebook"].skip_publish is False
+
+
+def test_legacy_folder_exclusion_example(mock_endpoint):
+    """Test the specific use case mentioned in the issue: excluding items in a 'legacy' folder."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create items exactly like in the user's example but using simpler item types
+        # /legacy/FabricNotebook.Notebook
+        legacy_notebook_dir = temp_path / "legacy" / "FabricNotebook.Notebook"
+        legacy_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_notebook_platform = legacy_notebook_dir / ".platform"
+        legacy_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "FabricNotebook",
+                "description": "Legacy notebook item",
+            },
+            "config": {"logicalId": "legacy-notebook-id"},
+        }
+
+        with legacy_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(legacy_notebook_metadata, f)
+
+        with (legacy_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # /legacy/Model.SemanticModel
+        legacy_model_dir = temp_path / "legacy" / "Model.SemanticModel"
+        legacy_model_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_model_platform = legacy_model_dir / ".platform"
+        legacy_model_metadata = {
+            "metadata": {
+                "type": "SemanticModel",
+                "displayName": "Model",
+                "description": "Legacy semantic model",
+            },
+            "config": {"logicalId": "legacy-model-id"},
+        }
+
+        with legacy_model_platform.open("w", encoding="utf-8") as f:
+            json.dump(legacy_model_metadata, f)
+
+        with (legacy_model_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create a current item outside legacy folder
+        current_notebook_dir = temp_path / "CurrentNotebook.Notebook"
+        current_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        current_notebook_platform = current_notebook_dir / ".platform"
+        current_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "CurrentNotebook",
+                "description": "Current notebook item",
+            },
+            "config": {"logicalId": "current-notebook-id"},
+        }
+
+        with current_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(current_notebook_metadata, f)
+
+        with (current_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            # Enable experimental feature flags for folder exclusion
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook", "SemanticModel"],
+                )
+
+                # Test: Exclude all items in 'legacy' folder using the folder path regex pattern
+                exclude_regex = r"^legacy/"  # Match items that start with 'legacy/'
+                publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
+
+                # Verify that legacy items were excluded
+                assert workspace.repository_items["Notebook"]["FabricNotebook"].skip_publish is True
+                assert workspace.repository_items["SemanticModel"]["Model"].skip_publish is True
+
+                # Verify that current items were NOT excluded
+                assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
+
+            finally:
+                # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)

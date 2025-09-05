@@ -740,6 +740,51 @@ class ConfigValidator:
                     constants.CONFIG_VALIDATION_MSGS["field"]["item_types_list_or_dict"].format(type(items).__name__)
                 )
 
+        # Validate folder_exclude_regex if present (publish only)
+        if "folder_exclude_regex" in section:
+            if section_name != "publish":
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unsupported_field"].format(
+                        "folder_exclude_regex", section_name
+                    )
+                )
+
+            folder_exclude_regex = section["folder_exclude_regex"]
+            if isinstance(folder_exclude_regex, str):
+                if not folder_exclude_regex.strip():
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                            f"{section_name}.folder_exclude_regex"
+                        )
+                    )
+                else:
+                    self._validate_regex(folder_exclude_regex, f"{section_name}.folder_exclude_regex")
+
+            elif isinstance(folder_exclude_regex, dict):
+                # Validate environment mapping
+                if not self._validate_environment_mapping(
+                    folder_exclude_regex, f"{section_name}.folder_exclude_regex", str
+                ):
+                    return
+
+                # Validate each environment's regex pattern
+                for env, regex_pattern in folder_exclude_regex.items():
+                    if not regex_pattern.strip():
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                                f"{section_name}.folder_exclude_regex.{env}"
+                            )
+                        )
+                        continue
+
+                    self._validate_regex(regex_pattern, f"{section_name}.folder_exclude_regex.{env}")
+            else:
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
+                        f"{section_name}.folder_exclude_regex", type(folder_exclude_regex).__name__
+                    )
+                )
+
         # Validate skip if present
         if "skip" in section:
             skip_value = section["skip"]

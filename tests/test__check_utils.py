@@ -123,6 +123,7 @@ def test_schedules_file_jsonpath_compatibility(real_schedules_file):
     first_match = matches[0]
     assert first_match is True  # Our test data has enabled=True
 
+
 def test_real_sample_schedules_file():
     """Test that the actual sample .schedules file works with our function."""
     from pathlib import Path
@@ -142,7 +143,6 @@ def test_real_sample_schedules_file():
 
     assert "schedules" in data
     assert isinstance(data["schedules"], list)
-
 
 
 def test_check_valid_json_content_with_valid_json():

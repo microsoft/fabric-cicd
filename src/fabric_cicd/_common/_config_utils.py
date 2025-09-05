@@ -85,6 +85,12 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
             else:
                 settings["exclude_regex"] = publish_config["exclude_regex"]
 
+        if "folder_exclude_regex" in publish_config:
+            if isinstance(publish_config["folder_exclude_regex"], dict):
+                settings["folder_exclude_regex"] = publish_config["folder_exclude_regex"][environment]
+            else:
+                settings["folder_exclude_regex"] = publish_config["folder_exclude_regex"]
+
         if "items_to_include" in publish_config:
             if isinstance(publish_config["items_to_include"], dict):
                 settings["items_to_include"] = publish_config["items_to_include"][environment]
