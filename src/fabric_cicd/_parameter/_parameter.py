@@ -40,6 +40,10 @@ class Parameter:
             "minimum": {"find_key", "replace_value"},
             "maximum": {"find_key", "replace_value", "item_type", "item_name", "file_path"},
         },
+        "templates": {
+            "minimum": {"path"},
+            "maximum": {"path", "enabled"},
+        },
     }
 
     LOAD_ERROR_MSG = ""
@@ -147,6 +151,14 @@ class Parameter:
 
                 parameter_dict = yaml.full_load(yaml_content)
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
+
+                # Load and merge templates if present
+                if "templates" in parameter_dict:
+                    merged_dict = self._load_and_merge_templates(parameter_dict)
+                    # Keep the templates section for validation purposes
+                    merged_dict["templates"] = parameter_dict["templates"]
+                    parameter_dict = merged_dict
+
                 return True, parameter_dict
         except yaml.YAMLError as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
@@ -243,7 +255,8 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:4]
+        # Get all valid parameter names (excluding internal ones like spark_pool_replace_value)
+        params = [key for key in self.PARAMETER_KEYS if key != "spark_pool_replace_value"]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
@@ -257,6 +270,11 @@ class Parameter:
             return False, "parameter not found"
 
         logger.debug(constants.PARAMETER_MSGS["param_found"].format(param_name))
+
+        # Handle templates differently since they have a different structure
+        if param_name == "templates":
+            return self._validate_templates_parameter()
+
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
@@ -606,3 +624,135 @@ class Parameter:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
+
+    def _load_and_merge_templates(self, parameter_dict: dict) -> dict:
+        """Load and merge template parameter files with the main parameter file."""
+        templates = parameter_dict.get("templates", [])
+
+        # Start with main parameter dict (excluding templates section)
+        merged_dict = {k: v for k, v in parameter_dict.items() if k != "templates"}
+
+        # Load and merge each enabled template
+        for template_config in templates:
+            if not isinstance(template_config, dict):
+                continue
+
+            path = template_config.get("path")
+            enabled = template_config.get("enabled", True)  # Default to True if not specified
+
+            if not path or not enabled:
+                continue
+
+            # Convert string "true"/"false" to boolean if needed
+            if isinstance(enabled, str):
+                enabled = enabled.lower() == "true"
+
+            if not enabled:
+                continue
+
+            template_dict = self._load_template_file(path)
+            if template_dict:
+                merged_dict = self._merge_parameter_dicts(merged_dict, template_dict)
+
+        return merged_dict
+
+    def _load_template_file(self, template_path: str) -> dict:
+        """Load a template parameter file from the specified path."""
+        try:
+            # Resolve template path relative to repository directory
+            if not Path(template_path).is_absolute():
+                template_file_path = Path(self.repository_directory, template_path, "parameter.yml")
+            else:
+                template_file_path = Path(template_path, "parameter.yml")
+
+            template_file_path = template_file_path.resolve()
+
+            # Validate the template file exists
+            if not template_file_path.is_file():
+                logger.warning(f"Template parameter file not found: {template_file_path}")
+                return {}
+
+            # Load and parse the template file
+            with Path.open(template_file_path, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml_content = replace_variables_in_parameter_file(yaml_content)
+
+                validation_errors = self._validate_yaml_content(yaml_content)
+                if validation_errors:
+                    logger.warning(
+                        f"Template parameter file has validation errors: {template_file_path}: {validation_errors}"
+                    )
+                    return {}
+
+                template_dict = yaml.full_load(yaml_content)
+                logger.debug(f"Loaded template parameter file: {template_file_path}")
+
+                # Remove templates section from template files to avoid recursion
+                if "templates" in template_dict:
+                    del template_dict["templates"]
+                    logger.debug("Removed templates section from template file to avoid recursion")
+
+                return template_dict
+
+        except yaml.YAMLError as e:
+            logger.warning(f"Error loading template parameter file {template_path}: {e}")
+            return {}
+        except Exception as e:
+            logger.warning(f"Unexpected error loading template parameter file {template_path}: {e}")
+            return {}
+
+    def _merge_parameter_dicts(self, base_dict: dict, template_dict: dict) -> dict:
+        """Merge template parameter dictionary into the base dictionary."""
+        merged_dict = base_dict.copy()
+
+        # Merge each parameter section
+        for param_name, param_values in template_dict.items():
+            if param_name not in merged_dict:
+                merged_dict[param_name] = param_values
+            else:
+                # Append template values to existing parameter section
+                if isinstance(merged_dict[param_name], list) and isinstance(param_values, list):
+                    merged_dict[param_name].extend(param_values)
+                else:
+                    logger.warning(f"Cannot merge parameter section '{param_name}': incompatible types")
+
+        return merged_dict
+
+    def _validate_templates_parameter(self) -> tuple[bool, str]:
+        """Validate the templates parameter structure and values."""
+        templates = self.environment_parameter.get("templates", [])
+
+        # Validate templates is a list
+        if not isinstance(templates, list):
+            return False, "Templates must be a list"
+
+        # Validate each template configuration
+        for i, template_config in enumerate(templates):
+            if not isinstance(template_config, dict):
+                return False, f"Template {i + 1} must be a dictionary"
+
+            # Validate required fields
+            if "path" not in template_config:
+                return False, f"Template {i + 1} missing required field 'path'"
+
+            path = template_config["path"]
+            if not isinstance(path, str) or not path.strip():
+                return False, f"Template {i + 1} 'path' must be a non-empty string"
+
+            # Validate optional fields
+            if "enabled" in template_config:
+                enabled = template_config["enabled"]
+                if not isinstance(enabled, (bool, str)):
+                    return False, f"Template {i + 1} 'enabled' must be a boolean or string"
+
+                # If string, validate it's a valid boolean representation
+                if isinstance(enabled, str) and enabled.lower() not in ["true", "false"]:
+                    return False, f"Template {i + 1} 'enabled' string must be 'true' or 'false'"
+
+            # Validate no extra fields
+            allowed_fields = {"path", "enabled"}
+            extra_fields = set(template_config.keys()) - allowed_fields
+            if extra_fields:
+                return False, f"Template {i + 1} has invalid fields: {', '.join(extra_fields)}"
+
+        return True, "Valid templates configuration"

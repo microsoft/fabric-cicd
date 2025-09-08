@@ -318,7 +318,7 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
     if param_name:
         return _check_parameter_structure(param_dict.get(param_name))
 
-    # Parameters to validate
+    # Parameters to validate (templates have a different structure)
     param_names = ["find_replace", "key_value_replace", "spark_pool"]
 
     # Get only parameters that exist in param_dict

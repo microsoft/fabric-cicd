@@ -1,0 +1,105 @@
+find_replace:
+    # Lakehouse Connection Guid
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+        PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional fields:
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path:
+       - "/Hello World.Notebook/notebook-content.py"
+       - "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
+    # Lakehouse Connection Guid regex
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+        PPE: "$items.Lakehouse.WithoutSchema.id"   
+        PROD: "$items.Lakehouse.WithoutSchema.id" 
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Lakehouse workspace id regex
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+      # Variable: $workspace.id -> target workspace id
+        PPE: "$workspace.id"
+        PROD: "$workspace.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # SQL connection string
+    - find_value: "sqlserverconnectionstringinoriginlakehouse.com"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; sqlendpoint attribute returns the deployed item's sql endpoint)
+        PPE: "$items.Lakehouse.WithoutSchema.sqlendpoint"   
+        PROD: "$items.Lakehouse.WithoutSchema.sqlendpoint" 
+      # Optional fields:
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Eventhouse query URI
+    - find_value: "https://trd-origineventhouse.z4.kusto.fabric.microsoft.com"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; queryserviceuri attribute returns the deployed item's query service URI)
+        PPE: "$items.Eventhouse.SampleEventhouse.queryserviceuri"   
+        PROD: "$items.Eventhouse.SampleEventhouse.queryserviceuri" 
+      # Optional fields:
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    
+key_value_replace:
+    - find_key: $.variables[?(@.name=="SQL_Server")].value
+      replace_value:
+        PPE: "contoso-ppe.database.windows.net"
+        PROD: "contoso-prod.database.windows.net"
+        UAT: "contoso-uat.database.windows.net"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+        UAT: "UAT"
+      # Optional fields:
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value
+      replace_value:
+        PROD: "contoso-production-override.database.windows.net"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="Environment")].value
+      replace_value:
+        PROD: "PROD_ENV"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.schedules[?(@.jobType=="Execute")].enabled
+      replace_value:
+        PPE: false
+        PROD: true
+      file_path: "**/.schedules"
+
+spark_pool:
+    # CapacityPool_Large
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+        PPE: 
+           type: "Capacity"
+           name: "CapacityPool_Large_PPE"
+        PROD: 
+           type: "Capacity"
+           name: "CapacityPool_Large_PROD"
+      # Optional field:
+      item_name: "World"
+    # CapacityPool_Medium
+    - instance_pool_id: "e7b8f1c4-4a6e-4b8b-9b2e-8f1e5d6a9c3d"
+      replace_value:
+        PPE:
+           type: "Workspace"
+           name: "WorkspacePool_Medium"
+        PROD:
+           type: "Workspace"
+           name: "WorkspacePool_Medium"
+      # Optional field:
+      item_name:

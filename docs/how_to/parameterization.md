@@ -52,6 +52,109 @@ spark_pool:
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
 
+## Templates and Fragments
+
+For large workspaces with many Fabric items, the `parameter.yml` file can become very large and difficult to manage. To address this, fabric-cicd supports YAML templates (also called fragments) that allow you to split parameter configurations into smaller, focused files stored in subfolders.
+
+### Template Structure
+
+Templates are stored in subfolders within your repository directory, each with their own `parameter.yml` file. The main `parameter.yml` file can reference these templates using a `templates` section:
+
+```yaml
+templates:
+  - path: 'data-pipelines'
+    enabled: true
+  - path: 'notebooks'
+    enabled: true
+  - path: 'experimental'
+    enabled: false
+
+# Global parameters (applied first)
+find_replace:
+  - find_value: "global-workspace-id"
+    replace_value:
+      PPE: "$workspace.id"
+      PROD: "$workspace.id"
+```
+
+### Template Configuration
+
+Each template configuration supports the following fields:
+
+- **`path`** (required): Relative path to the template folder containing a `parameter.yml` file
+- **`enabled`** (optional): Boolean or string ("true"/"false") to enable/disable the template. Defaults to `true`
+
+### Merge Behavior
+
+When templates are enabled, fabric-cicd:
+
+1. **Loads the main parameter file** and extracts global parameters
+2. **Loads each enabled template** from the specified paths
+3. **Merges parameter sections** by appending template parameters to existing sections
+4. **Applies parameters** with the merged configuration
+
+This means global parameters are applied first, followed by template-specific parameters, allowing for both common baseline configurations and specialized overrides.
+
+### Example Directory Structure
+
+```
+/workspace
+  /parameter.yml                    # Main parameter file with templates
+  /templates
+    /database-configs
+      /parameter.yml               # Database-specific parameters
+    /lakehouse-configs
+      /parameter.yml               # Lakehouse-specific parameters
+    /notebook-configs
+      /parameter.yml               # Notebook-specific parameters
+  /MyNotebook.Notebook
+  /MyPipeline.DataPipeline
+  ...
+```
+
+### Benefits
+
+- **Smaller, focused files**: Each template handles a specific domain (databases, lakehouses, etc.)
+- **Fewer merge conflicts**: Teams can work on different templates independently
+- **Less repetition**: Common patterns can be templatized
+- **Environment-specific control**: Templates can be enabled/disabled per environment
+- **Better maintainability**: Easier to find and update specific parameter types
+
+### Template Example
+
+Main `parameter.yml`:
+```yaml
+templates:
+  - path: 'templates/database-configs'
+    enabled: true
+  - path: 'templates/lakehouse-configs' 
+    enabled: true
+
+find_replace:
+  - find_value: "global-value"
+    replace_value:
+      PPE: "global-ppe"
+      PROD: "global-prod"
+```
+
+Template file `templates/database-configs/parameter.yml`:
+```yaml
+find_replace:
+  - find_value: "database-connection-string"
+    replace_value:
+      PPE: "ppe-database.com"
+      PROD: "prod-database.com"
+    item_type: "SQLDatabase"
+
+key_value_replace:
+  - find_key: $.variables[?(@.name=="DatabaseServer")].value
+    replace_value:
+      PPE: "ppe-server"
+      PROD: "prod-server"
+```
+
+The result will be a merged parameter configuration with both global and template-specific parameters.
+
 ## Parameter Inputs
 
 ### `find_replace`

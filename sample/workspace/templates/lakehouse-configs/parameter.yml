@@ -1,0 +1,21 @@
+# Lakehouse-specific parameter template
+find_replace:
+    # Lakehouse Connection GUIDs
+    - find_value: "template-lakehouse-guid-001"
+      replace_value:
+        PPE: "$items.Lakehouse.WithSchema.id"
+        PROD: "$items.Lakehouse.WithSchema.id"
+      item_type: "Notebook"
+      
+    - find_value: "template-lakehouse-guid-002"
+      replace_value:
+        PPE: "$items.Lakehouse.WithoutSchema.id"
+        PROD: "$items.Lakehouse.WithoutSchema.id"
+      item_type: "Notebook"
+
+    # Lakehouse SQL endpoints
+    - find_value: "template-lakehouse-endpoint"
+      replace_value:
+        PPE: "$items.Lakehouse.WithSchema.sqlendpoint"
+        PROD: "$items.Lakehouse.WithSchema.sqlendpoint"
+      item_type: "Notebook"

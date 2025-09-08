@@ -1,0 +1,17 @@
+# Database-specific parameter template
+find_replace:
+    # SQL Database Connection String
+    - find_value: "dev-database-server.database.windows.net"
+      replace_value:
+          PPE: "ppe-database-server.database.windows.net"
+          PROD: "prod-database-server.database.windows.net"
+      item_type: "SQLDatabase"
+
+key_value_replace:
+    # Database connection parameters
+    - find_key: $.variables[?(@.name=="DatabaseServer")].value
+      replace_value:
+        PPE: "ppe-database-server.database.windows.net"
+        PROD: "prod-database-server.database.windows.net"
+      item_type: "VariableLibrary"
+      item_name: "Vars"
