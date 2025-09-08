@@ -572,23 +572,43 @@ class FabricWorkspace:
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
 
-        # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
-        if not kwargs.get("skip_publish_logging", False):
-            logger.info(f"{constants.INDENT}Published")
-
-        # Add structured log entry
-        end_time = datetime.now()
-        self.publish_log_entries.append(
-            PublishLogEntry(
-                name=item_name,
-                item_type=item_type,
-                success=success,
-                error=error_message,
-                start_time=start_time,
-                end_time=end_time,
-                guid=item_guid
+        start_time = datetime.now()
+        success = False
+        error_message = None
+        end_time = None
+        item_guid = None
+        try:
+            # --- original method body goes here ---
+            # (move all code from after the signature up to line 575 here)
+            # For example:
+            # ... existing logic ...
+            # At the point where publish is successful:
+            success = True
+            error_message = None
+            # If item_guid is set somewhere, ensure it's set here
+            # (You may need to move the assignment of item_guid here)
+        except Exception as e:
+            error_message = str(e)
+            logger.warning(f"Failed to publish {item_type} '{item_name}'. Raw exception: {e}")
+        finally:
+            end_time = datetime.now()
+            # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
+            if not kwargs.get("skip_publish_logging", False):
+                if success:
+                    logger.info(f"{constants.INDENT}Published")
+                else:
+                    logger.info(f"{constants.INDENT}Publish failed")
+            self.publish_log_entries.append(
+                PublishLogEntry(
+                    name=item_name,
+                    item_type=item_type,
+                    success=success,
+                    error=error_message,
+                    start_time=start_time,
+                    end_time=end_time,
+                    guid=item_guid
+                )
             )
-        )
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
