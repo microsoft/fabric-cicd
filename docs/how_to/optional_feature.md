@@ -9,18 +9,23 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | Flag Name                                 | Description                                                        | Experimental |
 | ----------------------------------------- | ------------------------------------------------------------------ | ------------ |
 | `enable_lakehouse_unpublish`              | Set to enable the deletion of Lakehouses                           |              |
+| `enable_warehouse_unpublish`              | Set to enable the deletion of Warehouses                           |              |
+| `enable_sqldatabase_unpublish`            | Set to enable the deletion of SQL Databases                        |              |
+| `enable_eventhouse_unpublish`             | Set to enable the deletion of Eventhouses                          |              |
 | `disable_print_identity`                  | Set to disable printing the executing identity name                |              |
 | `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the lakehouse               |              |
 | `enable_environment_variable_replacement` | Set to enable the use of pipeline variables                        |              |
 | `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                     |              |
 | `enable_experimental_features`            | Set to enable experimental features, such as selective deployments |              |
 | `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items           | ☑️           |
+| `enable_config_deploy`                    | Set to enable config file-based deployment                         | ☑️           |
 
 <span class="md-h3-nonanchor">Example</span>
 
 ```python
 from fabric_cicd import append_feature_flag
 append_feature_flag("enable_lakehouse_unpublish")
+append_feature_flag("enable_warehouse_unpublish")
 append_feature_flag("disable_print_identity")
 append_feature_flag("enable_environment_variable_replacement")
 ```

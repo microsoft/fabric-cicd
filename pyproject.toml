@@ -7,6 +7,13 @@ requires-python = ">=3.9,<3.13"
 license = { file = "LICENSE" }
 dynamic = ["version"]
 urls.Repository = "https://github.com/microsoft/fabric-cicd.git"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 
 dependencies = [
     "azure-identity>=1.19.0",

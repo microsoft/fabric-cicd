@@ -176,3 +176,259 @@ def test_mixed_valid_and_invalid_item_types_in_scope(mock_endpoint):
                 repository_directory=str(temp_path),
                 item_type_in_scope=["Notebook", "BadType", "Environment"],
             )
+
+
+def test_unpublish_feature_flag_warnings(mock_endpoint, caplog):
+    """Test that warnings are logged when unpublish feature flags are missing."""
+    import json
+    import logging
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create test items for each type that requires feature flags
+        test_items = [
+            ("TestLakehouse.Lakehouse", "Lakehouse", "test-lakehouse-id"),
+            ("TestWarehouse.Warehouse", "Warehouse", "test-warehouse-id"),
+            ("TestSQLDB.SQLDatabase", "SQLDatabase", "test-sqldb-id"),
+            ("TestEventhouse.Eventhouse", "Eventhouse", "test-eventhouse-id"),
+        ]
+
+        for item_dir_name, item_type, logical_id in test_items:
+            item_dir = temp_path / item_dir_name
+            item_dir.mkdir(parents=True, exist_ok=True)
+
+            platform_file = item_dir / ".platform"
+            metadata = {
+                "metadata": {
+                    "type": item_type,
+                    "displayName": item_dir_name.split(".")[0],
+                    "description": f"Test {item_type}",
+                },
+                "config": {"logicalId": logical_id},
+            }
+
+            with platform_file.open("w", encoding="utf-8") as f:
+                json.dump(metadata, f)
+
+            with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+                f.write("Dummy file content")
+
+        # Mock deployed items to simulate items exist in workspace
+        deployed_items = {
+            item_type: {item_dir_name.split(".")[0]: MagicMock()} for item_dir_name, item_type, _ in test_items
+        }
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace,
+                "_refresh_deployed_items",
+                new=lambda self: setattr(self, "deployed_items", deployed_items),
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+            patch.object(
+                FabricWorkspace,
+                "_unpublish_folders",
+                new=lambda _: None,  # Mock to avoid unrelated folder unpublish bug
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "Eventhouse"],
+            )
+
+            # Call unpublish_all_orphan_items without any feature flags enabled
+            publish.unpublish_all_orphan_items(workspace)
+
+            # Check that warnings were logged for each item type
+            expected_warnings = [
+                "Skipping unpublish for Lakehouse items because the 'enable_lakehouse_unpublish' feature flag is not enabled.",
+                "Skipping unpublish for Warehouse items because the 'enable_warehouse_unpublish' feature flag is not enabled.",
+                "Skipping unpublish for SQLDatabase items because the 'enable_sqldatabase_unpublish' feature flag is not enabled.",
+                "Skipping unpublish for Eventhouse items because the 'enable_eventhouse_unpublish' feature flag is not enabled.",
+            ]
+
+            for expected_warning in expected_warnings:
+                assert expected_warning in caplog.text
+
+
+def test_unpublish_with_feature_flags_enabled(mock_endpoint, caplog):
+    """Test that no warnings are logged when unpublish feature flags are enabled."""
+    import json
+    import logging
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+
+    import fabric_cicd.constants as constants
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a test lakehouse
+        lakehouse_dir = temp_path / "TestLakehouse.Lakehouse"
+        lakehouse_dir.mkdir(parents=True, exist_ok=True)
+
+        platform_file = lakehouse_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "Lakehouse",
+                "displayName": "TestLakehouse",
+                "description": "Test Lakehouse",
+            },
+            "config": {"logicalId": "test-lakehouse-id"},
+        }
+
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        with (lakehouse_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Mock deployed items
+        deployed_items = {"Lakehouse": {"TestLakehouse": MagicMock()}}
+
+        # Enable the lakehouse unpublish feature flag
+        original_flags = constants.FEATURE_FLAG.copy()
+        constants.FEATURE_FLAG.add("enable_lakehouse_unpublish")
+
+        try:
+            with (
+                patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+                patch.object(
+                    FabricWorkspace,
+                    "_refresh_deployed_items",
+                    new=lambda self: setattr(self, "deployed_items", deployed_items),
+                ),
+                patch.object(
+                    FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+                ),
+                patch.object(
+                    FabricWorkspace,
+                    "_unpublish_folders",
+                    new=lambda _: None,  # Mock to avoid unrelated folder unpublish bug
+                ),
+                patch.object(
+                    FabricWorkspace,
+                    "_unpublish_item",
+                    new=lambda _, __, ___: None,  # Mock unpublish to avoid actual API calls
+                ),
+                caplog.at_level(logging.WARNING),
+            ):
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Lakehouse"],
+                )
+
+                # Call unpublish_all_orphan_items with feature flag enabled
+                publish.unpublish_all_orphan_items(workspace)
+
+                # Check that no feature flag warnings were logged
+                assert "enable_lakehouse_unpublish" not in caplog.text
+                assert "Skipping unpublish for Lakehouse" not in caplog.text
+
+        finally:
+            # Restore original feature flags
+            constants.FEATURE_FLAG.clear()
+            constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_mirrored_database_published_before_lakehouse(mock_endpoint):
+    """Test that MirroredDatabase items are published before Lakehouse items to enable shortcuts."""
+    import json
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    # Track the order of function calls
+    call_order = []
+
+    def mock_publish_lakehouses(_workspace):
+        call_order.append("Lakehouse")
+
+    def mock_publish_mirroreddatabase(_workspace):
+        call_order.append("MirroredDatabase")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a Lakehouse item
+        lakehouse_dir = temp_path / "TestLakehouse.Lakehouse"
+        lakehouse_dir.mkdir(parents=True, exist_ok=True)
+
+        lakehouse_platform_file = lakehouse_dir / ".platform"
+        lakehouse_metadata = {
+            "metadata": {
+                "type": "Lakehouse",
+                "displayName": "Test Lakehouse",
+                "description": "Test lakehouse",
+            },
+            "config": {"logicalId": "test-lakehouse-id"},
+        }
+
+        with lakehouse_platform_file.open("w", encoding="utf-8") as f:
+            json.dump(lakehouse_metadata, f)
+
+        with (lakehouse_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create a MirroredDatabase item
+        mirrored_db_dir = temp_path / "TestMirroredDB.MirroredDatabase"
+        mirrored_db_dir.mkdir(parents=True, exist_ok=True)
+
+        mirrored_db_platform_file = mirrored_db_dir / ".platform"
+        mirrored_db_metadata = {
+            "metadata": {
+                "type": "MirroredDatabase",
+                "displayName": "Test Mirrored Database",
+                "description": "Test mirrored database",
+            },
+            "config": {"logicalId": "test-mirrored-db-id"},
+        }
+
+        with mirrored_db_platform_file.open("w", encoding="utf-8") as f:
+            json.dump(mirrored_db_metadata, f)
+
+        with (mirrored_db_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+            patch("fabric_cicd._items.publish_lakehouses", side_effect=mock_publish_lakehouses),
+            patch("fabric_cicd._items.publish_mirroreddatabase", side_effect=mock_publish_mirroreddatabase),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["Lakehouse", "MirroredDatabase"],
+            )
+
+            # Call publish_all_items
+            publish.publish_all_items(workspace)
+
+            # Verify that both item types were processed
+            assert len(call_order) == 2
+            assert "MirroredDatabase" in call_order
+            assert "Lakehouse" in call_order
+
+            # Verify that MirroredDatabase was published before Lakehouse
+            mirrored_db_index = call_order.index("MirroredDatabase")
+            lakehouse_index = call_order.index("Lakehouse")
+            assert mirrored_db_index < lakehouse_index, (
+                f"MirroredDatabase should be published before Lakehouse, but got order: {call_order}"
+            )

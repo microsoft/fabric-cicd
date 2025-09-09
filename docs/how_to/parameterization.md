@@ -24,6 +24,32 @@ C:/dev/workspace
     /parameter.yml
 ```
 
+Example of parameter.yml file content:
+
+```yaml
+find_replace:
+    - find_value: "your-dev-lakehouse-id"
+      replace_value:
+          PPE: "ppe-lakehouse-id"
+          PROD: "prod-lakehouse-id"
+
+key_value_replace:
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+          PPE: "PPE"
+          PROD: "PROD"
+
+spark_pool:
+    - instance_pool_id: "your-dev-pool-instance-id"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "PPE-Pool-name"
+          PROD:
+              type: "Capacity"
+              name: "PROD-Pool-name"
+```
+
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
 
 ## Parameter Inputs
@@ -54,7 +80,7 @@ find_replace:
 
 Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
-Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, etc. e.g., find and replace a connection GUID referenced in a data pipeline.
+Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, Schedules files, etc. The function automatically detects and processes any file containing valid JSON content, regardless of file extension (e.g., `.schedules`, `.platform` files).
 
 ```yaml
 key_value_replace:
@@ -335,6 +361,13 @@ key_value_replace:
           PROD: "6c517159-d27a-41d5-b71e-ca1ecff6542b" # PROD SQL Server Connection
       item_type: "DataPipeline" # filter on data pipeline files
 
+    # Schedule enabled state to be replaced
+    - find_key: $.schedules[?(@.jobType=="Execute")].enabled
+      replace_value:
+          PPE: false # disable execution in PPE environment
+          PROD: true # enable execution in PROD environment
+      file_path: "**/.schedules" # filter on all .schedules files
+
 spark_pool:
     - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b" # spark_pool_instance_id to be replaced
       replace_value:
@@ -586,6 +619,48 @@ key_value_replace:
     }
 }
 ```
+
+### Schedules
+
+#### `key_value_replace` Parameterization Case
+
+**Case:** Items with schedules need to have their execution settings parameterized across environments. The `enabled` field in `.schedules` files typically needs different values for different environments (e.g., disabled in test environments, enabled in production).
+
+**Solution:** In the `.schedules` file, the `enabled` field for Execute jobs must be replaced with environment-specific boolean values. This replacement is managed by the `key_value_replace` input in the `parameter.yml` file where fabric-cicd finds the JSONPath expression within the specified repository files and replaces it with the appropriate value for the deployed environment.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+key_value_replace:
+    - find_key: $.schedules[?(@.jobType=="Execute")].enabled
+      replace_value:
+          PPE: false
+          PROD: true
+      file_path: "**/.schedules"
+```
+
+<span class="md-h4-nonanchor">.schedules file</span>
+
+```json
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/schedules/1.0.0/schema.json",
+    "schedules": [
+        {
+            "enabled": true,
+            "jobType": "Execute",
+            "configuration": {
+                "type": "Cron",
+                "startDateTime": "2025-07-01T12:00:00",
+                "endDateTime": "2029-07-01T12:00:00",
+                "localTimeZoneId": "Pacific Standard Time",
+                "interval": 15
+            }
+        }
+    ]
+}
+```
+
+**Note:** The `.schedules` file contains JSON content but does not have a `.json` file extension. The fabric-cicd library automatically detects and processes files with valid JSON content regardless of their file extension, making this parameterization work seamlessly.
 
 ### Environments
 

@@ -858,3 +858,161 @@ def test_fabric_workspace_with_none_item_types_defaults_to_all(
     # Verify that the notebook item was loaded correctly
     assert "Notebook" in workspace.repository_items
     assert "Test Notebook" in workspace.repository_items["Notebook"]
+
+def test_parameter_file_path_types(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test different path types for parameter_file_path in FabricWorkspace."""
+
+    # Absolute path - accepted
+    param_file = temp_workspace_dir / "parameters.yml"
+    param_file.write_text("""
+find_replace:
+  - find_value: "test-value"
+    replace_value:
+      DEV: "dev-replacement"
+""")
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=str(param_file),
+    )
+
+    assert workspace.parameter_file_path == str(param_file)
+
+    # Relative path - now resolved against repository directory but file doesn't exist
+    # This should not raise an exception now, it's handled gracefully
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path="relative/path/parameters.yml",
+    )
+
+    # The workspace should be created successfully but with empty parameters
+    assert workspace is not None
+    assert hasattr(workspace, "environment_parameter")
+    assert not workspace.environment_parameter
+
+
+def test_parameter_file_path_none(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test None cases for parameter_file_path in FabricWorkspace."""
+    # Create a workspace with parameter_file_path set to None
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id, repository_directory=str(temp_workspace_dir), parameter_file_path=None
+    )
+    assert workspace.parameter_file_path is None
+
+    # Create a workspace without parameter_file_path provided
+    workspace = patched_fabric_workspace(workspace_id=valid_workspace_id, repository_directory=str(temp_workspace_dir))
+    assert workspace.parameter_file_path is None
+
+
+def test_parameter_file_path_with_environment(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that FabricWorkspace works with both parameter_file_path and environment."""
+    param_file = temp_workspace_dir / "dev_parameters.yml"
+    param_file.write_text("""
+find_replace:
+  - find_value: "test-value"
+    replace_value:
+      DEV: "dev-replacement"
+""")
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=str(param_file),
+        environment="DEV",
+    )
+
+    assert workspace.parameter_file_path == str(param_file)
+    assert workspace.environment == "DEV"
+
+
+def test_parameter_file_path_backward_compatibility(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that existing code without parameter_file_path continues to work."""
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook"],
+        environment="PROD",
+    )
+
+    # Should work as before without parameter_file_path
+    assert workspace.parameter_file_path is None
+    assert workspace.environment == "PROD"
+    assert workspace.item_type_in_scope == ["Notebook"]
+
+
+def test_parameter_file_path_integration_with_parameter_class(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """Test that parameter_file_path integrates correctly with Parameter class."""
+    param_file = temp_workspace_dir / "test_parameters.yml"
+    param_content = """
+find_replace:
+  - find_value: "test-value"
+    replace_value:
+      DEV: "dev-replacement"
+      PROD: "prod-replacement"
+"""
+    param_file.write_text(param_content)
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=str(param_file),
+        environment="DEV",
+    )
+
+    # The workspace should use the parameter file path
+    assert workspace.parameter_file_path == str(param_file)
+
+    # The parameter data should be loaded correctly
+    # (Note: This is testing the integration, actual Parameter behavior tested separately)
+    assert hasattr(workspace, "environment_parameter")
+    assert "find_replace" in workspace.environment_parameter
+
+
+def test_parameter_file_path_invalid_type_rejected(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that FabricWorkspace handles invalid types for parameter_file_path."""
+    # This should not raise an exception now since Parameter handles the error internally
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=123,  # Invalid type
+    )
+
+    # The workspace should be created, but parameter loading should fail silently
+    assert workspace is not None
+    assert hasattr(workspace, "environment_parameter")
+    # Environment parameter should be empty since the parameter file path was invalid
+    assert not workspace.environment_parameter
+
+def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id):
+    """Test that passing base_api_url as kwarg raises an error."""
+    from fabric_cicd._common._exceptions import InputError
+
+    # Create a simple platform file
+    notebook_dir = temp_workspace_dir / "Test Notebook"
+    notebook_dir.mkdir()
+    platform_file = notebook_dir / ".platform"
+    platform_content = {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+        "metadata": {"type": "Notebook", "displayName": "Test Notebook"},
+        "config": {"version": "2.0", "logicalId": "12345678-1234-5678-abcd-1234567890ab"}
+    }
+
+    with platform_file.open("w", encoding="utf-8") as f:
+        json.dump(platform_content, f)
+
+    # Test that base_api_url kwarg raises InputError
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint"):
+        with pytest.raises(InputError) as exc_info:
+            FabricWorkspace(
+                workspace_id=valid_workspace_id,
+                repository_directory=str(temp_workspace_dir),
+                base_api_url="https://custom.api.url"
+            )
+    
+        # Verify the error message contains the expected text
+        assert "base_api_url is no longer supported" in str(exc_info.value)
+        assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)

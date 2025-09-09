@@ -57,6 +57,10 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
                 msg = "Semantic model not found in the repository. Cannot deploy a report with a relative path without deploying the model."
                 raise ItemDependencyError(msg, logger)
 
+            definition_body["$schema"] = (
+                "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/1.0.0/schema.json"
+            )
+
             definition_body["datasetReference"] = {
                 "byConnection": {
                     "connectionString": None,

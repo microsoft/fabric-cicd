@@ -437,6 +437,81 @@ def test_validate_find_replace_replace_value(parameter_object, replace_value, re
 
 
 @pytest.mark.parametrize(
+    ("replace_value", "result", "msg"),
+    [
+        # Valid cases - all values are same type
+        (
+            {"PPE": "string_value", "PROD": "another_string"},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": True, "PROD": False},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": 123, "PROD": 456},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": 1.5, "PROD": 2.7},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": ["item1", "item2"], "PROD": ["item3", "item4"]},
+            True,
+            "valid replace value",
+        ),
+        (
+            {"PPE": {"key": "value1"}, "PROD": {"key": "value2"}},
+            True,
+            "valid replace value",
+        ),
+        # Invalid cases - missing values
+        (
+            {"PPE": "value", "PROD": None},
+            False,
+            "missing replace value",
+        ),
+        # Invalid cases - mixed types
+        (
+            {"PPE": "string_value", "PROD": 123},
+            False,
+            "mixed types",
+        ),
+        (
+            {"PPE": True, "PROD": "false"},
+            False,
+            "mixed types",
+        ),
+        (
+            {"PPE": 123, "PROD": 45.6},
+            False,
+            "mixed types",
+        ),
+    ],
+)
+def test_validate_key_value_replace_replace_value(parameter_object, replace_value, result, msg):
+    """Test the _validate_key_value_replace_replace_value method."""
+    is_valid, actual_msg = parameter_object._validate_key_value_replace_replace_value(replace_value)
+
+    if msg == "valid replace value":
+        expected_msg = constants.PARAMETER_MSGS[msg].format("key_value_replace")
+        assert (is_valid, actual_msg) == (result, expected_msg)
+    elif msg == "missing replace value":
+        # For missing replace value, check that the message contains the expected format
+        assert is_valid == result
+        assert "key_value_replace is missing a replace value for" in actual_msg
+    elif msg == "mixed types":
+        # For mixed types, check that the message contains the expected content
+        assert is_valid == result
+        assert "Inconsistent data types in key_value_replace replace_value" in actual_msg
+
+
+@pytest.mark.parametrize(
     ("replace_value", "result", "msg", "desc"),
     [
         (
@@ -1060,3 +1135,271 @@ spark_pool:
     finally:
         # Clean up temporary file
         Path(temp_file_path).unlink()
+
+
+def test_parameter_file_path_absolute():
+    """Test that Parameter class accepts absolute parameter_file_path."""
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          TEST: "test-replacement"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param_obj = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=temp_file_path,
+        )
+
+        # Should work without errors
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_parameter_file_path_relative():
+    """Test that Parameter class handles relative parameter_file_path by resolving it against repository_directory."""
+    import tempfile
+    from pathlib import Path
+
+    # Create a temporary directory to act as the repository
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo_dir = Path(temp_dir)
+
+        # Create a nested directory and parameter file
+        relative_dir = "relative/path"
+        (repo_dir / relative_dir).mkdir(parents=True)
+
+        param_file = "parameters.yml"
+        param_file_path = Path(repo_dir, relative_dir, param_file)
+        param_file_path.write_text("key: value")  # Simple valid YAML
+
+        # Test with relative path that exists
+        relative_path = f"{relative_dir}/{param_file}"
+
+        # Create a Parameter instance with a relative path
+        param = Parameter(
+            repository_directory=repo_dir,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=relative_path,
+        )
+
+        # Verify the path was resolved relative to repository_directory
+        expected_path = param_file_path.resolve()
+        assert param.parameter_file_path == expected_path
+
+        # Test with relative path that doesn't exist
+        non_existent_path = "relative/path/non_existent.yml"
+
+        # This should not raise an error but should log an error message
+        param2 = Parameter(
+            repository_directory=repo_dir,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=non_existent_path,
+        )
+
+        # Verify the path was resolved but parameter loading failed
+        assert param2.parameter_file_path is not None
+        assert not param2.environment_parameter
+
+        # Test with path that exists but is a directory, not a file
+        param3 = Parameter(
+            repository_directory=repo_dir,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=relative_dir,
+        )
+
+        # Verify the path was resolved but parameter loading failed
+        assert param3.parameter_file_path is not None
+        assert not param3.environment_parameter
+
+
+def test_parameter_file_path_none():
+    """Test that Parameter class accepts None for parameter_file_path (uses parameter_file_name)."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        param_file = temp_dir_path / "parameters.yml"
+        param_file.write_text("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          TEST: "test-replacement"
+""")
+
+        param_obj = Parameter(
+            repository_directory=temp_dir_path,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",
+            parameter_file_path=None,
+        )
+
+        # Should work with parameter_file_name fallback
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+        # Verify the parameter_file_path was set correctly from parameter_file_name
+        assert param_obj.parameter_file_path == (temp_dir_path / "parameters.yml").resolve()
+
+
+def test_parameter_file_path_and_name_inputs():
+    """Test that parameter_file_path takes precedence over parameter_file_name."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+
+        # Create file referenced by parameter_file_name
+        fallback_file = temp_dir_path / "parameters.yml"
+        fallback_file.write_text("""
+find_replace:
+    - find_value: "fallback-value"
+      replace_value:
+          TEST: "fallback-replacement"
+""")
+
+        # Create file referenced by parameter_file_path
+        primary_file = temp_dir_path / "primary_parameters.yml"
+        primary_file.write_text("""
+find_replace:
+    - find_value: "primary-value"
+      replace_value:
+          TEST: "primary-replacement"
+""")
+
+        param_obj = Parameter(
+            repository_directory=temp_dir_path,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",  # This should be ignored
+            parameter_file_path=str(primary_file),  # This should be used
+        )
+
+        # Should use primary_file content
+        assert param_obj.environment == "TEST"
+        # Check that the primary file was used by examining parameter content
+        assert "find_replace" in param_obj.environment_parameter
+        assert len(param_obj.environment_parameter["find_replace"]) == 1
+        assert param_obj.environment_parameter["find_replace"][0]["find_value"] == "primary-value"
+
+
+def test_no_provided_parameter_file_path():
+    """Test that default behavior without parameter_file_path remains unchanged."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        param_file = temp_dir_path / "parameters.yml"
+        param_file.write_text("""
+find_replace:
+    - find_value: "test-value"
+      replace_value:
+          TEST: "test-replacement"
+""")
+
+        # Original behavior - no parameter_file_path specified
+        param_obj = Parameter(
+            repository_directory=temp_dir_path,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",
+        )
+
+        # Should work exactly as before
+        assert param_obj.environment == "TEST"
+        assert param_obj.item_type_in_scope == ["Notebook"]
+        assert "find_replace" in param_obj.environment_parameter
+        assert len(param_obj.environment_parameter["find_replace"]) == 1
+
+
+def test_parameter_file_path_nonexistent():
+    """Test behavior when parameter_file_path points to nonexistent file."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        nonexistent_path = str(Path(temp_dir) / "nonexistent" / "parameters.yml")
+
+        # Should log an error but not raise an exception
+        param = Parameter(
+            repository_directory=Path.cwd(),
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=nonexistent_path,
+        )
+
+        # Parameter file path should be set but the environment_parameter should be empty
+        assert param.parameter_file_path is not None
+        assert not param.environment_parameter
+
+
+def test_validate_parameter_file_exists_none():
+    """Test that _validate_parameter_file_exists returns False when parameter_file_path is None."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a Parameter instance with parameter_file_path set to None in _set_parameter_file_path
+        param = Parameter(
+            repository_directory=Path(temp_dir),
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="does_not_exist.yml",  # This file doesn't exist
+        )
+
+        # Force parameter_file_path to None
+        param.parameter_file_path = None
+
+        # Method should return False without raising errors
+        assert param._validate_parameter_file_exists() is False
+
+
+def test_parameter_file_path_invalid_type():
+    """Test that Parameter class handles invalid types for parameter_file_path."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Parameter class should handle the invalid type internally without raising an exception
+        param = Parameter(
+            repository_directory=Path(temp_dir),
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_path=123,  # Invalid type
+        )
+
+        # The error handling in _set_parameter_file_path sets is_param_path to False
+        # and falls back to the default parameter file path
+        assert param.parameter_file_path is not None
+        assert param.parameter_file_path == (Path(temp_dir) / "parameter.yml").resolve()
+
+
+def test_set_parameter_file_path_error_handling():
+    """Test error handling in _set_parameter_file_path method."""
+    import tempfile
+
+    # Create a mock that raises an exception when called with any arguments
+    path_mock = mock.Mock(side_effect=Exception("Simulated error"))
+
+    with tempfile.TemporaryDirectory() as temp_dir, mock.patch("fabric_cicd._parameter._parameter.Path", path_mock):
+        # Create parameter with both parameters to test the error handling
+        param = Parameter(
+            repository_directory=temp_dir,  # Using string path to avoid early Path conversion
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name="parameters.yml",
+            parameter_file_path="custom_path.yml",
+        )
+
+        # The method should have caught the exception and set parameter_file_path to None
+        assert param.parameter_file_path is None

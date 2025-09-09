@@ -6,6 +6,38 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.27
+
+<span class="md-h2-subheader">Release Date: 2025-09-05</span>
+
+-   🔧 Fix traliing comma in report schema ([#534](https://github.com/microsoft/fabric-cicd/issues/534))
+
+## Version 0.1.26
+
+<span class="md-h2-subheader">Release Date: 2025-09-05</span>
+
+-   💥 Deprecate Base API URL kwarg in Fabric Workspace ([#529](https://github.com/microsoft/fabric-cicd/issues/529))
+-   ✨ Support Schedules parameterization ([#508](https://github.com/microsoft/fabric-cicd/issues/508))
+-   ✨ Support YAML configuration file-based deployment ([#470](https://github.com/microsoft/fabric-cicd/issues/470))
+-   📝 Add dynamically generated Python version requirements to documentation ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
+-   ⚡ Enhance pytest output to limit console verbosity ([#514](https://github.com/microsoft/fabric-cicd/issues/514))
+-   🔧 Fix Report item schema handling ([#518](https://github.com/microsoft/fabric-cicd/issues/518))
+-   🔧 Fix deployment order to publish Mirrored Database before Lakehouse ([#482](https://github.com/microsoft/fabric-cicd/issues/482))
+
+## Version 0.1.25
+
+<span class="md-h2-subheader">Release Date: 2025-08-19</span>
+
+-   💥 Modify the default for item_types_in_scope and add thorough validation ([#464](https://github.com/microsoft/fabric-cicd/issues/464))
+-   ✨ Add new experimental feature flag to enable selective deployment ([#384](https://github.com/microsoft/fabric-cicd/issues/384))
+-   ✨ Support "ALL" environment concept in parameterization ([#320](https://github.com/microsoft/fabric-cicd/issues/320))
+-   📝 Enhance Overview section in Parameterization docs ([#495](https://github.com/microsoft/fabric-cicd/issues/495))
+-   ⚡ Eliminate ACCEPTED_ITEM_TYPES_NON_UPN constant and unify with ACCEPTED_ITEM_TYPES ([#477](https://github.com/microsoft/fabric-cicd/issues/477))
+-   ⚡ Add comprehensive GitHub Copilot instructions for effective codebase development ([#468](https://github.com/microsoft/fabric-cicd/issues/468))
+-   🔧 Add feature flags and warnings for Warehouse, SQL Database, and Eventhouse unpublish operations ([#483](https://github.com/microsoft/fabric-cicd/issues/483))
+-   🔧 Fix code formatting inconsistencies in fabric_workspace unit test ([#474](https://github.com/microsoft/fabric-cicd/issues/474))
+-   🔧 Fix KeyError when deploying Reports with Semantic Model dependencies in Report-only scope case ([#278](https://github.com/microsoft/fabric-cicd/issues/278))
+
 ## Version 0.1.24
 
 <span class="md-h2-subheader">Release Date: 2025-08-04</span>
