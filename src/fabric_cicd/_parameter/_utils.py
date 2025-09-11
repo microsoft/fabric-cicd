@@ -358,7 +358,7 @@ def process_input_path(
     # Set the logging function based on validation_flag
     log_func = logger.error if validation_flag else logger.debug
 
-    # Return empty list for None or empty input
+    # Return None for None or empty input
     if not input_path:
         return None
 
