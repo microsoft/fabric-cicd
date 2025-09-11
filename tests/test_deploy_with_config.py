@@ -179,7 +179,9 @@ class TestWorkspaceSettingsExtraction:
         config_file.write_text(yaml.dump(config_data))
 
         # Environment validation should happen during config loading, not extraction
-        with pytest.raises(ConfigValidationError, match="Environment 'prod' not found in 'core.workspace_id' mappings"):
+        with pytest.raises(
+            ConfigValidationError, match=r"Environment 'prod' not found in 'core.workspace_id' mappings"
+        ):
             load_config_file(str(config_file), "prod")
 
     def test_extract_missing_workspace_config(self, tmp_path):

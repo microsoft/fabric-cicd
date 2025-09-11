@@ -364,9 +364,9 @@ def test_handle_response_item_display_name_already_in_use(setup_mocks):
 
 def test_handle_response_environment_libraries_not_found(setup_mocks):
     """Test _handle_response exits loop when environment libraries are not found (404)."""
-    dl, mock_requests = setup_mocks
+    _, _mock_requests = setup_mocks
     response = Mock(status_code=404, headers={"x-ms-public-api-error-code": "EnvironmentLibrariesNotFound"})
-    exit_loop, method, url, body, long_running = _handle_response(
+    exit_loop, _method, _url, _body, long_running = _handle_response(
         response=response,
         method="GET",
         url="http://example.com",
