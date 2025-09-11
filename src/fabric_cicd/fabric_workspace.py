@@ -127,6 +127,7 @@ class FabricWorkspace:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.publish_folder_path_exclude_regex = None
         self.items_to_include = None
         self.repository_folders = {}
         self.repository_items = {}
@@ -481,6 +482,16 @@ class FabricWorkspace:
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
                 return
 
+        # Skip publishing if the item's folder path is excluded by the regex
+        if self.publish_folder_path_exclude_regex:
+            regex_pattern = check_regex(self.publish_folder_path_exclude_regex)
+            relative_path = item.path.relative_to(Path(self.repository_directory))
+            relative_path_str = relative_path.as_posix()
+            if regex_pattern.search(relative_path_str):
+                item.skip_publish = True
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
+                return
+
         # Skip publishing if the item is not in the include list
         if self.items_to_include:
             current_item = f"{item_name}.{item_type}"
@@ -758,16 +769,16 @@ class FabricWorkspace:
                 # Get the folder path
                 folder_path = folder_id_to_path_mapping[folder_id]
 
-            # Move up the folder hierarchy and add all ancestor folders
-            current_folder_path = folder_path
-            while current_folder_path != "/":
-                # Get the parent folder path
-                current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
+                # Move up the folder hierarchy and add all ancestor folders
+                current_folder_path = folder_path
+                while current_folder_path != "/":
+                    # Get the parent folder path
+                    current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
 
-                # Get the folder_id for this path and add to the unorphaned_folder set
-                parent_folder_id = self.deployed_folders.get(current_folder_path)
-                if parent_folder_id:
-                    unorphaned_folders.add(parent_folder_id)
+                    # Get the folder_id for this path and add to the unorphaned_folder set
+                    parent_folder_id = self.deployed_folders.get(current_folder_path)
+                    if parent_folder_id:
+                        unorphaned_folders.add(parent_folder_id)
 
         # Check if deletion can be skipped after update to unorphaned_folder set
         if unorphaned_folders == set(sorted_folder_ids):
