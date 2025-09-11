@@ -345,7 +345,7 @@ def _check_parameter_structure(param_value: any) -> bool:
 
 def process_input_path(
     repository_directory: Path, input_path: Union[str, list[str], None], validation_flag: bool = False
-) -> list[Path]:
+) -> Union[list[Path], None]:
     """
     Processes the input_path value according to its type. Supports both
     regular paths and wildcard paths, including mixed lists.
@@ -360,7 +360,7 @@ def process_input_path(
 
     # Return empty list for None or empty input
     if not input_path:
-        return []
+        return None
 
     # Use a set to avoid duplicate paths
     valid_paths = set()
@@ -603,7 +603,7 @@ def _validate_nested_brackets_braces(pattern: str, log_func: logging.Logger) -> 
 def check_replacement(
     input_type: Union[str, list[str], None],
     input_name: Union[str, list[str], None],
-    input_path: list[Path],
+    input_path: Union[list[Path], None],
     item_type: str,
     item_name: str,
     file_path: Path,
@@ -620,7 +620,7 @@ def check_replacement(
         file_path: The file_path value to compare with.
     """
     # No optional parameters found
-    if not input_type and not input_name and not input_path:
+    if input_type is None and input_name is None and input_path is None:
         logger.debug("No optional filters found. Find and replace applied in this repository file")
         return True
 
@@ -657,7 +657,7 @@ def _find_match(
         compare_value: The value to compare with.
     """
     # If no parameter value, checking for matches is not required
-    if not param_value:
+    if param_value is None:
         return True
 
     # Otherwise, check for matches based on the parameter value type
