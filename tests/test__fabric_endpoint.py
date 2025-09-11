@@ -62,7 +62,7 @@ def generate_mock_jwt(authtype=""):
 
 def test_integration(setup_mocks):
     """Test integration of FabricEndpoint for GET request."""
-    dl, mock_requests = setup_mocks
+    _, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
     )
@@ -75,7 +75,7 @@ def test_integration(setup_mocks):
 
 def test_performance(setup_mocks):
     """Test that _handle_response completes quickly under long-running simulation."""
-    dl, mock_requests = setup_mocks
+    _, _mock_requests = setup_mocks
     response = Mock(status_code=200, headers={}, json=Mock(return_value={"status": "Succeeded"}))
     start_time = time.time()
     _handle_response(
@@ -100,7 +100,7 @@ def test_performance(setup_mocks):
 )
 def test_invoke(setup_mocks, method, url, body, files):
     """Test FabricEndpoint invoke method success + with optional files."""
-    dl, mock_requests = setup_mocks
+    _, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
     )
@@ -134,7 +134,7 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
 def test_invoke_exception(setup_mocks):
     """Test invoking endpoint when the AAD token is expired and refreshed."""
-    dl, mock_requests = setup_mocks
+    _, mock_requests = setup_mocks
     mock_requests.side_effect = Exception("Test exception")
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value.token = generate_mock_jwt()
@@ -190,7 +190,7 @@ def test_refresh_token_no_exp_claim(monkeypatch):
     test_token = "dummy_token_value"
     credential = DummyCredential(test_token)
     monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._decode_jwt", lambda _: {"upn": "user@example.com"})
-    with pytest.raises(TokenError, match="Token does not contain expiration claim."):
+    with pytest.raises(TokenError, match=r"Token does not contain expiration claim."):
         FabricEndpoint(token_credential=credential)
 
 
@@ -233,7 +233,7 @@ def test_handle_response(
     """Test _handle_response behavior for various HTTP responses and long-running operations."""
     response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=response_json))
 
-    exit_loop, _method, url, _body, long_running = _handle_response(
+    exit_loop, _method, _url, _body, long_running = _handle_response(
         response=response,
         method=request_method,
         url="old",
@@ -342,7 +342,7 @@ def test_handle_response_exceptions(
 def test_handle_response_feature_not_available():
     """Test _handle_response for feature not available"""
     response = Mock(status_code=403, reason="FeatureNotAvailable")
-    with pytest.raises(Exception, match="Item type not supported. Description: FeatureNotAvailable"):
+    with pytest.raises(Exception, match=r"Item type not supported. Description: FeatureNotAvailable"):
         _handle_response(
             response=response,
             method="GET",
@@ -355,7 +355,7 @@ def test_handle_response_feature_not_available():
 
 def test_handle_response_item_display_name_already_in_use(setup_mocks):
     """Test _handle_response logs a retry message when item display name is already in use."""
-    dl, mock_requests = setup_mocks
+    dl, _mock_requests = setup_mocks
     response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameNotAvailableYet"})
     _handle_response(response, "GET", "http://example.com", "{}", False, 1)
     expected = f"{constants.INDENT}Item name is reserved. Checking again in 60 seconds (Attempt 1)..."
