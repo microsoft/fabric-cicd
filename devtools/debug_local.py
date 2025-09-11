@@ -26,29 +26,16 @@ from fabric_cicd import (
 # Uncomment to add feature flag
 append_feature_flag("enable_shortcut_publish")
 
+
 # The defined environment values should match the names found in the parameter.yml file
-workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
+workspace_id = "24a801cd-fad0-431a-a450-a5d5667fd697"
 environment = "PPE"
 
 # In this example, our workspace content sits within the root/sample/workspace directory
 repository_directory = str(root_directory / "sample" / "workspace")
 
 # Explicitly define which of the item types we want to deploy
-item_type_in_scope = [
-    "Lakehouse",
-    "VariableLibrary",
-    "Dataflow",
-    "DataPipeline",
-    "Notebook",
-    "Environment",
-    "SemanticModel",
-    "Report",
-    "Eventhouse",
-    "KQLDatabase",
-    "KQLQueryset",
-    "Reflex",
-    "Eventstream",
-]
+item_type_in_scope = ["Notebook", "Lakehouse"]
 
 # Uncomment to use SPN auth
 # client_id = "your-client-id"
@@ -70,8 +57,8 @@ target_workspace = FabricWorkspace(
 
 # Uncomment to publish
 # Publish all items defined in item_type_in_scope
-# publish_all_items(target_workspace)
+publish_all_items(target_workspace)
 
 # Uncomment to unpublish
 # Unpublish all items defined in scope not found in repository
-# unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r"^DEBUG.*")
+unpublish_all_orphan_items(target_workspace, item_name_exclude_regex=r"^DEBUG.*")
