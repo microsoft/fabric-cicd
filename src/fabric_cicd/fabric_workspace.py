@@ -396,7 +396,6 @@ class FabricWorkspace:
                 if find_value in raw_file and self.environment in replace_value_dict and filter_match:
                     replace_value = extract_replace_value(self, replace_value_dict[self.environment])
                     if replace_value:
-                        print(replace_value)
                         raw_file = raw_file.replace(find_value, replace_value)
                         logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
 

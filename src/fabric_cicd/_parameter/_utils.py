@@ -74,11 +74,9 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
 
     # If $workspace variable, return the workspace ID value
     if replace_value.startswith("$workspace."):
-        if replace_value == "$workspace.id":
-            if get_dataflow_name:
-                msg = "Invalid replace_value variable format: '$workspace.id'. Expected format to get dataflow name: $items.type.name.attribute"
-                raise InputError(msg, logger)
-            return workspace_obj.workspace_id
+        if get_dataflow_name:
+            msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.attribute"
+            raise InputError(msg, logger)
 
         return _extract_workspace_id(workspace_obj, replace_value)
 
@@ -93,6 +91,9 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
 
 def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) -> str:
     """Extracts the workspace ID from the $workspace variable to set as the replace_value."""
+    if replace_value == "$workspace.id":
+        return workspace_obj.workspace_id
+
     try:
         # Extract the workspace name from the variable
         var_parts = replace_value.removeprefix("$workspace.").split(".")
@@ -101,6 +102,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
             raise ParsingError(msg, logger)
 
         workspace_name = var_parts[0].strip()
+        logger.debug(f"Extracted workspace name: {workspace_name}")
 
         # Resolve workspace ID from name
         try:

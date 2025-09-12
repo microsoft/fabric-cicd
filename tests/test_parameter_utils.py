@@ -163,7 +163,7 @@ class TestParameterUtilities:
         with pytest.raises(
             InputError,
             match=re.escape(
-                "Invalid replace_value variable format: '$workspace.id'. Expected format to get dataflow name: $items.type.name.attribute"
+                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.attribute"
             ),
         ):
             result = extract_replace_value(mock_workspace, "$workspace.id", True)
