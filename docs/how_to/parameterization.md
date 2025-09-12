@@ -154,7 +154,10 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
 -   Dynamic replacement works in tandem with `find_value` as either a regex or a literal string.
 -   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
 -   **Supported variables:**
-    -   **Workspace ID variable:** `$workspace.id`, replaces a workspace ID with the workspace ID of the **target environment.**
+    -   **Workspace variable:**
+        -   `$workspace.id`, replaces a value with the workspace ID of the **target environment**.
+        -   `$workspace.<name>`, replaces a value with the workspace ID of the specified **workspace name** (case sensitive), e.g. `$workspace.TestWorkspace`.
+        -   **Note:** When using the `$workspace.<name>` variable, ensure the executing identity has proper permissions to access the specified workspace.
     -   **Item attribute variable:** `$items.<item_type>.<item_name>.<attribute>`, replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         -   **Supported attributes**: `id` (item ID of the deployed item), `sqlendpoint` (sql connection string of the deployed item, only applicable to lakehouse and warehouse items), and `queryserviceuri` (query uri of the deployed item, only applicable to eventhouse item). Attributes should be lowercase.
         -   Item type and name are **case-sensitive**.
@@ -177,7 +180,7 @@ find_replace:
     - find_value: "123e4567-e89b-12d3-a456-426614174000" # Workspace ID
       replace_value:
           PPE: "$workspace.id" # PPE workspace ID
-          PROD: "$workspace.id" # PROD workspace ID
+          PROD: "$workspace.Prod_Workspace" # PROD workspace ID
     - find_value: "serverconnectionstringexample.com" # SQL endpoint connection string
       replace_value:
           PPE: "$items.Lakehouse.Sample_LH.sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
