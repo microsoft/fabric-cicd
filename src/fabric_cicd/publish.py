@@ -6,7 +6,7 @@
 import logging
 from typing import Optional
 
-import dpath.util as dpath
+import dpath
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
@@ -469,7 +469,7 @@ def deploy_with_config(
     if not unpublish_settings.get("skip", False):
         unpublish_all_orphan_items(
             workspace,
-            item_name_exclude_regex=unpublish_settings.get("exclude_regex"),
+            item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
             items_to_include=unpublish_settings.get("items_to_include"),
         )
     else:
