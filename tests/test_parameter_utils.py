@@ -291,8 +291,8 @@ class TestParameterUtilities:
         # Mock the _resolve_workspace_id method to raise InputError
         mock_workspace._resolve_workspace_id.side_effect = InputError("Workspace name not found", logger)
 
-        # Should raise InputError with meaningful message
-        with pytest.raises(InputError, match=r"Error resolving workspace ID for name"):
+        # Should re-raise the same InputError
+        with pytest.raises(InputError, match=r"Workspace name not found"):
             _extract_workspace_id(mock_workspace, "$workspace.unknown_workspace")
 
     def test_extract_workspace_id_general_error(self, mock_workspace):

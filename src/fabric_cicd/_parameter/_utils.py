@@ -105,11 +105,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
         logger.debug(f"Extracted workspace name: {workspace_name}")
 
         # Resolve workspace ID from name
-        try:
-            return workspace_obj._resolve_workspace_id(workspace_name)
-        except InputError as e:
-            msg = f"Error resolving workspace ID for name '{workspace_name}': {e}"
-            raise InputError(msg, logger) from e
+        return workspace_obj._resolve_workspace_id(workspace_name)
 
     except Exception as e:
         # Re-raise exceptions
