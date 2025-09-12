@@ -6,7 +6,7 @@
 import logging
 from typing import Optional
 
-import dpath.util as dpath
+import dpath
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 def publish_all_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: Optional[str] = None,
+    folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
 ) -> None:
     """
@@ -41,8 +42,13 @@ def publish_all_items(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
+        folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
 
+    folder_path_exclude_regex:
+        This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
+        not recommended due to item dependencies. To enable this feature, see How To -> Optional Features
+        for information on which flags to enable.
 
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -68,6 +74,16 @@ def publish_all_items(
         ... )
         >>> exclude_regex = ".*_do_not_publish"
         >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
+
+        With folder exclusion
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> folder_exclude_regex = "^legacy/"
+        >>> publish_all_items(workspace, folder_path_exclude_regex=folder_exclude_regex)
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
@@ -111,12 +127,25 @@ def publish_all_items(
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
-    if items_to_include:
-        if "enable_experimental_features" not in constants.FEATURE_FLAG:
-            msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
+    if folder_path_exclude_regex:
+        if (
+            "enable_experimental_features" not in constants.FEATURE_FLAG
+            or "enable_exclude_folder" not in constants.FEATURE_FLAG
+        ):
+            msg = "Feature flags 'enable_experimental_features' and 'enable_exclude_folder' must be set."
             raise InputError(msg, logger)
-        if "enable_items_to_include" not in constants.FEATURE_FLAG:
-            msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
+        logger.warning("Folder path exclusion is enabled.")
+        logger.warning(
+            "Using folder_path_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
+
+    if items_to_include:
+        if (
+            "enable_experimental_features" not in constants.FEATURE_FLAG
+            or "enable_items_to_include" not in constants.FEATURE_FLAG
+        ):
+            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
             raise InputError(msg, logger)
         logger.warning("Selective deployment is enabled.")
         logger.warning(
@@ -253,11 +282,11 @@ def unpublish_all_orphan_items(
     print_header("Unpublishing Orphaned Items")
 
     if items_to_include:
-        if "enable_experimental_features" not in constants.FEATURE_FLAG:
-            msg = "A list of items to include was provided, but the 'enable_experimental_features' feature flag is not set."
-            raise InputError(msg, logger)
-        if "enable_items_to_include" not in constants.FEATURE_FLAG:
-            msg = "Experimental features are enabled but the 'enable_items_to_include' feature flag is not set."
+        if (
+            "enable_experimental_features" not in constants.FEATURE_FLAG
+            or "enable_items_to_include" not in constants.FEATURE_FLAG
+        ):
+            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
             raise InputError(msg, logger)
         logger.warning("Selective unpublish is enabled.")
         logger.warning(
@@ -431,6 +460,7 @@ def deploy_with_config(
         publish_all_items(
             workspace,
             item_name_exclude_regex=publish_settings.get("exclude_regex"),
+            folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
             items_to_include=publish_settings.get("items_to_include"),
         )
     else:
@@ -439,7 +469,7 @@ def deploy_with_config(
     if not unpublish_settings.get("skip", False):
         unpublish_all_orphan_items(
             workspace,
-            item_name_exclude_regex=unpublish_settings.get("exclude_regex"),
+            item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
             items_to_include=unpublish_settings.get("items_to_include"),
         )
     else:

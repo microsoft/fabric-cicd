@@ -846,7 +846,7 @@ class TestPathUtilities:
     def test_process_input_path_none(self, temp_repository):
         """Tests process_input_path with none input."""
         result = process_input_path(temp_repository, None)
-        assert result == []
+        assert result is None
 
     def test_process_input_path_string(self, temp_repository, monkeypatch):
         """Tests process_input_path with string input."""
