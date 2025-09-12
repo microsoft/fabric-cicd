@@ -147,6 +147,13 @@ class TestParameterUtilities:
         # Workspace ID variable should return the workspace ID
         assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
 
+        # Workspace name variable should resolve to workspace ID
+        with mock.patch("fabric_cicd._parameter._utils._extract_workspace_id") as mock_extract_ws:
+            mock_extract_ws.return_value = "resolved-workspace-id"
+            result = extract_replace_value(mock_workspace, "$workspace.dev")
+            assert result == "resolved-workspace-id"
+            mock_extract_ws.assert_called_once_with(mock_workspace, "$workspace.dev")
+
         # Item attribute variables should extract values from workspace items
         with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
             mock_extract.return_value = "notebook-id"
@@ -248,6 +255,56 @@ class TestParameterUtilities:
         assert result is None
 
         # Test with non-Dataflow item, should return None
+
+    def test_extract_workspace_id_direct(self, mock_workspace):
+        """Tests _extract_workspace_id with direct workspace ID variable."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Test with $workspace.id - should return workspace_id directly
+        result = _extract_workspace_id(mock_workspace, "$workspace.id")
+        assert result == "mock-workspace-id"
+
+    def test_extract_workspace_id_resolve(self, mock_workspace):
+        """Tests _extract_workspace_id with workspace name resolution."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+
+        # Test with $workspace.name - should resolve the workspace ID from name
+        result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
+        assert result == "resolved-workspace-id"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+
+    def test_extract_workspace_id_invalid_syntax(self, mock_workspace):
+        """Tests _extract_workspace_id with invalid syntax."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Test with invalid format (too many parts)
+        with pytest.raises(ParsingError, match=r"Invalid \$workspace variable syntax"):
+            _extract_workspace_id(mock_workspace, "$workspace.name.extra")
+
+    def test_extract_workspace_id_resolve_error(self, mock_workspace):
+        """Tests _extract_workspace_id when workspace name resolution fails."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method to raise InputError
+        mock_workspace._resolve_workspace_id.side_effect = InputError("Workspace name not found", logger)
+
+        # Should raise InputError with meaningful message
+        with pytest.raises(InputError, match=r"Error resolving workspace ID for name"):
+            _extract_workspace_id(mock_workspace, "$workspace.unknown_workspace")
+
+    def test_extract_workspace_id_general_error(self, mock_workspace):
+        """Tests _extract_workspace_id with unexpected errors."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method to raise a general exception
+        mock_workspace._resolve_workspace_id.side_effect = Exception("Unexpected error")
+
+        # Should wrap general exceptions in ParsingError
+        with pytest.raises(ParsingError, match=r"Error parsing \$workspace variable"):
+            _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
         result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test Lakehouse.id", True)
         assert result is None
 
