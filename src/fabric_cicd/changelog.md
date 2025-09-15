@@ -6,6 +6,15 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.28
+
+<span class="md-h2-subheader">Release Date: 2025-09-15</span>
+
+-   ✨ Add folder exclusion feature for publish operations ([#427](https://github.com/microsoft/fabric-cicd/issues/427))
+-   ✨ Expand workspace ID dynamic replacement capabilities in parameterization ([#408](https://github.com/microsoft/fabric-cicd/issues/408))
+-   🔧 Fix unexpected behavior with file_path parameter filter ([#545](https://github.com/microsoft/fabric-cicd/issues/545))
+-   🔧 Fix unpublish exclude_regex bug in configuration file-based deployment ([#544](https://github.com/microsoft/fabric-cicd/issues/544))
+
 ## Version 0.1.27
 
 <span class="md-h2-subheader">Release Date: 2025-09-05</span>
