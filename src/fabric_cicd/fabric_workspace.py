@@ -460,8 +460,9 @@ class FabricWorkspace:
         item_type: str,
         exclude_path: str = r"^(?!.*)",
         func_process_file: Optional[callable] = None,
+        return_response: bool = False,
         **kwargs,
-    ) -> None:
+    ) -> Optional[dict]:
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -470,9 +471,16 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
             exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
             func_process_file: Custom function to process file contents. Defaults to None.
+            return_response: If True, returns the API response from the publish operation. Defaults to False.
             **kwargs: Additional keyword arguments.
+
+        Returns:
+            Dict containing the API response if return_response is True, otherwise None.
         """
         item = self.repository_items[item_type][item_name]
+
+        # Initialize response collection
+        api_response = None
 
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
@@ -480,7 +488,7 @@ class FabricWorkspace:
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
-                return
+                return api_response if return_response else None
 
         # Skip publishing if the item's folder path is excluded by the regex
         if self.publish_folder_path_exclude_regex:
@@ -490,7 +498,7 @@ class FabricWorkspace:
             if regex_pattern.search(relative_path_str):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
-                return
+                return api_response if return_response else None
 
         # Skip publishing if the item is not in the include list
         if self.items_to_include:
@@ -504,7 +512,7 @@ class FabricWorkspace:
             if not match_found:
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
-                return
+                return api_response if return_response else None
 
         item_guid = item.guid
         item_files = item.item_files
@@ -546,38 +554,54 @@ class FabricWorkspace:
             item_create_response = self.endpoint.invoke(
                 method="POST", url=f"{self.base_api_url}/items", body=combined_body
             )
+            api_response = item_create_response
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
 
         elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-            self.endpoint.invoke(
+            update_response = self.endpoint.invoke(
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
             )
+            api_response = update_response
         elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
             metadata_body.pop("type", None)
 
             # Update the item's metadata
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
+            metadata_update_response = self.endpoint.invoke(
                 method="PATCH",
                 url=f"{self.base_api_url}/items/{item_guid}",
                 body=metadata_body,
             )
+            api_response = metadata_update_response
 
         if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
-            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+            if (
+                is_deployed
+                and item_type in self.deployed_items
+                and item_name in self.deployed_items[item_type]
+                and self.deployed_items[item_type][item_name].folder_id != item.folder_id
+            ):
                 # Move the item to the correct folder if it has been moved
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
-                self.endpoint.invoke(
+                move_response = self.endpoint.invoke(
                     method="POST",
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
                 )
+                # For move operations, update the response if we're tracking it
+                if return_response:
+                    if api_response:
+                        # If we already have a response, combine them
+                        api_response = {"publish_response": api_response, "move_response": move_response}
+                    else:
+                        # If move is the only operation, use the move response
+                        api_response = move_response
                 logger.debug(
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
@@ -585,7 +609,8 @@ class FabricWorkspace:
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published")
-        return
+
+        return api_response if return_response else None
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """

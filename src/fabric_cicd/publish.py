@@ -35,7 +35,8 @@ def publish_all_items(
     item_name_exclude_regex: Optional[str] = None,
     folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
-) -> None:
+    return_response: bool = False,
+) -> Optional[dict]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
@@ -44,6 +45,10 @@ def publish_all_items(
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
         folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
+        return_response: If True, returns a dict containing the API responses from all publish operations. Defaults to False.
+
+    Returns:
+        Dict containing all API responses if return_response is True, otherwise None.
 
     folder_path_exclude_regex:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -96,6 +101,9 @@ def publish_all_items(
         >>> publish_all_items(workspace, items_to_include=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
+    # Initialize response collection for return_response mode
+    all_responses = {} if return_response else None
 
     # check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
@@ -221,6 +229,9 @@ def publish_all_items(
     if _should_publish_item_type("Environment"):
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
+
+    # Return response data if requested
+    return all_responses if return_response else None
 
 
 def unpublish_all_orphan_items(
