@@ -20,6 +20,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items           | ☑️           |
 | `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish operations     | ☑️           |
 | `enable_config_deploy`                    | Set to enable config file-based deployment                         | ☑️           |
+| `enable_response_collection`              | Set to enable collection of API responses during publish operations|              |
 
 <span class="md-h3-nonanchor">Example</span>
 
@@ -29,6 +30,33 @@ append_feature_flag("enable_lakehouse_unpublish")
 append_feature_flag("enable_warehouse_unpublish")
 append_feature_flag("disable_print_identity")
 append_feature_flag("enable_environment_variable_replacement")
+append_feature_flag("enable_response_collection")
+```
+
+<span class="md-h3-nonanchor">Response Collection</span>
+
+The `enable_response_collection` feature flag allows you to collect API response data from publish operations. When enabled, responses are stored in the `workspace.responses` attribute as a dictionary, where keys are in the format "item_name.item_type" and values are the API response objects.
+
+```python
+from fabric_cicd import append_feature_flag, FabricWorkspace, publish_all_items
+
+# Enable response collection
+append_feature_flag("enable_response_collection")
+
+workspace = FabricWorkspace(
+    workspace_id="your-workspace-id",
+    repository_directory="/path/to/repo",
+    item_type_in_scope=["Notebook", "DataPipeline"]
+)
+
+# Publish items and collect responses
+publish_all_items(workspace)
+
+# Access individual item responses
+notebook_response = workspace.responses.get("MyNotebook.Notebook")
+if notebook_response:
+    item_id = notebook_response["body"]["id"]
+    print(f"Created notebook with ID: {item_id}")
 ```
 
 <span class="md-h3-nonanchor">Experimental Features</span>
