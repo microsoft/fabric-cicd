@@ -138,25 +138,35 @@ def test_publish_item_without_response_collection(test_workspace_with_notebook):
 
 
 def test_publish_item_with_response_collection(test_workspace_with_notebook):
-    """Test that _publish_item stores responses when responses is enabled."""
+    """Test that _publish_item stores responses when feature flag is enabled."""
     workspace = test_workspace_with_notebook
-    workspace.responses = {}  # Enable response collection
 
-    with (
-        patch.object(workspace, "_replace_logical_ids", side_effect=lambda x: x),
-        patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents),
-        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda x: x),
-    ):
-        workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
+    # Import constants and add the feature flag
+    import fabric_cicd.constants as constants
 
-        # Should store the response
-        assert workspace.responses is not None
-        assert "TestNotebook.Notebook" in workspace.responses
-        response = workspace.responses["TestNotebook.Notebook"]
-        assert response["body"]["id"] == "mock-item-id-12345"
+    constants.FEATURE_FLAG.add("enable_response_collection")
+
+    try:
+        workspace.responses = {}  # Enable response collection
+
+        with (
+            patch.object(workspace, "_replace_logical_ids", side_effect=lambda x: x),
+            patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents),
+            patch.object(workspace, "_replace_workspace_ids", side_effect=lambda x: x),
+        ):
+            workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
+
+            # Should store the response
+            assert workspace.responses is not None
+            assert "TestNotebook.Notebook" in workspace.responses
+            response = workspace.responses["TestNotebook.Notebook"]
+            assert response["body"]["id"] == "mock-item-id-12345"
+    finally:
+        # Clean up the feature flag
+        constants.FEATURE_FLAG.discard("enable_response_collection")
 
 
-def test_publish_all_items_enable_responses_false(test_workspace_with_notebook):
+def test_publish_all_items_no_feature_flag(test_workspace_with_notebook):
     """Test that publish_all_items doesn't enable responses by default."""
     workspace = test_workspace_with_notebook
 
@@ -166,45 +176,97 @@ def test_publish_all_items_enable_responses_false(test_workspace_with_notebook):
     assert workspace.responses is None
 
 
-def test_publish_all_items_enable_responses_true(test_workspace_with_notebook):
-    """Test that publish_all_items enables response collection when requested."""
+def test_publish_all_items_with_feature_flag(test_workspace_with_notebook):
+    """Test that publish_all_items enables response collection when feature flag is set."""
     workspace = test_workspace_with_notebook
 
-    result = publish.publish_all_items(workspace, enable_responses=True)
+    # Import constants and add the feature flag
+    import fabric_cicd.constants as constants
 
-    # Should have initialized responses as a dict
-    assert workspace.responses is not None
-    assert isinstance(workspace.responses, dict)
-    # Should return the responses
-    assert result is workspace.responses
+    constants.FEATURE_FLAG.add("enable_response_collection")
+
+    try:
+        result = publish.publish_all_items(workspace)
+
+        # Should have initialized responses as a dict
+        assert workspace.responses is not None
+        assert isinstance(workspace.responses, dict)
+        # Should return the responses
+        assert result is workspace.responses
+    finally:
+        # Clean up the feature flag
+        constants.FEATURE_FLAG.discard("enable_response_collection")
 
 
 def test_workspace_responses_access_pattern(test_workspace_with_notebook):
     """Test the recommended access pattern for responses."""
     workspace = test_workspace_with_notebook
 
-    # Enable response collection and publish
-    publish.publish_all_items(workspace, enable_responses=True)
+    # Import constants and add the feature flag
+    import fabric_cicd.constants as constants
 
-    # Users can access responses directly from the workspace
-    assert hasattr(workspace, "responses")
-    assert workspace.responses is not None
+    constants.FEATURE_FLAG.add("enable_response_collection")
 
-    # Can access individual item responses
-    if workspace.responses:
-        for item_key, response in workspace.responses.items():
-            assert isinstance(item_key, str)
-            assert "." in item_key  # Should be in format "item_name.item_type"
-            assert isinstance(response, dict)
+    try:
+        # Enable response collection and publish
+        publish.publish_all_items(workspace)
+
+        # Users can access responses directly from the workspace
+        assert hasattr(workspace, "responses")
+        assert workspace.responses is not None
+
+        # Can access individual item responses
+        if workspace.responses:
+            for item_key, response in workspace.responses.items():
+                assert isinstance(item_key, str)
+                assert "." in item_key  # Should be in format "item_name.item_type"
+                assert isinstance(response, dict)
+    finally:
+        # Clean up the feature flag
+        constants.FEATURE_FLAG.discard("enable_response_collection")
 
 
 def test_publish_item_skipped_no_response_stored(test_workspace_with_notebook):
     """Test that skipped items don't store responses even when collection is enabled."""
     workspace = test_workspace_with_notebook
-    workspace.responses = {}  # Enable response collection
-    workspace.publish_item_name_exclude_regex = "TestNotebook"  # Exclude the test item
 
-    workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
+    # Import constants and add the feature flag
+    import fabric_cicd.constants as constants
 
-    # Should not store response for skipped item
-    assert "TestNotebook.Notebook" not in workspace.responses
+    constants.FEATURE_FLAG.add("enable_response_collection")
+
+    try:
+        workspace.responses = {}  # Enable response collection
+        workspace.publish_item_name_exclude_regex = "TestNotebook"  # Exclude the test item
+
+        workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
+
+        # Should not store response for skipped item
+        assert "TestNotebook.Notebook" not in workspace.responses
+    finally:
+        # Clean up the feature flag
+        constants.FEATURE_FLAG.discard("enable_response_collection")
+
+
+def test_append_feature_flag_enables_response_collection(test_workspace_with_notebook):
+    """Test that using append_feature_flag enables response collection."""
+    workspace = test_workspace_with_notebook
+
+    # Use the public API to enable the feature flag
+    from fabric_cicd import append_feature_flag
+
+    append_feature_flag("enable_response_collection")
+
+    try:
+        result = publish.publish_all_items(workspace)
+
+        # Should have initialized responses as a dict
+        assert workspace.responses is not None
+        assert isinstance(workspace.responses, dict)
+        # Should return the responses
+        assert result is workspace.responses
+    finally:
+        # Clean up the feature flag
+        import fabric_cicd.constants as constants
+
+        constants.FEATURE_FLAG.discard("enable_response_collection")
