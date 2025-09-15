@@ -129,6 +129,7 @@ class FabricWorkspace:
         self.publish_item_name_exclude_regex = None
         self.publish_folder_path_exclude_regex = None
         self.items_to_include = None
+        self.responses = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -460,9 +461,8 @@ class FabricWorkspace:
         item_type: str,
         exclude_path: str = r"^(?!.*)",
         func_process_file: Optional[callable] = None,
-        return_response: bool = False,
         **kwargs,
-    ) -> Optional[dict]:
+    ) -> None:
         """
         Publishes or updates an item in the Fabric Workspace.
 
@@ -471,15 +471,11 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
             exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
             func_process_file: Custom function to process file contents. Defaults to None.
-            return_response: If True, returns the API response from the publish operation. Defaults to False.
             **kwargs: Additional keyword arguments.
-
-        Returns:
-            Dict containing the API response if return_response is True, otherwise None.
         """
         item = self.repository_items[item_type][item_name]
 
-        # Initialize response collection
+        # Initialize response collection for this item if responses are being tracked
         api_response = None
 
         # Skip publishing if the item is excluded by the regex
@@ -488,7 +484,7 @@ class FabricWorkspace:
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
-                return api_response if return_response else None
+                return
 
         # Skip publishing if the item's folder path is excluded by the regex
         if self.publish_folder_path_exclude_regex:
@@ -498,7 +494,7 @@ class FabricWorkspace:
             if regex_pattern.search(relative_path_str):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
-                return api_response if return_response else None
+                return
 
         # Skip publishing if the item is not in the include list
         if self.items_to_include:
@@ -512,7 +508,7 @@ class FabricWorkspace:
             if not match_found:
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
-                return api_response if return_response else None
+                return
 
         item_guid = item.guid
         item_files = item.item_files
@@ -594,8 +590,8 @@ class FabricWorkspace:
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
                 )
-                # For move operations, update the response if we're tracking it
-                if return_response:
+                # For move operations, combine responses if we're tracking them
+                if self.responses is not None:
                     if api_response:
                         # If we already have a response, combine them
                         api_response = {"publish_response": api_response, "move_response": move_response}
@@ -606,11 +602,15 @@ class FabricWorkspace:
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
 
+        # Store response if responses are being tracked
+        if self.responses is not None and api_response:
+            item_key = f"{item_name}.{item_type}"
+            self.responses[item_key] = api_response
+
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published")
-
-        return api_response if return_response else None
+        return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """

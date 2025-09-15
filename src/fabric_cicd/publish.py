@@ -35,7 +35,7 @@ def publish_all_items(
     item_name_exclude_regex: Optional[str] = None,
     folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
-    return_response: bool = False,
+    enable_responses: bool = False,
 ) -> Optional[dict]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
@@ -45,10 +45,10 @@ def publish_all_items(
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
         folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
-        return_response: If True, returns a dict containing the API responses from all publish operations. Defaults to False.
+        enable_responses: If True, enables collection of API responses from publish operations in the workspace.responses attribute.
 
     Returns:
-        Dict containing all API responses if return_response is True, otherwise None.
+        Dict containing all API responses if enable_responses is True and responses were collected, otherwise None.
 
     folder_path_exclude_regex:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -99,11 +99,23 @@ def publish_all_items(
         ... )
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
         >>> publish_all_items(workspace, items_to_include=items_to_include)
+
+        With response collection
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> responses = publish_all_items(workspace, enable_responses=True)
+        >>> # Access individual item responses
+        >>> notebook_response = workspace.responses.get("MyNotebook.Notebook")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    # Initialize response collection for return_response mode
-    all_responses = {} if return_response else None
+    # Initialize response collection if enabled
+    if enable_responses:
+        fabric_workspace_obj.responses = {}
 
     # check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
@@ -230,8 +242,8 @@ def publish_all_items(
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 
-    # Return response data if requested
-    return all_responses if return_response else None
+    # Return response data if enabled and responses were collected
+    return fabric_workspace_obj.responses if enable_responses and fabric_workspace_obj.responses else None
 
 
 def unpublish_all_orphan_items(
