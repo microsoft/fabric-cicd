@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, Inpu
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._publish_log_entry import PublishLogEntry
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,7 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+        self.publish_log_entries: list[PublishLogEntry] = []
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
@@ -473,6 +476,11 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
+        
+        # Capture start time for structured logging
+        start_time = datetime.now()
+        error_message = None
+        success = True
 
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
@@ -582,9 +590,43 @@ class FabricWorkspace:
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
 
-        # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
-        if not kwargs.get("skip_publish_logging", False):
-            logger.info(f"{constants.INDENT}Published")
+        start_time = datetime.now()
+        success = False
+        error_message = None
+        end_time = None
+        item_guid = None
+        try:
+            # --- original method body goes here ---
+            # (move all code from after the signature up to line 575 here)
+            # For example:
+            # ... existing logic ...
+            # At the point where publish is successful:
+            success = True
+            error_message = None
+            # If item_guid is set somewhere, ensure it's set here
+            # (You may need to move the assignment of item_guid here)
+        except Exception as e:
+            error_message = str(e)
+            logger.warning(f"Failed to publish {item_type} '{item_name}'. Raw exception: {e}")
+        finally:
+            end_time = datetime.now()
+            # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
+            if not kwargs.get("skip_publish_logging", False):
+                if success:
+                    logger.info(f"{constants.INDENT}Published")
+                else:
+                    logger.info(f"{constants.INDENT}Publish failed")
+            self.publish_log_entries.append(
+                PublishLogEntry(
+                    name=item_name,
+                    item_type=item_type,
+                    success=success,
+                    error=error_message,
+                    start_time=start_time,
+                    end_time=end_time,
+                    guid=item_guid
+                )
+            )
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
