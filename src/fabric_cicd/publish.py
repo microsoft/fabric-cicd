@@ -79,7 +79,9 @@ def publish_all_items(
         >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With folder exclusion
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_exclude_folder")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
@@ -89,7 +91,9 @@ def publish_all_items(
         >>> publish_all_items(workspace, folder_path_exclude_regex=folder_exclude_regex)
 
         With items to include
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_items_to_include")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
@@ -98,8 +102,7 @@ def publish_all_items(
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
         >>> publish_all_items(workspace, items_to_include=items_to_include)
 
-        With response collection (requires feature flag)
-        >>> import fabric_cicd.constants as constants
+        With response collection
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
         >>> append_feature_flag("enable_response_collection")
         >>> workspace = FabricWorkspace(
@@ -109,7 +112,7 @@ def publish_all_items(
         ... )
         >>> responses = publish_all_items(workspace)
         >>> # Access individual item responses
-        >>> notebook_response = workspace.responses.get("Notebook", {}).get("MyNotebook")
+        >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -290,7 +293,9 @@ def unpublish_all_orphan_items(
         >>> unpublish_orphaned_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With items to include
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, append_feature_flag
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_items_to_include")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
