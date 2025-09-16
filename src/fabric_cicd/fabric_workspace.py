@@ -576,13 +576,10 @@ class FabricWorkspace:
             )
             api_response = metadata_update_response
 
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
-            if (
-                is_deployed
-                and item_type in self.deployed_items
-                and item_name in self.deployed_items[item_type]
-                and self.deployed_items[item_type][item_name].folder_id != item.folder_id
-            ):
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+            deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
+            # Check if the folder has changed
+            if deployed_item is not None and deployed_item.folder_id != item.folder_id:
                 # Move the item to the correct folder if it has been moved
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
                 move_response = self.endpoint.invoke(
