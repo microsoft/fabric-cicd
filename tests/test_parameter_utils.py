@@ -284,6 +284,10 @@ class TestParameterUtilities:
         with pytest.raises(ParsingError, match=r"Invalid \$workspace variable syntax"):
             _extract_workspace_id(mock_workspace, "$workspace.name.extra")
 
+        # Test with invalid format (partial items format)
+        with pytest.raises(ParsingError, match=r"Invalid \$workspace variable syntax"):
+            _extract_workspace_id(mock_workspace, "$workspace.name.items")
+
     def test_extract_workspace_id_resolve_error(self, mock_workspace):
         """Tests _extract_workspace_id when workspace name resolution fails."""
         from fabric_cicd._parameter._utils import _extract_workspace_id
@@ -323,6 +327,59 @@ class TestParameterUtilities:
             match=re.escape(f"Attribute 'guid' is invalid. Supported attributes: {mock_items_attr_lookup}"),
         ):
             _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.guid", True)
+
+    def test_extract_workspace_id_with_item_lookup(self, mock_workspace):
+        """Tests _extract_workspace_id with item lookup in another workspace."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+
+        # Mock the _lookup_item_id method
+        mock_workspace._lookup_item_id = mock.MagicMock(return_value="item-123-id")
+
+        # Test with $workspace.<name>.items.<item_type>.<item_name>.id format
+        result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace.items.Notebook.Test Notebook.id")
+
+        assert result == "item-123-id"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_id.assert_called_once_with("resolved-workspace-id", "Notebook", "Test Notebook")
+
+    def test_extract_workspace_id_with_item_lookup_not_found(self, mock_workspace):
+        """Tests _extract_workspace_id when item lookup fails."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+
+        # Mock the _lookup_item_id method to raise InputError (item not found)
+        error_msg = (
+            "Failed to look up item in workspace: resolved-workspace-id, item_type: Notebook, item_name: Test Notebook"
+        )
+        mock_workspace._lookup_item_id = mock.MagicMock(side_effect=InputError(error_msg, logger))
+
+        # Should re-raise the InputError
+        with pytest.raises(InputError, match=re.escape(error_msg)):
+            _extract_workspace_id(mock_workspace, "$workspace.test_workspace.items.Notebook.Test Notebook.id")
+
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_id.assert_called_once_with("resolved-workspace-id", "Notebook", "Test Notebook")
+
+    def test_extract_workspace_id_with_item_lookup_invalid_format(self, mock_workspace):
+        """Tests _extract_workspace_id with invalid item lookup format."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Test with invalid format (missing parts)
+        with pytest.raises(ParsingError, match="Invalid \\$workspace variable syntax"):
+            _extract_workspace_id(mock_workspace, "$workspace.test_workspace.items.Notebook.id")
+
+        # Test with invalid format (extra parts)
+        with pytest.raises(ParsingError, match="Invalid \\$workspace variable syntax"):
+            _extract_workspace_id(mock_workspace, "$workspace.test_workspace.items.Notebook.Test Notebook.id.extra")
+
+        # Test with invalid format (wrong keyword)
+        with pytest.raises(ParsingError, match="Invalid \\$workspace variable syntax"):
+            _extract_workspace_id(mock_workspace, "$workspace.test_workspace.item.Notebook.Test Notebook.id")
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""

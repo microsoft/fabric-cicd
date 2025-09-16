@@ -90,22 +90,51 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
 
 
 def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) -> str:
-    """Extracts the workspace ID from the $workspace variable to set as the replace_value."""
+    """
+    Extracts the workspace ID from the $workspace variable to set as the replace_value.
+
+    Supports the following formats:
+    - $workspace.id - Returns the target workspace ID
+    - $workspace.<name> - Resolves the workspace ID from the name
+    - $workspace.<name>.items.<item_type>.<item_name>.id - Resolves an item ID from the specified workspace
+    """
+    # Case 1: $workspace.id
     if replace_value == "$workspace.id":
         return workspace_obj.workspace_id
 
     try:
-        # Extract the workspace name from the variable
+        # Extract parts from the variable
         var_parts = replace_value.removeprefix("$workspace.").split(".")
-        if len(var_parts) != 1:
-            msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.<name>"
-            raise ParsingError(msg, logger)
 
+        # Extract workspace name
         workspace_name = var_parts[0].strip()
         logger.debug(f"Extracted workspace name: {workspace_name}")
 
-        # Resolve workspace ID from name
-        return workspace_obj._resolve_workspace_id(workspace_name)
+        # Resolve workspace ID
+        workspace_id = workspace_obj._resolve_workspace_id(workspace_name)
+
+        # Case 2: $workspace.<name>
+        if len(var_parts) == 1:
+            return workspace_id
+
+        # Case 3: $workspace.<name>.items.<item_type>.<item_name>.id
+        if len(var_parts) == 5 and var_parts[1] == "items" and var_parts[4] == "id":
+            item_type = var_parts[2].strip()
+            item_name = var_parts[3].strip()
+
+            logger.debug(f"Looking up {item_type} '{item_name}' in workspace '{workspace_name}'")
+
+            # Look up the item in the specified workspace
+            item_id = workspace_obj._lookup_item_id(workspace_id, item_type, item_name)
+            if item_id:
+                logger.debug(f"Found item ID: {item_id}")
+                return item_id
+
+            msg = f"{item_type} '{item_name}' not found in workspace '{workspace_name}'"
+            raise InputError(msg, logger)
+
+        msg = f"Invalid $workspace variable syntax: {replace_value}. Expected formats: $workspace.<name> or $workspace.<name>.items.<item_type>.<item_name>.id"
+        raise ParsingError(msg, logger)
 
     except Exception as e:
         # Re-raise exceptions
