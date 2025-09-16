@@ -126,12 +126,8 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
 
             # Look up the item in the specified workspace
             item_id = workspace_obj._lookup_item_id(workspace_id, item_type, item_name)
-            if item_id:
-                logger.debug(f"Found item ID: {item_id}")
-                return item_id
-
-            msg = f"{item_type} '{item_name}' not found in workspace '{workspace_name}'"
-            raise InputError(msg, logger)
+            logger.debug(f"Found item ID: {item_id}")
+            return item_id
 
         msg = f"Invalid $workspace variable syntax: {replace_value}. Expected formats: $workspace.<name> or $workspace.<name>.items.<item_type>.<item_name>.id"
         raise ParsingError(msg, logger)
