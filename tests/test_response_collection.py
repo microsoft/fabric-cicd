@@ -245,7 +245,9 @@ def test_publish_item_skipped_no_response_stored(test_workspace_with_notebook):
         workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
 
         # Should not store response for skipped item
-        assert "Notebook" not in workspace.responses or "TestNotebook" not in workspace.responses.get("Notebook", {})
+        assert "Notebook" not in workspace.responses
+        if "Notebook" in workspace.responses:
+            assert "TestNotebook" not in workspace.responses["Notebook"]
     finally:
         # Clean up the feature flag
         constants.FEATURE_FLAG.discard("enable_response_collection")
