@@ -111,6 +111,8 @@ def publish_all_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> responses = publish_all_items(workspace)
+        >>> # Access all responses
+        >>> print(responses)
         >>> # Access individual item responses
         >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
     """
