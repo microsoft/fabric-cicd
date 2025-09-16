@@ -158,8 +158,9 @@ def test_publish_item_with_response_collection(test_workspace_with_notebook):
 
             # Should store the response
             assert workspace.responses is not None
-            assert "TestNotebook.Notebook" in workspace.responses
-            response = workspace.responses["TestNotebook.Notebook"]
+            assert "Notebook" in workspace.responses
+            assert "TestNotebook" in workspace.responses["Notebook"]
+            response = workspace.responses["Notebook"]["TestNotebook"]
             assert response["body"]["id"] == "mock-item-id-12345"
     finally:
         # Clean up the feature flag
@@ -217,10 +218,12 @@ def test_workspace_responses_access_pattern(test_workspace_with_notebook):
 
         # Can access individual item responses
         if workspace.responses:
-            for item_key, response in workspace.responses.items():
-                assert isinstance(item_key, str)
-                assert "." in item_key  # Should be in format "item_name.item_type"
-                assert isinstance(response, dict)
+            for item_type, items in workspace.responses.items():
+                assert isinstance(item_type, str)
+                assert isinstance(items, dict)
+                for item_name, response in items.items():
+                    assert isinstance(item_name, str)
+                    assert isinstance(response, dict)
     finally:
         # Clean up the feature flag
         constants.FEATURE_FLAG.discard("enable_response_collection")
@@ -242,7 +245,7 @@ def test_publish_item_skipped_no_response_stored(test_workspace_with_notebook):
         workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
 
         # Should not store response for skipped item
-        assert "TestNotebook.Notebook" not in workspace.responses
+        assert "Notebook" not in workspace.responses or "TestNotebook" not in workspace.responses.get("Notebook", {})
     finally:
         # Clean up the feature flag
         constants.FEATURE_FLAG.discard("enable_response_collection")

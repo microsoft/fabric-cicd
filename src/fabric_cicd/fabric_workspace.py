@@ -604,8 +604,10 @@ class FabricWorkspace:
 
         # Store response if responses are being tracked
         if self.responses is not None and api_response:
-            item_key = f"{item_name}.{item_type}"
-            self.responses[item_key] = api_response
+            # Initialize item_type dictionary if it doesn't exist
+            if item_type not in self.responses:
+                self.responses[item_type] = {}
+            self.responses[item_type][item_name] = api_response
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):

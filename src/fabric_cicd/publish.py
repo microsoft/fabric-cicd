@@ -109,7 +109,7 @@ def publish_all_items(
         ... )
         >>> responses = publish_all_items(workspace)
         >>> # Access individual item responses
-        >>> notebook_response = workspace.responses.get("MyNotebook.Notebook")
+        >>> notebook_response = workspace.responses.get("Notebook", {}).get("MyNotebook")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
