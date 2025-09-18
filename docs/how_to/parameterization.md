@@ -155,41 +155,43 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
 -   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
 -   **Supported variables:**
     -   **Workspace variable:**
-        -   `$workspace.id`, replaces a value with the workspace ID of the **target environment**.
+        -   `$workspace.id` or `$workspace.$id`, replaces a value with the workspace ID of the **target environment**.
         -   `$workspace.<name>`, replaces a value with the workspace ID of the specified **workspace name**, e.g. `$workspace.TestWorkspace`.
-        -   `$workspace.<name>.items.<item_type>.<item_name>.id`, replaces a value with the item ID of the specified item in a specified workspace, e.g. `$workspace.TestWorkspace.Lakehouse.Example_LH.id`
-        -   **Note:** When using `$workspace.<name>` or `$workspace.<name>.items.<item_type>.<item_name>.id` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure names match exactly (case sensitive).
-    -   **Item attribute variable:** `$items.<item_type>.<item_name>.<attribute>`, replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
+        -   `$workspace.<name>.$items.<item_type>.<item_name>.$id`, replaces a value with the item ID of the specified item in a specified workspace, e.g. `$workspace.TestWorkspace.Lakehouse.Example_LH.$id`
+        -   **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$id` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure names match exactly (case sensitive).
+    -   **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
+        -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
+        -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
         -   **Supported attributes**: `id` (item ID of the deployed item), `sqlendpoint` (sql connection string of the deployed item, only applicable to lakehouse and warehouse items), and `queryserviceuri` (query uri of the deployed item, only applicable to eventhouse item). Attributes should be lowercase.
         -   Item type and name are **case-sensitive**.
         -   Item type must be valid and in scope.
         -   Item name must be an **exact match** (include spaces, if present).
-        -   **Example:** set `$items.Notebook.Hello World.id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
+        -   **Example:** set `$items.Notebook.Hello World.$id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
 -   **Important**: Deployment will fail in the following cases:
-    -   Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.id` instead of `$items.Notebook.Hello World.id`.
-    -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.id` or `$items.Environment.Hello World.id`.
-    -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.guid` instead of `$items.Notebook.Hello World.id`.
-    -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.sqlendpoint` (Notebook items don't have a SQL Endpoint).
+    -   Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.$id` instead of `$items.Notebook.Hello World.$id`.
+    -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
+    -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
+    -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
 -   For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
 
 ```yaml
 find_replace:
     - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0" # Lakehouse GUID
       replace_value:
-          PPE: "$items.Lakehouse.Sample_LH.id" # PPE Sample_LH Lakehouse GUID
-          PROD: "$items.Lakehouse.Sample_LH.id" # PROD Sample_LH Lakehouse GUID
+          PPE: "$items.Lakehouse.Sample_LH.$id" # PPE Sample_LH Lakehouse GUID
+          PROD: "$items.Lakehouse.Sample_LH.$id" # PROD Sample_LH Lakehouse GUID
     - find_value: "123e4567-e89b-12d3-a456-426614174000" # Workspace ID
       replace_value:
-          PPE: "$workspace.id" # PPE workspace ID
+          PPE: "$workspace.$id" # PPE workspace ID
           PROD: "$workspace.Prod_Workspace" # PROD workspace ID
     - find_value: "serverconnectionstringexample.com" # SQL endpoint connection string
       replace_value:
-          PPE: "$items.Lakehouse.Sample_LH.sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
-          PROD: "$items.Lakehouse.Sample_LH.sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
+          PPE: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
+          PROD: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
     - find_value: "https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com" # Eventhouse query service URI
       replace_value:
-          PPE: "$items.Eventhouse.Sample_EH.queryserviceuri" # PPE Sample_EH Eventhouse query service URI
-          PROD: "$items.Eventhouse.Sample_EH.queryserviceuri" # PROD Sample_EH Eventhouse query service URI
+          PPE: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PPE Sample_EH Eventhouse query service URI
+          PROD: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PROD Sample_EH Eventhouse query service URI
 ```
 
 ### Environment Variable Replacement
@@ -264,7 +266,7 @@ find_replace:
     - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
       replace_value:
           # use _ALL_ or _all_ or _All_
-          _ALL_: "$items.Lakehouse.Example_LH.id"
+          _ALL_: "$items.Lakehouse.Example_LH.$id"
 ```
 
 ## Optional Fields
@@ -341,8 +343,8 @@ find_replace:
     # lakehouse GUID to be replaced (using regex pattern)
     - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-          PPE: "$items.Lakehouse.Example_LH.id" # PPE lakehouse GUID (dynamic)
-          PROD: "$items.Lakehouse.Example_LH.id" # PROD lakehouse GUID (dynamic)
+          PPE: "$items.Lakehouse.Example_LH.$id" # PPE lakehouse GUID (dynamic)
+          PROD: "$items.Lakehouse.Example_LH.$id" # PROD lakehouse GUID (dynamic)
       is_regex: "true" # enable regex pattern matching
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
@@ -350,7 +352,7 @@ find_replace:
     # lakehouse workspace ID to be replaced (using regex pattern)
     - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-          _ALL_: "$workspace.id" # workspace ID of the target environment (dynamic)
+          _ALL_: "$workspace.$id" # workspace ID of the target environment (dynamic)
       is_regex: "true" # enable regex pattern matching
       item_name: # filter on specific notebook files
           - "Hello World"
@@ -474,16 +476,16 @@ find_replace:
     # lakehouse GUID matching group 1 of regex pattern to be replaced
     - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-          PPE: "$items.Lakehouse.Example_LH.id" # PPE lakehouse GUID (dynamic)
-          PROD: "$items.Lakehouse.Example_LH.id" # PROD lakehouse GUID (dynamic)
+          PPE: "$items.Lakehouse.Example_LH.$id" # PPE lakehouse GUID (dynamic)
+          PROD: "$items.Lakehouse.Example_LH.$id" # PROD lakehouse GUID (dynamic)
       is_regex: "true"
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
     # workspace ID matching group 1 of regex pattern to be replaced
     - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
       replace_value:
-          PPE: "$workspace.id" # PPE workspace ID (dynamic)
-          PROD: "$workspace.id" # PROD workspace ID (dynamic)
+          PPE: "$workspace.$id" # PPE workspace ID (dynamic)
+          PROD: "$workspace.$id" # PROD workspace ID (dynamic)
       is_regex: "true"
       file_path: # filter on notebook files with these paths
           - "/Hello World.Notebook/notebook-content.py"
@@ -731,7 +733,7 @@ Connections must be parameterized in addition to item references.
     - The source Dataflow must be deployed BEFORE the dependent Dataflow (especially during first time deployment).
     - To handle this dependency correctly and prevent deployment errors, set up the `find_replace` parameter with the following requirements (incorrect setup may introduce failure during Dataflow deployment):
         - Set `find_value` to match the `dataflowId` GUID referenced in the `mashup.pq` file (literal string or [regex](#find_value-regex)).
-        - Set `replace_value` to the variable `$items.Dataflow.<The Source Dataflow Name>.id`. **Important:** Make sure the **item type** is `"Dataflow"` and the **item name** matches the source Dataflow name in the repository directory exactly (case sensitive, include any spaces).
+        - Set `replace_value` to the variable `$items.Dataflow.<The Source Dataflow Name>.$id`. **Important:** Make sure the **item type** is `"Dataflow"` and the **item name** matches the source Dataflow name in the repository directory exactly (case sensitive, include any spaces).
         - File filters are optional but recommended when using a regex pattern for `find_value`.
         - **You don't need to parameterize the source Dataflow workspace ID here** as the library automatically handles this replacement when you use the items variable in _this_ Dataflow scenario.
     - **How this works:** This parameterization approach ensures correct deployment of interdependent Dataflows while automatically updating references to point to the newly deployed Dataflow in the target workspace.
@@ -743,8 +745,8 @@ Connections must be parameterized in addition to item references.
         - find_value: "0187104d-7a35-4abe-a2ca-a241ec81c8f1"
           # Type = Dataflow and Name = <The Source Dataflow Name>, Attribute = id
           replace_value:
-              PPE: "$items.Dataflow.Source Dataflow.id"
-              PROD: "$items.Dataflow.Source Dataflow.id"
+              PPE: "$items.Dataflow.Source Dataflow.$id"
+              PROD: "$items.Dataflow.Source Dataflow.$id"
           # Optional fields:
           file_path:
               - "\\Referencing Dataflow.Dataflow\\mashup.pq"
@@ -793,16 +795,16 @@ find_replace:
     # Lakehouse workspace ID regex - matches the workspaceId GUID
     - find_value: Navigation_1\s*=\s*Pattern\{\[workspaceId\s*=\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"\]\}
       replace_value:
-          PPE: "$workspace.id" # PPE workspace ID (dynamic)
-          PROD: "$workspace.id"
+          PPE: "$workspace.$id" # PPE workspace ID (dynamic)
+          PROD: "$workspace.$id"
       is_regex: "true" # Activate find_value regex matching
       file_path: "/Sample Dataflow.Dataflow/mashup.pq"
 
     # Lakehouse ID regex - matches the lakehouseId GUID
     - find_value: Navigation_2\s*=\s*Navigation_1\{\[lakehouseId\s*=\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"\]\}
       replace_value:
-          PPE: "$items.Lakehouse.Sample_LH.id" # Sample_LH Lakehouse ID in PPE (dynamic)
-          PROD: "$items.Lakehouse.Sample_LH.id"
+          PPE: "$items.Lakehouse.Sample_LH.$id" # Sample_LH Lakehouse ID in PPE (dynamic)
+          PROD: "$items.Lakehouse.Sample_LH.$id"
       is_regex: "true" # Activate find_value regex matching
       file_path: "/Sample Dataflow.Dataflow/mashup.pq"
 

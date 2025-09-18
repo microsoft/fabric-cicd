@@ -94,43 +94,58 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     Extracts the workspace ID from the $workspace variable to set as the replace_value.
 
     Supports the following formats:
-    - $workspace.id - Returns the target workspace ID
+    - $workspace.id or $workspace.$id- Returns the target workspace ID
     - $workspace.<name> - Resolves the workspace ID from the name
-    - $workspace.<name>.items.<item_type>.<item_name>.id - Resolves an item ID from the specified workspace
+    - $workspace.name.$items.type.name.$id - Resolves an item ID from the specified workspace
     """
     # Case 1: $workspace.id
-    if replace_value == "$workspace.id":
+    if replace_value == "$workspace.id" or replace_value == "$workspace.$id":
         return workspace_obj.workspace_id
 
     try:
-        # Extract parts from the variable
-        var_parts = replace_value.removeprefix("$workspace.").split(".")
+        # Extract the variable string without the prefix
+        var_string = replace_value.removeprefix("$workspace.")
 
-        # Extract workspace name
-        workspace_name = var_parts[0].strip()
-        logger.debug(f"Extracted workspace name: {workspace_name}")
+        # Check for pattern: $workspace.name.$items.type.name.$id
+        if "$items." in var_string and var_string.endswith(".$id"):
+            # Split on the $items prefix to get workspace name
+            workspace_part, items_part = var_string.split(".$items.", 1)
+            workspace_name = workspace_part.strip()
+            logger.debug(f"Extracted workspace name: {workspace_name}")
 
-        # Resolve workspace ID
-        workspace_id = workspace_obj._resolve_workspace_id(workspace_name)
+            # Get workspace ID
+            workspace_id = workspace_obj._resolve_workspace_id(workspace_name)
 
-        # Case 2: $workspace.<name>
-        if len(var_parts) == 1:
-            return workspace_id
+            # Remove the trailing .$id to get the item info
+            items_info = items_part.removesuffix(".$id")
 
-        # Case 3: $workspace.<name>.items.<item_type>.<item_name>.id
-        if len(var_parts) == 5 and var_parts[1] == "items" and var_parts[4] == "id":
-            item_type = var_parts[2].strip()
-            item_name = var_parts[3].strip()
+            # Find the last period to separate item type from item name
+            last_period_pos = items_info.rfind(".")
+            if last_period_pos == -1:
+                msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.name.$items.type.name.$id"
+                raise ParsingError(msg, logger)
 
-            logger.debug(f"Looking up {item_type} '{item_name}' in workspace '{workspace_name}'")
+            # Extract item_type and item_name
+            item_type = items_info[:last_period_pos].strip()
+            item_name = items_info[last_period_pos + 1 :].strip()
+
+            logger.debug(f"Extracted item type: {item_type}, item name: {item_name}")
+
+            if item_type not in constants.ACCEPTED_ITEM_TYPES:
+                msg = f"Item type '{item_type}' is invalid or not supported"
+                raise ParsingError(msg, logger)
 
             # Look up the item in the specified workspace
             item_id = workspace_obj._lookup_item_id(workspace_id, item_type, item_name)
             logger.debug(f"Found item ID: {item_id}")
             return item_id
 
-        msg = f"Invalid $workspace variable syntax: {replace_value}. Expected formats: $workspace.<name> or $workspace.<name>.items.<item_type>.<item_name>.id"
-        raise ParsingError(msg, logger)
+        # Pattern: $workspace.<name>
+        workspace_name = var_string.strip()
+        logger.debug(f"Extracted workspace name: {workspace_name}")
+
+        # Resolve workspace ID
+        return workspace_obj._resolve_workspace_id(workspace_name)
 
     except Exception as e:
         # Re-raise exceptions
@@ -148,21 +163,61 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
 
     Args:
         workspace_obj: The FabricWorkspace object containing the workspace items dictionary used to access item metadata.
-        variable: The $items variable string to be parsed and processed, format: $items.type.name.attribute (supported attributes: id and sqlendpoint).
+        variable: The $items variable string to be parsed and processed.
+            Supports the following formats:
+            - $items.type.name.attribute (legacy format)
+            - $items.type.name.$attribute (new format)
+            Supported attributes: id, sqlendpoint, queryserviceuri
         get_dataflow_name: A boolean flag to indicate if the dataflow item name should be returned instead of the attribute value.
     """
     error = None
     try:
-        # Split the variable into 3 parts (item type, name, and attribute)
-        var_parts = variable.removeprefix("$items.").split(".")
-        if len(var_parts) != 3:
-            msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.attribute"
-            error = ParsingError(msg, logger)
-            return None
+        var_string = variable.removeprefix("$items.")
 
-        item_type = var_parts[0].strip()
-        item_name = var_parts[1].strip()
-        attribute = var_parts[2].strip()
+        # Check for new pattern with $attribute
+        if ".$" in var_string:
+            # Split on the $attribute marker
+            name_part, attr_part = var_string.rsplit(".$", 1)
+
+            # Extract attribute name
+            attribute = attr_part.strip()
+
+            # Find the last period to separate item_type from item_name
+            last_period_pos = name_part.rfind(".")
+            if last_period_pos == -1:
+                msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.$attribute"
+                error = ParsingError(msg, logger)
+                return None
+
+            # Extract item_type and item_name
+            item_type = name_part[:last_period_pos].strip()
+            item_name = name_part[last_period_pos + 1 :].strip()
+
+        # Backward compatibility for legacy pattern
+        else:
+            msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.attribute"
+            # Split the string to get item_type (first part)
+            parts = var_string.split(".", 1)
+            if len(parts) < 2:
+                error = ParsingError(msg, logger)
+                return None
+
+            item_type = parts[0].strip()
+
+            # Get the attribute (last part)
+            if "." not in parts[1]:
+                error = ParsingError(msg, logger)
+                return None
+
+            # Find the position of the last period which separates item_name from attribute
+            last_period_pos = parts[1].rfind(".")
+            if last_period_pos == -1:
+                error = ParsingError(msg, logger)
+                return None
+
+            # Extract item_name and attribute
+            item_name = parts[1][:last_period_pos].strip()
+            attribute = parts[1][last_period_pos + 1 :].strip()
 
         # Validate attribute before further processing
         attr_name = attribute.lower()
@@ -171,6 +226,9 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             error = ParsingError(msg, logger)
             return None
 
+        logger.warning(
+            "The $items variable format has changed. Please update to the new format: $items.type.name.$attribute"
+        )
         logger.debug(
             f"Processing $items variable with item_type={item_type}, item_name={item_name}, attribute={attribute}"
         )
