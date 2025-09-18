@@ -129,6 +129,7 @@ class FabricWorkspace:
         self.publish_item_name_exclude_regex = None
         self.publish_folder_path_exclude_regex = None
         self.items_to_include = None
+        self.responses = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -485,6 +486,9 @@ class FabricWorkspace:
         """
         item = self.repository_items[item_type][item_name]
 
+        # Initialize response collection for this item if responses are being tracked
+        api_response = None
+
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
             regex_pattern = check_regex(self.publish_item_name_exclude_regex)
@@ -557,41 +561,61 @@ class FabricWorkspace:
             item_create_response = self.endpoint.invoke(
                 method="POST", url=f"{self.base_api_url}/items", body=combined_body
             )
+            api_response = item_create_response
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
 
         elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-            self.endpoint.invoke(
+            update_response = self.endpoint.invoke(
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
             )
+            api_response = update_response
         elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
             metadata_body.pop("type", None)
 
             # Update the item's metadata
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
+            metadata_update_response = self.endpoint.invoke(
                 method="PATCH",
                 url=f"{self.base_api_url}/items/{item_guid}",
                 body=metadata_body,
             )
+            api_response = metadata_update_response
 
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
-            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+            deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
+            # Check if the folder has changed
+            if deployed_item is not None and deployed_item.folder_id != item.folder_id:
                 # Move the item to the correct folder if it has been moved
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
-                self.endpoint.invoke(
+                move_response = self.endpoint.invoke(
                     method="POST",
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
                 )
+                # For move operations, combine responses if we're tracking them
+                if self.responses is not None:
+                    if api_response:
+                        # If we already have a response, combine them
+                        api_response = {"publish_response": api_response, "move_response": move_response}
+                    else:
+                        # If move is the only operation, use the move response
+                        api_response = move_response
                 logger.debug(
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
+
+        # Store response if responses are being tracked
+        if self.responses is not None and api_response:
+            # Initialize item_type dictionary if it doesn't exist
+            if item_type not in self.responses:
+                self.responses[item_type] = {}
+            self.responses[item_type][item_name] = api_response
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):

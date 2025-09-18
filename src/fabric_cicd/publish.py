@@ -35,7 +35,7 @@ def publish_all_items(
     item_name_exclude_regex: Optional[str] = None,
     folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
-) -> None:
+) -> Optional[dict]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
 
@@ -44,6 +44,9 @@ def publish_all_items(
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
         folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
+
+    Returns:
+        Dict containing all API responses if the "enable_response_collection" feature flag is enabled and responses were collected, otherwise None.
 
     folder_path_exclude_regex:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -76,7 +79,9 @@ def publish_all_items(
         >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With folder exclusion
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_exclude_folder")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
@@ -86,7 +91,9 @@ def publish_all_items(
         >>> publish_all_items(workspace, folder_path_exclude_regex=folder_exclude_regex)
 
         With items to include
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_items_to_include")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
@@ -94,8 +101,26 @@ def publish_all_items(
         ... )
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
         >>> publish_all_items(workspace, items_to_include=items_to_include)
+
+        With response collection
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> append_feature_flag("enable_response_collection")
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ... )
+        >>> responses = publish_all_items(workspace)
+        >>> # Access all responses
+        >>> print(responses)
+        >>> # Access individual item responses
+        >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
+    # Initialize response collection if feature flag is enabled
+    if "enable_response_collection" in constants.FEATURE_FLAG:
+        fabric_workspace_obj.responses = {}
 
     # check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
@@ -222,6 +247,13 @@ def publish_all_items(
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 
+    # Return response data if feature flag is enabled and responses were collected
+    return (
+        fabric_workspace_obj.responses
+        if "enable_response_collection" in constants.FEATURE_FLAG and fabric_workspace_obj.responses
+        else None
+    )
+
 
 def unpublish_all_orphan_items(
     fabric_workspace_obj: FabricWorkspace,
@@ -263,7 +295,9 @@ def unpublish_all_orphan_items(
         >>> unpublish_orphaned_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With items to include
-        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, append_feature_flag
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_items_to_include")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
