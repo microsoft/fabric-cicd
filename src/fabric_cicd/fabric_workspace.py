@@ -9,7 +9,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, List, Optional
 
 import dpath
 from azure.core.credentials import TokenCredential
@@ -455,6 +455,7 @@ class FabricWorkspace:
         item_type: str,
         exclude_path: str = r"^(?!.*)",
         func_process_file: Optional[callable] = None,
+        post_publish_steps: List[Callable[[], None]] = [],
         **kwargs,
     ) -> None:
         """
@@ -504,92 +505,86 @@ class FabricWorkspace:
         # Only shell deployment, no definition support
         shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
 
-        if kwargs.get("creation_payload"):
-            creation_payload = {"creationPayload": kwargs["creation_payload"]}
-            combined_body = {**metadata_body, **creation_payload}
-        elif shell_only_publish:
-            combined_body = metadata_body
-        else:
-            item_payload = []
-            for file in item_files:
-                if not re.match(exclude_path, file.relative_path):
-                    if file.type == "text" and not str(file.file_path).endswith(".platform"):
-                        file.contents = func_process_file(self, item, file) if func_process_file else file.contents
-                        file.contents = self._replace_logical_ids(file.contents)
-                        file.contents = self._replace_parameters(file, item)
-                        file.contents = self._replace_workspace_ids(file.contents)
-
-                    item_payload.append(file.base64_payload)
-
-            definition_body = {"definition": {"parts": item_payload}}
-            combined_body = {**metadata_body, **definition_body}
-
-        logger.info(f"Publishing {item_type} '{item_name}'")
-
-        is_deployed = bool(item_guid)
-
-        if not is_deployed:
-            combined_body = {**combined_body, **{"folderId": item.folder_id}}
-
-            # Create a new item if it does not exist
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
-            item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body
-            )
-            item_guid = item_create_response["body"]["id"]
-            self.repository_items[item_type][item_name].guid = item_guid
-
-        elif is_deployed and not shell_only_publish:
-            # Update the item's definition if full publish is required
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-            self.endpoint.invoke(
-                method="POST",
-                url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
-                body=definition_body,
-            )
-        elif is_deployed and shell_only_publish:
-            # Remove the 'type' key as it's not supported in the update-item API
-            metadata_body.pop("type", None)
-
-            # Update the item's metadata
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
-                method="PATCH",
-                url=f"{self.base_api_url}/items/{item_guid}",
-                body=metadata_body,
-            )
-
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
-            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
-                # Move the item to the correct folder if it has been moved
-                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
-                self.endpoint.invoke(
-                    method="POST",
-                    url=f"{self.base_api_url}/items/{item_guid}/move",
-                    body={"targetFolderId": f"{item.folder_id}"},
-                )
-                logger.debug(
-                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
-                )
-
-        start_time = datetime.now()
-        success = False
+        success = True
         error_message = None
         end_time = None
-        item_guid = None
+
         try:
-            # --- original method body goes here ---
-            # (move all code from after the signature up to line 575 here)
-            # For example:
-            # ... existing logic ...
-            # At the point where publish is successful:
-            success = True
-            error_message = None
-            # If item_guid is set somewhere, ensure it's set here
-            # (You may need to move the assignment of item_guid here)
+            if kwargs.get("creation_payload"):
+                creation_payload = {"creationPayload": kwargs["creation_payload"]}
+                combined_body = {**metadata_body, **creation_payload}
+            elif shell_only_publish:
+                combined_body = metadata_body
+            else:
+                item_payload = []
+                for file in item_files:
+                    if not re.match(exclude_path, file.relative_path):
+                        if file.type == "text" and not str(file.file_path).endswith(".platform"):
+                            file.contents = func_process_file(self, item, file) if func_process_file else file.contents
+                            file.contents = self._replace_logical_ids(file.contents)
+                            file.contents = self._replace_parameters(file, item)
+                            file.contents = self._replace_workspace_ids(file.contents)
+
+                        item_payload.append(file.base64_payload)
+
+                definition_body = {"definition": {"parts": item_payload}}
+                combined_body = {**metadata_body, **definition_body}
+
+            logger.info(f"Publishing {item_type} '{item_name}'")
+
+            is_deployed = bool(item_guid)
+
+            if not is_deployed:
+                combined_body = {**combined_body, **{"folderId": item.folder_id}}
+
+                # Create a new item if it does not exist
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
+                item_create_response = self.endpoint.invoke(
+                    method="POST", url=f"{self.base_api_url}/items", body=combined_body
+                )
+                item_guid = item_create_response["body"]["id"]
+                self.repository_items[item_type][item_name].guid = item_guid
+
+            elif is_deployed and not shell_only_publish:
+                # Update the item's definition if full publish is required
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
+                self.endpoint.invoke(
+                    method="POST",
+                    url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
+                    body=definition_body,
+                )
+            elif is_deployed and shell_only_publish:
+                # Remove the 'type' key as it's not supported in the update-item API
+                metadata_body.pop("type", None)
+
+                # Update the item's metadata
+                # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
+                self.endpoint.invoke(
+                    method="PATCH",
+                    url=f"{self.base_api_url}/items/{item_guid}",
+                    body=metadata_body,
+                )
+
+            if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
+                if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+                    # Move the item to the correct folder if it has been moved
+                    # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
+                    self.endpoint.invoke(
+                        method="POST",
+                        url=f"{self.base_api_url}/items/{item_guid}/move",
+                        body={"targetFolderId": f"{item.folder_id}"},
+                    )
+                    logger.debug(
+                        f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                    )
+
+            for step in post_publish_steps:
+                step()
+
         except Exception as e:
+            success = False
             error_message = str(e)
-            logger.warning(f"Failed to publish {item_type} '{item_name}'. Raw exception: {e}")
+            logger.error(f"Failed to publish {item_type} '{item_name}'. Raw exception: {e}")
         finally:
             end_time = datetime.now()
             # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done

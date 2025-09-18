@@ -7,6 +7,8 @@ import logging
 import os
 import re
 import urllib.parse
+from functools import partial
+from typing import Callable, List
 from pathlib import Path
 
 import dpath
@@ -33,14 +35,15 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     item_type = "Environment"
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
         # Only deploy the shell for environments
+        post_steps: List[Callable[[], None]] = []
+        if not item.skip_publish:
+            post_steps = [partial(_publish_environment_metadata, fabric_workspace_obj, item_name)]
+
         fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=item_type,
-            skip_publish_logging=True,
+            post_publish_steps=post_steps,
         )
-        if item.skip_publish:
-            continue
-        _publish_environment_metadata(fabric_workspace_obj, item_name=item_name)
 
 
 def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
