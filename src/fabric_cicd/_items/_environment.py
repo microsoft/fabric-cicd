@@ -42,6 +42,7 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
         fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=item_type,
+            skip_publish_logging=True,
             post_publish_steps=post_steps,
         )
 

@@ -48,6 +48,7 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             item_name=item_name,
             item_type=item_type,
             creation_payload=creation_payload,
+            skip_publish_logging=True,
             post_publish_steps=post_steps,
         )
 
