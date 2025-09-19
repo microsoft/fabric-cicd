@@ -73,12 +73,12 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
         return replace_value
 
     # If $workspace variable, return the workspace ID value
-    if replace_value == "$workspace.id":
+    if replace_value.startswith("$workspace."):
         if get_dataflow_name:
-            msg = "Invalid replace_value variable format: '$workspace.id'. Expected format to get dataflow name: $items.type.name.attribute"
+            msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.attribute"
             raise InputError(msg, logger)
 
-        return workspace_obj.workspace_id
+        return _extract_workspace_id(workspace_obj, replace_value)
 
     # If $items variable, return the item attribute value if found
     if replace_value.startswith("$items."):
@@ -87,6 +87,34 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
     # Otherwise, raise an error for invalid variable syntax
     msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id"
     raise InputError(msg, logger)
+
+
+def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) -> str:
+    """Extracts the workspace ID from the $workspace variable to set as the replace_value."""
+    if replace_value == "$workspace.id":
+        return workspace_obj.workspace_id
+
+    try:
+        # Extract the workspace name from the variable
+        var_parts = replace_value.removeprefix("$workspace.").split(".")
+        if len(var_parts) != 1:
+            msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.<name>"
+            raise ParsingError(msg, logger)
+
+        workspace_name = var_parts[0].strip()
+        logger.debug(f"Extracted workspace name: {workspace_name}")
+
+        # Resolve workspace ID from name
+        return workspace_obj._resolve_workspace_id(workspace_name)
+
+    except Exception as e:
+        # Re-raise exceptions
+        if isinstance(e, (ParsingError, InputError)):
+            raise e
+
+        # Otherwise, wrap it in a ParsingError
+        msg = f"Error parsing $workspace variable: {e}"
+        raise ParsingError(msg, logger) from e
 
 
 def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_dataflow_name: bool) -> str:
@@ -345,7 +373,7 @@ def _check_parameter_structure(param_value: any) -> bool:
 
 def process_input_path(
     repository_directory: Path, input_path: Union[str, list[str], None], validation_flag: bool = False
-) -> list[Path]:
+) -> Union[list[Path], None]:
     """
     Processes the input_path value according to its type. Supports both
     regular paths and wildcard paths, including mixed lists.
@@ -358,9 +386,9 @@ def process_input_path(
     # Set the logging function based on validation_flag
     log_func = logger.error if validation_flag else logger.debug
 
-    # Return empty list for None or empty input
+    # Return None for None or empty input
     if not input_path:
-        return []
+        return None
 
     # Use a set to avoid duplicate paths
     valid_paths = set()
@@ -603,7 +631,7 @@ def _validate_nested_brackets_braces(pattern: str, log_func: logging.Logger) -> 
 def check_replacement(
     input_type: Union[str, list[str], None],
     input_name: Union[str, list[str], None],
-    input_path: list[Path],
+    input_path: Union[list[Path], None],
     item_type: str,
     item_name: str,
     file_path: Path,
@@ -620,7 +648,7 @@ def check_replacement(
         file_path: The file_path value to compare with.
     """
     # No optional parameters found
-    if not input_type and not input_name and not input_path:
+    if input_type is None and input_name is None and input_path is None:
         logger.debug("No optional filters found. Find and replace applied in this repository file")
         return True
 
@@ -657,7 +685,7 @@ def _find_match(
         compare_value: The value to compare with.
     """
     # If no parameter value, checking for matches is not required
-    if not param_value:
+    if param_value is None:
         return True
 
     # Otherwise, check for matches based on the parameter value type

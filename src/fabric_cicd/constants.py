@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.27"
+VERSION = "0.1.28"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -144,7 +144,7 @@ CONFIG_SECTIONS = {
         "type": dict,
         "settings": ["workspace_id", "workspace", "repository_directory", "item_types_in_scope", "parameter"],
     },
-    "publish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
+    "publish": {"type": dict, "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "skip"]},
     "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
     "features": {"type": (list, dict), "settings": []},
     "constants": {"type": dict, "settings": []},
