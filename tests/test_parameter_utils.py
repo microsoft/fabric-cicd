@@ -197,17 +197,25 @@ class TestParameterUtilities:
         # Test with valid notebook item
         result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id", False)
         assert result == "notebook-id"
+        result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.$id", False)
+        assert result == "notebook-id"
 
         # Test with valid lakehouse item
         result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.sqlendpoint", False)
+        assert result == "lakehouse-endpoint"
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.$sqlendpoint", False)
         assert result == "lakehouse-endpoint"
 
         # Test with valid warehouse item
         result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.id", False)
         assert result == "warehouse-id"
+        result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.$id", False)
+        assert result == "warehouse-id"
 
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
+        assert result == "eventhouse-query-uri"
+        result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.$queryserviceuri", False)
         assert result == "eventhouse-query-uri"
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
