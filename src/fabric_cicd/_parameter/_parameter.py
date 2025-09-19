@@ -41,7 +41,7 @@ class Parameter:
             "maximum": {"find_key", "replace_value", "item_type", "item_name", "file_path"},
         },
         "templates": {
-            "minimum": {"path"},
+            "minimum": {"path", "enabled"},
             "maximum": {"path", "enabled"},
         },
     }
@@ -638,7 +638,7 @@ class Parameter:
                 continue
 
             path = template_config.get("path")
-            enabled = template_config.get("enabled", True)  # Default to True if not specified
+            enabled = template_config.get("enabled")
 
             if not path or not enabled:
                 continue
@@ -739,15 +739,17 @@ class Parameter:
             if not isinstance(path, str) or not path.strip():
                 return False, f"Template {i + 1} 'path' must be a non-empty string"
 
-            # Validate optional fields
-            if "enabled" in template_config:
-                enabled = template_config["enabled"]
-                if not isinstance(enabled, (bool, str)):
-                    return False, f"Template {i + 1} 'enabled' must be a boolean or string"
+            # Validate required enabled field
+            if "enabled" not in template_config:
+                return False, f"Template {i + 1} missing required field 'enabled'"
 
-                # If string, validate it's a valid boolean representation
-                if isinstance(enabled, str) and enabled.lower() not in ["true", "false"]:
-                    return False, f"Template {i + 1} 'enabled' string must be 'true' or 'false'"
+            enabled = template_config["enabled"]
+            if not isinstance(enabled, (bool, str)):
+                return False, f"Template {i + 1} 'enabled' must be a boolean or string"
+
+            # If string, validate it's a valid boolean representation
+            if isinstance(enabled, str) and enabled.lower() not in ["true", "false"]:
+                return False, f"Template {i + 1} 'enabled' string must be 'true' or 'false'"
 
             # Validate no extra fields
             allowed_fields = {"path", "enabled"}

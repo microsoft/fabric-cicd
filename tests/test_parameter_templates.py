@@ -292,11 +292,12 @@ spark_pool:
         assert parameter.environment_parameter["spark_pool"][0]["instance_pool_id"] == "template-pool-id"
 
     def test_templates_default_enabled_true(self):
-        """Test that templates are enabled by default when enabled field is not specified."""
+        """Test template validation requires enabled field to be explicitly set."""
         # Create main parameter file without enabled field
         main_param_content = """
 templates:
   - path: 'folder1'
+    enabled: true
 
 find_replace:
   - find_value: "main-value"
@@ -334,3 +335,44 @@ find_replace:
         find_values = [item["find_value"] for item in parameter.environment_parameter["find_replace"]]
         assert "main-value" in find_values
         assert "template-value" in find_values
+
+    def test_templates_missing_enabled_field_fails_validation(self):
+        """Test that templates without enabled field fail validation."""
+        # Create main parameter file without enabled field
+        main_param_content = """
+templates:
+  - path: 'folder1'
+
+find_replace:
+  - find_value: "main-value"
+    replace_value:
+      PPE: "main-ppe"
+      PROD: "main-prod"
+"""
+        main_param_file = self.repository_directory / "parameter.yml"
+        main_param_file.write_text(main_param_content)
+
+        # Create template directory and parameter file
+        template_dir = self.repository_directory / "folder1"
+        template_dir.mkdir()
+        template_param_content = """
+find_replace:
+  - find_value: "template-value"
+    replace_value:
+      PPE: "template-ppe"
+      PROD: "template-prod"
+"""
+        template_param_file = template_dir / "parameter.yml"
+        template_param_file.write_text(template_param_content)
+
+        # Test parameter loading should fail due to missing enabled field
+        parameter = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+        )
+
+        # Verify validation fails for missing enabled field
+        is_valid, msg = parameter._validate_templates_parameter()
+        assert not is_valid
+        assert "missing required field 'enabled'" in msg
