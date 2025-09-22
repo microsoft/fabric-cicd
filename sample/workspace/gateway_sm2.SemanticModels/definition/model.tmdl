@@ -1,0 +1,27 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_QueryOrder = ["DimReseller","DimSalesReason","DimSalesTerritory","FactProductInventory","FactResellerSales"]
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation __LastRPTime = 134015002329503645
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table DimReseller
+ref table DimSalesReason
+ref table DimSalesTerritory
+ref table FactProductInventory
+ref table DateTableTemplate_e03c5f3d-515d-43d3-802a-b8bf749b3494
+ref table LocalDateTable_7763c2df-89f4-45c4-aca1-369f7bd9d826
+ref table FactResellerSales
+ref table LocalDateTable_a97c91ad-7c31-493d-a732-23ecaef19d01
+ref table LocalDateTable_146a1486-d216-4960-a372-8c3f0084cc73
+ref table LocalDateTable_bad8d443-d49f-4052-9a66-6957e88d82ec
+

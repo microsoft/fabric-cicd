@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/localSettings/1.0.0/schema.json",
+  "remoteArtifacts": [
+    {
+      "reportId": null
+    }
+  ],
+  "securityBindingsSignature": "AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAFyOuhVgfOkqq3c8fe5wB7wAAAAACAAAAAAAQZgAAAAEAACAAAABjGvoSOvn5cp0O9Mdv6KJ83mZ58hc3fk4lTIp4wAaEkQAAAAAOgAAAAAIAACAAAAB1ZEwwn1HX8zo7S9aVp63XqUrK829gNMgFqX2jxbgWiHAAAABML7ph113Y209CSrryXZtQYFblgcmatuDd7dz6VppfwgmNctL1YjjX2/6CLAc7tppoNgvJ05c9awHSkRpRWS0CBTjSlr0VYb8Lumnq30ZYojwcFH8r6UJFy0iKViRCAQ/vEdyHPojFTbsNomLOTvMHQAAAABK4JtHK5m8/8tB27jL1pCYv5+bc4wPmDSUEUlobmPp2W1iuufOsb9Jsny+1aM4FvWR9/yr0XI7fNElSHPCfarI="
+}

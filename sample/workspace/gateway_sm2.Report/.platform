@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "gateway_sm2"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "8f604652-c94d-4360-aaf2-648b15a498f0"
+  }
+}

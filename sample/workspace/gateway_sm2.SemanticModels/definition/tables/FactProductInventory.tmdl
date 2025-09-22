@@ -1,0 +1,84 @@
+table FactProductInventory
+	lineageTag: 2031c43f-f0f5-4ac2-a0f7-196c8778e2eb
+
+	column ProductKey
+		dataType: int64
+		formatString: 0
+		lineageTag: 4723f451-0b3f-42c4-8b29-db89f8f2993c
+		summarizeBy: count
+		sourceColumn: ProductKey
+
+		annotation SummarizationSetBy = Automatic
+
+	column DateKey
+		dataType: int64
+		formatString: 0
+		lineageTag: 3f4a85f3-e356-45e8-853f-c22d78887f27
+		summarizeBy: count
+		sourceColumn: DateKey
+
+		annotation SummarizationSetBy = Automatic
+
+	column MovementDate
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 957dd974-37f2-4daf-8074-671edaaf19dd
+		summarizeBy: none
+		sourceColumn: MovementDate
+
+		variation Variation
+			isDefault
+			relationship: 3717a1ff-47ac-4c9f-a5d9-e14fd491d357
+			defaultHierarchy: LocalDateTable_7763c2df-89f4-45c4-aca1-369f7bd9d826.'Date Hierarchy'
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column UnitCost
+		dataType: decimal
+		formatString: \$#,0.###############;(\$#,0.###############);\$#,0.###############
+		lineageTag: 9295934c-f2af-4120-b0d6-a464aa7620e4
+		summarizeBy: sum
+		sourceColumn: UnitCost
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-US"}
+
+	column UnitsIn
+		dataType: int64
+		formatString: 0
+		lineageTag: 3871a75c-ec94-479c-8f9d-6473bda4568f
+		summarizeBy: sum
+		sourceColumn: UnitsIn
+
+		annotation SummarizationSetBy = Automatic
+
+	column UnitsOut
+		dataType: int64
+		formatString: 0
+		lineageTag: b728e775-b8ac-4b18-9d46-2313e56d77ab
+		summarizeBy: sum
+		sourceColumn: UnitsOut
+
+		annotation SummarizationSetBy = Automatic
+
+	column UnitsBalance
+		dataType: int64
+		formatString: 0
+		lineageTag: f656d530-1607-4587-8880-0567fd2cc69c
+		summarizeBy: sum
+		sourceColumn: UnitsBalance
+
+		annotation SummarizationSetBy = Automatic
+
+	partition FactProductInventory = m
+		mode: import
+		source =
+				let
+				  Source = Sql.Database(".\sqlexpress", "AdventureWorksDW2019"),
+				  #"Navigation 1" = Source{[Schema = "dbo", Item = "FactProductInventory"]}[Data]
+				in
+				  #"Navigation 1"
+

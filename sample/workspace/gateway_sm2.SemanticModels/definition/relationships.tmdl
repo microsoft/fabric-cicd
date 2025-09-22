@@ -1,0 +1,32 @@
+relationship 3717a1ff-47ac-4c9f-a5d9-e14fd491d357
+	joinOnDateBehavior: datePartOnly
+	fromColumn: FactProductInventory.MovementDate
+	toColumn: LocalDateTable_7763c2df-89f4-45c4-aca1-369f7bd9d826.Date
+
+relationship 6c695f01-7fe0-4e3e-a27a-b8bb100dc8a3
+	joinOnDateBehavior: datePartOnly
+	fromColumn: FactResellerSales.OrderDate
+	toColumn: LocalDateTable_a97c91ad-7c31-493d-a732-23ecaef19d01.Date
+
+relationship b296cd53-b7f5-44e9-8ee1-7e25c2a75d1a
+	joinOnDateBehavior: datePartOnly
+	fromColumn: FactResellerSales.DueDate
+	toColumn: LocalDateTable_146a1486-d216-4960-a372-8c3f0084cc73.Date
+
+relationship 11fe35cd-5316-4bf0-a3ca-88c0826e6576
+	joinOnDateBehavior: datePartOnly
+	fromColumn: FactResellerSales.ShipDate
+	toColumn: LocalDateTable_bad8d443-d49f-4052-9a66-6957e88d82ec.Date
+
+relationship bc283194-42c5-433a-9822-c8694c359d84
+	fromColumn: FactResellerSales.ResellerKey
+	toColumn: DimReseller.ResellerKey
+
+	annotation PBI_IsFromSource = FS
+
+relationship ad00991d-cb97-43b0-bdca-e0becaabd125
+	fromColumn: FactResellerSales.SalesTerritoryKey
+	toColumn: DimSalesTerritory.SalesTerritoryKey
+
+	annotation PBI_IsFromSource = FS
+
