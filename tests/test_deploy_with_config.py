@@ -179,7 +179,9 @@ class TestWorkspaceSettingsExtraction:
         config_file.write_text(yaml.dump(config_data))
 
         # Environment validation should happen during config loading, not extraction
-        with pytest.raises(ConfigValidationError, match="Environment 'prod' not found in 'core.workspace_id' mappings"):
+        with pytest.raises(
+            ConfigValidationError, match=r"Environment 'prod' not found in 'core.workspace_id' mappings"
+        ):
             load_config_file(str(config_file), "prod")
 
     def test_extract_missing_workspace_config(self, tmp_path):
@@ -428,6 +430,7 @@ class TestDeployWithConfig:
         mock_publish.assert_called_once_with(
             mock_workspace_instance,
             item_name_exclude_regex="^DONT_DEPLOY.*",
+            folder_path_exclude_regex=None,
             items_to_include=None,
         )
         mock_unpublish.assert_called_once_with(
@@ -661,3 +664,32 @@ class TestConfigIntegration:
 
             unpublish_settings = extract_unpublish_settings(config, env)
             assert unpublish_settings["skip"] == config_data["unpublish"]["skip"][env]
+
+
+class TestConfigUtilsExtractSettings:
+    """Test config utility functions for extracting settings."""
+
+    def test_extract_publish_settings_with_folder_exclude_regex(self):
+        """Test extracting publish settings with folder_exclude_regex."""
+        config = {
+            "publish": {
+                "folder_exclude_regex": "^DONT_DEPLOY_FOLDER/",
+            }
+        }
+
+        settings = extract_publish_settings(config, "dev")
+        assert settings["folder_exclude_regex"] == "^DONT_DEPLOY_FOLDER/"
+
+    def test_extract_publish_settings_with_environment_specific_folder_exclude_regex(self):
+        """Test extracting publish settings with environment-specific folder_exclude_regex."""
+        config = {
+            "publish": {
+                "folder_exclude_regex": {"dev": "^DEV_FOLDER/", "prod": "^PROD_FOLDER/"},
+            }
+        }
+
+        settings = extract_publish_settings(config, "dev")
+        assert settings["folder_exclude_regex"] == "^DEV_FOLDER/"
+
+        settings = extract_publish_settings(config, "prod")
+        assert settings["folder_exclude_regex"] == "^PROD_FOLDER/"
