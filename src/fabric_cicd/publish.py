@@ -241,6 +241,9 @@ def publish_all_items(
     if _should_publish_item_type("GraphQLApi"):
         print_header("Publishing GraphQL APIs")
         items.publish_graphqlapis(fabric_workspace_obj)
+    if "SparkJobDefinition" in fabric_workspace_obj.item_type_in_scope:
+        print_header("Publishing Spark Job Definitions")
+        items.publish_sparkjobdefinitions(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
