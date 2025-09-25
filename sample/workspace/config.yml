@@ -26,7 +26,10 @@ core: # Core configurations
 
 publish: # Publish configuration (optional)
   exclude_regex: "^DONT_DEPLOY.*"  # Regex pattern to exclude items from publishing
-  #items_to_include:  # Optional list of specific items to publish (requires feature flags)
+
+  # folder_exclude_regex: "^DONT_DEPLOY_FOLDER/"  # Regex pattern to exclude folder with items from publishing (requires feature flags)
+
+  # items_to_include:  # Optional list of specific items to publish (requires feature flags)
   #   - "Hello World.Notebook"
   #   - "Run Hello World.DataPipeline"
 

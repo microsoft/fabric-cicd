@@ -44,7 +44,7 @@ find_replace:
         PROD: "$items.Eventhouse.SampleEventhouse.queryserviceuri" 
       # Optional fields:
       file_path: "/Example Notebook.Notebook/notebook-content.py"
-    
+
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
       replace_value:

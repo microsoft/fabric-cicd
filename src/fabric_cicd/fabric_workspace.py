@@ -127,7 +127,9 @@ class FabricWorkspace:
             self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
+        self.publish_folder_path_exclude_regex = None
         self.items_to_include = None
+        self.responses = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -473,12 +475,25 @@ class FabricWorkspace:
         """
         item = self.repository_items[item_type][item_name]
 
+        # Initialize response collection for this item if responses are being tracked
+        api_response = None
+
         # Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
             regex_pattern = check_regex(self.publish_item_name_exclude_regex)
             if regex_pattern.match(item_name):
                 item.skip_publish = True
                 logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return
+
+        # Skip publishing if the item's folder path is excluded by the regex
+        if self.publish_folder_path_exclude_regex:
+            regex_pattern = check_regex(self.publish_folder_path_exclude_regex)
+            relative_path = item.path.relative_to(Path(self.repository_directory))
+            relative_path_str = relative_path.as_posix()
+            if regex_pattern.search(relative_path_str):
+                item.skip_publish = True
+                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
                 return
 
         # Skip publishing if the item is not in the include list
@@ -535,41 +550,61 @@ class FabricWorkspace:
             item_create_response = self.endpoint.invoke(
                 method="POST", url=f"{self.base_api_url}/items", body=combined_body
             )
+            api_response = item_create_response
             item_guid = item_create_response["body"]["id"]
             self.repository_items[item_type][item_name].guid = item_guid
 
         elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-            self.endpoint.invoke(
+            update_response = self.endpoint.invoke(
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
                 body=definition_body,
             )
+            api_response = update_response
         elif is_deployed and shell_only_publish:
             # Remove the 'type' key as it's not supported in the update-item API
             metadata_body.pop("type", None)
 
             # Update the item's metadata
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
-            self.endpoint.invoke(
+            metadata_update_response = self.endpoint.invoke(
                 method="PATCH",
                 url=f"{self.base_api_url}/items/{item_guid}",
                 body=metadata_body,
             )
+            api_response = metadata_update_response
 
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:  # noqa: SIM102
-            if is_deployed and self.deployed_items[item_type][item_name].folder_id != item.folder_id:
+        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+            deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
+            # Check if the folder has changed
+            if deployed_item is not None and deployed_item.folder_id != item.folder_id:
                 # Move the item to the correct folder if it has been moved
                 # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/move-item
-                self.endpoint.invoke(
+                move_response = self.endpoint.invoke(
                     method="POST",
                     url=f"{self.base_api_url}/items/{item_guid}/move",
                     body={"targetFolderId": f"{item.folder_id}"},
                 )
+                # For move operations, combine responses if we're tracking them
+                if self.responses is not None:
+                    if api_response:
+                        # If we already have a response, combine them
+                        api_response = {"publish_response": api_response, "move_response": move_response}
+                    else:
+                        # If move is the only operation, use the move response
+                        api_response = move_response
                 logger.debug(
                     f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
+
+        # Store response if responses are being tracked
+        if self.responses is not None and api_response:
+            # Initialize item_type dictionary if it doesn't exist
+            if item_type not in self.responses:
+                self.responses[item_type] = {}
+            self.responses[item_type][item_name] = api_response
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
@@ -758,16 +793,16 @@ class FabricWorkspace:
                 # Get the folder path
                 folder_path = folder_id_to_path_mapping[folder_id]
 
-            # Move up the folder hierarchy and add all ancestor folders
-            current_folder_path = folder_path
-            while current_folder_path != "/":
-                # Get the parent folder path
-                current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
+                # Move up the folder hierarchy and add all ancestor folders
+                current_folder_path = folder_path
+                while current_folder_path != "/":
+                    # Get the parent folder path
+                    current_folder_path = current_folder_path.rsplit("/", 1)[0] or "/"
 
-                # Get the folder_id for this path and add to the unorphaned_folder set
-                parent_folder_id = self.deployed_folders.get(current_folder_path)
-                if parent_folder_id:
-                    unorphaned_folders.add(parent_folder_id)
+                    # Get the folder_id for this path and add to the unorphaned_folder set
+                    parent_folder_id = self.deployed_folders.get(current_folder_path)
+                    if parent_folder_id:
+                        unorphaned_folders.add(parent_folder_id)
 
         # Check if deletion can be skipped after update to unorphaned_folder set
         if unorphaned_folders == set(sorted_folder_ids):
