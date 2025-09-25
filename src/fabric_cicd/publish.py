@@ -241,6 +241,9 @@ def publish_all_items(
     if _should_publish_item_type("GraphQLApi"):
         print_header("Publishing GraphQL APIs")
         items.publish_graphqlapis(fabric_workspace_obj)
+    if _should_publish_item_type("ApacheAirflowJob"):
+        print_header("Publishing Apache Airflow Jobs")
+        items.publish_apacheairflowjobs(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -339,6 +342,7 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "ApacheAirflowJob",
         "GraphQLApi",
         "DataPipeline",
         "Dataflow",

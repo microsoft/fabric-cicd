@@ -7,6 +7,13 @@
 -   **Initial deployment** may not reflect streaming data immediately.
 -   **Reflex** is the item name in source control. Source control may not support all activators/reflexes, as not all sources are compatible.
 
+## Apache Airflow Jobs
+
+-   **Parameterization:**
+    -   The referenced items in DAG files will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   **Connections** are not source controlled and must be created manually.
+-   See known CI/CD limitations [here](https://learn.microsoft.com/en-us/fabric/data-factory/cicd-apache-airflow-jobs#known-limitations).
+
 ## API for GraphQL
 
 -   **Parameterization:**

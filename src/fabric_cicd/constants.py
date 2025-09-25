@@ -32,6 +32,7 @@ ACCEPTED_ITEM_TYPES = (
     "KQLDashboard",
     "Dataflow",
     "GraphQLApi",
+    "ApacheAirflowJob",
 )
 
 # Publish
