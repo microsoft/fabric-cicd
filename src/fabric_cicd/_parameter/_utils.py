@@ -94,7 +94,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     Extracts the workspace ID from the $workspace variable to set as the replace_value.
 
     Supports the following formats:
-    - $workspace.id or $workspace.$id- Returns the target workspace ID
+    - $workspace.id or $workspace.$id - Returns the target workspace ID
     - $workspace.<name> - Resolves the workspace ID from the name
     - $workspace.name.$items.type.name.$id - Resolves an item ID from the specified workspace
     """
@@ -219,6 +219,10 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             item_name = parts[1][:last_period_pos].strip()
             attribute = parts[1][last_period_pos + 1 :].strip()
 
+            logger.warning(
+                "The $items variable format has changed. Please update to the new format: $items.type.name.$attribute"
+            )
+
         # Validate attribute before further processing
         attr_name = attribute.lower()
         if attr_name not in constants.ITEM_ATTR_LOOKUP:
@@ -226,9 +230,6 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             error = ParsingError(msg, logger)
             return None
 
-        logger.warning(
-            "The $items variable format has changed. Please update to the new format: $items.type.name.$attribute"
-        )
         logger.debug(
             f"Processing $items variable with item_type={item_type}, item_name={item_name}, attribute={attribute}"
         )

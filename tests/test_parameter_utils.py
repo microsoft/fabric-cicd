@@ -252,7 +252,35 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.Dataflow.source dataflow.id", get_dataflow_name=True)
         assert result is None
 
-        # Test with non-Dataflow item, should return None
+    def test_extract_item_attribute_warns_legacy_format(self, mock_workspace, caplog):
+        """Tests that _extract_item_attribute warns when using legacy format."""
+        # import logging
+
+        # Use the caplog fixture to capture log messages
+        with caplog.at_level(logging.WARNING):
+            # Call the function with the legacy format
+            result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id", False)
+
+            # Assert that the result is as expected
+            assert result == "notebook-id"
+
+            # Check that the warning message was logged
+            expected_warning = (
+                "The $items variable format has changed. Please update to the new format: $items.type.name.$attribute"
+            )
+            assert expected_warning in caplog.text
+
+        # Clear the log and test that the warning doesn't appear with new format
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            # Call the function with the new format
+            result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.$id", False)
+
+            # Assert that the result is still as expected
+            assert result == "notebook-id"
+
+            # Check that no warning was logged
+            assert expected_warning not in caplog.text
 
     def test_extract_workspace_id_direct(self, mock_workspace):
         """Tests _extract_workspace_id with direct workspace ID variable."""
