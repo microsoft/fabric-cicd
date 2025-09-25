@@ -205,6 +205,9 @@ def publish_all_items(
     if _should_publish_item_type("Notebook"):
         print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
+    if _should_publish_item_type("Eventhouse"):
+        print_header("Publishing Eventhouses")
+        items.publish_eventhouses(fabric_workspace_obj)
     if _should_publish_item_type("SemanticModel"):
         print_header("Publishing Semantic Models")
         items.publish_semanticmodels(fabric_workspace_obj)
@@ -214,9 +217,6 @@ def publish_all_items(
     if _should_publish_item_type("CopyJob"):
         print_header("Publishing Copy Jobs")
         items.publish_copyjobs(fabric_workspace_obj)
-    if _should_publish_item_type("Eventhouse"):
-        print_header("Publishing Eventhouses")
-        items.publish_eventhouses(fabric_workspace_obj)
     if _should_publish_item_type("KQLDatabase"):
         print_header("Publishing KQL Databases")
         items.publish_kqldatabases(fabric_workspace_obj)
@@ -244,6 +244,9 @@ def publish_all_items(
     if _should_publish_item_type("ApacheAirflowJob"):
         print_header("Publishing Apache Airflow Jobs")
         items.publish_apacheairflowjobs(fabric_workspace_obj)
+    if _should_publish_item_type("MountedDataFactory"):
+        print_header("Publishing Mounted Data Factories")
+        items.publish_mounteddatafactories(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -342,6 +345,7 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "MountedDataFactory",
         "ApacheAirflowJob",
         "GraphQLApi",
         "DataPipeline",
@@ -351,10 +355,10 @@ def unpublish_all_orphan_items(
         "KQLDashboard",
         "KQLQueryset",
         "KQLDatabase",
-        "Eventhouse",
         "CopyJob",
         "Report",
         "SemanticModel",
+        "Eventhouse",
         "Notebook",
         "Environment",
         "MirroredDatabase",

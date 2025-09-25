@@ -33,6 +33,7 @@ ACCEPTED_ITEM_TYPES = (
     "Dataflow",
     "GraphQLApi",
     "ApacheAirflowJob",
+    "MountedDataFactory",
 )
 
 # Publish
