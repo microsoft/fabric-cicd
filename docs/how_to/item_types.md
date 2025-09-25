@@ -17,6 +17,13 @@
 -   Changes made to the original API query are not source controlled. You will need to manually update the query in the GraphQL item's query editor within the target workspace.
 -   Only user authentication is currently supported for GraphQL items that source data from the SQL Analytics Endpoint.
 
+## Azure Data Factory
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   Deploys a **mounted** Azure Data Factory to a Fabric Workspace.
+-   Before deployment, ensure the Azure Data Factory resource exists with proper permissions.
+
 ## Copy Jobs
 
 -   **Parameterization:**

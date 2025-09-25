@@ -15,6 +15,7 @@ from fabric_cicd._items._kqlqueryset import publish_kqlquerysets
 from fabric_cicd._items._lakehouse import publish_lakehouses
 from fabric_cicd._items._manage_dependencies import set_unpublish_order
 from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
+from fabric_cicd._items._mounteddatafactory import publish_mounteddatafactories
 from fabric_cicd._items._notebook import publish_notebooks
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
@@ -38,6 +39,7 @@ __all__ = [
     "publish_kqlquerysets",
     "publish_lakehouses",
     "publish_mirroreddatabase",
+    "publish_mounteddatafactories",
     "publish_notebooks",
     "publish_reports",
     "publish_semanticmodels",

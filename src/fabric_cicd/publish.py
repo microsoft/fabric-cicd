@@ -187,6 +187,9 @@ def publish_all_items(
     if _should_publish_item_type("GraphQLApi"):
         print_header("Publishing GraphQL APIs")
         items.publish_graphqlapis(fabric_workspace_obj)
+    if _should_publish_item_type("MountedDataFactory"):
+        print_header("Publishing Mounted Data Factories")
+        items.publish_mounteddatafactories(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -276,6 +279,7 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "MountedDataFactory",
         "GraphQLApi",
         "DataPipeline",
         "Dataflow",
