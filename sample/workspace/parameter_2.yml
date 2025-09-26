@@ -1,0 +1,23 @@
+# Extended parameter file 2: Lakehouse regex patterns
+# This file contains regex-based parameter replacements for lakehouse metadata
+
+find_replace:
+  # Lakehouse Connection Guid regex pattern
+  - find_value: '\#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"'
+    replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+      PPE: "$items.Lakehouse.WithoutSchema.id"   
+      PROD: "$items.Lakehouse.WithoutSchema.id"
+    is_regex: true
+    item_type: "Notebook"
+
+spark_pool:
+  # Spark pool configurations for lakehouse processing
+  - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+    replace_value:
+      PPE: 
+        type: "Capacity"
+        name: "CapacityPool_Large_PPE"
+      PROD: 
+        type: "Capacity"
+        name: "CapacityPool_Large_PROD"
