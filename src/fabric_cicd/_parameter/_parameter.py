@@ -40,9 +40,9 @@ class Parameter:
             "minimum": {"find_key", "replace_value"},
             "maximum": {"find_key", "replace_value", "item_type", "item_name", "file_path"},
         },
-        "templates": {
-            "minimum": {"path", "enabled"},
-            "maximum": {"path", "enabled"},
+        "extend": {
+            "minimum": set(),  # extend can be empty
+            "maximum": set(),  # extend just needs to be a list of strings
         },
     }
 
@@ -152,11 +152,11 @@ class Parameter:
                 parameter_dict = yaml.full_load(yaml_content)
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
 
-                # Load and merge templates if present
-                if "templates" in parameter_dict:
-                    merged_dict = self._load_and_merge_templates(parameter_dict)
-                    # Keep the templates section for validation purposes
-                    merged_dict["templates"] = parameter_dict["templates"]
+                # Load and merge extended parameter files if present
+                if "extend" in parameter_dict:
+                    merged_dict = self._load_and_merge_extended_files(parameter_dict)
+                    # Keep the extend section for validation purposes
+                    merged_dict["extend"] = parameter_dict["extend"]
                     parameter_dict = merged_dict
 
                 return True, parameter_dict
@@ -222,6 +222,7 @@ class Parameter:
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
+            ("extend parameter", lambda: self._validate_parameter("extend")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -233,7 +234,13 @@ class Parameter:
                     return True
                 # Discontinue validation check for absent parameter
                 if (
-                    step in ("find_replace parameter", "key_value_replace parameter", "spark_pool parameter")
+                    step
+                    in (
+                        "find_replace parameter",
+                        "key_value_replace parameter",
+                        "spark_pool parameter",
+                        "extend parameter",
+                    )
                     and msg == "parameter not found"
                 ):
                     continue
@@ -271,9 +278,9 @@ class Parameter:
 
         logger.debug(constants.PARAMETER_MSGS["param_found"].format(param_name))
 
-        # Handle templates differently since they have a different structure
-        if param_name == "templates":
-            return self._validate_templates_parameter()
+        # Handle extend differently since it has a different structure
+        if param_name == "extend":
+            return self._validate_extend_parameter()
 
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
@@ -625,80 +632,68 @@ class Parameter:
 
         return True, "Valid file path"
 
-    def _load_and_merge_templates(self, parameter_dict: dict) -> dict:
-        """Load and merge template parameter files with the main parameter file."""
-        templates = parameter_dict.get("templates", [])
+    def _load_and_merge_extended_files(self, parameter_dict: dict) -> dict:
+        """Load and merge extended parameter files with the main parameter file."""
+        extend_files = parameter_dict.get("extend", [])
 
-        # Start with main parameter dict (excluding templates section)
-        merged_dict = {k: v for k, v in parameter_dict.items() if k != "templates"}
+        # Start with main parameter dict (excluding extend section)
+        merged_dict = {k: v for k, v in parameter_dict.items() if k != "extend"}
 
-        # Load and merge each enabled template
-        for template_config in templates:
-            if not isinstance(template_config, dict):
+        # Load and merge each extended file
+        for file_path in extend_files:
+            if not isinstance(file_path, str):
+                logger.warning(f"Skipping invalid extend file path: {file_path}")
                 continue
 
-            path = template_config.get("path")
-            enabled = template_config.get("enabled")
-
-            if not path or not enabled:
-                continue
-
-            # Convert string "true"/"false" to boolean if needed
-            if isinstance(enabled, str):
-                enabled = enabled.lower() == "true"
-
-            if not enabled:
-                continue
-
-            template_dict = self._load_template_file(path)
-            if template_dict:
-                merged_dict = self._merge_parameter_dicts(merged_dict, template_dict)
+            extended_dict = self._load_extended_file(file_path)
+            if extended_dict:
+                merged_dict = self._merge_parameter_dicts(merged_dict, extended_dict)
 
         return merged_dict
 
-    def _load_template_file(self, template_path: str) -> dict:
-        """Load a template parameter file from the specified path."""
+    def _load_extended_file(self, file_path: str) -> dict:
+        """Load an extended parameter file from the specified path."""
         try:
-            # Resolve template path relative to repository directory
-            if not Path(template_path).is_absolute():
-                template_file_path = Path(self.repository_directory, template_path, "parameter.yml")
+            # Resolve file path relative to repository directory
+            if not Path(file_path).is_absolute():
+                extended_file_path = Path(self.repository_directory, file_path)
             else:
-                template_file_path = Path(template_path, "parameter.yml")
+                extended_file_path = Path(file_path)
 
-            template_file_path = template_file_path.resolve()
+            extended_file_path = extended_file_path.resolve()
 
-            # Validate the template file exists
-            if not template_file_path.is_file():
-                logger.warning(f"Template parameter file not found: {template_file_path}")
+            # Validate the extended file exists
+            if not extended_file_path.is_file():
+                logger.warning(f"Extended parameter file not found: {extended_file_path}")
                 return {}
 
-            # Load and parse the template file
-            with Path.open(template_file_path, encoding="utf-8") as yaml_file:
+            # Load and parse the extended file
+            with Path.open(extended_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
 
                 validation_errors = self._validate_yaml_content(yaml_content)
                 if validation_errors:
                     logger.warning(
-                        f"Template parameter file has validation errors: {template_file_path}: {validation_errors}"
+                        f"Extended parameter file has validation errors: {extended_file_path}: {validation_errors}"
                     )
                     return {}
 
-                template_dict = yaml.full_load(yaml_content)
-                logger.debug(f"Loaded template parameter file: {template_file_path}")
+                extended_dict = yaml.full_load(yaml_content)
+                logger.debug(f"Loaded extended parameter file: {extended_file_path}")
 
-                # Remove templates section from template files to avoid recursion
-                if "templates" in template_dict:
-                    del template_dict["templates"]
-                    logger.debug("Removed templates section from template file to avoid recursion")
+                # Remove extend section from extended files to avoid recursion
+                if "extend" in extended_dict:
+                    del extended_dict["extend"]
+                    logger.debug("Removed extend section from extended file to avoid recursion")
 
-                return template_dict
+                return extended_dict
 
         except yaml.YAMLError as e:
-            logger.warning(f"Error loading template parameter file {template_path}: {e}")
+            logger.warning(f"Error loading extended parameter file {file_path}: {e}")
             return {}
         except Exception as e:
-            logger.warning(f"Unexpected error loading template parameter file {template_path}: {e}")
+            logger.warning(f"Unexpected error loading extended parameter file {file_path}: {e}")
             return {}
 
     def _merge_parameter_dicts(self, base_dict: dict, template_dict: dict) -> dict:
@@ -718,43 +713,20 @@ class Parameter:
 
         return merged_dict
 
-    def _validate_templates_parameter(self) -> tuple[bool, str]:
-        """Validate the templates parameter structure and values."""
-        templates = self.environment_parameter.get("templates", [])
+    def _validate_extend_parameter(self) -> tuple[bool, str]:
+        """Validate the extend parameter structure and values."""
+        extend_files = self.environment_parameter.get("extend", [])
 
-        # Validate templates is a list
-        if not isinstance(templates, list):
-            return False, "Templates must be a list"
+        # Validate extend is a list
+        if not isinstance(extend_files, list):
+            return False, "Extend must be a list"
 
-        # Validate each template configuration
-        for i, template_config in enumerate(templates):
-            if not isinstance(template_config, dict):
-                return False, f"Template {i + 1} must be a dictionary"
+        # Validate each file path in extend
+        for i, file_path in enumerate(extend_files):
+            if not isinstance(file_path, str):
+                return False, f"Extend item {i + 1} must be a string file path"
 
-            # Validate required fields
-            if "path" not in template_config:
-                return False, f"Template {i + 1} missing required field 'path'"
+            if not file_path.strip():
+                return False, f"Extend item {i + 1} must be a non-empty string"
 
-            path = template_config["path"]
-            if not isinstance(path, str) or not path.strip():
-                return False, f"Template {i + 1} 'path' must be a non-empty string"
-
-            # Validate required enabled field
-            if "enabled" not in template_config:
-                return False, f"Template {i + 1} missing required field 'enabled'"
-
-            enabled = template_config["enabled"]
-            if not isinstance(enabled, (bool, str)):
-                return False, f"Template {i + 1} 'enabled' must be a boolean or string"
-
-            # If string, validate it's a valid boolean representation
-            if isinstance(enabled, str) and enabled.lower() not in ["true", "false"]:
-                return False, f"Template {i + 1} 'enabled' string must be 'true' or 'false'"
-
-            # Validate no extra fields
-            allowed_fields = {"path", "enabled"}
-            extra_fields = set(template_config.keys()) - allowed_fields
-            if extra_fields:
-                return False, f"Template {i + 1} has invalid fields: {', '.join(extra_fields)}"
-
-        return True, "Valid templates configuration"
+        return True, "Valid extend configuration"
