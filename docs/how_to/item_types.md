@@ -7,6 +7,13 @@
 -   **Initial deployment** may not reflect streaming data immediately.
 -   **Reflex** is the item name in source control. Source control may not support all activators/reflexes, as not all sources are compatible.
 
+## Apache Airflow Jobs
+
+-   **Parameterization:**
+    -   The referenced items in DAG files will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   **Connections** are not source controlled and must be created manually.
+-   See known CI/CD limitations [here](https://learn.microsoft.com/en-us/fabric/data-factory/cicd-apache-airflow-jobs#known-limitations).
+
 ## API for GraphQL
 
 -   **Parameterization:**
@@ -16,6 +23,13 @@
 -   When using the **Saved Credential** method to connect to data sources, developers must have access to the Saved Credential information in order to successfully deploy GraphQL item.
 -   Changes made to the original API query are not source controlled. You will need to manually update the query in the GraphQL item's query editor within the target workspace.
 -   Only user authentication is currently supported for GraphQL items that source data from the SQL Analytics Endpoint.
+
+## Azure Data Factory
+
+-   **Parameterization:**
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
+-   Deploys a **mounted** Azure Data Factory to a Fabric Workspace.
+-   Before deployment, ensure the Azure Data Factory resource exists with proper permissions.
 
 ## Copy Jobs
 
