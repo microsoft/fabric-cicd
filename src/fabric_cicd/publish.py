@@ -202,6 +202,9 @@ def publish_all_items(
     if _should_publish_item_type("Environment"):
         print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
+    if _should_publish_item_type("DataAgent"):
+        print_header("Publishing Data Agents")
+        items.publish_dataagents(fabric_workspace_obj)
     if _should_publish_item_type("Notebook"):
         print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
@@ -345,6 +348,7 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "DataAgent",
         "MountedDataFactory",
         "ApacheAirflowJob",
         "GraphQLApi",
