@@ -14,7 +14,7 @@ The following contains all major, minor, and patch version release notes.
 -   ✨ Onboard Mounted Data Factory item type ([#406](https://github.com/microsoft/fabric-cicd/issues/406))
 -   ✨ Support dynamic replacement for cross-workspace item IDs ([#558](https://github.com/microsoft/fabric-cicd/issues/558))
 -   ✨ Add option to return API response for publish operations in publish_all_items ([#497](https://github.com/microsoft/fabric-cicd/issues/497))
--   🔧 Fix publish order of Eventhouses and Semantic Models ([#566](https://github.com/microsoft/fabric-cicd/issues/545))
+-   🔧 Fix publish order of Eventhouses and Semantic Models ([#566](https://github.com/microsoft/fabric-cicd/issues/566))
 
 ## Version 0.1.28
 
