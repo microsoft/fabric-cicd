@@ -118,6 +118,13 @@ PARAMETER_MSGS = {
     "param_count": "{} {} parameters found",
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
+    # Template parameter file messages
+    "extended_file_not_found": "Extended parameter file not found: {}",
+    "extended_file_invalid": "Invalid extended parameter file {}: {}",
+    "extended_file_error": "Error loading extended parameter file {}: {}",
+    "extended_file_loaded": "Successfully loaded extended parameter file: {}",
+    "extended_files_processed": "Successfully processed {} extended parameter files",
+    "extended_files_none_valid": "None of the extended parameter files were valid or found",
 }
 
 # Wildcard path support validations

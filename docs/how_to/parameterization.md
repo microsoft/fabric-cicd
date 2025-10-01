@@ -315,6 +315,33 @@ Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, man
 
 **Deployment:** At the start of a deployment, an automated validation checks the validity of the `parameter.yml` file, if it is present. This step ensures that valid parameters are loaded, allowing deployment to run smoothly with correctly applied parameterized configurations. If the parameter file is invalid, the deployment will NOT proceed.
 
+# Parameter File Template
+
+The parameter file system supports modularizing your configuration through the `extend` directive. This allows you to:
+
+1. Split large parameter files into smaller, more manageable pieces
+2. Share common parameters across multiple environments
+3. Organize parameters by function or team
+
+## Basic Usage
+
+In your main `parameter.yml` file, add an `extend` section with a list of files to include:
+
+```yaml
+# Main parameter.yml
+extend:
+    - common_parameters.yml
+    - team_specific_parameters.yml
+    - environment_specific_parameters.yml
+
+find_replace:
+    # Your main parameter file can also contain parameters
+    - find_value: "some-value"
+      replace_value:
+          DEV: "dev-replace"
+          PROD: "prod-replace"
+```
+
 ## Sample Parameter File
 
 An exhaustive example of all capabilities currently supported in the `parameter.yml` file.
