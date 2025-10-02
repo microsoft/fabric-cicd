@@ -1,0 +1,23 @@
+# Example parameter.yml with extend support
+# This demonstrates the new extend functionality for parameter files
+
+# Extend from other parameter files
+extend:
+  - parameter_1.yml
+  - parameter_2.yml
+
+# Main parameter configurations (will be merged with extended files)
+find_replace:
+  - find_value: "main-workspace-id"
+    replace_value:
+      PPE: "$workspace.id"
+      PROD: "$workspace.id"
+
+key_value_replace:
+  - find_key: "$.variables[?(@.name=="Environment")].value"
+    replace_value:
+      PPE: "PPE"
+      PROD: "PROD"
+      UAT: "UAT"
+    item_type: "VariableLibrary"
+    item_name: "Vars"

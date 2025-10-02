@@ -1,0 +1,53 @@
+# Example parameter.yml with template support
+# This demonstrates how to split large parameter files into focused templates
+
+# Templates configuration - load parameter configurations from subfolders
+templates:
+  - path: 'templates/database-configs'
+    enabled: true  # Include database-specific parameters
+  - path: 'templates/lakehouse-configs'
+    enabled: true  # Include lakehouse-specific parameters
+  # Example of disabled template:
+  # - path: 'templates/experimental-configs'
+  #   enabled: false
+
+# Global parameter definitions (applied first)
+find_replace:
+    # Global workspace ID replacement
+    - find_value: "global-workspace-id-placeholder"
+      replace_value:
+        PPE: "$workspace.id"
+        PROD: "$workspace.id"
+      
+    # Global Lakehouse Connection Guid (this will be merged with template configs)
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+        PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path:
+       - "/Hello World.Notebook/notebook-content.py"
+       - "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
+
+key_value_replace:
+    # Global variable replacements
+    - find_key: $.variables[?(@.name=="Environment")].value
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+        UAT: "UAT"
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+
+spark_pool:
+    # Global spark pool configurations
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+        PPE: 
+           type: "Capacity"
+           name: "CapacityPool_Large_PPE"
+        PROD: 
+           type: "Capacity"
+           name: "CapacityPool_Large_PROD"
+      item_name: "World"

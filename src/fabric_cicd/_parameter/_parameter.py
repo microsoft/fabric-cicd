@@ -40,6 +40,10 @@ class Parameter:
             "minimum": {"find_key", "replace_value"},
             "maximum": {"find_key", "replace_value", "item_type", "item_name", "file_path"},
         },
+        "extend": {
+            "minimum": set(),  # extend can be empty
+            "maximum": set(),  # extend just needs to be a list of strings
+        },
     }
 
     LOAD_ERROR_MSG = ""
@@ -147,6 +151,14 @@ class Parameter:
 
                 parameter_dict = yaml.full_load(yaml_content)
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
+
+                # Load and merge extended parameter files if present
+                if "extend" in parameter_dict:
+                    merged_dict = self._load_and_merge_extended_files(parameter_dict)
+                    # Keep the extend section for validation purposes
+                    merged_dict["extend"] = parameter_dict["extend"]
+                    parameter_dict = merged_dict
+
                 return True, parameter_dict
         except yaml.YAMLError as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
@@ -210,6 +222,7 @@ class Parameter:
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
+            ("extend parameter", lambda: self._validate_parameter("extend")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -221,7 +234,13 @@ class Parameter:
                     return True
                 # Discontinue validation check for absent parameter
                 if (
-                    step in ("find_replace parameter", "key_value_replace parameter", "spark_pool parameter")
+                    step
+                    in (
+                        "find_replace parameter",
+                        "key_value_replace parameter",
+                        "spark_pool parameter",
+                        "extend parameter",
+                    )
                     and msg == "parameter not found"
                 ):
                     continue
@@ -243,7 +262,8 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:4]
+        # Get all valid parameter names (excluding internal ones like spark_pool_replace_value)
+        params = [key for key in self.PARAMETER_KEYS if key != "spark_pool_replace_value"]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
@@ -257,6 +277,11 @@ class Parameter:
             return False, "parameter not found"
 
         logger.debug(constants.PARAMETER_MSGS["param_found"].format(param_name))
+
+        # Handle extend differently since it has a different structure
+        if param_name == "extend":
+            return self._validate_extend_parameter()
+
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
@@ -606,3 +631,102 @@ class Parameter:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
+
+    def _load_and_merge_extended_files(self, parameter_dict: dict) -> dict:
+        """Load and merge extended parameter files with the main parameter file."""
+        extend_files = parameter_dict.get("extend", [])
+
+        # Start with main parameter dict (excluding extend section)
+        merged_dict = {k: v for k, v in parameter_dict.items() if k != "extend"}
+
+        # Load and merge each extended file
+        for file_path in extend_files:
+            if not isinstance(file_path, str):
+                logger.warning(f"Skipping invalid extend file path: {file_path}")
+                continue
+
+            extended_dict = self._load_extended_file(file_path)
+            if extended_dict:
+                merged_dict = self._merge_parameter_dicts(merged_dict, extended_dict)
+
+        return merged_dict
+
+    def _load_extended_file(self, file_path: str) -> dict:
+        """Load an extended parameter file from the specified path."""
+        try:
+            # Resolve file path relative to repository directory
+            if not Path(file_path).is_absolute():
+                extended_file_path = Path(self.repository_directory, file_path)
+            else:
+                extended_file_path = Path(file_path)
+
+            extended_file_path = extended_file_path.resolve()
+
+            # Validate the extended file exists
+            if not extended_file_path.is_file():
+                logger.warning(f"Extended parameter file not found: {extended_file_path}")
+                return {}
+
+            # Load and parse the extended file
+            with Path.open(extended_file_path, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml_content = replace_variables_in_parameter_file(yaml_content)
+
+                validation_errors = self._validate_yaml_content(yaml_content)
+                if validation_errors:
+                    logger.warning(
+                        f"Extended parameter file has validation errors: {extended_file_path}: {validation_errors}"
+                    )
+                    return {}
+
+                extended_dict = yaml.full_load(yaml_content)
+                logger.debug(f"Loaded extended parameter file: {extended_file_path}")
+
+                # Remove extend section from extended files to avoid recursion
+                if "extend" in extended_dict:
+                    del extended_dict["extend"]
+                    logger.debug("Removed extend section from extended file to avoid recursion")
+
+                return extended_dict
+
+        except yaml.YAMLError as e:
+            logger.warning(f"Error loading extended parameter file {file_path}: {e}")
+            return {}
+        except Exception as e:
+            logger.warning(f"Unexpected error loading extended parameter file {file_path}: {e}")
+            return {}
+
+    def _merge_parameter_dicts(self, base_dict: dict, template_dict: dict) -> dict:
+        """Merge template parameter dictionary into the base dictionary."""
+        merged_dict = base_dict.copy()
+
+        # Merge each parameter section
+        for param_name, param_values in template_dict.items():
+            if param_name not in merged_dict:
+                merged_dict[param_name] = param_values
+            else:
+                # Append template values to existing parameter section
+                if isinstance(merged_dict[param_name], list) and isinstance(param_values, list):
+                    merged_dict[param_name].extend(param_values)
+                else:
+                    logger.warning(f"Cannot merge parameter section '{param_name}': incompatible types")
+
+        return merged_dict
+
+    def _validate_extend_parameter(self) -> tuple[bool, str]:
+        """Validate the extend parameter structure and values."""
+        extend_files = self.environment_parameter.get("extend", [])
+
+        # Validate extend is a list
+        if not isinstance(extend_files, list):
+            return False, "Extend must be a list"
+
+        # Validate each file path in extend
+        for i, file_path in enumerate(extend_files):
+            if not isinstance(file_path, str):
+                return False, f"Extend item {i + 1} must be a string file path"
+
+            if not file_path.strip():
+                return False, f"Extend item {i + 1} must be a non-empty string"
+
+        return True, "Valid extend configuration"
