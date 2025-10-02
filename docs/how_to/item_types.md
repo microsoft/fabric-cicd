@@ -48,6 +48,11 @@
 -   **Connections** are not source controlled and require manual creation.
 -   If you use connections that differ between environments, parameterize them in the `parameter.yml` file.
 
+## Data Agents
+
+-   **Parameterization:**
+    -   Data source items (e.g., Lakehouse, Warehouse, Semantic Model) will always reference the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+
 ## Data Pipelines
 
 -   **Parameterization:**
