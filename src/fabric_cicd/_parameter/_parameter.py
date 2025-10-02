@@ -40,6 +40,7 @@ class Parameter:
             "minimum": {"find_key", "replace_value"},
             "maximum": {"find_key", "replace_value", "item_type", "item_name", "file_path"},
         },
+        "extend": {"minimum": set(), "maximum": set()},
     }
 
     LOAD_ERROR_MSG = ""
@@ -134,9 +135,10 @@ class Parameter:
         return self.parameter_file_path.is_file()
 
     def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
-        """Validate loading the parameter file to a dictionary."""
+        """Validate loading the parameter file to a dictionary, including any extensions."""
         parameter_dict = {}
         try:
+            # Load the main parameter file
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
@@ -145,12 +147,181 @@ class Parameter:
                     self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(validation_errors)
                     return False, parameter_dict
 
-                parameter_dict = yaml.full_load(yaml_content)
+                parameter_dict = yaml.full_load(yaml_content) or {}
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
+
+                # Process extended parameter files if present
+                if parameter_dict.get("extend"):
+                    parameter_dict = self._process_extended_parameter_files(parameter_dict)
+
                 return True, parameter_dict
+
         except yaml.YAMLError as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
+        except Exception as e:
+            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(f"Unexpected error: {e}")
+            return False, parameter_dict
+
+    def _process_extended_parameter_files(self, base_parameter_dict: dict) -> dict:
+        """
+        Process extended parameter files and merge them with the base parameter dictionary.
+
+        Args:
+            base_parameter_dict: The base parameter dictionary from the main file
+
+        Returns:
+            The merged parameter dictionary including extensions
+        """
+        if not isinstance(base_parameter_dict.get("extend"), list):
+            logger.warning("The 'extend' key must contain a list of parameter files to extend")
+            return base_parameter_dict
+
+        # Get the directory of the main parameter file for relative path resolution
+        base_dir = self.parameter_file_path.parent
+        extended_files = base_parameter_dict["extend"]
+        successful_extensions = 0
+
+        # Process each extended file
+        for extension_file in extended_files:
+            try:
+                # Validate the extension file path
+                if not isinstance(extension_file, str):
+                    logger.warning(f"Invalid extension file specification: {extension_file}. Must be a string path.")
+                    continue
+
+                # Resolve the path relative to the main parameter file
+                extension_path = (base_dir / extension_file).resolve()
+
+                # Ensure the path is within the repository directory to prevent path traversal
+                try:
+                    extension_path.relative_to(self.repository_directory)
+                except ValueError:
+                    logger.warning(
+                        f"Extended parameter file path is outside the repository directory: {extension_path}"
+                    )
+                    continue
+
+                # Check that the file exists
+                if not extension_path.is_file():
+                    logger.warning(constants.PARAMETER_MSGS["extended_file_not_found"].format(extension_path))
+                    continue
+
+                # Load and validate the extension file
+                extension_dict = self._load_extended_parameter_file(extension_path)
+                if not extension_dict:
+                    continue
+
+                # Merge the extension with the base dictionary
+                base_parameter_dict = self._merge_parameter_dicts(base_parameter_dict, extension_dict)
+                successful_extensions += 1
+                logger.info(constants.PARAMETER_MSGS["extended_file_loaded"].format(extension_path))
+
+            except Exception as e:
+                logger.error(f"Error processing extended parameter file {extension_file}: {e}")
+                continue
+
+        # Log the results of extension processing
+        if successful_extensions > 0:
+            logger.info(constants.PARAMETER_MSGS["extended_files_processed"].format(successful_extensions))
+        elif extended_files:
+            logger.warning(constants.PARAMETER_MSGS["extended_files_none_valid"])
+
+        # Remove the extend directive after processing to prevent duplicate processing
+        if "extend" in base_parameter_dict:
+            del base_parameter_dict["extend"]
+
+        return base_parameter_dict
+
+    def _load_extended_parameter_file(self, file_path: Path) -> dict:
+        """
+        Load and validate an extended parameter file.
+
+        Args:
+            file_path: The path to the extended parameter file
+
+        Returns:
+            The loaded parameter dictionary or an empty dict if loading failed
+        """
+        try:
+            with Path.open(file_path, encoding="utf-8") as ext_file:
+                ext_content = ext_file.read()
+                ext_content = replace_variables_in_parameter_file(ext_content)
+
+                # Validate the content
+                ext_validation_errors = self._validate_yaml_content(ext_content)
+                if ext_validation_errors:
+                    logger.error(
+                        constants.PARAMETER_MSGS["extended_file_invalid"].format(file_path, ext_validation_errors)
+                    )
+                    return {}
+
+                # Load the content
+                ext_dict = yaml.full_load(ext_content) or {}
+
+                # Process nested extensions if present (support recursive extension)
+                if "extend" in ext_dict and isinstance(ext_dict["extend"], list):
+                    # Save current parameter file path to restore it later
+                    original_path = self.parameter_file_path
+                    try:
+                        # Temporarily change the parameter file path for correct relative path resolution
+                        self.parameter_file_path = file_path
+                        ext_dict = self._process_extended_parameter_files(ext_dict)
+                    finally:
+                        # Restore the original parameter file path
+                        self.parameter_file_path = original_path
+
+                return ext_dict
+
+        except yaml.YAMLError as e:
+            logger.error(constants.PARAMETER_MSGS["extended_file_error"].format(file_path, e))
+            return {}
+        except Exception as e:
+            logger.error(constants.PARAMETER_MSGS["extended_file_error"].format(file_path, f"Unexpected error: {e}"))
+            return {}
+
+    def _merge_parameter_dicts(self, base_dict: dict, extension_dict: dict) -> dict:
+        """
+        Merge two parameter dictionaries, properly handling lists and nested structures.
+        All entries are preserved as-is, letting validation handle any issues later.
+
+        Args:
+            base_dict: The base parameter dictionary
+            extension_dict: The extension parameter dictionary to merge into the base
+
+        Returns:
+            A merged parameter dictionary
+        """
+        result = base_dict.copy()
+
+        for key, ext_value in extension_dict.items():
+            # Skip the 'extend' key as it's processed separately
+            if key == "extend":
+                continue
+
+            # If the key doesn't exist in the base dict, just add it
+            if key not in result:
+                result[key] = ext_value
+                continue
+
+            base_value = result[key]
+
+            # Handle merging based on value types
+            if isinstance(base_value, list) and isinstance(ext_value, list):
+                # For parameter lists like find_replace, append items from extension
+                result[key] = base_value + ext_value
+
+            elif isinstance(base_value, dict) and isinstance(ext_value, dict):
+                # For nested dictionaries, recursively merge them
+                result[key] = self._merge_parameter_dicts(base_value, ext_value)
+
+            else:
+                # For scalar values or type mismatches, add both to a list
+                # This preserves all values and lets validation handle any issues
+                result[key] = [base_value, ext_value]
+                logger.debug(f"Type mismatch for key '{key}': creating list of values for validation")
+
+        return result
 
     def _validate_yaml_content(self, content: str) -> list[str]:
         """Validate the yaml content of the parameter file."""
