@@ -364,6 +364,25 @@ class TestParameterUtilities:
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
         mock_workspace._lookup_item_id.assert_called_once_with("resolved-workspace-id", "Notebook", "Test Notebook")
 
+    def test_extract_workspace_id_with_item_attribute_lookup(self, mock_workspace):
+        """Tests _extract_workspace_id with item lookup in another workspace."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+
+        # Mock the _lookup_item_id method
+        mock_workspace._lookup_item_id = mock.MagicMock(return_value="item-123-id")
+
+        # Test with $workspace.<name>.$items.<item_type>.<item_name>.$attribute format
+        result = _extract_workspace_id(
+            mock_workspace, "$workspace.test_workspace.$items.Notebook.Test Notebook.$sqlendpoint"
+        )
+
+        assert result == "item-123-id"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_id.assert_called_once_with("resolved-workspace-id", "Notebook", "Test Notebook")
+
     def test_extract_workspace_id_with_item_lookup_not_found(self, mock_workspace):
         """Tests _extract_workspace_id when item lookup fails."""
         from fabric_cicd._parameter._utils import _extract_workspace_id

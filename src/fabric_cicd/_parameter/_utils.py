@@ -107,7 +107,9 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
         var_string = replace_value.removeprefix("$workspace.")
 
         # Check for pattern: $workspace.name.$items.type.name.$id
-        if "$items." in var_string and var_string.endswith(".$id"):
+        if "$items." in var_string and var_string.endswith(
+            tuple(f"{prefix}{suffix}" for suffix in constants.ITEM_ATTR_LOOKUP for prefix in [".$", "."])
+        ):
             # Split on the $items prefix to get workspace name
             workspace_part, items_part = var_string.split(".$items.", 1)
             workspace_name = workspace_part.strip()
@@ -117,12 +119,12 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
             workspace_id = workspace_obj._resolve_workspace_id(workspace_name)
 
             # Remove the trailing .$id to get the item info
-            items_info = items_part.removesuffix(".$id")
+            items_info = items_part.rsplit(".", 1)[0]
 
             # Find the last period to separate item type from item name
             last_period_pos = items_info.rfind(".")
             if last_period_pos == -1:
-                msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.name.$items.type.name.$id"
+                msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.name.$items.type.name.$attribute"
                 raise ParsingError(msg, logger)
 
             # Extract item_type and item_name
