@@ -54,10 +54,16 @@ INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
 
 # Property path to get SQL Endpoint or Eventhouse URI
-PROPERTY_PATH_MAPPING = {
-    "Lakehouse": "body/properties/sqlEndpointProperties/connectionString",
-    "Warehouse": "body/properties/connectionString",
-    "Eventhouse": "body/properties/queryServiceUri",
+PROPERTY_PATH_ATTR_MAPPING = {
+    "Lakehouse": {
+        "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+    },
+    "Warehouse": {
+        "sqlendpoint": "body/properties/connectionString",
+    },
+    "Eventhouse": {
+        "queryserviceuri": "body/properties/queryServiceUri",
+    },
 }
 
 # Parameter file configs

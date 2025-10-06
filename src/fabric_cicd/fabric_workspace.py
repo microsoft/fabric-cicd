@@ -184,42 +184,41 @@ class FabricWorkspace:
         raise InputError(msg, logger)
 
     def _get_item_attribute(
-        self, workspace_id: str, item_type: str, item_guid: str, item_name: str, attribute_name: Optional[str] = None
+        self, workspace_id: str, item_type: str, item_guid: str, item_name: str, attribute_name: str
     ) -> str:
         """Returns the attribute value of an item in the specified workspace based on item type and id"""
-        if item_type not in constants.PROPERTY_PATH_MAPPING or not item_guid:
+        # No need to make API calls if we don't have an item guid
+        if not item_guid:
             return ""
 
-        # Set the property path based on item_type
-        property_path = constants.PROPERTY_PATH_MAPPING.get(item_type)
-        if not property_path:
-            msg = f"No property path mapping defined for {item_type}"
-            raise InputError(msg, logger)
+        # Check if this item type has property mappings
+        if item_type not in constants.PROPERTY_PATH_ATTR_MAPPING:
+            logger.debug(f"No property path mappings defined for {item_type}")
+            return ""
 
-        # Use attribute name to validate in the context of user input
-        if attribute_name is not None:
-            # Only make API call if attribute aligns with the property path
-            valid_attribute = bool(
-                (property_path.endswith("connectionString") and attribute_name == "sqlendpoint")
-                or (property_path.endswith("queryServiceUri") and attribute_name == "queryserviceuri")
+        # Get the attribute mappings for this item type
+        attribute_mappings = constants.PROPERTY_PATH_ATTR_MAPPING.get(item_type)
+
+        # Check if the requested attribute is supported
+        if attribute_name not in attribute_mappings:
+            logger.debug(
+                f"Attribute '{attribute_name}' not supported for {item_type} '{item_name}'. Supported: {list(attribute_mappings.keys())}"
             )
-            if not valid_attribute:
-                logger.debug(
-                    f"Attribute name '{attribute_name}' does not align with property path for item type '{item_type}'."
-                )
-                return ""
+            return ""
+
+        # Get the property path for this attribute
+        property_path = attribute_mappings[attribute_name]
 
         response = self.endpoint.invoke(
             method="GET",
             url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}/{item_type.lower()}s/{item_guid}",
         )
-        # Extract the property value using the path
+        # Extract the attribute value using the path
         attribute_value = dpath.get(response, property_path, default="")
         if not attribute_value:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
             raise InputError(msg, logger)
 
-        # Return the attribute value
         return attribute_value
 
     def _refresh_parameter_file(self) -> None:
@@ -356,9 +355,13 @@ class FabricWorkspace:
 
             # Get additional properties
             if item_type in ["Lakehouse", "Warehouse"]:
-                sql_endpoint = self._get_item_attribute(self.workspace_id, item_type, item_guid, item_name)
+                sql_endpoint = self._get_item_attribute(
+                    self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                )
             if item_type in ["Eventhouse"]:
-                query_service_uri = self._get_item_attribute(self.workspace_id, item_type, item_guid, item_name)
+                query_service_uri = self._get_item_attribute(
+                    self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
+                )
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
