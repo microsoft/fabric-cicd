@@ -167,16 +167,60 @@ class FabricWorkspace:
         msg = f"Workspace ID could not be resolved from workspace name: {workspace_name}."
         raise InputError(msg, logger)
 
-    def _lookup_item_id(self, workspace_id: str, item_type: str, item_name: str) -> str:
-        """Lookup item ID in the specified workspace based on item type and name."""
+    def _lookup_item_attribute(self, workspace_id: str, item_type: str, item_name: str, attribute_name: str) -> str:
+        """Lookup item attribute in the specified workspace based on item type and name."""
         response = self.endpoint.invoke(
             method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}/items"
         )
         for item in response["body"]["value"]:
             if item["type"] == item_type and item["displayName"] == item_name:
-                return item["id"]
+                item_guid = item["id"]
+                if attribute_name == "id":
+                    return item_guid
+                # For other attribute, use the item guid to get the attribute value
+                return self._get_item_attribute(workspace_id, item_type, item_guid, item_name, attribute_name)
+
         msg = f"Failed to look up item in workspace: {workspace_id}, item_type: {item_type}, item_name: {item_name}"
         raise InputError(msg, logger)
+
+    def _get_item_attribute(
+        self, workspace_id: str, item_type: str, item_guid: str, item_name: str, attribute_name: Optional[str] = None
+    ) -> str:
+        """Returns the attribute value of an item in the specified workspace based on item type and id"""
+        if item_type not in constants.PROPERTY_PATH_MAPPING or not item_guid:
+            return ""
+
+        # Set the property path based on item_type
+        property_path = constants.PROPERTY_PATH_MAPPING.get(item_type)
+        if not property_path:
+            msg = f"No property path mapping defined for {item_type}"
+            raise InputError(msg, logger)
+
+        # Use attribute name to validate in the context of user input
+        if attribute_name is not None:
+            # Only make API call if attribute aligns with the property path
+            valid_attribute = bool(
+                (property_path.endswith("connectionString") and attribute_name == "sqlendpoint")
+                or (property_path.endswith("queryServiceUri") and attribute_name == "queryserviceuri")
+            )
+            if not valid_attribute:
+                logger.debug(
+                    f"Attribute name '{attribute_name}' does not align with property path for item type '{item_type}'."
+                )
+                return ""
+
+        response = self.endpoint.invoke(
+            method="GET",
+            url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}/{item_type.lower()}s/{item_guid}",
+        )
+        # Extract the property value using the path
+        attribute_value = dpath.get(response, property_path, default="")
+        if not attribute_value:
+            msg = f"Attribute value not found for {item_type} '{item_name}'"
+            raise InputError(msg, logger)
+
+        # Return the attribute value
+        return attribute_value
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
@@ -310,21 +354,11 @@ class FabricWorkspace:
             if item_type not in self.workspace_items:
                 self.workspace_items[item_type] = {}
 
-            # Get additional properties based on item type
-            if item_type in ["Lakehouse", "Warehouse", "Eventhouse"]:
-                # Construct the endpoint URL and set the property path based on item type
-                endpoint_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
-                response = self.endpoint.invoke(method="GET", url=endpoint_url)
-                # Use dpath.get for safe nested property access
-                property_path = constants.PROPERTY_PATH_MAPPING[item_type]
-                property_value = dpath.get(response, property_path, default="")
-                # Set the appropriate variable based on the last segment of the path
-                if not property_value:
-                    logger.debug(f"Failed to get endpoint for {item_type} '{item_name}'")
-                elif property_path.endswith("connectionString"):
-                    sql_endpoint = property_value
-                elif property_path.endswith("queryServiceUri"):
-                    query_service_uri = property_value
+            # Get additional properties
+            if item_type in ["Lakehouse", "Warehouse"]:
+                sql_endpoint = self._get_item_attribute(self.workspace_id, item_type, item_guid, item_name)
+            if item_type in ["Eventhouse"]:
+                query_service_uri = self._get_item_attribute(self.workspace_id, item_type, item_guid, item_name)
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(

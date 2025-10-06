@@ -157,8 +157,8 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
     -   **Workspace variable:**
         -   `$workspace.id` or `$workspace.$id`, replaces a value with the workspace ID of the **target environment**.
         -   `$workspace.<name>`, replaces a value with the workspace ID of the specified **workspace name**, e.g. `$workspace.TestWorkspace`.
-        -   `$workspace.<name>.$items.<item_type>.<item_name>.$id`, replaces a value with the item ID of the specified item in a specified workspace, e.g. `$workspace.TestWorkspace.Lakehouse.Example_LH.$id`
-        -   **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$id` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+        -   `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, replaces a value with the **attribute value** of the specified item in a specified workspace (see **supported attributes** below), e.g. `$workspace.TestWorkspace.Lakehouse.Example_LH.$id` or `$workspace.TestWorkspace.Warehouse.Example_WH.$sqlendpoint`
+        -   **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
     -   **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
         -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
