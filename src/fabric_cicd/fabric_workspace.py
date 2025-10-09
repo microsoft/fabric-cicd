@@ -167,6 +167,17 @@ class FabricWorkspace:
         msg = f"Workspace ID could not be resolved from workspace name: {workspace_name}."
         raise InputError(msg, logger)
 
+    def _lookup_item_id(self, workspace_id: str, item_type: str, item_name: str) -> str:
+        """Lookup item ID in the specified workspace based on item type and name."""
+        response = self.endpoint.invoke(
+            method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}/items"
+        )
+        for item in response["body"]["value"]:
+            if item["type"] == item_type and item["displayName"] == item_name:
+                return item["id"]
+        msg = f"Failed to look up item in workspace: {workspace_id}, item_type: {item_type}, item_name: {item_name}"
+        raise InputError(msg, logger)
+
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
         from fabric_cicd._parameter._parameter import Parameter

@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.28"
+VERSION = "0.1.29"
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -32,6 +32,8 @@ ACCEPTED_ITEM_TYPES = (
     "KQLDashboard",
     "Dataflow",
     "GraphQLApi",
+    "ApacheAirflowJob",
+    "MountedDataFactory",
 )
 
 # Publish

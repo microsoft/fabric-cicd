@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from fabric_cicd.fabric_workspace import FabricWorkspace
+from fabric_cicd.fabric_workspace import FabricWorkspace, constants
 
 
 @pytest.fixture
@@ -1018,3 +1018,64 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
         # Verify the error message contains the expected text
         assert "base_api_url is no longer supported" in str(exc_info.value)
         assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)
+
+
+def test_lookup_item_id(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that _lookup_item_id correctly finds items in another workspace."""
+    # Mock endpoint response for workspace items
+    mock_endpoint = MagicMock()
+
+    # Ensure the mock response exactly matches what's expected
+    mock_response = {
+        "body": {
+            "value": [
+                {"id": "item-id-1234", "type": "Notebook", "displayName": "Test Notebook"},
+                {"id": "item-id-5678", "type": "DataPipeline", "displayName": "Test Pipeline"},
+            ]
+        }
+    }
+    mock_endpoint.invoke.return_value = mock_response
+
+    # Create a workspace with our mocked endpoint
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook", "DataPipeline"],
+        )
+
+        # Replace the endpoint attribute to ensure our mock is being used
+        workspace.endpoint = mock_endpoint
+
+        # Test finding an existing item
+        item_id = workspace._lookup_item_id("target-workspace-id", "Notebook", "Test Notebook")
+        assert item_id == "item-id-1234"
+
+        # Test API was called with correct parameters
+        mock_endpoint.invoke.assert_called_with(
+            method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/target-workspace-id/items"
+        )
+
+        # Test finding a different item type
+        item_id = workspace._lookup_item_id("target-workspace-id", "DataPipeline", "Test Pipeline")
+        assert item_id == "item-id-5678"
+
+        # Test item not found - should raise InputError
+        from fabric_cicd._common._exceptions import InputError
+
+        with pytest.raises(InputError) as exc_info:
+            workspace._lookup_item_id("target-workspace-id", "Notebook", "Non-Existent Notebook")
+
+        assert "Failed to look up item in workspace" in str(exc_info.value)
+        assert "target-workspace-id" in str(exc_info.value)
+        assert "Notebook" in str(exc_info.value)
+        assert "Non-Existent Notebook" in str(exc_info.value)
+
+        # Test item type not found - should raise InputError
+        with pytest.raises(InputError) as exc_info:
+            workspace._lookup_item_id("target-workspace-id", "NonExistentType", "Test Item")
+
+        assert "Failed to look up item in workspace" in str(exc_info.value)
+        assert "target-workspace-id" in str(exc_info.value)
+        assert "NonExistentType" in str(exc_info.value)
+        assert "Test Item" in str(exc_info.value)
