@@ -5,6 +5,8 @@
 
 import json
 import logging
+from functools import partial
+from typing import Callable, List
 
 import dpath
 
@@ -24,7 +26,6 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
     """
     item_type = "Lakehouse"
-
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
         creation_payload = next(
             (
@@ -35,28 +36,21 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             None,
         )
 
+        post_steps: List[Callable[[], None]] = []
+
+        if not item.skip_publish:
+            post_steps = [partial(check_sqlendpoint_provision_status, fabric_workspace_obj, item)]
+
+            if "enable_shortcut_publish" in constants.FEATURE_FLAG:
+                post_steps.append(partial(process_shortcuts, fabric_workspace_obj, item))
+
         fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=item_type,
             creation_payload=creation_payload,
             skip_publish_logging=True,
+            post_publish_steps=post_steps,
         )
-
-        # Check if the item is published to avoid any post publish actions
-        if item.skip_publish:
-            continue
-
-        check_sqlendpoint_provision_status(fabric_workspace_obj, item)
-
-        logger.info(f"{constants.INDENT}Published")
-
-    # Need all lakehouses published first to protect interrelationships
-    if "enable_shortcut_publish" in constants.FEATURE_FLAG:
-        for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
-            # Check if the item is published to avoid any post publish actions
-            if item_obj.skip_publish:
-                continue
-            process_shortcuts(fabric_workspace_obj, item_obj)
 
 
 def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
