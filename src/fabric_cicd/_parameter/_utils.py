@@ -120,12 +120,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
                     break
 
             if not valid_attribute:
-                # Extract the attribute part to show in the error message
-                if ".$" in var_string:
-                    _, invalid_attr = var_string.rsplit(".$", 1)
-                    msg = f"Invalid attribute '${invalid_attr}' in cross-workspace variable. Supported attributes: ${', $'.join(constants.ITEM_ATTR_LOOKUP)}"
-                else:
-                    msg = f"Missing attribute in cross-workspace variable '{replace_value}'. Expected format: $workspace.name.$items.type.name.$attribute where $attribute is one of: ${', $'.join(constants.ITEM_ATTR_LOOKUP)}"
+                msg = f"Invalid syntax or missing attribute in cross-workspace variable '{replace_value}'. Expected format: $workspace.name.$items.type.name.$attribute where attribute is one of: {', '.join(constants.ITEM_ATTR_LOOKUP)}"
                 raise ParsingError(msg, logger)
 
             # Split on the $items prefix to get workspace name
