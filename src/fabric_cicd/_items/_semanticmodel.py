@@ -66,7 +66,7 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
             logger.warning(f"No gateway binding found for semantic model: {semantic_model_name}")
 
 
-def bind_semanticmodel_to_gateway(fabric_workspace_obj: FabricWorkspace, datasets_id: str, gateway_id: str) -> str:
+def bind_semanticmodel_to_gateway(fabric_workspace_obj: FabricWorkspace, datasets_id: str, gateway_id: str) -> int:
     """
     Binds a semantic model to a specified gateway.
 
