@@ -131,9 +131,8 @@ def publish_all_items(
 
     has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
 
-    if (
-        not has_assigned_capacity
-        and not set(fabric_workspace_obj.item_type_in_scope).issubset(set(constants.NO_ASSIGNED_CAPACITY_REQUIRED))
+    if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
+        set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
@@ -208,6 +207,9 @@ def publish_all_items(
     if _should_publish_item_type("Notebook"):
         print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
+    if _should_publish_item_type("UserDataFunction"):
+        print_header("Publishing User Data Functions")
+        items.publish_userdatafunctions(fabric_workspace_obj)
     if _should_publish_item_type("Eventhouse"):
         print_header("Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
@@ -368,6 +370,7 @@ def unpublish_all_orphan_items(
         "SemanticModel",
         "Eventhouse",
         "Notebook",
+        "UserDataFunction",
         "Environment",
         "MirroredDatabase",
         "SQLDatabase",

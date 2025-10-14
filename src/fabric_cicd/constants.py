@@ -36,6 +36,7 @@ ACCEPTED_ITEM_TYPES = (
     "MountedDataFactory",
     "DataAgent",
     "OrgApp",
+    "UserDataFunction",
 )
 
 # Publish
