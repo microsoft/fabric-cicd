@@ -146,6 +146,12 @@
 -   **SQL Database content is not deployed.** Only the item shell is deployed. The SQL database schema (DDL) must be deployed separately using a DACPAC or other tools such as dbt.
 -   **Unpublish** is disabled by default, enable with feature flag `enable_sqldatabase_unpublish`.
 
+## User Data Functions
+
+-   **Parameterization:**
+    -   User Data Functions attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
+-   User Data Functions are Python functions that can be invoked from notebooks and data pipelines. See [User Data Functions overview](https://learn.microsoft.com/en-us/fabric/data-engineering/user-data-functions/user-data-functions-overview) for more details.
+
 ## Variable Libraries
 
 -   **Parameterization:**
