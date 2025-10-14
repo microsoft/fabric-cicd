@@ -96,7 +96,8 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     Supports the following formats:
     - $workspace.id or $workspace.$id - Returns the target workspace ID
     - $workspace.<name> - Resolves the workspace ID from the name
-    - $workspace.name.$items.type.name.$id - Resolves an item ID from the specified workspace
+    - $workspace.<name>.$items.<type>.<name>.$<attribute> - Resolves an item attribute from the specified workspace,
+      where $attribute is any supported attribute in constants.ITEM_ATTR_LOOKUP
     """
     # Case 1: $workspace.id
     if replace_value == "$workspace.id" or replace_value == "$workspace.$id":
@@ -106,8 +107,22 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
         # Extract the variable string without the prefix
         var_string = replace_value.removeprefix("$workspace.")
 
-        # Check for pattern: $workspace.name.$items.type.name.$id
-        if "$items." in var_string and var_string.endswith(".$id"):
+        # Check if this is a cross-workspace item reference
+        if "$items." in var_string:
+            # Check if the variable ends with a valid attribute
+            valid_attribute = False
+            attribute = None
+
+            for attr in constants.ITEM_ATTR_LOOKUP:
+                if var_string.endswith(f".${attr}"):
+                    valid_attribute = True
+                    attribute = attr
+                    break
+
+            if not valid_attribute:
+                msg = f"Invalid syntax or missing attribute in cross-workspace variable '{replace_value}'. Expected format: $workspace.name.$items.type.name.$attribute where attribute is one of: {', '.join(constants.ITEM_ATTR_LOOKUP)}"
+                raise ParsingError(msg, logger)
+
             # Split on the $items prefix to get workspace name
             workspace_part, items_part = var_string.split(".$items.", 1)
             workspace_name = workspace_part.strip()
@@ -116,29 +131,29 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
             # Get workspace ID
             workspace_id = workspace_obj._resolve_workspace_id(workspace_name)
 
-            # Remove the trailing .$id to get the item info
-            items_info = items_part.removesuffix(".$id")
+            # Remove the trailing .$attribute to get the item info
+            items_info = items_part.removesuffix(f".${attribute}")
 
             # Find the last period to separate item type from item name
             last_period_pos = items_info.rfind(".")
             if last_period_pos == -1:
-                msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.name.$items.type.name.$id"
+                msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.name.$items.type.name.$attribute"
                 raise ParsingError(msg, logger)
 
             # Extract item_type and item_name
             item_type = items_info[:last_period_pos].strip()
             item_name = items_info[last_period_pos + 1 :].strip()
 
-            logger.debug(f"Extracted item type: {item_type}, item name: {item_name}")
+            logger.debug(f"Extracted item type: {item_type}, item name: {item_name}, attribute: {attribute}")
 
             if item_type not in constants.ACCEPTED_ITEM_TYPES:
                 msg = f"Item type '{item_type}' is invalid or not supported"
                 raise ParsingError(msg, logger)
 
-            # Look up the item in the specified workspace
-            item_id = workspace_obj._lookup_item_id(workspace_id, item_type, item_name)
-            logger.debug(f"Found item ID: {item_id}")
-            return item_id
+            # Look up the attribute value of the item in the specified workspace
+            attribute_value = workspace_obj._lookup_item_attribute(workspace_id, item_type, item_name, attribute)
+            logger.debug(f"Found item {attribute}: {attribute_value}")
+            return attribute_value
 
         # Pattern: $workspace.<name>
         workspace_name = var_string.strip()

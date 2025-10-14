@@ -354,15 +354,18 @@ class TestParameterUtilities:
         # Mock the _resolve_workspace_id method
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
 
-        # Mock the _lookup_item_id method
-        mock_workspace._lookup_item_id = mock.MagicMock(return_value="item-123-id")
+        # Mock the _lookup_item_attribute method
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="item-123-id")
 
         # Test with $workspace.<name>.$items.<item_type>.<item_name>.$id format
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$items.Notebook.Test Notebook.$id")
 
         assert result == "item-123-id"
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
-        mock_workspace._lookup_item_id.assert_called_once_with("resolved-workspace-id", "Notebook", "Test Notebook")
+        # attribute should be passed without leading '$'
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Notebook", "Test Notebook", "id"
+        )
 
     def test_extract_workspace_id_with_item_lookup_not_found(self, mock_workspace):
         """Tests _extract_workspace_id when item lookup fails."""
@@ -371,18 +374,20 @@ class TestParameterUtilities:
         # Mock the _resolve_workspace_id method
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
 
-        # Mock the _lookup_item_id method to raise InputError (item not found)
+        # Mock the _lookup_item_attribute method to raise InputError (item not found)
         error_msg = (
             "Failed to look up item in workspace: resolved-workspace-id, item_type: Notebook, item_name: Test Notebook"
         )
-        mock_workspace._lookup_item_id = mock.MagicMock(side_effect=InputError(error_msg, logger))
+        mock_workspace._lookup_item_attribute = mock.MagicMock(side_effect=InputError(error_msg, logger))
 
         # Should re-raise the InputError
         with pytest.raises(InputError, match=re.escape(error_msg)):
             _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$items.Notebook.Test Notebook.$id")
 
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
-        mock_workspace._lookup_item_id.assert_called_once_with("resolved-workspace-id", "Notebook", "Test Notebook")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Notebook", "Test Notebook", "id"
+        )
 
     @pytest.mark.parametrize(
         "invalid_var",
@@ -399,6 +404,40 @@ class TestParameterUtilities:
         # Test with invalid formats
         with pytest.raises(ParsingError):
             _extract_workspace_id(mock_workspace, invalid_var)
+
+    def test_extract_workspace_id_with_item_lookup_sqlendpoint(self, mock_workspace):
+        """Tests _extract_workspace_id resolves sqlendpoint from another workspace via $items reference."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="lakehouse-endpoint-value")
+
+        result = _extract_workspace_id(
+            mock_workspace, "$workspace.test_workspace.$items.Lakehouse.Test_Lakehouse.$sqlendpoint"
+        )
+
+        assert result == "lakehouse-endpoint-value"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Lakehouse", "Test_Lakehouse", "sqlendpoint"
+        )
+
+    def test_extract_workspace_id_with_item_lookup_queryserviceuri(self, mock_workspace):
+        """Tests _extract_workspace_id resolves queryserviceuri from another workspace via $items reference."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="eventhouse-query-uri-value")
+
+        result = _extract_workspace_id(
+            mock_workspace, "$workspace.test_workspace.$items.Eventhouse.Test Eventhouse.$queryserviceuri"
+        )
+
+        assert result == "eventhouse-query-uri-value"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Eventhouse", "Test Eventhouse", "queryserviceuri"
+        )
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""

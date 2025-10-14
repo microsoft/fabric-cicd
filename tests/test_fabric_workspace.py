@@ -1020,8 +1020,8 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
         assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)
 
 
-def test_lookup_item_id(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
-    """Test that _lookup_item_id correctly finds items in another workspace."""
+def test_lookup_item_attribute(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that _lookup_item_attribute correctly finds items in another workspace."""
     # Mock endpoint response for workspace items
     mock_endpoint = MagicMock()
 
@@ -1048,7 +1048,7 @@ def test_lookup_item_id(patched_fabric_workspace, valid_workspace_id, temp_works
         workspace.endpoint = mock_endpoint
 
         # Test finding an existing item
-        item_id = workspace._lookup_item_id("target-workspace-id", "Notebook", "Test Notebook")
+        item_id = workspace._lookup_item_attribute("target-workspace-id", "Notebook", "Test Notebook", "id")
         assert item_id == "item-id-1234"
 
         # Test API was called with correct parameters
@@ -1057,14 +1057,14 @@ def test_lookup_item_id(patched_fabric_workspace, valid_workspace_id, temp_works
         )
 
         # Test finding a different item type
-        item_id = workspace._lookup_item_id("target-workspace-id", "DataPipeline", "Test Pipeline")
+        item_id = workspace._lookup_item_attribute("target-workspace-id", "DataPipeline", "Test Pipeline", "id")
         assert item_id == "item-id-5678"
 
         # Test item not found - should raise InputError
         from fabric_cicd._common._exceptions import InputError
 
         with pytest.raises(InputError) as exc_info:
-            workspace._lookup_item_id("target-workspace-id", "Notebook", "Non-Existent Notebook")
+            workspace._lookup_item_attribute("target-workspace-id", "Notebook", "Non-Existent Notebook", "id")
 
         assert "Failed to look up item in workspace" in str(exc_info.value)
         assert "target-workspace-id" in str(exc_info.value)
@@ -1073,7 +1073,7 @@ def test_lookup_item_id(patched_fabric_workspace, valid_workspace_id, temp_works
 
         # Test item type not found - should raise InputError
         with pytest.raises(InputError) as exc_info:
-            workspace._lookup_item_id("target-workspace-id", "NonExistentType", "Test Item")
+            workspace._lookup_item_attribute("target-workspace-id", "NonExistentType", "Test Item", "id")
 
         assert "Failed to look up item in workspace" in str(exc_info.value)
         assert "target-workspace-id" in str(exc_info.value)

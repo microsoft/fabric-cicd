@@ -133,7 +133,7 @@ def publish_all_items(
 
     if (
         not has_assigned_capacity
-        and fabric_workspace_obj.item_type_in_scope not in constants.NO_ASSIGNED_CAPACITY_REQUIRED
+        and not set(fabric_workspace_obj.item_type_in_scope).issubset(set(constants.NO_ASSIGNED_CAPACITY_REQUIRED))
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
@@ -202,6 +202,9 @@ def publish_all_items(
     if _should_publish_item_type("Environment"):
         print_header("Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
+    if _should_publish_item_type("DataAgent"):
+        print_header("Publishing Data Agents")
+        items.publish_dataagents(fabric_workspace_obj)
     if _should_publish_item_type("Notebook"):
         print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
@@ -247,6 +250,9 @@ def publish_all_items(
     if _should_publish_item_type("MountedDataFactory"):
         print_header("Publishing Mounted Data Factories")
         items.publish_mounteddatafactories(fabric_workspace_obj)
+    if _should_publish_item_type("OrgApp"):
+        print_header("Publishing Org Apps")
+        items.publish_orgapps(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -345,6 +351,8 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "DataAgent",
+        "OrgApp",
         "MountedDataFactory",
         "ApacheAirflowJob",
         "GraphQLApi",
