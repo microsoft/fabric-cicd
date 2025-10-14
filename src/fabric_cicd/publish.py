@@ -133,7 +133,7 @@ def publish_all_items(
 
     if (
         not has_assigned_capacity
-        and fabric_workspace_obj.item_type_in_scope not in constants.NO_ASSIGNED_CAPACITY_REQUIRED
+        and not set(fabric_workspace_obj.item_type_in_scope).issubset(set(constants.NO_ASSIGNED_CAPACITY_REQUIRED))
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)

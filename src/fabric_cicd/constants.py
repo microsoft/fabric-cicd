@@ -41,7 +41,7 @@ ACCEPTED_ITEM_TYPES = (
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
 # Items that do not require assigned capacity
-NO_ASSIGNED_CAPACITY_REQUIRED = [["SemanticModel", "Report"], ["SemanticModel"], ["Report"]]
+NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
