@@ -19,6 +19,7 @@ from fabric_cicd._items._manage_dependencies import set_unpublish_order
 from fabric_cicd._items._mirroreddatabase import publish_mirroreddatabase
 from fabric_cicd._items._mounteddatafactory import publish_mounteddatafactories
 from fabric_cicd._items._notebook import publish_notebooks
+from fabric_cicd._items._orgapp import publish_orgapps
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
 from fabric_cicd._items._sqldatabase import publish_sqldatabases
@@ -45,6 +46,7 @@ __all__ = [
     "publish_mirroreddatabase",
     "publish_mounteddatafactories",
     "publish_notebooks",
+    "publish_orgapps",
     "publish_reports",
     "publish_semanticmodels",
     "publish_sqldatabases",
