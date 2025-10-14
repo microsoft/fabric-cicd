@@ -39,7 +39,7 @@ ACCEPTED_ITEM_TYPES = (
 )
 
 # Publish
-SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
+SHELL_ONLY_PUBLISH = ["Lakehouse", "Warehouse", "SQLDatabase"]
 
 # Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
