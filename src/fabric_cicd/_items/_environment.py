@@ -145,36 +145,101 @@ def _update_compute_settings(
         item_guid: The GUID of the environment item.
         item_name: Name of the environment item.
     """
-    from fabric_cicd._parameter._utils import process_environment_key
+    from fabric_cicd._parameter._utils import (
+        check_replacement,
+        extract_find_value,
+        extract_parameter_filters,
+        extract_replace_value,
+        process_environment_key,
+        replace_key_value,
+    )
 
     # Read compute settings from YAML file
-    with Path.open(Path(item_path, "Setting", "Sparkcompute.yml"), "r+", encoding="utf-8") as f:
-        yaml_body = yaml.safe_load(f)
+    sparkcompute_path = Path(item_path, "Setting", "Sparkcompute.yml")
+    with Path.open(sparkcompute_path, "r", encoding="utf-8") as f:
+        raw_yaml_content = f.read()
 
-        # Update instance pool settings if present
-        if "instance_pool_id" in yaml_body:
-            pool_id = yaml_body["instance_pool_id"]
-            if "spark_pool" in fabric_workspace_obj.environment_parameter:
-                parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
-                for key in parameter_dict:
-                    instance_pool_id = key["instance_pool_id"]
-                    replace_value = process_environment_key(fabric_workspace_obj, key["replace_value"])
-                    input_name = key.get("item_name")
-                    if instance_pool_id == pool_id and (input_name == item_name or not input_name):
-                        # replace any found references with specified environment value
-                        yaml_body["instancePool"] = replace_value[fabric_workspace_obj.environment]
-                        del yaml_body["instance_pool_id"]
+    # Apply find_replace parameterization
+    if "find_replace" in fabric_workspace_obj.environment_parameter:
+        for parameter_dict in fabric_workspace_obj.environment_parameter.get("find_replace"):
+            # Extract the file filter values and set the match condition
+            input_type, input_name, input_path = extract_parameter_filters(fabric_workspace_obj, parameter_dict)
+            filter_match = check_replacement(
+                input_type, input_name, input_path, "Environment", item_name, sparkcompute_path
+            )
 
-        yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
+            # Extract the find_value and replace_value_dict
+            find_value = extract_find_value(parameter_dict, raw_yaml_content, filter_match)
+            replace_value_dict = process_environment_key(fabric_workspace_obj, parameter_dict.get("replace_value", {}))
 
-        # Update compute settings
-        # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-compute/update-staging-settings
-        fabric_workspace_obj.endpoint.invoke(
-            method="PATCH",
-            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
-            body=yaml_body,
-        )
-        logger.info(f"{constants.INDENT}Updated Spark Settings")
+            # Replace any found references with specified environment value if conditions are met
+            if (
+                find_value in raw_yaml_content
+                and fabric_workspace_obj.environment in replace_value_dict
+                and filter_match
+            ):
+                replace_value = extract_replace_value(
+                    fabric_workspace_obj, replace_value_dict[fabric_workspace_obj.environment]
+                )
+                if replace_value:
+                    raw_yaml_content = raw_yaml_content.replace(find_value, replace_value)
+                    logger.debug(
+                        f"Replacing '{find_value}' with '{replace_value}' in {item_name}.Environment Sparkcompute.yml"
+                    )
+
+    # Apply key_value_replace parameterization
+    if "key_value_replace" in fabric_workspace_obj.environment_parameter:
+        import json
+
+        for parameter_dict in fabric_workspace_obj.environment_parameter.get("key_value_replace"):
+            # Extract the file filter values and set the match condition
+            input_type, input_name, input_path = extract_parameter_filters(fabric_workspace_obj, parameter_dict)
+            filter_match = check_replacement(
+                input_type, input_name, input_path, "Environment", item_name, sparkcompute_path
+            )
+
+            # Perform replacement if condition is met
+            # Convert YAML to JSON for key_value_replace processing
+            if filter_match:
+                try:
+                    yaml_dict = yaml.safe_load(raw_yaml_content)
+                    json_content = json.dumps(yaml_dict)
+                    updated_json = replace_key_value(
+                        fabric_workspace_obj, parameter_dict, json_content, fabric_workspace_obj.environment
+                    )
+                    yaml_dict = json.loads(updated_json)
+                    raw_yaml_content = yaml.dump(yaml_dict)
+                except (json.JSONDecodeError, yaml.YAMLError):
+                    # If conversion fails, skip this replacement
+                    logger.debug(f"Could not apply key_value_replace to Sparkcompute.yml for {item_name}")
+
+    # Parse the updated YAML content
+    yaml_body = yaml.safe_load(raw_yaml_content)
+
+    # Update instance pool settings if present (spark_pool parameterization)
+    if "instance_pool_id" in yaml_body:
+        pool_id = yaml_body["instance_pool_id"]
+        if "spark_pool" in fabric_workspace_obj.environment_parameter:
+            parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
+            for key in parameter_dict:
+                instance_pool_id = key["instance_pool_id"]
+                replace_value = process_environment_key(fabric_workspace_obj, key["replace_value"])
+                input_name = key.get("item_name")
+                if instance_pool_id == pool_id and (input_name == item_name or not input_name):
+                    # replace any found references with specified environment value
+                    yaml_body["instancePool"] = replace_value[fabric_workspace_obj.environment]
+                    del yaml_body["instance_pool_id"]
+
+    yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
+
+    # Update compute settings
+    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-compute/update-staging-settings
+    fabric_workspace_obj.endpoint.invoke(
+        method="PATCH",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
+        body=yaml_body,
+    )
+    logger.info(f"{constants.INDENT}Updated Spark Settings")
 
 
 def _get_repo_libraries(item_path: Path) -> dict:
