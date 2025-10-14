@@ -375,7 +375,6 @@ class Parameter:
             else:
                 expected_type = "string"
 
-            # expected_type = "dictionary" if key == "replace_value" else "string"
             is_valid, msg = self._validate_data_type(param_dict[key], expected_type, key, param_name)
             if not is_valid:
                 return False, msg

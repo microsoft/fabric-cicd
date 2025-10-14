@@ -48,6 +48,10 @@ spark_pool:
           PROD:
               type: "Capacity"
               name: "PROD-Pool-name"
+
+gateway_binding:
+    - gateway_id: "gateway_id"
+      dataset_name: "dataset_name"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
@@ -112,6 +116,22 @@ spark_pool:
               name: <pool-name>
       # Optional field: value must be a string or array of strings
       item_name: <item-name-filter-value>
+```
+
+### `gateway_binding`
+
+Gateway binding is used to connect semantic models (datasets) that require on-premises data sources to the appropriate data gateway after deployment. The `gateway_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from on-premises sources in the target environment.
+
+**Only supports the on-premises data gateway**
+
+```yaml
+gateway_binding:
+    # Required field: value must be a string (GUID)
+    - gateway_id: <gateway_id>
+    # Required field: value must be a string or a list of strings
+      dataset_name: <dataset_name>
+    # OR
+      dataset_name: [<dataset_name1>,<dataset_name2>,...]
 ```
 
 ## Advanced Find and Replace

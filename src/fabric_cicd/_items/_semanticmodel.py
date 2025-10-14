@@ -39,6 +39,9 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         gateway_id = gateway.get("gateway_id")
         dataset_name = gateway.get("dataset_name", [])
 
+        if isinstance(dataset_name, str):
+            dataset_name = [dataset_name]
+
         for _d in dataset_name:
             gateway_mapping[_d] = gateway_id
 

@@ -106,7 +106,4 @@ spark_pool:
       
 gateway_binding:
     - gateway_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
-      dataset_name: ["gateway_sm2"]
-# - gateway:
-#     gateway_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6f"
-#     binds_to: ['gateway_sm3']
+      dataset_name: "gateway_sm2"
