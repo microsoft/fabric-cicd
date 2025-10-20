@@ -13,7 +13,7 @@ The following contains all major, minor, and patch version release notes.
 -   ✨ Add support for binding semantic models to on-premise gateways in Fabric workspaces ([#569](https://github.com/microsoft/fabric-cicd/issues/569))
 -   ✨ Add support for publishing and managing Data Agent items ([#556](https://github.com/microsoft/fabric-cicd/issues/556))
 -   ✨ Add OrgApp item type support ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
--   ⚡ Enhance cross-workspace variable support to allow referencing other attribute ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
+-   ⚡ Enhance cross-workspace variable support to allow referencing other attributes ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
 -   🔧 Fix workspace name extraction bug for non-ID attrs using ITEM_ATTR_LOOKUP ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
 -   🔧 Fix capacity requirement check ([#593](https://github.com/microsoft/fabric-cicd/issues/593))
 
