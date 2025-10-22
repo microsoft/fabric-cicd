@@ -35,6 +35,7 @@ ACCEPTED_ITEM_TYPES = (
     "ApacheAirflowJob",
     "MountedDataFactory",
     "DataAgent",
+    "UserDataFunction",
     "OrgApp",
 )
 
