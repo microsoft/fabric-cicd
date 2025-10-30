@@ -140,6 +140,7 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
         shortcut_dict: The dict of shortcuts to publish
     """
     for shortcut in shortcut_dict.values():
+        shortcut = replace_default_lakehouse_id(shortcut, item_obj)
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
         try:
             fabric_workspace_obj.endpoint.invoke(
@@ -198,3 +199,18 @@ def list_deployed_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Ite
         request_url = response["header"].get("continuationUri", None)
 
     return deployed_shortcut_paths
+
+
+def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
+    """
+    Replaces the default lakehouse ID (all zeros) with the actual lakehouse ID
+    in the shortcut definition when present.
+
+    Args:
+        shortcut: The shortcut definition dictionary
+        item_obj: The item object used to get the default lakehouse ID
+    """
+    if shortcut.get("target").get("oneLake").get("itemId") == constants.DEFAULT_WORKSPACE_ID:
+        shortcut["target"]["oneLake"]["itemId"] = item_obj.guid
+
+    return shortcut
