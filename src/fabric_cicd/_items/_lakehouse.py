@@ -210,7 +210,7 @@ def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
         shortcut: The shortcut definition dictionary
         item_obj: The item object used to get the default lakehouse ID
     """
-    if shortcut.get("target").get("oneLake").get("itemId") == constants.DEFAULT_WORKSPACE_ID:
+    if dpath.get(shortcut, "target/oneLake/itemId", default=None) == constants.DEFAULT_GUID:
         shortcut["target"]["oneLake"]["itemId"] = item_obj.guid
 
     return shortcut
