@@ -1,0 +1,17 @@
+find_replace:
+    # SQL connection string
+    - find_value: "sqlserverconnectionstringinoriginlakehouse.com"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; sqlendpoint attribute returns the deployed item's sql endpoint)
+        PPE: "$items.Lakehouse.WithoutSchema.sqlendpoint"   
+        PROD: "$items.Lakehouse.WithoutSchema.sqlendpoint" 
+      # Optional fields:
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Eventhouse query URI
+    - find_value: "https://trd-origineventhouse.z4.kusto.fabric.microsoft.com"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; queryserviceuri attribute returns the deployed item's query service URI)
+        PPE: "$items.Eventhouse.SampleEventhouse.queryserviceuri"   
+        PROD: "$items.Eventhouse.SampleEventhouse.queryserviceuri" 
+      # Optional fields:
+      file_path: "/Example Notebook.Notebook/notebook-content.py"

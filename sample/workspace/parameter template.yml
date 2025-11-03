@@ -1,0 +1,16 @@
+extend:
+    - "nb parameter template 1.yml"
+    - "nb parameter template 2.yml"
+
+find_replace:
+    # Lakehouse Connection Guid
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+        PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+        PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional fields:
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path:
+       - "/Hello World.Notebook/notebook-content.py"
+       - "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"

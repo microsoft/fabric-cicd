@@ -119,12 +119,12 @@ PARAMETER_MSGS = {
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
     # Template parameter file messages
-    "extended_file_not_found": "Extended parameter file not found: {}",
-    "extended_file_invalid": "Invalid extended parameter file {}: {}",
-    "extended_file_error": "Error loading extended parameter file {}: {}",
-    "extended_file_loaded": "Successfully loaded extended parameter file: {}",
-    "extended_files_processed": "Successfully processed {} extended parameter files",
-    "extended_files_none_valid": "None of the extended parameter files were valid or found",
+    "template_file_not_found": "Template parameter file not found: {}",
+    "template_file_invalid": "Invalid template parameter file {}: {}",
+    "template_file_error": "Error loading template parameter file {}: {}",
+    "template_file_loaded": "Successfully loaded template parameter file: {}",
+    "template_files_processed": "Successfully processed {} template parameter files",
+    "template_files_none_valid": "None of the template parameter files were valid or found, content will not be added",
 }
 
 # Wildcard path support validations

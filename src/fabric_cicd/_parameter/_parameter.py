@@ -135,10 +135,10 @@ class Parameter:
         return self.parameter_file_path.is_file()
 
     def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
-        """Validate loading the parameter file to a dictionary, including any extensions."""
+        """Validate loading the parameter file to a dictionary, including any templates."""
         parameter_dict = {}
         try:
-            # Load the main parameter file
+            # Load the base parameter file
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
@@ -150,9 +150,9 @@ class Parameter:
                 parameter_dict = yaml.full_load(yaml_content) or {}
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
 
-                # Process extended parameter files if present
+                # Process template parameter files if present
                 if parameter_dict.get("extend"):
-                    parameter_dict = self._process_extended_parameter_files(parameter_dict)
+                    parameter_dict = self._process_template_parameter_files(parameter_dict)
 
                 return True, parameter_dict
 
@@ -163,162 +163,139 @@ class Parameter:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(f"Unexpected error: {e}")
             return False, parameter_dict
 
-    def _process_extended_parameter_files(self, base_parameter_dict: dict) -> dict:
+    def _process_template_parameter_files(self, base_parameter_dict: dict) -> dict:
         """
-        Process extended parameter files and merge them with the base parameter dictionary.
-
-        Args:
-            base_parameter_dict: The base parameter dictionary from the main file
-
-        Returns:
-            The merged parameter dictionary including extensions
+        Process template parameter files and merge them with the base parameter dictionary.
+        Template files must be located in a 'templates' directory within the repository.
         """
         if not isinstance(base_parameter_dict.get("extend"), list):
             logger.warning("The 'extend' key must contain a list of parameter files to extend")
             return base_parameter_dict
 
-        # Get the directory of the main parameter file for relative path resolution
-        base_dir = self.parameter_file_path.parent
-        extended_files = base_parameter_dict["extend"]
-        successful_extensions = 0
+        template_files = base_parameter_dict["extend"]
+        successful_templates = 0
+        failed_templates = []
 
-        # Process each extended file
-        for extension_file in extended_files:
+        # Validate templates directory exists
+        templates_dir = self.repository_directory / "templates"
+        if not templates_dir.is_dir():
+            logger.warning("Templates directory not found. Parameter files must be located in a 'templates' directory")
+            return base_parameter_dict
+
+        # Process each template file
+        for param_file in template_files:
             try:
-                # Validate the extension file path
-                if not isinstance(extension_file, str):
-                    logger.warning(f"Invalid extension file specification: {extension_file}. Must be a string path.")
+                # Validate the parameter file path
+                if not isinstance(param_file, str):
+                    error_msg = "Invalid parameter file path, must be a string path"
+                    failed_templates.append((param_file, error_msg))
                     continue
 
-                # Resolve the path relative to the main parameter file
-                extension_path = (base_dir / extension_file).resolve()
-
-                # Ensure the path is within the repository directory to prevent path traversal
-                try:
-                    extension_path.relative_to(self.repository_directory)
-                except ValueError:
-                    logger.warning(
-                        f"Extended parameter file path is outside the repository directory: {extension_path}"
-                    )
+                # Resolve the path relative to the templates directory and validate
+                template_path = (templates_dir / param_file).resolve()
+                if not template_path.is_relative_to(templates_dir):
+                    error_msg = f"Parameter file {param_file} must be located within the templates directory"
+                    failed_templates.append((param_file, error_msg))
                     continue
 
-                # Check that the file exists
-                if not extension_path.is_file():
-                    logger.warning(constants.PARAMETER_MSGS["extended_file_not_found"].format(extension_path))
+                # Load and validate the parameter file
+                template_dict = self._load_template_parameter_file(template_path)
+                if not template_dict:
                     continue
 
-                # Load and validate the extension file
-                extension_dict = self._load_extended_parameter_file(extension_path)
-                if not extension_dict:
+                # Check for nested templates
+                if "extend" in template_dict:
+                    error_msg = f"Nested templates are not supported in {param_file}"
+                    failed_templates.append((param_file, error_msg))
                     continue
 
-                # Merge the extension with the base dictionary
-                base_parameter_dict = self._merge_parameter_dicts(base_parameter_dict, extension_dict)
-                successful_extensions += 1
-                logger.info(constants.PARAMETER_MSGS["extended_file_loaded"].format(extension_path))
+                # Merge the template with the base dictionary
+                base_parameter_dict = self._merge_parameter_dicts(base_parameter_dict, template_dict)
+                successful_templates += 1
+                logger.debug(constants.PARAMETER_MSGS["template_file_loaded"].format(template_path))
 
             except Exception as e:
-                logger.error(f"Error processing extended parameter file {extension_file}: {e}")
+                error_msg = f"Error processing template file: {e!s}"
+                failed_templates.append((template_path, error_msg))
                 continue
 
-        # Log the results of extension processing
-        if successful_extensions > 0:
-            logger.info(constants.PARAMETER_MSGS["extended_files_processed"].format(successful_extensions))
-        elif extended_files:
-            logger.warning(constants.PARAMETER_MSGS["extended_files_none_valid"])
+        # Log results of template processing
+        if successful_templates > 0:
+            logger.debug(constants.PARAMETER_MSGS["template_files_processed"].format(successful_templates))
 
-        # Remove the extend directive after processing to prevent duplicate processing
+        if failed_templates:
+            for failed_file, reason in failed_templates:
+                logger.error(f"Validation failed for template file: {failed_file}")
+                logger.error(f"{reason}")
+        elif successful_templates == 0:
+            logger.warning(constants.PARAMETER_MSGS["template_files_none_valid"])
+
+        # Remove the extend key after processing
         if "extend" in base_parameter_dict:
             del base_parameter_dict["extend"]
 
         return base_parameter_dict
 
-    def _load_extended_parameter_file(self, file_path: Path) -> dict:
-        """
-        Load and validate an extended parameter file.
-
-        Args:
-            file_path: The path to the extended parameter file
-
-        Returns:
-            The loaded parameter dictionary or an empty dict if loading failed
-        """
+    def _load_template_parameter_file(self, file_path: Path) -> dict:
+        """Load and validate a template parameter file."""
         try:
-            with Path.open(file_path, encoding="utf-8") as ext_file:
-                ext_content = ext_file.read()
-                ext_content = replace_variables_in_parameter_file(ext_content)
+            with Path.open(file_path, encoding="utf-8") as param_file:
+                param_content = param_file.read()
+                param_content = replace_variables_in_parameter_file(param_content)
 
                 # Validate the content
-                ext_validation_errors = self._validate_yaml_content(ext_content)
-                if ext_validation_errors:
-                    logger.error(
-                        constants.PARAMETER_MSGS["extended_file_invalid"].format(file_path, ext_validation_errors)
-                    )
-                    return {}
+                param_validation_errors = self._validate_yaml_content(param_content)
+                if param_validation_errors:
+                    msg = constants.PARAMETER_MSGS["template_file_invalid"].format(file_path, param_validation_errors)
+                    return {}, msg
 
                 # Load the content
-                ext_dict = yaml.full_load(ext_content) or {}
+                template_dict = yaml.full_load(param_content) or {}
 
-                # Process nested extensions if present (support recursive extension)
-                if "extend" in ext_dict and isinstance(ext_dict["extend"], list):
-                    # Save current parameter file path to restore it later
-                    original_path = self.parameter_file_path
-                    try:
-                        # Temporarily change the parameter file path for correct relative path resolution
-                        self.parameter_file_path = file_path
-                        ext_dict = self._process_extended_parameter_files(ext_dict)
-                    finally:
-                        # Restore the original parameter file path
-                        self.parameter_file_path = original_path
+                if "extend" in template_dict:
+                    logger.warning(f"Nested templates are not supported. Ignoring 'extend' key in {file_path}")
+                    del template_dict["extend"]
 
-                return ext_dict
+                return template_dict
 
         except yaml.YAMLError as e:
-            logger.error(constants.PARAMETER_MSGS["extended_file_error"].format(file_path, e))
+            logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
             return {}
         except Exception as e:
-            logger.error(constants.PARAMETER_MSGS["extended_file_error"].format(file_path, f"Unexpected error: {e}"))
+            logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, f"Unexpected error: {e}"))
             return {}
 
-    def _merge_parameter_dicts(self, base_dict: dict, extension_dict: dict) -> dict:
+    def _merge_parameter_dicts(self, base_dict: dict, template_dict: dict) -> dict:
         """
         Merge two parameter dictionaries, properly handling lists and nested structures.
-        All entries are preserved as-is, letting validation handle any issues later.
-
-        Args:
-            base_dict: The base parameter dictionary
-            extension_dict: The extension parameter dictionary to merge into the base
-
-        Returns:
-            A merged parameter dictionary
+        Preserves all entries, letting validation handle any issues later.
         """
         result = base_dict.copy()
 
-        for key, ext_value in extension_dict.items():
+        for key, template_value in template_dict.items():
             # Skip the 'extend' key as it's processed separately
             if key == "extend":
                 continue
 
             # If the key doesn't exist in the base dict, just add it
             if key not in result:
-                result[key] = ext_value
+                result[key] = template_value
                 continue
 
             base_value = result[key]
 
             # Handle merging based on value types
-            if isinstance(base_value, list) and isinstance(ext_value, list):
-                # For parameter lists like find_replace, append items from extension
-                result[key] = base_value + ext_value
+            if isinstance(base_value, list) and isinstance(template_value, list):
+                # For parameter lists like find_replace, append items from template
+                result[key] = base_value + template_value
 
-            elif isinstance(base_value, dict) and isinstance(ext_value, dict):
+            elif isinstance(base_value, dict) and isinstance(template_value, dict):
                 # For nested dictionaries, recursively merge them
-                result[key] = self._merge_parameter_dicts(base_value, ext_value)
+                result[key] = self._merge_parameter_dicts(base_value, template_value)
 
             else:
-                # For scalar values or type mismatches, add both to a list
-                # This preserves all values and lets validation handle any issues
-                result[key] = [base_value, ext_value]
+                # Add both values into a list for later validation
+                result[key] = [base_value, template_value]
                 logger.debug(f"Type mismatch for key '{key}': creating list of values for validation")
 
         return result
