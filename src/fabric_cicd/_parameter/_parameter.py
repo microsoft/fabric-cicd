@@ -152,7 +152,7 @@ class Parameter:
 
                 # Process template parameter files if present
                 if parameter_dict.get("extend"):
-                    parameter_dict = self._process_template_parameter_files(parameter_dict)
+                    parameter_dict = self._process_template_parameters(parameter_dict)
 
                 return True, parameter_dict
 
@@ -160,53 +160,48 @@ class Parameter:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
 
-    def _process_template_parameter_files(self, base_parameter_dict: dict) -> dict:
+    def _process_template_parameters(self, base_parameter_dict: dict) -> dict:
         """
         Process template parameter files and merge them with the base parameter dictionary.
         Template files must be located in a 'templates' directory within the repository.
         """
+        # Step 1: Check extend contains files
         if not isinstance(base_parameter_dict.get("extend"), list):
-            logger.warning("The 'extend' key must contain a list of parameter files to extend")
+            logger.warning("No template parameter files specified under 'extend'")
             return base_parameter_dict
 
         template_files = base_parameter_dict["extend"]
         successful_templates = 0
         failed_templates = []
 
-        # Validate templates directory exists
+        # Step 2: Check templates directory exists
         templates_dir = self.repository_directory / "templates"
         if not templates_dir.is_dir():
             logger.warning("Templates directory not found. Parameter files must be located in a 'templates' directory")
             return base_parameter_dict
 
-        # Process each template file
+        # Step 3: Process each template file
         for param_file in template_files:
             try:
-                # Validate the parameter file path
-                if not isinstance(param_file, str):
-                    error_msg = "Invalid parameter file path, must be a string path"
-                    failed_templates.append((param_file, error_msg))
-                    continue
-
-                # Resolve the path relative to the templates directory and validate
-                template_path = (templates_dir / param_file).resolve()
+                # Step a: Resolve the path relative to the templates directory and validate
+                template_path = (templates_dir / str(param_file)).resolve()
                 if not template_path.is_relative_to(templates_dir):
                     error_msg = f"Parameter file {param_file} must be located within the templates directory"
                     failed_templates.append((param_file, error_msg))
                     continue
 
-                # Load and validate the parameter file
+                # Step b: Load and validate the parameter file
                 template_dict = self._load_template_parameter_file(template_path)
                 if not template_dict:
                     continue
 
-                # Check for nested templates
+                # Step c: Check for nested templates
                 if "extend" in template_dict:
                     error_msg = f"Nested templates are not supported in {param_file}"
                     failed_templates.append((param_file, error_msg))
                     continue
 
-                # Merge the template with the base dictionary
+                # Step d: Merge the template dict with the base parameter dict
                 base_parameter_dict = self._merge_template_dict(base_parameter_dict, template_dict)
                 successful_templates += 1
                 logger.debug(constants.PARAMETER_MSGS["template_file_loaded"].format(template_path))
@@ -216,7 +211,7 @@ class Parameter:
                 failed_templates.append((template_path, error_msg))
                 continue
 
-        # Log results of template processing
+        # Step 4: Log results
         if successful_templates > 0:
             logger.debug(constants.PARAMETER_MSGS["template_files_processed"].format(successful_templates))
 
@@ -227,10 +222,10 @@ class Parameter:
         elif successful_templates == 0:
             logger.warning(constants.PARAMETER_MSGS["template_files_none_valid"])
 
-        # Remove the extend key after processing
+        # Step 5: Remove the extend key after processing
         if "extend" in base_parameter_dict:
             del base_parameter_dict["extend"]
-
+        print(base_parameter_dict)
         return base_parameter_dict
 
     def _load_template_parameter_file(self, file_path: Path) -> dict:
