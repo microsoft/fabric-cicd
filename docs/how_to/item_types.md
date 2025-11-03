@@ -114,6 +114,10 @@
 -   **Initial deployment** for Azure SQL Database or Azure SQL Managed Instance requires manual granting of System Assigned Managed Identity (SAMI) Read and Write permission to the mirrored database for replication to be successful after deployment. ref -> ([Prerequisites](https://learn.microsoft.com/en-us/fabric/database/mirrored-database/mirrored-database-rest-api#create-mirrored-database))
 -   **Unpublish** - a warning is shown for any default Semantic Models created by the Mirror Database. This is a current limitation of the Fabric API and can be ignored.
 
+## ML Experiments
+
+-   **Only the ML Shell is created.** The create API does not support the creation an machine learning experiment with definition.
+
 ## Notebooks
 
 -   **Parameterization:**
@@ -162,7 +166,3 @@
 -   **Warehouse content is not deployed.** Only the item shell is deployed. Warehouse DDL must be deployed separately using a DACPAC or other tools such as dbt.
 -   **Case insensitive collation is supported** custom collation must be manually edited in the `.platform` file creation payload. See [How to: Create a warehouse with case-insensitive (CI) collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation) for more details.
 -   **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.
-
-## ML Experiments
-
--   **Only the ML Shell is created.** The create API does not support the creation an machine learning experiment with definition.

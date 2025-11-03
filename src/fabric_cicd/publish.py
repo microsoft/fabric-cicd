@@ -252,6 +252,9 @@ def publish_all_items(
     if _should_publish_item_type("OrgApp"):
         print_header("Publishing Org Apps")
         items.publish_orgapps(fabric_workspace_obj)
+    if _should_publish_item_type("MLExperiment"):
+        print_header("Publishing ML Experiments")
+        items.publish_mlexperiments(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -373,6 +376,7 @@ def unpublish_all_orphan_items(
         "Lakehouse",
         "Warehouse",
         "VariableLibrary",
+        "MLExperiment",
     ]:
         if item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.deployed_items:
             unpublish_flag = unpublish_flag_mapping.get(item_type)

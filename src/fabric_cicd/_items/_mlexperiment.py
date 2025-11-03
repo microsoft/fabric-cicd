@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Functions to process and deploy Notebook item."""
+"""Functions to process and deploy ML Experiment item."""
 
 import logging
 

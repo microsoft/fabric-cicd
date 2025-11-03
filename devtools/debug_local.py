@@ -48,7 +48,6 @@ item_type_in_scope = [
     "KQLQueryset",
     "Reflex",
     "Eventstream",
-    "MLExperiment",
 ]
 
 # Uncomment to use SPN auth
