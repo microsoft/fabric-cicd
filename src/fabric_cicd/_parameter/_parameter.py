@@ -159,9 +159,6 @@ class Parameter:
         except yaml.YAMLError as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
-        except Exception as e:
-            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(f"Unexpected error: {e}")
-            return False, parameter_dict
 
     def _process_template_parameter_files(self, base_parameter_dict: dict) -> dict:
         """
@@ -210,7 +207,7 @@ class Parameter:
                     continue
 
                 # Merge the template with the base dictionary
-                base_parameter_dict = self._merge_parameter_dicts(base_parameter_dict, template_dict)
+                base_parameter_dict = self._merge_template_dict(base_parameter_dict, template_dict)
                 successful_templates += 1
                 logger.debug(constants.PARAMETER_MSGS["template_file_loaded"].format(template_path))
 
@@ -261,13 +258,10 @@ class Parameter:
         except yaml.YAMLError as e:
             logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
             return {}
-        except Exception as e:
-            logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, f"Unexpected error: {e}"))
-            return {}
 
-    def _merge_parameter_dicts(self, base_dict: dict, template_dict: dict) -> dict:
+    def _merge_template_dict(self, base_dict: dict, template_dict: dict) -> dict:
         """
-        Merge two parameter dictionaries, properly handling lists and nested structures.
+        Merge the template dictionary with the base dictionary, properly handling lists and nested structures.
         Preserves all entries, letting validation handle any issues later.
         """
         result = base_dict.copy()
