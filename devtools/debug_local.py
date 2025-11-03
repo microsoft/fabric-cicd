@@ -27,7 +27,7 @@ from fabric_cicd import (
 append_feature_flag("enable_shortcut_publish")
 
 # The defined environment values should match the names found in the parameter.yml file
-workspace_id = "f0e3fa10-e2d7-4ce6-a508-4e6e16ba3a27"
+workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
 environment = "PPE"
 
 # In this example, our workspace content sits within the root/sample/workspace directory
@@ -70,7 +70,7 @@ target_workspace = FabricWorkspace(
 
 # Uncomment to publish
 # Publish all items defined in item_type_in_scope
-publish_all_items(target_workspace)
+# publish_all_items(target_workspace)
 
 # Uncomment to unpublish
 # Unpublish all items defined in scope not found in repository
