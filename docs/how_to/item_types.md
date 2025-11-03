@@ -117,7 +117,7 @@
 ## ML Experiments
 
 -   **Parameterization:**
-    -   The `find_replace` section in the `parameter.yml` file is applied.
+    -   The `find_replace` section in the `parameter.yml` file is not applied.
 -   **Only the ML Shell is created.** The create API does not support the creation an machine learning experiment with definition.
 
 ## Notebooks
