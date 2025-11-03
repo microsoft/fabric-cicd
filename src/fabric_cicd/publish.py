@@ -353,6 +353,7 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "MLExperiment",
         "DataAgent",
         "OrgApp",
         "MountedDataFactory",
@@ -376,7 +377,6 @@ def unpublish_all_orphan_items(
         "Lakehouse",
         "Warehouse",
         "VariableLibrary",
-        "MLExperiment",
     ]:
         if item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.deployed_items:
             unpublish_flag = unpublish_flag_mapping.get(item_type)
