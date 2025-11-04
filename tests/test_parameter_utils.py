@@ -147,6 +147,9 @@ class TestParameterUtilities:
         # Workspace ID variable should return the workspace ID
         assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
 
+        # Workspace ID variable should return the workspace ID
+        assert extract_replace_value(mock_workspace, "$workspace.$id", False) == "mock-workspace-id"
+
         # Workspace name variable should resolve to workspace ID
         with mock.patch("fabric_cicd._parameter._utils._extract_workspace_id") as mock_extract_ws:
             mock_extract_ws.return_value = "resolved-workspace-id"
@@ -194,17 +197,25 @@ class TestParameterUtilities:
         # Test with valid notebook item
         result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id", False)
         assert result == "notebook-id"
+        result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.$id", False)
+        assert result == "notebook-id"
 
         # Test with valid lakehouse item
         result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.sqlendpoint", False)
+        assert result == "lakehouse-endpoint"
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.$sqlendpoint", False)
         assert result == "lakehouse-endpoint"
 
         # Test with valid warehouse item
         result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.id", False)
         assert result == "warehouse-id"
+        result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.$id", False)
+        assert result == "warehouse-id"
 
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
+        assert result == "eventhouse-query-uri"
+        result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.$queryserviceuri", False)
         assert result == "eventhouse-query-uri"
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
@@ -214,27 +225,14 @@ class TestParameterUtilities:
             _extract_item_attribute(mock_workspace, "$items.Notebook", False)
         with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
             _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook", False)
-        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id.extra", False)
 
+        # Test with too many segments - now check for invalid attribute instead of invalid syntax
         mock_items_attr_lookup = list(constants.ITEM_ATTR_LOOKUP)
-
-        # Test with invalid item types, names, or attributes
-        with pytest.raises(ParsingError, match="Item type 'InvalidType' is invalid"):
-            _extract_item_attribute(mock_workspace, "$items.InvalidType.Test Notebook.id", False)
-        with pytest.raises(ParsingError, match="Item 'InvalidName' not found"):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.InvalidName.id", False)
         with pytest.raises(
             ParsingError,
-            match=re.escape(f"Attribute 'guid' is invalid. Supported attributes: {mock_items_attr_lookup}"),
+            match=re.escape(f"Attribute 'extra' is invalid. Supported attributes: {mock_items_attr_lookup}"),
         ):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.guid", False)
-
-        # Test wrong type and attribute combination
-        with pytest.raises(
-            ParsingError, match="Value does not exist for attribute 'sqlendpoint' in the Notebook item 'Test Notebook'"
-        ):
-            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.sqlendpoint", False)
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id.extra", False)
 
     def test_extract_item_attribute_get_dataflow_name(self, mock_workspace):
         """Test _extract_item_attribute with special handling for Dataflow references."""
@@ -254,7 +252,35 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.Dataflow.source dataflow.id", get_dataflow_name=True)
         assert result is None
 
-        # Test with non-Dataflow item, should return None
+    def test_extract_item_attribute_warns_legacy_format(self, mock_workspace, caplog):
+        """Tests that _extract_item_attribute warns when using legacy format."""
+        # import logging
+
+        # Use the caplog fixture to capture log messages
+        with caplog.at_level(logging.WARNING):
+            # Call the function with the legacy format
+            result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.id", False)
+
+            # Assert that the result is as expected
+            assert result == "notebook-id"
+
+            # Check that the warning message was logged
+            expected_warning = (
+                "The $items variable format has changed. Please update to the new format: $items.type.name.$attribute"
+            )
+            assert expected_warning in caplog.text
+
+        # Clear the log and test that the warning doesn't appear with new format
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            # Call the function with the new format
+            result = _extract_item_attribute(mock_workspace, "$items.Notebook.Test Notebook.$id", False)
+
+            # Assert that the result is still as expected
+            assert result == "notebook-id"
+
+            # Check that no warning was logged
+            assert expected_warning not in caplog.text
 
     def test_extract_workspace_id_direct(self, mock_workspace):
         """Tests _extract_workspace_id with direct workspace ID variable."""
@@ -262,6 +288,9 @@ class TestParameterUtilities:
 
         # Test with $workspace.id - should return workspace_id directly
         result = _extract_workspace_id(mock_workspace, "$workspace.id")
+        assert result == "mock-workspace-id"
+
+        result = _extract_workspace_id(mock_workspace, "$workspace.$id")
         assert result == "mock-workspace-id"
 
     def test_extract_workspace_id_resolve(self, mock_workspace):
@@ -275,14 +304,6 @@ class TestParameterUtilities:
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
         assert result == "resolved-workspace-id"
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
-
-    def test_extract_workspace_id_invalid_syntax(self, mock_workspace):
-        """Tests _extract_workspace_id with invalid syntax."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
-        # Test with invalid format (too many parts)
-        with pytest.raises(ParsingError, match=r"Invalid \$workspace variable syntax"):
-            _extract_workspace_id(mock_workspace, "$workspace.name.extra")
 
     def test_extract_workspace_id_resolve_error(self, mock_workspace):
         """Tests _extract_workspace_id when workspace name resolution fails."""
@@ -305,6 +326,10 @@ class TestParameterUtilities:
         # Should wrap general exceptions in ParsingError
         with pytest.raises(ParsingError, match=r"Error parsing \$workspace variable"):
             _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
+
+    def test_extract_item_attribute_null_return(self, mock_workspace):
+        """Tests _extract_item_attribute cases that return None."""
+        # Test with non-Dataflow item in get_dataflow_name mode should return None
         result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test Lakehouse.id", True)
         assert result is None
 
@@ -312,10 +337,8 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.sqlendpoint", True)
         assert result is None
 
-        # Test syntax error in variable
-        with pytest.raises(ParsingError, match="Invalid \\$items variable syntax"):
-            _extract_item_attribute(mock_workspace, "$item.Dataflow.Source Dataflow.id", True)
-
+    def test_extract_item_attribute_invalid_attribute(self, mock_workspace):
+        """Tests _extract_item_attribute with invalid attribute."""
         # Test with invalid attribute
         mock_items_attr_lookup = list(constants.ITEM_ATTR_LOOKUP)
         with pytest.raises(
@@ -323,6 +346,98 @@ class TestParameterUtilities:
             match=re.escape(f"Attribute 'guid' is invalid. Supported attributes: {mock_items_attr_lookup}"),
         ):
             _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.guid", True)
+
+    def test_extract_workspace_id_with_item_lookup(self, mock_workspace):
+        """Tests _extract_workspace_id with item lookup in another workspace."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+
+        # Mock the _lookup_item_attribute method
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="item-123-id")
+
+        # Test with $workspace.<name>.$items.<item_type>.<item_name>.$id format
+        result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$items.Notebook.Test Notebook.$id")
+
+        assert result == "item-123-id"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        # attribute should be passed without leading '$'
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Notebook", "Test Notebook", "id"
+        )
+
+    def test_extract_workspace_id_with_item_lookup_not_found(self, mock_workspace):
+        """Tests _extract_workspace_id when item lookup fails."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Mock the _resolve_workspace_id method
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+
+        # Mock the _lookup_item_attribute method to raise InputError (item not found)
+        error_msg = (
+            "Failed to look up item in workspace: resolved-workspace-id, item_type: Notebook, item_name: Test Notebook"
+        )
+        mock_workspace._lookup_item_attribute = mock.MagicMock(side_effect=InputError(error_msg, logger))
+
+        # Should re-raise the InputError
+        with pytest.raises(InputError, match=re.escape(error_msg)):
+            _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$items.Notebook.Test Notebook.$id")
+
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Notebook", "Test Notebook", "id"
+        )
+
+    @pytest.mark.parametrize(
+        "invalid_var",
+        [
+            "$workspace.$items.Notebook.Test Notebook.$id",  # Missing workspace name
+            "$workspace.test_workspace.$items.InvalidType.Test Notebook.$id",  # Invalid item type
+            "$workspace.test_workspace.$items.Notebook.$id",  # Missing item name
+        ],
+    )
+    def test_extract_workspace_id_with_item_lookup_invalid_format(self, mock_workspace, invalid_var):
+        """Tests _extract_workspace_id with invalid item lookup format."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        # Test with invalid formats
+        with pytest.raises(ParsingError):
+            _extract_workspace_id(mock_workspace, invalid_var)
+
+    def test_extract_workspace_id_with_item_lookup_sqlendpoint(self, mock_workspace):
+        """Tests _extract_workspace_id resolves sqlendpoint from another workspace via $items reference."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="lakehouse-endpoint-value")
+
+        result = _extract_workspace_id(
+            mock_workspace, "$workspace.test_workspace.$items.Lakehouse.Test_Lakehouse.$sqlendpoint"
+        )
+
+        assert result == "lakehouse-endpoint-value"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Lakehouse", "Test_Lakehouse", "sqlendpoint"
+        )
+
+    def test_extract_workspace_id_with_item_lookup_queryserviceuri(self, mock_workspace):
+        """Tests _extract_workspace_id resolves queryserviceuri from another workspace via $items reference."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="eventhouse-query-uri-value")
+
+        result = _extract_workspace_id(
+            mock_workspace, "$workspace.test_workspace.$items.Eventhouse.Test Eventhouse.$queryserviceuri"
+        )
+
+        assert result == "eventhouse-query-uri-value"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Eventhouse", "Test Eventhouse", "queryserviceuri"
+        )
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""

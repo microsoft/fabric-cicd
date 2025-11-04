@@ -347,6 +347,7 @@ class Parameter:
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
+            ("gateway_binding parameter", lambda: self._validate_parameter("gateway_binding")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -358,7 +359,13 @@ class Parameter:
                     return True
                 # Discontinue validation check for absent parameter
                 if (
-                    step in ("find_replace parameter", "key_value_replace parameter", "spark_pool parameter")
+                    step
+                    in (
+                        "find_replace parameter",
+                        "key_value_replace parameter",
+                        "spark_pool parameter",
+                        "gateway_binding parameter",
+                    )
                     and msg == "parameter not found"
                 ):
                     continue
@@ -380,7 +387,7 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:4]
+        params = list(self.PARAMETER_KEYS.keys())[:5]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
@@ -410,6 +417,8 @@ class Parameter:
             key_name = "find_key"
         elif param_name == "spark_pool":
             key_name = "instance_pool_id"
+        elif param_name == "gateway_binding":
+            key_name = "gateway_id"
         else:
             key_name = "find_value"
 
@@ -417,12 +426,16 @@ class Parameter:
             param_num_str = str(param_num) if multiple_param else ""
             find_value = parameter_dict[key_name]
             for step, validation_func in validation_steps:
+                if param_name == "gateway_binding" and step == "replace_value":
+                    continue
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-
+            # Special case to skip environment validation for gateway_binding
+            if param_name == "gateway_binding":
+                continue
             # Check if replacement will be skipped for a given find value
             is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
@@ -488,7 +501,13 @@ class Parameter:
             if not param_dict.get(key):
                 return False, constants.PARAMETER_MSGS["missing required value"].format(key, param_name)
 
-            expected_type = "dictionary" if key == "replace_value" else "string"
+            if key == "replace_value":
+                expected_type = "dictionary"
+            elif key == "dataset_name":
+                expected_type = "string or list[string]"
+            else:
+                expected_type = "string"
+
             is_valid, msg = self._validate_data_type(param_dict[key], expected_type, key, param_name)
             if not is_valid:
                 return False, msg

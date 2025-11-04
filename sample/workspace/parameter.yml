@@ -103,3 +103,7 @@ spark_pool:
            name: "WorkspacePool_Medium"
       # Optional field:
       item_name:
+      
+gateway_binding:
+    - gateway_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
+      dataset_name: "gateway_sm2"

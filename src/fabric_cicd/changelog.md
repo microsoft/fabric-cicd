@@ -6,6 +6,27 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.30
+
+<span class="md-h2-subheader">Release Date: 2025-10-20</span>
+
+-   ✨ Add support for binding semantic models to on-premise gateways in Fabric workspaces ([#569](https://github.com/microsoft/fabric-cicd/issues/569))
+-   ✨ Add support for publishing and managing Data Agent items ([#556](https://github.com/microsoft/fabric-cicd/issues/556))
+-   ✨ Add OrgApp item type support ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
+-   ⚡ Enhance cross-workspace variable support to allow referencing other attributes ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
+-   🔧 Fix workspace name extraction bug for non-ID attrs using ITEM_ATTR_LOOKUP ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
+-   🔧 Fix capacity requirement check ([#593](https://github.com/microsoft/fabric-cicd/issues/593))
+
+## Version 0.1.29
+
+<span class="md-h2-subheader">Release Date: 2025-10-01</span>
+
+-   ✨ Onboard Apache Airflow Job item type ([#565](https://github.com/microsoft/fabric-cicd/issues/565))
+-   ✨ Onboard Mounted Data Factory item type ([#406](https://github.com/microsoft/fabric-cicd/issues/406))
+-   ✨ Support dynamic replacement for cross-workspace item IDs ([#558](https://github.com/microsoft/fabric-cicd/issues/558))
+-   ✨ Add option to return API response for publish operations in publish_all_items ([#497](https://github.com/microsoft/fabric-cicd/issues/497))
+-   🔧 Fix publish order of Eventhouses and Semantic Models ([#566](https://github.com/microsoft/fabric-cicd/issues/566))
+
 ## Version 0.1.28
 
 <span class="md-h2-subheader">Release Date: 2025-09-15</span>

@@ -4,8 +4,8 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.28"
-DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
+VERSION = "0.1.30"
+DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
 FEATURE_FLAG = set()
@@ -32,13 +32,17 @@ ACCEPTED_ITEM_TYPES = (
     "KQLDashboard",
     "Dataflow",
     "GraphQLApi",
+    "ApacheAirflowJob",
+    "MountedDataFactory",
+    "DataAgent",
+    "OrgApp",
 )
 
 # Publish
 SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
 
 # Items that do not require assigned capacity
-NO_ASSIGNED_CAPACITY_REQUIRED = [["SemanticModel", "Report"], ["SemanticModel"], ["Report"]]
+NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
@@ -52,10 +56,16 @@ INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
 
 # Property path to get SQL Endpoint or Eventhouse URI
-PROPERTY_PATH_MAPPING = {
-    "Lakehouse": "body/properties/sqlEndpointProperties/connectionString",
-    "Warehouse": "body/properties/connectionString",
-    "Eventhouse": "body/properties/queryServiceUri",
+PROPERTY_PATH_ATTR_MAPPING = {
+    "Lakehouse": {
+        "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+    },
+    "Warehouse": {
+        "sqlendpoint": "body/properties/connectionString",
+    },
+    "Eventhouse": {
+        "queryserviceuri": "body/properties/queryServiceUri",
+    },
 }
 
 # Parameter file configs
