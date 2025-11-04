@@ -246,12 +246,10 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
             # Replace the dataflow ID with its logical ID and the workspace ID with the default workspace ID
             if logical_id:
                 file_obj.contents = file_obj.contents.replace(source_dataflow_id, logical_id)
-                file_obj.contents = file_obj.contents.replace(
-                    source_dataflow_workspace_id, constants.DEFAULT_WORKSPACE_ID
-                )
+                file_obj.contents = file_obj.contents.replace(source_dataflow_workspace_id, constants.DEFAULT_GUID)
                 logger.debug(
                     f"Replaced dataflow ID '{source_dataflow_id}' with logical ID '{logical_id}' and workspace ID "
-                    f"'{source_dataflow_workspace_id}' with default workspace ID '{constants.DEFAULT_WORKSPACE_ID}' "
+                    f"'{source_dataflow_workspace_id}' with default workspace ID '{constants.DEFAULT_GUID}' "
                     f"in '{item_obj.name}' file"
                 )
 

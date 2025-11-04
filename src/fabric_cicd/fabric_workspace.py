@@ -463,8 +463,8 @@ class FabricWorkspace:
         return re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
-                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, self.workspace_id)
-                if match.group(2) == constants.DEFAULT_WORKSPACE_ID
+                match.group(0).replace(constants.DEFAULT_GUID, self.workspace_id)
+                if match.group(2) == constants.DEFAULT_GUID
                 else match.group(0)
             ),
             raw_file,
