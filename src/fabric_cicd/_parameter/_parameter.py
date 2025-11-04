@@ -171,6 +171,7 @@ class Parameter:
         # Step 1: Check extend contains files
         if not isinstance(base_parameter_dict.get("extend"), list):
             logger.warning("No template parameter files specified under 'extend'")
+            del base_parameter_dict["extend"]
             return base_parameter_dict
 
         template_files = base_parameter_dict["extend"]
@@ -181,6 +182,7 @@ class Parameter:
         templates_dir = self.repository_directory / "templates"
         if not templates_dir.is_dir():
             logger.warning("Templates directory not found. Parameter files must be located in a 'templates' directory")
+            del base_parameter_dict["extend"]
             return base_parameter_dict
 
         # Step 3: Process each template file
@@ -222,12 +224,14 @@ class Parameter:
             for failed_file, reason in failed_templates:
                 logger.error(f"Validation failed for template file: {failed_file}")
                 logger.error(f"{reason}")
+                logger.warning(
+                    f"Template parameter '{failed_file}' content will not be included in the parameter dictionary"
+                )
         elif successful_templates == 0:
             logger.warning(constants.PARAMETER_MSGS["template_files_none_valid"])
 
         # Step 5: Remove the extend key after processing
-        if "extend" in base_parameter_dict:
-            del base_parameter_dict["extend"]
+        del base_parameter_dict["extend"]
 
         return base_parameter_dict
 
@@ -241,17 +245,13 @@ class Parameter:
                 # Validate the content
                 param_validation_errors = self._validate_yaml_content(param_content)
                 if param_validation_errors:
-                    msg = constants.PARAMETER_MSGS["template_file_invalid"].format(file_path, param_validation_errors)
-                    return {}, msg
+                    logger.error(
+                        constants.PARAMETER_MSGS["template_file_invalid"].format(file_path, param_validation_errors)
+                    )
+                    return {}
 
                 # Load the content
-                template_dict = yaml.full_load(param_content) or {}
-
-                if "extend" in template_dict:
-                    logger.warning(f"Nested templates are not supported. Ignoring 'extend' key in {file_path}")
-                    del template_dict["extend"]
-
-                return template_dict
+                return yaml.full_load(param_content) or {}
 
         except yaml.YAMLError as e:
             logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
@@ -283,7 +283,7 @@ class Parameter:
 
             elif isinstance(base_value, dict) and isinstance(template_value, dict):
                 # For nested dictionaries, recursively merge them
-                result[key] = self._merge_parameter_dicts(base_value, template_value)
+                result[key] = self._merge_template_dict(base_value, template_value)
 
             else:
                 # Add both values into a list for later validation
@@ -427,7 +427,7 @@ class Parameter:
 
         for param_num, parameter_dict in enumerate(self.environment_parameter[param_name], start=1):
             param_num_str = str(param_num) if multiple_param else ""
-            find_value = parameter_dict[key_name]
+            find_value = parameter_dict.get(key_name)
             for step, validation_func in validation_steps:
                 if param_name == "gateway_binding" and step == "replace_value":
                     continue

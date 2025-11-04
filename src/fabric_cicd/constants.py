@@ -133,7 +133,7 @@ PARAMETER_MSGS = {
     "template_file_invalid": "Invalid template parameter file {}: {}",
     "template_file_error": "Error loading template parameter file {}: {}",
     "template_file_loaded": "Successfully loaded template parameter file: {}",
-    "template_files_processed": "Successfully processed {} template parameter files",
+    "template_files_processed": "Successfully processed {} template parameter file(s)",
     "template_files_none_valid": "None of the template parameter files were valid or found, content will not be added",
 }
 
