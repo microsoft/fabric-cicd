@@ -149,12 +149,12 @@
 ## User Data Functions
 
 -   **Parameterization:**
-    -   Connection references and libraries in the definitions.json file will always point to the original items unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    -   Connection references and libraries in the `definitions.json` file will always point to the original items unless parameterized in the `find_replace` section of the `parameter.yml` file.
     -   **Important:** When parameterizing connections or libraries that reference items in different workspaces, use the appropriate `replace_value` variables with workspace and item IDs.
--   **Initial deployment** includes all connections and libraries specified in the source workspace.
--   **Function code deployment** includes the function-app.py file containing your custom functions logic.
--   **Metadata and configuration** are automatically managed through the functions.json file in the resources folder.
--   User Data Functions support both HTTP triggers and custom business logic for data transformations.
+-   **deployment**:
+    -   includes all connections and libraries specified in the source workspace.
+    -   **Important:** Due to the nature of UserDataFunctions they could take up to a few minutes to publish.
+-   **Metadata and configuration** are automatically managed through the `functions.json` file in the resources folder.
 
 ## Variable Libraries
 
