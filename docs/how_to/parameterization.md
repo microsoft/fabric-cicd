@@ -338,6 +338,132 @@ Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, man
 
 **Deployment:** At the start of a deployment, an automated validation checks the validity of the `parameter.yml` file, if it is present. This step ensures that valid parameters are loaded, allowing deployment to run smoothly with correctly applied parameterized configurations. If the parameter file is invalid, the deployment will NOT proceed.
 
+## Parameter File Templates
+
+This option supports splitting a larger parameter file into smaller parameter file "templates". Simply, create a folder directory named `templates` under the **repository directory** which will contain the template YAML files. In the main `parameter.yml` file, add the `extend` key with a list of template parameter file names to be included in the parameter dictionary.
+
+<span class="md-h4-nonanchor">Repository directory</span>
+
+```
+C:/dev/workspace
+    /HelloWorld.Notebook
+        ...
+    /GoodbyeWorld.Notebook
+        ...
+    /parameter.yml
+        ...
+    /templates
+        /nb_parameters.yml
+        /pl_parameters.yml
+        /df_parameters.yml
+```
+
+<span class="md-h4-nonanchor">Main `parameter.yml` file</span>
+
+```yaml
+extend:
+    - "nb_parameters.yml"
+    # - "pl_parameters.yml"
+    # - "df_parameters.yml"
+
+find_replace:
+    # Lakehouse Connection Guid
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional fields:
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path:
+          - "/Hello World.Notebook/notebook-content.py"
+          - "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
+
+spark_pool:
+    # CapacityPool_Large
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "CapacityPool_Large_PPE"
+          PROD:
+              type: "Capacity"
+              name: "CapacityPool_Large_PROD"
+      # Optional field:
+      item_name: "World"
+```
+
+<span class="md-h4-nonanchor">`nb_parameters.yml` file</span>
+
+```yaml
+find_replace:
+    # Lakehouse Connection Guid regex
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+          PPE: "$items.Lakehouse.WithoutSchema.id"
+          PROD: "$items.Lakehouse.WithoutSchema.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Lakehouse workspace id regex
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          # Variable: $workspace.id -> target workspace id
+          PPE: "$workspace.id"
+          PROD: "$workspace.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+```
+
+<span class="md-h4-nonanchor">Parameter dictionary</span>
+
+```json
+{
+    "find_replace": [
+        {
+            "find_value": "db52be81-c2b2-4261-84fa-840c67f4bbd0",
+            "replace_value": {
+                "PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733",
+                "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+            },
+            "item_type": "Notebook",
+            "item_name": ["Hello World", "Hello World Subfolder"],
+            "file_path": [
+                "/Hello World.Notebook/notebook-content.py",
+                "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
+            ]
+        },
+        {
+            "find_value": "\\#\\s*META\\s+\"default_lakehouse\":\\s*\"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\"",
+            "replace_value": {
+                "PPE": "$items.Lakehouse.WithoutSchema.id",
+                "PROD": "$items.Lakehouse.WithoutSchema.id"
+            },
+            "is_regex": "true",
+            "file_path": "/Example Notebook.Notebook/notebook-content.py"
+        },
+        {
+            "find_value": "\\#\\s*META\\s+\"default_lakehouse_workspace_id\":\\s*\"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\"",
+            "replace_value": { "PPE": "$workspace.id", "PROD": "$workspace.id" },
+            "is_regex": "true",
+            "file_path": "/Example Notebook.Notebook/notebook-content.py"
+        }
+    ],
+    "spark_pool": [
+        {
+            "instance_pool_id": "72c68dbc-0775-4d59-909d-a47896f4573b",
+            "replace_value": {
+                "PPE": { "type": "Capacity", "name": "CapacityPool_Large_PPE" },
+                "PROD": { "type": "Capacity", "name": "CapacityPool_Large_PROD" }
+            },
+            "item_name": "World"
+        }
+    ]
+}
+```
+
 ## Sample Parameter File
 
 An exhaustive example of all capabilities currently supported in the `parameter.yml` file.
