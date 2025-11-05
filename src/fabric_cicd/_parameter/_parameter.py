@@ -177,17 +177,26 @@ class Parameter:
         template_files = base_parameter_dict["extend"]
         successful_templates = 0
         failed_templates = []
+        processed_templates = set()
 
         # Step 2: Check templates directory exists
         templates_dir = self.repository_directory / "templates"
         if not templates_dir.is_dir():
-            logger.warning("Templates directory not found. Parameter files must be located in a 'templates' directory")
+            logger.warning(
+                "'templates' directory not found. Template parameter file(s) must be located in a 'templates' directory"
+            )
+            logger.warning("The specified template file(s) will be excluded from the parameter dictionary")
             del base_parameter_dict["extend"]
             return base_parameter_dict
 
         # Step 3: Process each template file
         for param_file in template_files:
             try:
+                # Check if this template file has been already processed to prevent duplication
+                if param_file in processed_templates:
+                    logger.warning(f"Skipping duplicate template parameter file reference: {param_file}")
+                    continue
+
                 # Step a: Resolve the path relative to the templates directory and validate
                 template_path = (templates_dir / str(param_file)).resolve()
                 if not template_path.is_relative_to(templates_dir):
@@ -209,6 +218,8 @@ class Parameter:
                 # Step d: Merge the template dict with the base parameter dict
                 base_parameter_dict = self._merge_template_dict(base_parameter_dict, template_dict)
                 successful_templates += 1
+                # Mark template parameter file as processed
+                processed_templates.add(param_file)
                 logger.debug(constants.PARAMETER_MSGS["template_file_loaded"].format(template_path))
 
             except Exception as e:
