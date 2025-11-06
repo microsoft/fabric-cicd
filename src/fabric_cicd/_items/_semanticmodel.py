@@ -23,9 +23,12 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         exclude_path = r".*\.pbi[/\\].*"
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
 
-    connections = get_connections(fabric_workspace_obj)
-
     dataset_with_binding_dict = fabric_workspace_obj.environment_parameter.get("dataset_binding", [])
+
+    if not dataset_with_binding_dict:
+        return
+
+    connections = get_connections(fabric_workspace_obj)
 
     # Build connection mapping from dataset_binding parameter
     binding_mapping = {}
@@ -56,20 +59,26 @@ def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
         Dictionary with connection ID as key and connection details as value
     """
     connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/connections"
-    connections_list = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)["body"]["value"]
+
+    try:
+        connections_list = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)["body"]["value"]
+
+        connections_dict = {}
+        for connection in connections_list:
+            connection_id = connection.get("id")
+            if connection_id:
+                connections_dict[connection_id] = {
+                    "id": connection_id,
+                    "connectivityType": connection.get("connectivityType"),
+                    "connectionDetails": connection.get("connectionDetails", {}),
+                }
+
+        return connections_dict
+    except Exception as e:
+        logger.error(f"Failed to retrieve connections: {e}")
+        return {}
 
     # Build dictionary with connection ID as key
-    connections_dict = {}
-    for connection in connections_list:
-        connection_id = connection.get("id")
-        if connection_id:
-            connections_dict[connection_id] = {
-                "id": connection_id,
-                "connectivityType": connection.get("connectivityType"),
-                "connectionDetails": connection.get("connectionDetails", {}),
-            }
-
-    return connections_dict
 
 
 def bind_semanticmodel_to_connection(
@@ -109,7 +118,7 @@ def bind_semanticmodel_to_connection(
             connections_response = fabric_workspace_obj.endpoint.invoke(method="GET", url=item_connections_url)
             connections_data = connections_response.get("body", {}).get("value", [])
 
-            if not connections_data:
+            if not connections_data or len(connections_data) == 0:
                 logger.warning(f"No connections found for semantic model '{dataset_name}'")
                 continue
 
@@ -155,14 +164,15 @@ def build_request_body(body: dict) -> dict:
         Ordered dictionary with id, connectivityType, and connectionDetails
     """
     connection_binding = body.get("connectionBinding", {})
+    connection_details = connection_binding.get("connectionDetails", {})
 
     return {
         "connectionBinding": {
             "id": connection_binding.get("id"),
             "connectivityType": connection_binding.get("connectivityType"),
             "connectionDetails": {
-                "type": connection_binding.get("connectionDetails", {}).get("type"),
-                "path": connection_binding.get("connectionDetails", {}).get("path"),
+                "type": connection_details.get("type") if "type" in connection_details else None,
+                "path": connection_details.get("path") if "path" in connection_details else None,
             },
         }
     }

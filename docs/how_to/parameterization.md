@@ -123,7 +123,7 @@ spark_pool:
 Dataset binding is used to connect semantic models (datasets) that require cloud or on-premises data sources to the appropriate connection after deployment. The `dataset_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
 
 ```yaml
-gateway_binding:
+dataset_binding:
     # Required field: value must be a string (GUID)
     # Connection Ids can be found from the Fabric UI under Settings -> Manage Connections and gateways -> Settings pane of the connection
     - connection_id: <connection_id>
