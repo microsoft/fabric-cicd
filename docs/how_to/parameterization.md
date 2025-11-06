@@ -49,8 +49,8 @@ spark_pool:
               type: "Capacity"
               name: "PROD-Pool-name"
 
-gateway_binding:
-    - gateway_id: "gateway_id"
+dataset_binding:
+    - connection_id: "connection_id"
       dataset_name: "dataset_name"
 ```
 
@@ -118,16 +118,15 @@ spark_pool:
       item_name: <item-name-filter-value>
 ```
 
-### `gateway_binding`
+### `dataset_binding`
 
-Gateway binding is used to connect semantic models (datasets) that require on-premises data sources to the appropriate data gateway after deployment. The `gateway_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from on-premises sources in the target environment.
-
-**Only supports the on-premises data gateway**
+Dataset binding is used to connect semantic models (datasets) that require cloud or on-premises data sources to the appropriate connection after deployment. The `dataset_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
 
 ```yaml
 gateway_binding:
     # Required field: value must be a string (GUID)
-    - gateway_id: <gateway_id>
+    # Connection Ids can be found from the Fabric UI under Settings -> Manage Connections and gateways -> Settings pane of the connection
+    - connection_id: <connection_id>
     # Required field: value must be a string or a list of strings
       dataset_name: <dataset_name>
     # OR

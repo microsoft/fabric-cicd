@@ -23,58 +23,145 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         exclude_path = r".*\.pbi[/\\].*"
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
 
-    # Use Power BI API to get dataset information
-    # https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-datasets-in-group
-    powerbi_url = f"{constants.DEFAULT_API_ROOT_URL}/v1.0/myorg/groups/{fabric_workspace_obj.workspace_id}/datasets"
-    response = fabric_workspace_obj.endpoint.invoke(method="GET", url=powerbi_url)
+    connections = get_connections(fabric_workspace_obj)
 
-    datasets = response.get("body", {}).get("value", [])
+    dataset_with_binding_dict = fabric_workspace_obj.environment_parameter.get("dataset_binding", [])
 
-    datasets_with_gateway = [ds for ds in datasets if ds.get("isOnPremGatewayRequired")]
-
-    gateway_dict = fabric_workspace_obj.environment_parameter.get("gateway_binding", [])
-    # Build gateway mapping once
-    gateway_mapping = {}
-    for gateway in gateway_dict:
-        gateway_id = gateway.get("gateway_id")
-        dataset_name = gateway.get("dataset_name", [])
+    # Build connection mapping from dataset_binding parameter
+    binding_mapping = {}
+    for dataset in dataset_with_binding_dict:
+        dataset_name = dataset.get("dataset_name", [])
+        connection_id = dataset.get("connection_id")
 
         if isinstance(dataset_name, str):
             dataset_name = [dataset_name]
 
-        for _d in dataset_name:
-            gateway_mapping[_d] = gateway_id
+        for name in dataset_name:
+            binding_mapping[name] = connection_id
 
-    for dataset in datasets_with_gateway:
-        semantic_model_name = dataset.get("name")
-        gateway_id = gateway_mapping.get(semantic_model_name)
-
-        if gateway_id:
-            logger.info(f"Binding semantic model '{semantic_model_name}' to gateway ID '{gateway_id}'")
-            status_code = bind_semanticmodel_to_gateway(
-                fabric_workspace_obj=fabric_workspace_obj, datasets_id=dataset.get("id"), gateway_id=gateway_id
-            )
-            if status_code == 200:
-                logger.info(
-                    f"Successfully bound semantic model '{semantic_model_name}' to gateway. Status code: {status_code}"
-                )
-            else:
-                logger.info(
-                    f"Failed to bind semantic model '{semantic_model_name}' to gateway. Status code: {status_code}"
-                )
-        else:
-            logger.warning(f"No gateway binding found for semantic model: {semantic_model_name}")
+    bind_semanticmodel_to_connection(
+        fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
+    )
 
 
-def bind_semanticmodel_to_gateway(fabric_workspace_obj: FabricWorkspace, datasets_id: str, gateway_id: str) -> int:
+def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
     """
-    Binds a semantic model to a specified gateway.
+    Get all connections from the workspace.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object
+
+    Returns:
+        Dictionary with connection ID as key and connection details as value
+    """
+    connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/connections"
+    connections_list = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)["body"]["value"]
+
+    # Build dictionary with connection ID as key
+    connections_dict = {}
+    for connection in connections_list:
+        connection_id = connection.get("id")
+        if connection_id:
+            connections_dict[connection_id] = {
+                "id": connection_id,
+                "connectivityType": connection.get("connectivityType"),
+                "connectionDetails": connection.get("connectionDetails", {}),
+            }
+
+    return connections_dict
+
+
+def bind_semanticmodel_to_connection(
+    fabric_workspace_obj: FabricWorkspace, connections: dict, connection_details: dict
+) -> None:
+    """
+    Binds semantic models to their specified connections.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-        datasets_id: The ID of the dataset to bind.
-        gateway_id: The ID of the gateway to bind to.
+        connections: Dictionary of connection objects with connection ID as key.
+        connection_details: Dictionary mapping dataset names to connection IDs from parameter.yml.
     """
-    powerbi_url = f"{constants.DEFAULT_API_ROOT_URL}/v1.0/myorg/groups/{fabric_workspace_obj.workspace_id}/datasets/{datasets_id}/Default.BindToGateway"
-    body = {"gatewayId": gateway_id}
-    return fabric_workspace_obj.endpoint.invoke(method="POST", url=powerbi_url, body=body)["status_code"]
+    item_type = "SemanticModel"
+
+    # Loop through each dataset in the dataset_binding section
+    for dataset_name, connection_id in connection_details.items():
+        # Check if the connection ID exists in the connections dict
+        if connection_id not in connections:
+            logger.warning(f"Connection ID '{connection_id}' not found for semantic model '{dataset_name}'")
+            continue
+
+        # Check if this semantic model exists in the repository
+        if dataset_name not in fabric_workspace_obj.repository_items.get(item_type, {}):
+            logger.warning(f"Semantic model '{dataset_name}' not found in repository")
+            continue
+
+        # Get the semantic model object
+        item_obj = fabric_workspace_obj.repository_items[item_type][dataset_name]
+        model_id = item_obj.guid
+
+        logger.info(f"Binding semantic model '{dataset_name}' (ID: {model_id}) to connection '{connection_id}'")
+
+        try:
+            # Get the connection details for this semantic model from Fabric API
+            item_connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/items/{model_id}/connections"
+            connections_response = fabric_workspace_obj.endpoint.invoke(method="GET", url=item_connections_url)
+            connections_data = connections_response.get("body", {}).get("value", [])
+
+            if not connections_data:
+                logger.warning(f"No connections found for semantic model '{dataset_name}'")
+                continue
+
+            # Use the first connection as the template
+            connection_binding = connections_data[0]
+
+            # Update the connection binding with the target connection ID from parameter.yml
+            connection_binding["id"] = connection_id
+            connection_binding["connectivityType"] = connections[connection_id]["connectivityType"]
+            connection_binding["connectionDetails"] = connections[connection_id]["connectionDetails"]
+
+            # Build the request body
+            request_body = build_request_body({"connectionBinding": connection_binding})
+
+            # Make the bind connection API call
+            powerbi_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/semanticModels/{model_id}/bindConnection"
+            bind_response = fabric_workspace_obj.endpoint.invoke(
+                method="POST",
+                url=powerbi_url,
+                body=request_body,
+            )
+
+            status_code = bind_response.get("status_code")
+
+            if status_code == 200:
+                logger.info(f"Successfully bound semantic model '{dataset_name}' to connection '{connection_id}'")
+            else:
+                logger.warning(f"Failed to bind semantic model '{dataset_name}'. Status code: {status_code}")
+
+        except Exception as e:
+            logger.error(f"Failed to bind semantic model '{dataset_name}' to connection: {e!s}")
+            continue
+
+
+def build_request_body(body: dict) -> dict:
+    """
+    Build request body with specific order of fields for connection binding.
+
+    Args:
+        body: Dictionary containing connectionBinding data
+
+    Returns:
+        Ordered dictionary with id, connectivityType, and connectionDetails
+    """
+    connection_binding = body.get("connectionBinding", {})
+
+    return {
+        "connectionBinding": {
+            "id": connection_binding.get("id"),
+            "connectivityType": connection_binding.get("connectivityType"),
+            "connectionDetails": {
+                "type": connection_binding.get("connectionDetails", {}).get("type"),
+                "path": connection_binding.get("connectionDetails", {}).get("path"),
+            },
+        }
+    }

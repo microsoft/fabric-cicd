@@ -104,6 +104,8 @@ spark_pool:
       # Optional field:
       item_name:
       
-gateway_binding:
-    - gateway_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
+dataset_binding:
+    - connection_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
       dataset_name: "gateway_sm2"
+    - connection_id: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+      dataset_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
