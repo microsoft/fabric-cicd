@@ -39,9 +39,10 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         for name in dataset_name:
             binding_mapping[name] = connection_id
 
-    bind_semanticmodel_to_connection(
-        fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
-    )
+    if binding_mapping:
+        bind_semanticmodel_to_connection(
+            fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
+        )
 
 
 def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
