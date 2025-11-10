@@ -23,24 +23,34 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         exclude_path = r".*\.pbi[/\\].*"
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
 
-    dataset_with_binding_dict = fabric_workspace_obj.environment_parameter.get("dataset_binding", [])
+    model_with_binding_dict = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
+    model_with_on_prem_dict = fabric_workspace_obj.environment_parameter.get("gateway_binding", [])
 
-    if not dataset_with_binding_dict:
+    if not model_with_binding_dict and not model_with_on_prem_dict:
         return
 
-    connections = get_connections(fabric_workspace_obj)
-
-    # Build connection mapping from dataset_binding parameter
+    # Build connection mapping from semantic_model_binding parameter
     binding_mapping = {}
-    for dataset in dataset_with_binding_dict:
-        dataset_name = dataset.get("dataset_name", [])
-        connection_id = dataset.get("connection_id")
 
-        if isinstance(dataset_name, str):
-            dataset_name = [dataset_name]
+    if model_with_binding_dict:
+        for model in model_with_binding_dict:
+            model_name = model.get("semantic_model_name", [])
+            connection_id = model.get("connection_id")
 
-        for name in dataset_name:
-            binding_mapping[name] = connection_id
+            if isinstance(model_name, str):
+                model_name = [model_name]
+
+            for name in model_name:
+                binding_mapping[name] = connection_id
+
+    if model_with_on_prem_dict:
+        for model in model_with_on_prem_dict:
+            if model.get("gateway_id") not in binding_mapping.values():
+                binding_mapping[model.get("dataset_name")] = model.get("gateway_id")
+
+    logger.info(f"the final dict is {binding_mapping}")
+
+    connections = get_connections(fabric_workspace_obj)
 
     if binding_mapping:
         bind_semanticmodel_to_connection(
