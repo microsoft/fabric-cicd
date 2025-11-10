@@ -51,7 +51,7 @@ spark_pool:
 
 dataset_binding:
     - connection_id: "connection_id"
-      dataset_name: "dataset_name"
+      semantic_model_name: "semantic_model_name"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
@@ -118,19 +118,19 @@ spark_pool:
       item_name: <item-name-filter-value>
 ```
 
-### `dataset_binding`
+### `semantic_model_binding`
 
-Dataset binding is used to connect semantic models (datasets) that require cloud or on-premises data sources to the appropriate connection after deployment. The `dataset_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
+Semantic model binding is used to connect semantic models that require cloud or on-premises data sources to the appropriate connection after deployment. The `semantic_model_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
 
 ```yaml
-dataset_binding:
+semantic_model_binding:
     # Required field: value must be a string (GUID)
     # Connection Ids can be found from the Fabric UI under Settings -> Manage Connections and gateways -> Settings pane of the connection
     - connection_id: <connection_id>
     # Required field: value must be a string or a list of strings
-      dataset_name: <dataset_name>
+      semantic_model_name: <semantic_model_name>
     # OR
-      dataset_name: [<dataset_name1>,<dataset_name2>,...]
+      semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
 ```
 
 ## Advanced Find and Replace
