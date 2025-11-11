@@ -166,7 +166,7 @@ class Parameter:
     def _process_template_parameters(self, base_parameter_dict: dict) -> dict:
         """
         Process template parameter files and merge them with the base parameter dictionary.
-        Template files must be located in a 'templates' directory within the repository.
+        Template files are resolved relative to the main parameter file's location.
         """
         # Step 1: Check extend contains files
         if not isinstance(base_parameter_dict.get("extend"), list):
@@ -179,15 +179,8 @@ class Parameter:
         failed_templates = []
         processed_templates = set()
 
-        # Step 2: Check templates directory exists
-        templates_dir = self.repository_directory / "templates"
-        if not templates_dir.is_dir():
-            logger.warning(
-                "'templates' directory not found. Template parameter file(s) must be located in a 'templates' directory"
-            )
-            logger.warning("The specified template file(s) will be excluded from the parameter dictionary")
-            del base_parameter_dict["extend"]
-            return base_parameter_dict
+        # Step 2: Get the directory containing the main parameter file
+        param_file_dir = self.parameter_file_path.parent
 
         # Step 3: Process each template file
         for param_file in template_files:
@@ -197,10 +190,12 @@ class Parameter:
                     logger.warning(f"Skipping duplicate template parameter file reference: {param_file}")
                     continue
 
-                # Step a: Resolve the path relative to the templates directory and validate
-                template_path = (templates_dir / str(param_file)).resolve()
-                if not template_path.is_relative_to(templates_dir):
-                    error_msg = f"Parameter file {param_file} must be located within the templates directory"
+                # Step a: Resolve the path relative to the main parameter file's directory
+                template_path = (param_file_dir / str(param_file)).resolve()
+
+                # Check if the template file exists
+                if not template_path.is_file():
+                    error_msg = f"Template file not found: {param_file}"
                     failed_templates.append((param_file, error_msg))
                     continue
 
@@ -224,7 +219,7 @@ class Parameter:
 
             except Exception as e:
                 error_msg = f"Error processing template file: {e!s}"
-                failed_templates.append((template_path, error_msg))
+                failed_templates.append((param_file, error_msg))
                 continue
 
         # Step 4: Log results
@@ -243,7 +238,6 @@ class Parameter:
 
         # Step 5: Remove the extend key after processing
         del base_parameter_dict["extend"]
-
         return base_parameter_dict
 
     def _load_template_parameter_file(self, file_path: Path) -> dict:

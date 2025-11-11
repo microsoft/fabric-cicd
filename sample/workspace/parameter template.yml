@@ -1,7 +1,7 @@
 # Add template parameter files
 extend:
-    - "nb parameter template 1.yml"
-    - "nb parameter template 2.yml"
+    - "./templates/nb parameter template 1.yml"
+    - "./templates/nb parameter template 2.yml"
 
 find_replace:
     # Lakehouse Connection Guid

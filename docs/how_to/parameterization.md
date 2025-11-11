@@ -340,7 +340,7 @@ Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, man
 
 ## Parameter File Templates
 
-This option supports splitting a large parameter file into smaller parameter file "templates". Simply, create a folder directory named `templates` under the **repository directory** which will contain the template YAML files. In the main `parameter.yml` file, add the `extend` key with a list of template parameter file names to be included in the parameter dictionary.
+This option supports splitting a large parameter file into smaller parameter file "templates". Create template YAML files in any location (in the following example, the files are located in a `templates` directory within the repository directory). In the main `parameter.yml` file, add the `extend` key with a list of template parameter file paths **relative to the main parameter file location.**
 
 <span class="md-h4-nonanchor">Repository directory</span>
 
@@ -362,9 +362,9 @@ C:/dev/workspace
 
 ```yaml
 extend:
-    - "nb_parameters.yml"
-    # - "pl_parameters.yml"
-    # - "df_parameters.yml"
+    - "./templates/nb_parameters.yml"
+    # - "./templates/pl_parameters.yml"
+    # - "./templates/df_parameters.yml"
 
 find_replace:
     # Lakehouse Connection Guid

@@ -1419,7 +1419,7 @@ def test_basic_template_processing(tmp_path):
     base_file = repo_dir / "parameter.yml"
     base_content = """
     extend:
-      - template1.yml
+      - ./templates/template1.yml
     find_replace:
       - find_value: "base-id"
         replace_value:
@@ -1540,22 +1540,24 @@ def test_nested_template_prevention(tmp_path):
     assert "child-id" not in find_values  # child template should not be processed
 
 
-def test_template_path_security(tmp_path):
-    """Test security checks for template file paths."""
+def test_template_path_resolution(tmp_path):
+    """Test that template files are resolved relative to the parameter file location."""
     # Setup repository structure
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
-    templates_dir = repo_dir / "templates"
-    templates_dir.mkdir()
 
-    # Create base parameter file with suspicious paths
+    # Create a directory at the same level as repo for "outside" templates
+    shared_dir = tmp_path / "shared"
+    shared_dir.mkdir()
+
+    # Create base parameter file
     base_file = repo_dir / "parameter.yml"
     base_content = """
     extend:
-      - normal.yml
-      - ../outside.yml
-      - /absolute/path.yml
-      - ../../traversal.yml
+      - normal.yml          # Same directory
+      - ../shared/shared.yml  # Outside repo (should work now)
+      - /absolute/path.yml   # Absolute path that doesn't exist (should fail)
+      - nonexistent.yml      # File doesn't exist (should fail)
     find_replace:
       - find_value: "base-id"
         replace_value:
@@ -1563,33 +1565,69 @@ def test_template_path_security(tmp_path):
     """
     base_file.write_text(base_content)
 
-    # Create valid template file
-    template_file = templates_dir / "normal.yml"
-    template_content = """
+    # Create template in same directory
+    normal_file = repo_dir / "normal.yml"
+    normal_content = """
     find_replace:
-      - find_value: "template-id"
+      - find_value: "normal-id"
         replace_value:
-          DEV: "dev-template"
+          DEV: "dev-normal"
     """
-    template_file.write_text(template_content)
+    normal_file.write_text(normal_content)
 
-    # Create file outside templates directory (should be ignored)
-    outside_file = repo_dir / "outside.yml"
-    outside_file.write_text("""
+    # Create shared template outside repo
+    shared_file = shared_dir / "shared.yml"
+    shared_content = """
     find_replace:
-      - find_value: "outside-id"
+      - find_value: "shared-id"
         replace_value:
-          DEV: "dev-outside"
-    """)
+          DEV: "dev-shared"
+    """
+    shared_file.write_text(shared_content)
 
     # Initialize parameter object
     param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
 
-    # Verify security checks worked
+    # Verify template processing results
     assert "extend" not in param.environment_parameter
+    # Should have: base, normal, and shared (3 total)
+    assert len(param.environment_parameter["find_replace"]) == 3
+    find_values = {item["find_value"] for item in param.environment_parameter["find_replace"]}
+    assert find_values == {"base-id", "normal-id", "shared-id"}
+
+
+def test_missing_template_files(tmp_path):
+    """Test that missing template files are handled gracefully."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - existing.yml
+      - missing.yml
+      - /absolute/missing.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    existing_file = repo_dir / "existing.yml"
+    existing_file.write_text("""
+    find_replace:
+      - find_value: "existing-id"
+        replace_value:
+          DEV: "dev-existing"
+    """)
+
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Only base and existing should be loaded
     assert len(param.environment_parameter["find_replace"]) == 2
     find_values = {item["find_value"] for item in param.environment_parameter["find_replace"]}
-    assert find_values == {"base-id", "template-id"}
+    assert find_values == {"base-id", "existing-id"}
 
 
 def test_template_merge_validation(tmp_path):
@@ -1604,8 +1642,8 @@ def test_template_merge_validation(tmp_path):
     base_file = repo_dir / "parameter.yml"
     base_content = """
     extend:
-      - template1.yml
-      - invalid.yml
+      - ./templates/template1.yml
+      - ./templates/invalid.yml
     find_replace:
       - find_value: "base-id"
         replace_value:
@@ -1783,6 +1821,7 @@ key_value_replace:
 
     # Create base parameter file
     base_file = repo_dir / "parameter.yml"
+    template_refs_with_path = [f"./templates/{ref}" for ref in template_refs]
     base_content = """
 find_replace:
   - find_value: "base-id"
@@ -1798,7 +1837,7 @@ key_value_replace:
     replace_value:
       DEV: "dev-base-value"
 extend:
-""" + yaml.safe_dump(template_refs, allow_unicode=True, indent=2)
+""" + yaml.safe_dump(template_refs_with_path, allow_unicode=True, indent=2)
 
     base_file.write_text(base_content.strip(), encoding="utf-8")
 
@@ -1865,104 +1904,6 @@ extend:
     ), "PROD environment value not correctly loaded"
 
 
-def test_template_security_and_validation(tmp_path):
-    """Test template security features and validation."""
-    repo_dir = tmp_path / "repo"
-    repo_dir.mkdir()
-    templates_dir = repo_dir / "templates"
-    templates_dir.mkdir()
-
-    # Create base parameter file with suspicious paths and invalid templates
-    base_file = repo_dir / "parameter.yml"
-    base_content = """
-    extend:
-      - normal.yml           # Valid template
-      - ../outside.yml      # Path traversal attempt
-      - /absolute/path.yml  # Absolute path attempt
-      - invalid.yml         # Invalid content
-      - invalid_yaml.yml    # Invalid YAML
-      - comments.yml        # Comments only
-    find_replace:
-      - find_value: "base-id"
-        replace_value:
-          DEV: "dev-base"
-    """
-    base_file.write_text(base_content)
-
-    # Create valid template
-    template_file = templates_dir / "normal.yml"
-    template_content = """
-    find_replace:
-      - find_value: "template-id"
-        replace_value:
-          DEV: "dev-template"
-    """
-    template_file.write_text(template_content)
-
-    # Create file outside templates directory (should be ignored)
-    outside_file = repo_dir / "outside.yml"
-    outside_file.write_text("""
-    find_replace:
-      - find_value: "outside-id"
-        replace_value:
-          DEV: "dev-outside"
-    """)
-
-    # Create invalid template
-    invalid_file = templates_dir / "invalid.yml"
-    invalid_content = """
-    find_replace:
-      - replace_value:
-          DEV: "dev-invalid"
-        optional_field: "value"
-    """
-    invalid_file.write_text(invalid_content)
-
-    # Create template with invalid YAML
-    invalid_yaml_file = templates_dir / "invalid_yaml.yml"
-    invalid_yaml_content = """
-    find_replace:
-      - find_value: "invalid-id
-        replace_value:
-          DEV: dev-template
-        missing-quote-and-colon
-    """
-    invalid_yaml_file.write_text(invalid_yaml_content)
-
-    # Create template with only comments
-    comments_file = templates_dir / "comments.yml"
-    comments_content = """
-    # This is a comment
-    # Another comment
-    # Yet another comment
-    """
-    comments_file.write_text(comments_content)
-
-    # Initialize parameter object
-    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
-
-    # Test 1: Security checks for template paths (during merge phase)
-    assert "extend" not in param.environment_parameter
-    assert len(param.environment_parameter["find_replace"]) == 3  # Base, normal and invalid template
-    find_values = {item["find_value"] for item in param.environment_parameter["find_replace"] if "find_value" in item}
-    assert find_values == {"base-id", "template-id"}  # Only valid find_values
-
-    # Verify invalid content was merged
-    assert any("optional_field" in item for item in param.environment_parameter["find_replace"]), (
-        "Invalid template content should be initially merged"
-    )
-
-    # Test 2: Invalid content validation (validation phase)
-    is_valid, message = param._validate_parameter("find_replace")
-    assert not is_valid, "Invalid content should fail validation"
-    assert message == constants.PARAMETER_MSGS["missing key"].format("find_replace")
-
-    # Test 3: Comment-only and empty files are properly handled
-    assert not any(
-        e.get("find_value", "").startswith("comment") for e in param.environment_parameter.get("find_replace", [])
-    )
-
-
 def test_template_merge_behavior(tmp_path):
     """Test template merging behavior including order, duplicates, and identical entries."""
     repo_dir = tmp_path / "repo"
@@ -1974,9 +1915,9 @@ def test_template_merge_behavior(tmp_path):
     base_file = repo_dir / "parameter.yml"
     base_content = """
     extend:
-      - template1.yml
-      - template1.yml  # Duplicate reference
-      - template2.yml
+      - ./templates/template1.yml
+      - ./templates/template1.yml  # Duplicate reference
+      - ./templates/template2.yml
     find_replace:
       - find_value: "id-1"
         replace_value:
