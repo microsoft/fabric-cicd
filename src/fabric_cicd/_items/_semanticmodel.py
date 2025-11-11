@@ -45,10 +45,8 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
 
     if model_with_on_prem_dict:
         for model in model_with_on_prem_dict:
-            if model.get("gateway_id") not in binding_mapping.values():
+            if model.get("dataset_name") not in binding_mapping:
                 binding_mapping[model.get("dataset_name")] = model.get("gateway_id")
-
-    logger.info(f"the final dict is {binding_mapping}")
 
     connections = get_connections(fabric_workspace_obj)
 
@@ -88,8 +86,6 @@ def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
         logger.error(f"Failed to retrieve connections: {e}")
         return {}
 
-    # Build dictionary with connection ID as key
-
 
 def bind_semanticmodel_to_connection(
     fabric_workspace_obj: FabricWorkspace, connections: dict, connection_details: dict
@@ -104,7 +100,7 @@ def bind_semanticmodel_to_connection(
     """
     item_type = "SemanticModel"
 
-    # Loop through each dataset in the dataset_binding section
+    # Loop through each semantic model in the semantic_model_binding section
     for dataset_name, connection_id in connection_details.items():
         # Check if the connection ID exists in the connections dict
         if connection_id not in connections:
@@ -128,7 +124,7 @@ def bind_semanticmodel_to_connection(
             connections_response = fabric_workspace_obj.endpoint.invoke(method="GET", url=item_connections_url)
             connections_data = connections_response.get("body", {}).get("value", [])
 
-            if not connections_data or len(connections_data) == 0:
+            if not connections_data:
                 logger.warning(f"No connections found for semantic model '{dataset_name}'")
                 continue
 
