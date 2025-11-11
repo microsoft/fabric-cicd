@@ -45,8 +45,15 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
 
     if model_with_on_prem_dict:
         for model in model_with_on_prem_dict:
-            if model.get("dataset_name") not in binding_mapping:
-                binding_mapping[model.get("dataset_name")] = model.get("gateway_id")
+            dataset_name = model.get("dataset_name", [])
+            gateway_id = model.get("gateway_id")
+
+            if isinstance(dataset_name, str):
+                dataset_name = [dataset_name]
+
+            for name in dataset_name:
+                if name not in binding_mapping:
+                    binding_mapping[name] = gateway_id
 
     connections = get_connections(fabric_workspace_obj)
 
