@@ -44,6 +44,10 @@ class Parameter:
             "minimum": {"gateway_id", "dataset_name"},
             "maximum": {"gateway_id", "dataset_name"},
         },
+        "semantic_model_binding": {
+            "minimum": {"connection_id", "semantic_model_name"},
+            "maximum": {"connection_id", "semantic_model_name"},
+        },
     }
 
     LOAD_ERROR_MSG = ""
@@ -215,6 +219,7 @@ class Parameter:
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("gateway_binding parameter", lambda: self._validate_parameter("gateway_binding")),
+            ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -232,6 +237,7 @@ class Parameter:
                         "key_value_replace parameter",
                         "spark_pool parameter",
                         "gateway_binding parameter",
+                        "semantic_model_binding parameter",
                     )
                     and msg == "parameter not found"
                 ):
@@ -254,7 +260,7 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:5]
+        params = list(self.PARAMETER_KEYS.keys())[:6]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
@@ -286,6 +292,8 @@ class Parameter:
             key_name = "instance_pool_id"
         elif param_name == "gateway_binding":
             key_name = "gateway_id"
+        elif param_name == "semantic_model_binding":
+            key_name = "connection_id"
         else:
             key_name = "find_value"
 
@@ -293,15 +301,15 @@ class Parameter:
             param_num_str = str(param_num) if multiple_param else ""
             find_value = parameter_dict[key_name]
             for step, validation_func in validation_steps:
-                if param_name == "gateway_binding" and step == "replace_value":
+                if param_name in ["gateway_binding", "semantic_model_binding"] and step == "replace_value":
                     continue
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-            # Special case to skip environment validation for gateway_binding
-            if param_name == "gateway_binding":
+            # Special case to skip environment validation for dataset_binding
+            if param_name in ["gateway_binding", "semantic_model_binding"]:
                 continue
             # Check if replacement will be skipped for a given find value
             is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
@@ -370,7 +378,7 @@ class Parameter:
 
             if key == "replace_value":
                 expected_type = "dictionary"
-            elif key == "dataset_name":
+            elif key in ["dataset_name", "semantic_model_name"]:
                 expected_type = "string or list[string]"
             else:
                 expected_type = "string"
