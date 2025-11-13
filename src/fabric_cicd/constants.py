@@ -37,10 +37,11 @@ ACCEPTED_ITEM_TYPES = (
     "DataAgent",
     "UserDataFunction",
     "OrgApp",
+    "MLExperiment",
 )
 
 # Publish
-SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
+SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase", "MLExperiment"]
 
 # Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
