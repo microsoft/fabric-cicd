@@ -92,11 +92,11 @@ class FabricEndpoint:
                     logger.debug(invoke_log_message)
 
             except requests.exceptions.ConnectionError as e:
-                logger.debug(f"RemoteDisconnected error occurred, retrying: {e}")
+                logger.warning(f"RemoteDisconnected error occurred, retrying: {e}")
                 handle_retry(
                     attempt=iteration_count,
                     base_delay=1,
-                    max_retries=5,
+                    max_retries=10,
                     prepend_message="Connection lost.",
                 )
             except Exception as e:
