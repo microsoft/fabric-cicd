@@ -65,9 +65,10 @@ class FabricEndpoint:
                 }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
-                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
+
+                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 invoke_log_message = _format_invoke_log(response, method, url, body)
 
