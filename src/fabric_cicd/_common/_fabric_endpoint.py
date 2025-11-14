@@ -8,6 +8,7 @@ import datetime
 import json
 import logging
 import time
+from http.client import RemoteDisconnected
 from typing import Optional
 
 import requests
@@ -89,6 +90,14 @@ class FabricEndpoint:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(invoke_log_message)
 
+            except RemoteDisconnected as e:
+                logger.debug(f"RemoteDisconnected error occurred, retrying: {e}")
+                handle_retry(
+                    attempt=iteration_count,
+                    base_delay=1,
+                    max_retries=3,
+                    prepend_message="Connection lost.",
+                )
             except Exception as e:
                 logger.debug(invoke_log_message)
                 raise InvokeError(e, logger, invoke_log_message) from e
