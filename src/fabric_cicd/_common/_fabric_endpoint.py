@@ -96,7 +96,7 @@ class FabricEndpoint:
                 handle_retry(
                     attempt=iteration_count,
                     base_delay=1,
-                    max_retries=3,
+                    max_retries=5,
                     prepend_message="Connection lost.",
                 )
             except Exception as e:
