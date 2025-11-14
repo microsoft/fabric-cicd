@@ -8,10 +8,10 @@ import datetime
 import json
 import logging
 import time
-from http.client import RemoteDisconnected
 from typing import Optional
 
 import requests
+import requests.exceptions
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
@@ -90,7 +90,7 @@ class FabricEndpoint:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(invoke_log_message)
 
-            except RemoteDisconnected as e:
+            except requests.exceptions.ConnectionError as e:
                 logger.debug(f"RemoteDisconnected error occurred, retrying: {e}")
                 handle_retry(
                     attempt=iteration_count,
