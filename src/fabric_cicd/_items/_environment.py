@@ -27,6 +27,11 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
     """
+    logger.warning(
+        "The underlying legacy Environment APIs will be deprecated by March 2026. "
+        "Please upgrade to the latest fabric-cicd version before March 2026 to avoid breaking deployments."
+    )
+
     # Check for ongoing publish
     check_environment_publish_state(fabric_workspace_obj, True)
 
@@ -74,9 +79,10 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     _remove_libraries(fabric_workspace_obj, item_guid, repo_library_files)
 
     # Publish updated settings
-    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/publish-environment
+    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
     fabric_workspace_obj.endpoint.invoke(
-        method="POST", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish"
+        method="POST",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish?preview=False",
     )
 
     logger.info(f"{constants.INDENT}Publish Submitted")
@@ -168,10 +174,10 @@ def _update_compute_settings(
         yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
 
         # Update compute settings
-        # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-compute/update-staging-settings
+        # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/update-spark-compute
         fabric_workspace_obj.endpoint.invoke(
             method="PATCH",
-            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute",
+            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute?preview=False",
             body=yaml_body,
         )
         logger.info(f"{constants.INDENT}Updated Spark Settings")
@@ -190,9 +196,42 @@ def _get_repo_libraries(item_path: Path) -> dict:
     if repo_library_path.exists():
         for root, _dirs, files in os.walk(repo_library_path):
             for file_name in files:
-                repo_library_files[file_name] = Path(root, file_name)
+                if file_name == "environment.yml":
+                    env_yml_path = Path(root, file_name)
+                    with Path.open(env_yml_path, "r", encoding="utf-8") as f:
+                        yaml_body = yaml.safe_load(f)
+                        external_libs = _parse_external_libraries(yaml_body)
+                        repo_library_files[file_name] = {"path": env_yml_path, "libraries": external_libs}
+                else:
+                    repo_library_files[file_name] = {"path": Path(root, file_name), "libraries": None}
 
     return repo_library_files
+
+
+def _parse_external_libraries(yaml_body: dict) -> dict:
+    """
+    Parses external libraries from environment.yml content.
+
+    Args:
+        yaml_body: The content of environment.yml as a dictionary.
+    """
+    external_libraries = {}
+
+    dependencies = yaml_body.get("dependencies", [])
+
+    for dep in dependencies:
+        # Process pip dependencies
+        if isinstance(dep, dict) and "pip" in dep:
+            for lib in dep["pip"]:
+                if isinstance(lib, str) and "==" in lib:
+                    pkg_name, pkg_version = lib.split("==", 1)
+                    external_libraries[pkg_name.strip()] = pkg_version.strip()
+        # Process conda dependencies
+        elif isinstance(dep, str) and "==" in dep:
+            pkg_name, pkg_version = dep.split("==", 1)
+            external_libraries[pkg_name.strip()] = pkg_version.strip()
+
+    return external_libraries
 
 
 def _add_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_library_files: dict) -> None:
@@ -204,17 +243,32 @@ def _add_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_l
         item_guid: The GUID of the environment item.
         repo_library_files: The list of libraries in the repository.
     """
-    for file_name, file_path in repo_library_files.items():
-        library_file = {"file": (file_name, file_path.open("rb"))}
+    for file_name, file_info in repo_library_files.items():
+        with file_info["path"].open("rb") as f:
+            file_content = f.read()
 
-        # Upload libraries From Repo
-        # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/upload-staging-library
-        fabric_workspace_obj.endpoint.invoke(
-            method="POST",
-            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries",
-            files=library_file,
-        )
-        logger.info(f"{constants.INDENT}Updated Library {file_path.name}")
+        if file_name == "environment.yml":
+            # Import external libraries from environment.yml
+            # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/import-external-libraries
+            fabric_workspace_obj.endpoint.invoke(
+                method="POST",
+                url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries/importExternalLibraries",
+                body=file_content,
+                headers={"Content-Type": "application/octet-stream"},
+            )
+            logger.info(f"{constants.INDENT}Updated External Libraries from {file_name}")
+
+        else:
+            # Upload custom library files (whl, jar, etc.)
+            # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/upload-custom-library
+            file_name_encoded = urllib.parse.quote(file_name)
+            fabric_workspace_obj.endpoint.invoke(
+                method="POST",
+                url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries/{file_name_encoded}",
+                body=file_content,
+                headers={"Content-Type": "application/octet-stream"},
+            )
+            logger.info(f"{constants.INDENT}Updated Custom Library {file_name}")
 
 
 def _remove_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, repo_library_files: dict) -> None:
@@ -225,47 +279,75 @@ def _remove_libraries(fabric_workspace_obj: FabricWorkspace, item_guid: str, rep
         fabric_workspace_obj: The FabricWorkspace object.
         item_guid: The GUID of the environment item.
         repo_library_files: The list of libraries in the repository.
-
     """
     # Get staged libraries
-    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/get-staging-libraries
+    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/list-libraries
     response_environment = fabric_workspace_obj.endpoint.invoke(
-        method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries"
+        method="GET",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?preview=False",
     )
 
     if response_environment["body"].get("errorCode", "") != "EnvironmentLibrariesNotFound":
-        if (
-            "environmentYml" in response_environment["body"]
-            and response_environment["body"]["environmentYml"]  # not none or ''
-            and "environment.yml" not in repo_library_files
-        ):
-            _remove_library(fabric_workspace_obj, item_guid, "environment.yml")
+        libraries = response_environment["body"].get("libraries", None)
+        if libraries:
+            for library in libraries:
+                library_type = library.get("libraryType", None)
+                file = library.get("name", None)
+                if file:
+                    # For external libraries, get the version
+                    version = library.get("version", None) if library_type == "External" else None
 
-        custom_libraries = response_environment["body"].get("customLibraries", None)
-        if custom_libraries:
-            for files in custom_libraries.values():
-                for file in files:
-                    if file not in repo_library_files:
-                        _remove_library(fabric_workspace_obj, item_guid, file)
+                    if library_type == "Custom" and file not in repo_library_files:
+                        _remove_library(fabric_workspace_obj, item_guid, file, library_type, version)
+
+                    if library_type == "External":
+                        # Case 1: No external libraries exist in repo, remove all
+                        if "environment.yml" not in repo_library_files:
+                            _remove_library(fabric_workspace_obj, item_guid, file, library_type, version)
+
+                        # Case 2: External libraries exist in repo, remove those not in repo
+                        else:
+                            # Get external libraries present in environment.yml repo file
+                            env_yml_libs = repo_library_files.get("environment.yml", {}).get("libraries", {})
+                            if file not in env_yml_libs or version != env_yml_libs[file]:
+                                _remove_library(fabric_workspace_obj, item_guid, file, library_type, version)
 
 
-def _remove_library(fabric_workspace_obj: FabricWorkspace, item_guid: str, file_name: str) -> None:
+def _remove_library(
+    fabric_workspace_obj: FabricWorkspace,
+    item_guid: str,
+    file_name: str,
+    library_type: str,
+    version: str,
+) -> None:
     """Remove library from workspace environment.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
         item_guid: The GUID of the environment item.
         file_name: The name of the file to be removed.
+        library_type: The type of the library ("Custom" or "External").
+        version: The version of the library (relevant for "External" type).
     """
-    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/spark-libraries/delete-staging-library
-    # encode the URL to escape string to be URL-safe.
-    file_name_encoded = urllib.parse.quote(file_name)
-    fabric_workspace_obj.endpoint.invoke(
-        method="DELETE",
-        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries?libraryToDelete={file_name_encoded}",
-        body={},
-    )
-    logger.info(f"{constants.INDENT}Removed {file_name}")
+    if library_type == "Custom":
+        # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/delete-custom-library
+        # encode the URL to escape string to be URL-safe.
+        file_name_encoded = urllib.parse.quote(file_name)
+        fabric_workspace_obj.endpoint.invoke(
+            method="DELETE",
+            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries/{file_name_encoded}",
+            body={},
+        )
+        logger.info(f"{constants.INDENT}Removed Custom Library {file_name}")
+
+    if library_type == "External" and version is not None:
+        # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/remove-external-library
+        fabric_workspace_obj.endpoint.invoke(
+            method="POST",
+            url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/libraries/removeExternalLibrary",
+            body={"name": file_name, "version": version},
+        )
+        logger.info(f"{constants.INDENT}Removed External Library {file_name}")
 
 
 def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace, input_dict: dict) -> dict:

@@ -62,9 +62,20 @@ class FabricEndpoint:
                     "Authorization": f"Bearer {self.aad_token}",
                     "User-Agent": f"{constants.USER_AGENT}",
                 }
-                if files is None:
+
+                # Merge custom headers from kwargs if provided
+                if "headers" in kwargs:
+                    headers.update(kwargs.pop("headers"))
+
+                # Set default Content-Type if not already set and no files
+                if files is None and "Content-Type" not in headers:
                     headers["Content-Type"] = "application/json; charset=utf-8"
-                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
+
+                # Use data= for bytes, json= for dict/str
+                if isinstance(body, bytes):
+                    response = self.requests.request(method=method, url=url, headers=headers, data=body, files=files)
+                else:
+                    response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
 
@@ -183,7 +194,7 @@ def _handle_response(
         url = response.headers.get("Location")
         method = "GET"
         body = "{}"
-        response_json = response.json()
+        response_json = response.json() if response.text else {}
 
         if long_running:
             status = response_json.get("status")
@@ -210,8 +221,12 @@ def _handle_response(
                     prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
-            time.sleep(1)
-            long_running = True
+            if url is None:
+                # No Location header means operation completed immediately
+                exit_loop = True
+            else:
+                time.sleep(1)
+                long_running = True
 
     # Handle successful responses
     elif response.status_code in {200, 201} or (
@@ -355,12 +370,20 @@ def _format_invoke_log(response: requests.Response, method: str, url: str, body:
         response: The response object from the HTTP request.
         method: The HTTP method used in the request.
         url: The URL used in the request.
-        body: The JSON body used in the request.
+        body: The JSON body or bytes used in the request.
     """
+    # Format body for logging
+    if isinstance(body, bytes):
+        body_str = f"<bytes: {len(body)} bytes>"
+    elif body:
+        body_str = f"Request Body:\n{json.dumps(body, indent=4)}"
+    else:
+        body_str = "Request Body: None"
+
     message = [
         f"\nURL: {url}",
         f"Method: {method}",
-        (f"Request Body:\n{json.dumps(body, indent=4)}" if body else "Request Body: None"),
+        body_str,
     ]
     if response is not None:
         message.extend([
