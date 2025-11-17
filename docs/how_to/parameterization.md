@@ -959,14 +959,14 @@ find_replace:
       replace_value:
           PPE: "76a8f5c3-e4b2-48d1-9c7f-382d69a5e7b0" # PPE Cluster ID
           PROD: "f297e14d-6c83-42a5-b718-59d40e3f8c2d" # PROD Cluster ID
-      file_path: "/Sample Dataflow.Dataflow/mashup.pq"
+      file_path: "/Sample Dataflow.Dataflow/queryMetadata.json"
 
     # Connection ID - Datasource ID
     - find_value: "d12c5f7b-90a3-47e6-8d2c-3fb59e01d47a"
       replace_value:
           PPE: "25b9a417-3d8e-4f62-901c-75de6ba84f35" # PPE Datasource ID
           PROD: "cb718d96-5ae2-47fc-8b93-1d24c0f5e8a7" # PROD Datasource ID
-      file_path: "/Sample Dataflow.Dataflow/mashup.pq"
+      file_path: "/Sample Dataflow.Dataflow/queryMetadata.json"
 ```
 
 <span class="md-h4-nonanchor">queryMetadata.json file</span>
