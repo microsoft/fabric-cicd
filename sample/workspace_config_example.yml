@@ -1,58 +1,83 @@
 # Workspace Configuration Example
 # This file demonstrates how to configure multiple workspaces for bulk creation
 # Use with the create_workspaces_from_config() function
+#
+# You can use inline role_assignments OR reference role templates from roles_example.yml
+# using the role_templates field for better reusability across workspaces.
 
 workspaces:
-  # Example 1: Workspace with full configuration
+  # Example 1: Using role templates (recommended for common roles across workspaces)
   - display_name: "Customer-001-Workspace"
-    description: "Customer 1 production workspace"
+    description: "Customer 1 production workspace using role templates"
     capacity_id: "12345678-1234-1234-1234-123456789012"  # Replace with your capacity ID
+    role_templates:  # Reference role templates from roles_example.yml
+      - "admin_team"  # All admins get access
+      - "dev_team"  # Dev team gets contributor access
+      - "analytics_viewers"  # Analytics team gets viewer access
+
+  # Example 2: Combining role templates with inline role assignments
+  - display_name: "Customer-002-Workspace"
+    description: "Customer 2 workspace with mixed role assignment methods"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
+    role_templates:
+      - "admin_team"  # Common admin access
+    role_assignments:  # Additional customer-specific roles
+      - principal_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        principal_type: "User"
+        role: "Member"
+
+  # Example 3: Using only role templates (no inline assignments)
+  - display_name: "Customer-003-Workspace"
+    description: "Customer 3 workspace using standard templates"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
+    role_templates:
+      - "admin_team"
+      - "automation_service"
+      - "executive_viewers"
+
+  # Example 4: Traditional inline role assignments (backward compatible)
+  - display_name: "Customer-004-Workspace"
+    description: "Customer 4 workspace with inline role assignments"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
     role_assignments:
-      - principal_id: "87654321-4321-4321-4321-210987654321"  # Replace with user/group/SP object ID
-        principal_type: "User"  # Options: User, Group, ServicePrincipal
-        role: "Admin"  # Options: Admin, Member, Contributor, Viewer
+      - principal_id: "87654321-4321-4321-4321-210987654321"
+        principal_type: "User"
+        role: "Admin"
       - principal_id: "11111111-1111-1111-1111-111111111111"
         principal_type: "Group"
         role: "Member"
 
-  # Example 2: Workspace with capacity but no role assignments
-  - display_name: "Customer-002-Workspace"
-    description: "Customer 2 production workspace"
-    capacity_id: "12345678-1234-1234-1234-123456789012"
-
-  # Example 3: Workspace with role assignments but no capacity
-  - display_name: "Customer-003-Workspace"
-    description: "Customer 3 development workspace"
-    role_assignments:
-      - principal_id: "22222222-2222-2222-2222-222222222222"
-        principal_type: "User"
-        role: "Admin"
-      - principal_id: "33333333-3333-3333-3333-333333333333"
-        principal_type: "ServicePrincipal"
-        role: "Contributor"
-
-  # Example 4: Minimal workspace configuration
-  - display_name: "Customer-004-Workspace"
-    description: "Customer 4 test workspace"
-
-  # Example 5: Multiple administrators
+  # Example 5: Workspace with capacity but no role assignments
   - display_name: "Customer-005-Workspace"
-    description: "Customer 5 workspace with multiple admins"
+    description: "Customer 5 production workspace"
     capacity_id: "12345678-1234-1234-1234-123456789012"
-    role_assignments:
-      - principal_id: "44444444-4444-4444-4444-444444444444"
-        principal_type: "User"
-        role: "Admin"
-      - principal_id: "55555555-5555-5555-5555-555555555555"
-        principal_type: "User"
-        role: "Admin"
-      - principal_id: "66666666-6666-6666-6666-666666666666"
-        principal_type: "Group"
-        role: "Member"
+
+  # Example 6: Multiple role templates for comprehensive access
+  - display_name: "Customer-006-Workspace"
+    description: "Customer 6 workspace with multiple teams"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
+    role_templates:
+      - "admin_team"
+      - "dev_team"
+      - "data_engineering"
+      - "analytics_viewers"
+      - "automation_service"
+
+  # Example 7: Minimal workspace configuration
+  - display_name: "Customer-007-Workspace"
+    description: "Customer 7 test workspace"
 
   # Add more workspaces as needed...
   # For ISV scenarios, you can define hundreds of workspaces here
+  # using role templates to ensure consistent access across all workspaces
 
-# Usage:
+# Usage without role templates:
 # from fabric_cicd import create_workspaces_from_config
 # results = create_workspaces_from_config("workspace_config_example.yml")
+
+# Usage with role templates (recommended):
+# from fabric_cicd import create_workspaces_from_config
+# results = create_workspaces_from_config(
+#     config_file_path="workspace_config_example.yml",
+#     roles_file_path="roles_example.yml"
+# )

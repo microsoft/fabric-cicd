@@ -165,9 +165,9 @@ publish_all_items(workspace)
 
 ### Using Configuration Files
 
-For ISV scenarios requiring multiple workspace deployments, use configuration files:
+For ISV scenarios requiring multiple workspace deployments, use configuration files.
 
-#### Create Configuration File
+#### Method 1: Inline Role Assignments
 
 Create a YAML file (e.g., `customer_workspaces.yml`):
 
@@ -191,26 +191,95 @@ workspaces:
       - principal_id: "22222222-2222-2222-2222-222222222222"
         principal_type: "User"
         role: "Admin"
-
-  - display_name: "Customer-003-Workspace"
-    description: "Customer 3 production workspace"
-    capacity_id: "12345678-1234-1234-1234-123456789012"
 ```
-
-#### Create Workspaces from Configuration
 
 ```python
 from fabric_cicd import create_workspaces_from_config
 
-# Create all workspaces defined in the config
 results = create_workspaces_from_config(
     config_file_path="customer_workspaces.yml"
 )
+```
 
-# Display results
+#### Method 2: Role Templates (Recommended for ISV Scenarios)
+
+For scenarios where you need the same roles across multiple workspaces (e.g., admin access for all customer workspaces), use role templates.
+
+**Create a roles template file** (`roles.yml`):
+
+```yaml
+role_templates:
+  # Admin team - applies to all workspaces
+  admin_team:
+    - principal_id: "12345678-1234-1234-1234-123456789012"
+      principal_type: "User"
+      role: "Admin"
+    - principal_id: "87654321-4321-4321-4321-210987654321"
+      principal_type: "Group"
+      role: "Admin"
+  
+  # Development team
+  dev_team:
+    - principal_id: "22222222-2222-2222-2222-222222222222"
+      principal_type: "Group"
+      role: "Contributor"
+  
+  # Analytics viewers
+  analytics_viewers:
+    - principal_id: "33333333-3333-3333-3333-333333333333"
+      principal_type: "Group"
+      role: "Viewer"
+```
+
+**Reference templates in workspace config**:
+
+```yaml
+workspaces:
+  - display_name: "Customer-001-Workspace"
+    description: "Customer 1 production workspace"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
+    role_templates:  # Reference role templates
+      - "admin_team"
+      - "dev_team"
+      - "analytics_viewers"
+
+  - display_name: "Customer-002-Workspace"
+    description: "Customer 2 production workspace"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
+    role_templates:
+      - "admin_team"  # All workspaces get admin access
+      - "analytics_viewers"
+  
+  # You can also combine templates with inline assignments
+  - display_name: "Customer-003-Workspace"
+    description: "Customer 3 with mixed role assignment"
+    capacity_id: "12345678-1234-1234-1234-123456789012"
+    role_templates:
+      - "admin_team"
+    role_assignments:  # Customer-specific roles
+      - principal_id: "44444444-4444-4444-4444-444444444444"
+        principal_type: "User"
+        role: "Member"
+```
+
+```python
+from fabric_cicd import create_workspaces_from_config
+
+# Create workspaces with role templates
+results = create_workspaces_from_config(
+    config_file_path="customer_workspaces.yml",
+    roles_file_path="roles.yml"  # Provide roles template file
+)
+
 for result in results:
     print(f"Created: {result['workspace_name']} - {result['workspace_id']}")
 ```
+
+**Benefits of Role Templates:**
+- **Reusability**: Define common roles once, use across all workspaces
+- **Consistency**: Ensure all workspaces have required admin access
+- **Maintainability**: Update admin team in one place, applies to all workspaces
+- **Scalability**: Perfect for ISV scenarios with 500+ workspaces needing the same roles
 
 ## ISV Scenario: Large-Scale Deployment
 
@@ -309,7 +378,147 @@ for result in results:
     publish_all_items(workspace)
 ```
 
-### Parallel Deployment for Performance
+### ISV Scenario with Role Templates
+
+For ISV scenarios with 500+ workspaces requiring consistent role assignments across all deployments:
+
+**1. Define shared role templates** (`isv_roles.yml`):
+
+```yaml
+role_templates:
+  # ISV admin team - manages all customer workspaces
+  isv_admins:
+    - principal_id: "isv-admin-group-guid"
+      principal_type: "Group"
+      role: "Admin"
+    - principal_id: "isv-automation-sp-guid"
+      principal_type: "ServicePrincipal"
+      role: "Admin"
+  
+  # Monitoring and alerting
+  monitoring_service:
+    - principal_id: "monitoring-sp-guid"
+      principal_type: "ServicePrincipal"
+      role: "Viewer"
+  
+  # Support team - can troubleshoot
+  support_team:
+    - principal_id: "support-group-guid"
+      principal_type: "Group"
+      role: "Contributor"
+  
+  # Data engineering team
+  data_engineers:
+    - principal_id: "data-eng-group-guid"
+      principal_type: "Group"
+      role: "Contributor"
+```
+
+**2. Define customer workspaces** (`customer_workspaces.yml`):
+
+```yaml
+workspaces:
+  # Customer A - Production + Dev
+  - display_name: "CustomerA-Production"
+    description: "Customer A production environment"
+    capacity_id: "capacity-prod-guid"
+    role_templates:  # All production workspaces get these
+      - "isv_admins"
+      - "monitoring_service"
+      - "support_team"
+    role_assignments:  # Customer-specific access
+      - principal_id: "customerA-admin-guid"
+        principal_type: "User"
+        role: "Admin"
+      - principal_id: "customerA-users-guid"
+        principal_type: "Group"
+        role: "Viewer"
+  
+  - display_name: "CustomerA-Development"
+    description: "Customer A development environment"
+    capacity_id: "capacity-dev-guid"
+    role_templates:
+      - "isv_admins"
+      - "data_engineers"  # Dev environments allow data engineering
+    role_assignments:
+      - principal_id: "customerA-dev-team-guid"
+        principal_type: "Group"
+        role: "Contributor"
+  
+  # Customer B
+  - display_name: "CustomerB-Production"
+    description: "Customer B production environment"
+    capacity_id: "capacity-prod-guid"
+    role_templates:
+      - "isv_admins"
+      - "monitoring_service"
+      - "support_team"
+    role_assignments:
+      - principal_id: "customerB-admin-guid"
+        principal_type: "User"
+        role: "Admin"
+  
+  # ... repeat for 500+ customers
+```
+
+**3. Automated deployment pipeline**:
+
+```python
+from fabric_cicd import (
+    create_workspaces_from_config,
+    FabricWorkspace,
+    publish_all_items
+)
+from azure.identity import ClientSecretCredential
+
+# Use service principal for automated deployment
+credential = ClientSecretCredential(
+    tenant_id="your-tenant-id",
+    client_id="your-client-id",
+    client_secret="your-client-secret"
+)
+
+# Create all customer workspaces with consistent role assignments
+print("Creating customer workspaces...")
+results = create_workspaces_from_config(
+    config_file_path="customer_workspaces.yml",
+    roles_file_path="isv_roles.yml",  # Shared roles across all customers
+    token_credential=credential
+)
+
+# Track results
+successful = [r for r in results if r.get('workspace_id')]
+failed = [r for r in results if 'error' in r]
+
+print(f"✓ Created {len(successful)} workspaces")
+if failed:
+    print(f"✗ Failed: {len(failed)} workspaces")
+    for f in failed:
+        print(f"  - {f['workspace_name']}: {f.get('error')}")
+
+# Deploy artifacts to each workspace
+repository_path = "/path/to/customer/artifacts"
+item_types = ["Environment", "Notebook", "DataPipeline", "Lakehouse"]
+
+for result in successful:
+    print(f"\nDeploying to {result['workspace_name']}...")
+    
+    workspace = FabricWorkspace(
+        workspace_id=result["workspace_id"],
+        repository_directory=repository_path,
+        item_type_in_scope=item_types,
+        environment="PRODUCTION"
+    )
+    
+    publish_all_items(workspace)
+    print(f"✓ Deployed to {result['workspace_name']}")
+
+print(f"\n✓ Complete: {len(successful)} customer workspaces deployed")
+```
+
+
+
+
 
 For faster deployment across many workspaces:
 
@@ -352,139 +561,4 @@ with ThreadPoolExecutor(max_workers=5) as executor:
             print(f"✗ {deployment_result['workspace']}: {deployment_result['error']}")
 ```
 
-## Environment-Specific Deployment
 
-Deploy different configurations based on environment:
-
-```python
-from fabric_cicd import create_workspace, FabricWorkspace, publish_all_items
-
-# Create workspaces for different environments
-environments = {
-    "DEV": "dev-capacity-id",
-    "TEST": "test-capacity-id",
-    "PROD": "prod-capacity-id"
-}
-
-for env, capacity in environments.items():
-    # Create workspace
-    result = create_workspace(
-        display_name=f"Customer-001-{env}",
-        description=f"Customer 1 {env} environment",
-        capacity_id=capacity
-    )
-    
-    # Deploy with environment-specific parameters
-    workspace = FabricWorkspace(
-        workspace_id=result["workspace_id"],
-        repository_directory="/path/to/artifacts",
-        environment=env
-    )
-    publish_all_items(workspace)
-```
-
-## Best Practices
-
-### 1. Error Handling
-
-```python
-from fabric_cicd import create_workspace
-from fabric_cicd._common._exceptions import InputError
-
-try:
-    result = create_workspace(
-        display_name="Customer-Workspace",
-        capacity_id="your-capacity-id"
-    )
-except InputError as e:
-    print(f"Validation error: {e}")
-except Exception as e:
-    print(f"Unexpected error: {e}")
-```
-
-### 2. Logging
-
-```python
-from fabric_cicd import create_workspace, change_log_level
-
-# Enable debug logging for detailed information
-change_log_level("DEBUG")
-
-result = create_workspace(display_name="Customer-Workspace")
-```
-
-### 3. Configuration Validation
-
-Validate your configuration file structure before creating workspaces:
-
-```yaml
-workspaces:
-  - display_name: "Valid-Workspace-Name"  # Required
-    description: "Optional description"     # Optional
-    capacity_id: "valid-guid-format"        # Optional, must be valid GUID
-    role_assignments:                        # Optional
-      - principal_id: "valid-guid"          # Required if role_assignments present
-        principal_type: "User"               # Must be: User, Group, or ServicePrincipal
-        role: "Admin"                        # Must be: Admin, Member, Contributor, or Viewer
-```
-
-### 4. Capacity Planning
-
-- Ensure your capacity has sufficient resources before creating multiple workspaces
-- Monitor capacity utilization during bulk deployments
-- Consider rate limiting for very large deployments (500+ workspaces)
-
-### 5. Authentication
-
-For production ISV scenarios, use service principal authentication:
-
-```python
-from azure.identity import ClientSecretCredential
-from fabric_cicd import create_workspaces_from_config
-
-credential = ClientSecretCredential(
-    client_id="your-client-id",
-    client_secret="your-client-secret",
-    tenant_id="your-tenant-id"
-)
-
-results = create_workspaces_from_config(
-    config_file_path="customer_workspaces.yml",
-    token_credential=credential
-)
-```
-
-## API Reference
-
-For detailed API documentation, see the [Code Reference](../code_reference.md#workspace-management) section.
-
-### Related Functions
-
-- [`create_workspace`](../code_reference.md#create_workspace): Create a single workspace
-- [`create_workspaces_from_config`](../code_reference.md#create_workspaces_from_config): Create multiple workspaces from YAML config
-- [`assign_workspace_to_capacity`](../code_reference.md#assign_workspace_to_capacity): Assign workspace to capacity
-- [`add_workspace_role_assignment`](../code_reference.md#add_workspace_role_assignment): Add user/group/SP to workspace
-- [`FabricWorkspace`](../code_reference.md#fabricworkspace): Initialize workspace for deployment
-- [`publish_all_items`](../code_reference.md#publish_all_items): Deploy items to workspace
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue**: "capacity_id must be a valid GUID format"
-- **Solution**: Ensure capacity ID is in the correct format: `12345678-1234-1234-1234-123456789012`
-
-**Issue**: "workspace_id must be a valid GUID format"
-- **Solution**: Verify the workspace ID format matches the GUID pattern
-
-**Issue**: "principal_type must be one of ['User', 'Group', 'ServicePrincipal']"
-- **Solution**: Check the `principal_type` value in role assignments matches exactly (case-sensitive)
-
-**Issue**: "role must be one of ['Admin', 'Member', 'Contributor', 'Viewer']"
-- **Solution**: Verify the role name is spelled correctly and matches one of the supported values
-
-**Issue**: "Configuration file not found"
-- **Solution**: Verify the path to your YAML configuration file is correct and accessible
-
-**Issue**: Failed to acquire AAD token
-- **Solution**: Ensure you're authenticated with `az login` or provide valid service principal credentials

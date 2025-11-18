@@ -281,6 +281,7 @@ def add_workspace_role_assignment(
 def create_workspaces_from_config(
     config_file_path: str,
     token_credential: Optional[TokenCredential] = None,
+    roles_file_path: Optional[str] = None,
 ) -> list[dict]:
     """
     Create multiple workspaces from a configuration file.
@@ -288,6 +289,7 @@ def create_workspaces_from_config(
     Args:
         config_file_path: Path to the YAML configuration file.
         token_credential: Optional token credential to use for API requests.
+        roles_file_path: Optional path to a separate YAML file defining reusable role templates.
 
     Returns:
         list[dict]: A list of dictionaries containing details for each created workspace.
@@ -298,17 +300,35 @@ def create_workspaces_from_config(
           - display_name: "Customer-Workspace-001"
             description: "Customer 1 deployment workspace"
             capacity_id: "your-capacity-id"  # Optional
-            role_assignments:  # Optional
+            role_assignments:  # Optional - inline definitions
               - principal_id: "user-object-id"
                 principal_type: "User"
                 role: "Admin"
-              - principal_id: "group-object-id"
-                principal_type: "Group"
-                role: "Member"
+            role_templates:  # Optional - reference role templates from roles file
+              - "admin_team"
+              - "viewer_group"
 
           - display_name: "Customer-Workspace-002"
             description: "Customer 2 deployment workspace"
             capacity_id: "your-capacity-id"
+            role_templates:  # Use common role templates
+              - "admin_team"
+        ```
+
+    Roles file structure (YAML):
+        ```yaml
+        role_templates:
+          admin_team:
+            - principal_id: "admin-user-guid"
+              principal_type: "User"
+              role: "Admin"
+            - principal_id: "admin-group-guid"
+              principal_type: "Group"
+              role: "Admin"
+          viewer_group:
+            - principal_id: "viewer-group-guid"
+              principal_type: "Group"
+              role: "Viewer"
         ```
 
     Examples:
@@ -320,9 +340,15 @@ def create_workspaces_from_config(
         >>> for result in results:
         ...     print(f"Created: {result['workspace_name']} - {result['workspace_id']}")
 
+        Create workspaces with role templates
+        >>> results = create_workspaces_from_config(
+        ...     config_file_path="workspace_config.yml",
+        ...     roles_file_path="roles.yml"
+        ... )
+
         ISV scenario - Deploy to multiple customer workspaces
         >>> from fabric_cicd import create_workspaces_from_config, FabricWorkspace, publish_all_items
-        >>> results = create_workspaces_from_config("customer_workspaces.yml")
+        >>> results = create_workspaces_from_config("customer_workspaces.yml", roles_file_path="roles.yml")
         >>> for result in results:
         ...     workspace = FabricWorkspace(
         ...         workspace_id=result["workspace_id"],
@@ -368,6 +394,39 @@ def create_workspaces_from_config(
         msg = "'workspaces' list cannot be empty"
         raise InputError(msg, logger)
 
+    # Load role templates if provided
+    role_templates = {}
+    if roles_file_path:
+        roles_path = Path(roles_file_path)
+        if not roles_path.exists():
+            msg = f"Roles file not found: {roles_file_path}"
+            raise InputError(msg, logger)
+
+        if not roles_path.is_file():
+            msg = f"Roles path is not a file: {roles_file_path}"
+            raise InputError(msg, logger)
+
+        try:
+            with Path.open(roles_path, encoding="utf-8") as f:
+                roles_config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            msg = f"Invalid YAML in roles file: {e}"
+            raise InputError(msg, logger) from e
+        except Exception as e:
+            msg = f"Error reading roles file: {e}"
+            raise InputError(msg, logger) from e
+
+        if not isinstance(roles_config, dict):
+            msg = "Roles file must contain a dictionary"
+            raise InputError(msg, logger)
+
+        if "role_templates" in roles_config:
+            if not isinstance(roles_config["role_templates"], dict):
+                msg = "'role_templates' must be a dictionary"
+                raise InputError(msg, logger)
+            role_templates = roles_config["role_templates"]
+            logger.info(f"Loaded {len(role_templates)} role template(s) from {roles_file_path}")
+
     # Create workspaces
     results = []
     for idx, workspace_config in enumerate(config["workspaces"]):
@@ -383,6 +442,7 @@ def create_workspaces_from_config(
         description = workspace_config.get("description", "")
         capacity_id = workspace_config.get("capacity_id")
         role_assignments = workspace_config.get("role_assignments", [])
+        role_template_refs = workspace_config.get("role_templates", [])
 
         # Create workspace
         result = create_workspace(
@@ -392,13 +452,41 @@ def create_workspaces_from_config(
             token_credential=token_credential,
         )
 
-        # Add role assignments if specified
+        # Collect all role assignments (inline + from templates)
+        all_role_assignments = []
+
+        # Add inline role assignments
         if role_assignments:
             if not isinstance(role_assignments, list):
                 msg = f"role_assignments for workspace '{display_name}' must be a list"
                 raise InputError(msg, logger)
+            all_role_assignments.extend(role_assignments)
 
-            for role_idx, role_config in enumerate(role_assignments):
+        # Add role assignments from templates
+        if role_template_refs:
+            if not isinstance(role_template_refs, list):
+                msg = f"role_templates for workspace '{display_name}' must be a list"
+                raise InputError(msg, logger)
+
+            for template_name in role_template_refs:
+                if not isinstance(template_name, str):
+                    msg = f"Role template name must be a string in workspace '{display_name}', got: {type(template_name).__name__}"
+                    raise InputError(msg, logger)
+
+                if template_name not in role_templates:
+                    msg = f"Role template '{template_name}' not found in roles file for workspace '{display_name}'"
+                    raise InputError(msg, logger)
+
+                template_roles = role_templates[template_name]
+                if not isinstance(template_roles, list):
+                    msg = f"Role template '{template_name}' must contain a list of role assignments"
+                    raise InputError(msg, logger)
+
+                all_role_assignments.extend(template_roles)
+
+        # Apply all role assignments
+        if all_role_assignments:
+            for role_idx, role_config in enumerate(all_role_assignments):
                 if not isinstance(role_config, dict):
                     msg = f"Role assignment at index {role_idx} for workspace '{display_name}' must be a dictionary"
                     raise InputError(msg, logger)
