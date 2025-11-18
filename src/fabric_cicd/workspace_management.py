@@ -4,10 +4,8 @@
 """Module provides workspace management functions for creating and configuring workspaces."""
 
 import logging
-from pathlib import Path
 from typing import Optional
 
-import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
@@ -15,6 +13,7 @@ from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_valid_guid
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._yaml_utils import load_yaml_file
 
 logger = logging.getLogger(__name__)
 
@@ -356,32 +355,10 @@ def create_workspaces_from_config(
         ...     )
         ...     publish_all_items(workspace)
     """
-    # Validate config file path
-    config_path = Path(config_file_path)
-    if not config_path.exists():
-        msg = f"Configuration file not found: {config_file_path}"
-        raise InputError(msg, logger)
-
-    if not config_path.is_file():
-        msg = f"Configuration path is not a file: {config_file_path}"
-        raise InputError(msg, logger)
-
     # Load configuration
-    try:
-        with Path.open(config_path, encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        msg = f"Invalid YAML in configuration file: {e}"
-        raise InputError(msg, logger) from e
-    except Exception as e:
-        msg = f"Error reading configuration file: {e}"
-        raise InputError(msg, logger) from e
+    config = load_yaml_file(config_file_path, "configuration file")
 
     # Validate configuration structure
-    if not isinstance(config, dict):
-        msg = "Configuration must be a dictionary"
-        raise InputError(msg, logger)
-
     if "workspaces" not in config:
         msg = "Configuration must contain a 'workspaces' key"
         raise InputError(msg, logger)
@@ -397,28 +374,7 @@ def create_workspaces_from_config(
     # Load role templates if provided
     role_templates = {}
     if roles_file_path:
-        roles_path = Path(roles_file_path)
-        if not roles_path.exists():
-            msg = f"Roles file not found: {roles_file_path}"
-            raise InputError(msg, logger)
-
-        if not roles_path.is_file():
-            msg = f"Roles path is not a file: {roles_file_path}"
-            raise InputError(msg, logger)
-
-        try:
-            with Path.open(roles_path, encoding="utf-8") as f:
-                roles_config = yaml.safe_load(f)
-        except yaml.YAMLError as e:
-            msg = f"Invalid YAML in roles file: {e}"
-            raise InputError(msg, logger) from e
-        except Exception as e:
-            msg = f"Error reading roles file: {e}"
-            raise InputError(msg, logger) from e
-
-        if not isinstance(roles_config, dict):
-            msg = "Roles file must contain a dictionary"
-            raise InputError(msg, logger)
+        roles_config = load_yaml_file(roles_file_path, "roles file")
 
         if "role_templates" in roles_config:
             if not isinstance(roles_config["role_templates"], dict):
