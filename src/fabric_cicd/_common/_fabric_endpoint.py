@@ -11,6 +11,7 @@ import time
 from typing import Optional
 
 import requests
+import requests.exceptions
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
@@ -64,9 +65,10 @@ class FabricEndpoint:
                 }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
-                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
+
+                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 invoke_log_message = _format_invoke_log(response, method, url, body)
 
@@ -89,6 +91,14 @@ class FabricEndpoint:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(invoke_log_message)
 
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"RemoteDisconnected error occurred, retrying: {e}")
+                handle_retry(
+                    attempt=iteration_count,
+                    base_delay=1,
+                    max_retries=10,
+                    prepend_message="Connection lost.",
+                )
             except Exception as e:
                 logger.debug(invoke_log_message)
                 raise InvokeError(e, logger, invoke_log_message) from e
