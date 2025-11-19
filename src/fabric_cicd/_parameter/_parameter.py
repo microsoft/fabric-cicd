@@ -48,6 +48,7 @@ class Parameter:
             "minimum": {"connection_id", "semantic_model_name"},
             "maximum": {"connection_id", "semantic_model_name"},
         },
+        "extend": {"minimum": set(), "maximum": set()},
     }
 
     LOAD_ERROR_MSG = ""
@@ -142,9 +143,10 @@ class Parameter:
         return self.parameter_file_path.is_file()
 
     def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
-        """Validate loading the parameter file to a dictionary."""
+        """Validate loading the parameter file to a dictionary, including any templates."""
         parameter_dict = {}
         try:
+            # Load the base parameter file
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
@@ -153,12 +155,151 @@ class Parameter:
                     self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(validation_errors)
                     return False, parameter_dict
 
-                parameter_dict = yaml.full_load(yaml_content)
+                parameter_dict = yaml.full_load(yaml_content) or {}
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
+
+                # Process template parameter files if present
+                if parameter_dict.get("extend"):
+                    parameter_dict = self._process_template_parameters(parameter_dict)
+
                 return True, parameter_dict
         except yaml.YAMLError as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
+
+    def _process_template_parameters(self, base_parameter_dict: dict) -> dict:
+        """
+        Process template parameter files and merge them with the base parameter dictionary.
+        Template files are resolved relative to the main parameter file's location.
+        """
+        # Step 1: Check extend contains files
+        if not isinstance(base_parameter_dict.get("extend"), list):
+            logger.warning("No template parameter files specified under 'extend'")
+            del base_parameter_dict["extend"]
+            return base_parameter_dict
+
+        template_files = base_parameter_dict["extend"]
+        successful_templates = 0
+        failed_templates = []
+        processed_templates = set()
+
+        # Step 2: Get the directory containing the main parameter file
+        param_file_dir = self.parameter_file_path.parent
+
+        # Step 3: Process each template file
+        for param_file in template_files:
+            try:
+                # Check if this template file has been already processed to prevent duplication
+                if param_file in processed_templates:
+                    logger.warning(f"Skipping duplicate template parameter file reference: {param_file}")
+                    continue
+
+                # Step a: Resolve the path relative to the main parameter file's directory
+                template_path = (param_file_dir / str(param_file)).resolve()
+
+                # Check if the template file exists
+                if not template_path.is_file():
+                    error_msg = f"Template file not found: {param_file}"
+                    failed_templates.append((param_file, error_msg))
+                    continue
+
+                # Step b: Load and validate the parameter file
+                template_dict = self._load_template_parameter_file(template_path)
+                if not template_dict:
+                    continue
+
+                # Step c: Check for nested templates
+                if "extend" in template_dict:
+                    error_msg = f"Nested templates are not supported in {param_file}"
+                    failed_templates.append((param_file, error_msg))
+                    continue
+
+                # Step d: Merge the template dict with the base parameter dict
+                base_parameter_dict = self._merge_template_dict(base_parameter_dict, template_dict)
+                successful_templates += 1
+                # Mark template parameter file as processed
+                processed_templates.add(param_file)
+                logger.debug(constants.PARAMETER_MSGS["template_file_loaded"].format(template_path))
+
+            except Exception as e:
+                error_msg = f"Error processing template file: {e!s}"
+                failed_templates.append((param_file, error_msg))
+                continue
+
+        # Step 4: Log results
+        if successful_templates > 0:
+            logger.debug(constants.PARAMETER_MSGS["template_files_processed"].format(successful_templates))
+
+        if failed_templates:
+            for failed_file, reason in failed_templates:
+                logger.error(f"Validation failed for template file: {failed_file}")
+                logger.error(f"{reason}")
+                logger.warning(
+                    f"Template parameter '{failed_file}' content will not be included in the parameter dictionary"
+                )
+        elif successful_templates == 0:
+            logger.warning(constants.PARAMETER_MSGS["template_files_none_valid"])
+
+        # Step 5: Remove the extend key after processing
+        del base_parameter_dict["extend"]
+        return base_parameter_dict
+
+    def _load_template_parameter_file(self, file_path: Path) -> dict:
+        """Load and validate a template parameter file."""
+        try:
+            with Path.open(file_path, encoding="utf-8") as param_file:
+                param_content = param_file.read()
+                param_content = replace_variables_in_parameter_file(param_content)
+
+                # Validate the content
+                param_validation_errors = self._validate_yaml_content(param_content)
+                if param_validation_errors:
+                    logger.error(
+                        constants.PARAMETER_MSGS["template_file_invalid"].format(file_path, param_validation_errors)
+                    )
+                    return {}
+
+                # Load the content
+                return yaml.full_load(param_content) or {}
+
+        except yaml.YAMLError as e:
+            logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
+            return {}
+
+    def _merge_template_dict(self, base_dict: dict, template_dict: dict) -> dict:
+        """
+        Merge the template dictionary with the base dictionary, properly handling lists and nested structures.
+        Preserves all entries, letting validation handle any issues later.
+        """
+        result = base_dict.copy()
+
+        for key, template_value in template_dict.items():
+            # Skip the 'extend' key as it's processed separately
+            if key == "extend":
+                continue
+
+            # If the key doesn't exist in the base dict, just add it
+            if key not in result:
+                result[key] = template_value
+                continue
+
+            base_value = result[key]
+
+            # Handle merging based on value types
+            if isinstance(base_value, list) and isinstance(template_value, list):
+                # For parameter lists like find_replace, append items from template
+                result[key] = base_value + template_value
+
+            elif isinstance(base_value, dict) and isinstance(template_value, dict):
+                # For nested dictionaries, recursively merge them
+                result[key] = self._merge_template_dict(base_value, template_value)
+
+            else:
+                # Add both values into a list for later validation
+                result[key] = [base_value, template_value]
+                logger.debug(f"Type mismatch for key '{key}': creating list of values for validation")
+
+        return result
 
     def _validate_yaml_content(self, content: str) -> list[str]:
         """Validate the yaml content of the parameter file."""
@@ -316,7 +457,7 @@ class Parameter:
 
         for param_num, parameter_dict in enumerate(self.environment_parameter[param_name], start=1):
             param_num_str = str(param_num) if multiple_param else ""
-            find_value = parameter_dict[key_name]
+            find_value = parameter_dict.get(key_name)
             for step, validation_func in validation_steps:
                 if param_name in ["semantic_model_binding"] and step == "replace_value":
                     continue
