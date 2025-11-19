@@ -22,7 +22,7 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     Publishes all environment items from the repository.
 
-    Environments can only deploy the shell; compute and spark configurations are published separately.
+    Environments are deployed using the updateDefinition API, and then compute settings and libraries are published separately.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
@@ -32,7 +32,7 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
 
     item_type = "Environment"
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
-        # Only deploy the shell for environments
+        # Deploy the environment definition
         fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=item_type,
