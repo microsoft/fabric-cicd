@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import dpath
 from azure.core.credentials import TokenCredential
@@ -438,16 +438,41 @@ class FabricWorkspace:
                 input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
-                # Extract the find_value and replace_value_dict
-                find_value = extract_find_value(parameter_dict, raw_file, filter_match)
+                # Extract the find_pattern and replace_value_dict
+                find_info = extract_find_value(parameter_dict, raw_file, filter_match)
                 replace_value_dict = process_environment_key(self, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
-                if find_value in raw_file and self.environment in replace_value_dict and filter_match:
+                if filter_match and self.environment in replace_value_dict and find_info["has_matches"]:
                     replace_value = extract_replace_value(self, replace_value_dict[self.environment])
                     if replace_value:
-                        raw_file = raw_file.replace(find_value, replace_value)
-                        logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
+                        pattern = find_info["pattern"]
+                        is_regex = find_info["is_regex"]
+
+                        if is_regex:
+                            # For regex patterns, use re.sub to replace only the captured group
+                            import re
+
+                            # Create a replacement function that replaces only the captured group
+                            def create_replacement_func(replacement_val: str) -> "Callable[[re.Match[str]], str]":
+                                def replace_captured_group(match: re.Match[str]) -> str:
+                                    # Replace the captured group (group 1) with the replacement value
+                                    # Keep the rest of the match intact
+                                    full_match = match.group(0)
+                                    captured_group = match.group(1)
+                                    # Replace the captured group within the full match
+                                    return full_match.replace(captured_group, replacement_val)
+
+                                return replace_captured_group
+
+                            raw_file = re.sub(pattern, create_replacement_func(replace_value), raw_file)
+                            logger.debug(
+                                f"Replacing regex pattern '{pattern}' captured groups with '{replace_value}' in {item_name}.{item_type}"
+                            )
+                        else:
+                            # For non-regex matches, replace as before
+                            raw_file = raw_file.replace(pattern, replace_value)
+                            logger.debug(f"Replacing '{pattern}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
 
