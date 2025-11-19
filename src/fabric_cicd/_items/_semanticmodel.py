@@ -24,14 +24,12 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
 
     model_with_binding_dict = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
-    model_with_on_prem_dict = fabric_workspace_obj.environment_parameter.get("gateway_binding", [])
 
-    if not model_with_binding_dict and not model_with_on_prem_dict:
+    if not model_with_binding_dict:
         return
 
     # Build connection mapping from semantic_model_binding parameter
     binding_mapping = {}
-
     if model_with_binding_dict:
         for model in model_with_binding_dict:
             model_name = model.get("semantic_model_name", [])
@@ -42,18 +40,6 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
 
             for name in model_name:
                 binding_mapping[name] = connection_id
-
-    if model_with_on_prem_dict:
-        for model in model_with_on_prem_dict:
-            dataset_name = model.get("dataset_name", [])
-            gateway_id = model.get("gateway_id")
-
-            if isinstance(dataset_name, str):
-                dataset_name = [dataset_name]
-
-            for name in dataset_name:
-                if name not in binding_mapping:
-                    binding_mapping[name] = gateway_id
 
     connections = get_connections(fabric_workspace_obj)
 
