@@ -186,12 +186,12 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
         -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
         -   **Supported attributes** (attributes should be lowercase):
 
-            | Attribute         | Description                                | Applicable Item Types |
-            | ----------------- | ------------------------------------------ | --------------------- |
-            | `id`              | Item ID of the deployed item               | All item types        |
-            | `sqlendpoint`     | SQL connection string of the deployed item | Lakehouse, Warehouse  |
-            | `sqlendpointid`   | SQL Endpoint ID of the deployed item       | Lakehouse             |
-            | `queryserviceuri` | Query service URI of the deployed item     | Eventhouse            |
+            | Attribute         | Description                                | Applicable Item Types | Example Usage                                      | Sample Value                                                                    |
+            | ----------------- | ------------------------------------------ | --------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
+            | `id`              | Item ID of the deployed item               | All item types        | `$items.Notebook.MyNotebook.$id`                   | `123e4567-e89b-12d3-a456-426614174000`                                          |
+            | `sqlendpoint`     | SQL connection string of the deployed item | Lakehouse, Warehouse  | `$items.Lakehouse.MyLakehouse.$sqlendpoint`        | `abc123def456.datawarehouse.fabric.microsoft.com`                               |
+            | `sqlendpointid`   | SQL Endpoint ID of the deployed item       | Lakehouse             | `$items.Lakehouse.MyLakehouse.$sqlendpointid`      | `37dc8a41-dea9-465d-b528-3e95043b2356`                                          |
+            | `queryserviceuri` | Query service URI of the deployed item     | Eventhouse            | `$items.Eventhouse.MyEventhouse.$queryserviceuri`  | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com`                  |
 
         -   Item type and name are **case-sensitive**.
         -   Item type must be valid and in scope.
