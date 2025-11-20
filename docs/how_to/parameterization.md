@@ -184,15 +184,16 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
 
         -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
         -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
-        -   **Supported attributes** (attributes should be lowercase):
+        -   **Supported attributes:**
 
-            | Attribute         | Description                                | Applicable Item Types | Example Usage                                      | Sample Value                                                                    |
-            | ----------------- | ------------------------------------------ | --------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
-            | `id`              | Item ID of the deployed item               | All item types        | `$items.Notebook.MyNotebook.$id`                   | `123e4567-e89b-12d3-a456-426614174000`                                          |
-            | `sqlendpoint`     | SQL connection string of the deployed item | Lakehouse, Warehouse  | `$items.Lakehouse.MyLakehouse.$sqlendpoint`        | `abc123def456.datawarehouse.fabric.microsoft.com`                               |
-            | `sqlendpointid`   | SQL Endpoint ID of the deployed item       | Lakehouse             | `$items.Lakehouse.MyLakehouse.$sqlendpointid`      | `37dc8a41-dea9-465d-b528-3e95043b2356`                                          |
-            | `queryserviceuri` | Query service URI of the deployed item     | Eventhouse            | `$items.Eventhouse.MyEventhouse.$queryserviceuri`  | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com`                  |
+        | Attribute Variable                                | Description                                | Applicable Item Types | Example Variable                                  | Sample Replace Value                                           |
+        | ------------------------------------------------- | ------------------------------------------ | --------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+        | `$items.<item_type>.<item_name>.$id`              | Item ID of the deployed item               | All                   | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
+        | `$items.<item_type>.<item_name>.$sqlendpoint`     | SQL connection string of the deployed item | Lakehouse, Warehouse  | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
+        | `$items.<item_type>.<item_name>.$sqlendpointid`   | SQL endpoint ID of the deployed item       | Lakehouse             | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
+        | `$items.<item_type>.<item_name>.$queryserviceuri` | Query service URI of the deployed item     | Eventhouse            | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
 
+        -   Attributes should be **lowercase**.
         -   Item type and name are **case-sensitive**.
         -   Item type must be valid and in scope.
         -   Item name must be an **exact match** (include spaces, if present).
@@ -205,30 +206,6 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
             -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
 
         -   For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
-
-        ```yaml
-        find_replace:
-            - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0" # Lakehouse GUID
-            replace_value:
-                PPE: "$items.Lakehouse.Sample_LH.$id" # PPE Sample_LH Lakehouse GUID
-                PROD: "$items.Lakehouse.Sample_LH.$id" # PROD Sample_LH Lakehouse GUID
-            - find_value: "123e4567-e89b-12d3-a456-426614174000" # Workspace ID
-            replace_value:
-                PPE: "$workspace.$id" # PPE workspace ID
-                PROD: "$workspace.Prod_Workspace" # PROD workspace ID
-            - find_value: "serverconnectionstringexample.com" # SQL endpoint connection string
-            replace_value:
-                PPE: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
-                PROD: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
-            - find_value: "37dc8a41-dea9-465d-b528-3e95043b2356" # SQL endpoint ID
-            replace_value:
-                PPE: "$items.Lakehouse.Sample_LH.$sqlendpointid" # PPE Sample_LH Lakehouse SQL endpoint ID
-                PROD: "$items.Lakehouse.Sample_LH.$sqlendpointid" # PROD Sample_LH Lakehouse SQL endpoint ID
-            - find_value: "https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com" # Eventhouse query service URI
-            replace_value:
-                PPE: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PPE Sample_EH Eventhouse query service URI
-                PROD: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PROD Sample_EH Eventhouse query service URI
-        ```
 
 ### Environment Variable Replacement
 
