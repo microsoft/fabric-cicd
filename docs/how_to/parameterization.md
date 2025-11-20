@@ -177,11 +177,11 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
 
     -   **Workspace variable:**
 
-        | Workspace Variable                                                    | Description                                                                                                                                              | Example                                                                 |
-        | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-        | `$workspace.$id` or `$workspace.id`                                   | Workspace ID of the target environment                                                                                                                   | `$workspace.$id`                                                        |
-        | `$workspace.<name>`                                                   | Workspace ID of the specified workspace name                                                                                                             | `$workspace.TestWorkspace`                                              |
-        | `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`       | Attribute value of the specified item in a specified workspace (see supported attributes above)                                                          | `$workspace.TestWorkspace.$items.Lakehouse.Example_LH.$id`              |
+        | Workspace Variable                                              | Description                                                                               | Example                                                    |
+        | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+        | `$workspace.$id` or `$workspace.id`                             | Workspace ID of the target environment                                                    | `$workspace.$id` or `$workspace.id`                        |
+        | `$workspace.<name>`                                             | Workspace ID of the specified workspace name                                              | `$workspace.TestWorkspace`                                 |
+        | `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` | Attribute value of the specified item in a specified workspace (see supported attributes) | `$workspace.TestWorkspace.$items.Lakehouse.Example_LH.$id` |
 
         **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
 
