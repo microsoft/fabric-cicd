@@ -11,6 +11,12 @@ from fabric_cicd._common._check_utils import check_version
 from fabric_cicd._common._logging import configure_logger, exception_handler
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import deploy_with_config, publish_all_items, unpublish_all_orphan_items
+from fabric_cicd.workspace_management import (
+    add_workspace_role_assignment,
+    assign_workspace_to_capacity,
+    create_workspace,
+    create_workspaces_from_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +62,12 @@ check_version()
 
 __all__ = [
     "FabricWorkspace",
+    "add_workspace_role_assignment",
     "append_feature_flag",
+    "assign_workspace_to_capacity",
     "change_log_level",
+    "create_workspace",
+    "create_workspaces_from_config",
     "deploy_with_config",
     "publish_all_items",
     "unpublish_all_orphan_items",

@@ -69,6 +69,10 @@ PROPERTY_PATH_ATTR_MAPPING = {
     },
 }
 
+# Workspace management
+WORKSPACE_ROLES = ["Admin", "Member", "Contributor", "Viewer"]
+WORKSPACE_PRINCIPAL_TYPES = ["User", "Group", "ServicePrincipal"]
+
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]

@@ -1,0 +1,75 @@
+# Role Templates Configuration
+# This file defines reusable role assignment templates that can be referenced
+# by multiple workspaces in workspace_config_example.yml
+
+role_templates:
+  # Template for admin team - grants admin access to key personnel
+  admin_team:
+    - principal_id: "12345678-1234-1234-1234-123456789012"  # Primary admin user
+      principal_type: "User"
+      role: "Admin"
+    - principal_id: "87654321-4321-4321-4321-210987654321"  # Admin group
+      principal_type: "Group"
+      role: "Admin"
+    - principal_id: "11111111-1111-1111-1111-111111111111"  # Backup admin user
+      principal_type: "User"
+      role: "Admin"
+
+  # Template for development team - grants contributor access
+  dev_team:
+    - principal_id: "22222222-2222-2222-2222-222222222222"  # Dev team group
+      principal_type: "Group"
+      role: "Contributor"
+    - principal_id: "33333333-3333-3333-3333-333333333333"  # Dev lead
+      principal_type: "User"
+      role: "Member"
+
+  # Template for analytics team - grants viewer access
+  analytics_viewers:
+    - principal_id: "44444444-4444-4444-4444-444444444444"  # Analytics group
+      principal_type: "Group"
+      role: "Viewer"
+    - principal_id: "55555555-5555-5555-5555-555555555555"  # BI team
+      principal_type: "Group"
+      role: "Viewer"
+
+  # Template for service principal access - for automation
+  automation_service:
+    - principal_id: "66666666-6666-6666-6666-666666666666"  # Deployment service principal
+      principal_type: "ServicePrincipal"
+      role: "Member"
+    - principal_id: "77777777-7777-7777-7777-777777777777"  # Monitoring service principal
+      principal_type: "ServicePrincipal"
+      role: "Contributor"
+
+  # Template for executive viewers - read-only access for leadership
+  executive_viewers:
+    - principal_id: "88888888-8888-8888-8888-888888888888"  # Executive team group
+      principal_type: "Group"
+      role: "Viewer"
+
+  # Template for data engineering team
+  data_engineering:
+    - principal_id: "99999999-9999-9999-9999-999999999999"  # Data engineering group
+      principal_type: "Group"
+      role: "Member"
+    - principal_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"  # Data platform team
+      principal_type: "Group"
+      role: "Contributor"
+
+# Usage:
+# Reference these templates in workspace_config_example.yml using the role_templates field:
+#
+# workspaces:
+#   - display_name: "Customer-Workspace"
+#     role_templates:
+#       - "admin_team"
+#       - "dev_team"
+#       - "analytics_viewers"
+#
+# Then call:
+# from fabric_cicd import create_workspaces_from_config
+# results = create_workspaces_from_config(
+#     config_file_path="workspace_config_example.yml",
+#     roles_file_path="roles_example.yml"
+# )
