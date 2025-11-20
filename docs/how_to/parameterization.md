@@ -82,9 +82,11 @@ find_replace:
 
 ### `key_value_replace`
 
-Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
+Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_key` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
 Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, Schedules files, etc. The function automatically detects and processes any file containing valid JSON content, regardless of file extension (e.g., `.schedules`, `.platform` files).
+
+The `replace_value` field supports the same dynamic replacement variables as `find_replace`, including `$items` and `$workspace` notation. See the **Dynamic Replacement** section under `find_replace` for details on supported variables and attributes.
 
 ```yaml
 key_value_replace:
@@ -97,6 +99,20 @@ key_value_replace:
       item_type: <item-type-filter-value>
       item_name: <item-name-filter-value>
       file_path: <file-path-filter-value>
+```
+
+Example with `$items` notation:
+
+```yaml
+key_value_replace:
+    - find_key: $.lakehouse.id
+      replace_value:
+          PPE: "$items.Lakehouse.Sample_LH.$id" # PPE Sample_LH Lakehouse GUID
+          PROD: "$items.Lakehouse.Sample_LH.$id" # PROD Sample_LH Lakehouse GUID
+    - find_key: $.connection.sqlendpoint
+      replace_value:
+          PPE: "$items.Warehouse.Sample_WH.$sqlendpoint" # PPE warehouse SQL endpoint
+          PROD: "$items.Warehouse.Sample_WH.$sqlendpoint" # PROD warehouse SQL endpoint
 ```
 
 ### `spark_pool`
@@ -168,10 +184,10 @@ find_replace:
 
 ### Dynamic Replacement
 
-The `replace_value` field in the `find_replace` parameter supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
+The `replace_value` field in the `find_replace` and `key_value_replace` parameters supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
 
 -   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
--   Dynamic replacement works in tandem with `find_value` as either a regex or a literal string.
+-   Dynamic replacement works in tandem with `find_value` (for `find_replace`) as either a regex or a literal string, or with `find_key` (for `key_value_replace`) as a JSONPath expression.
 -   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
 -   **Supported variables:**
     -   **Workspace variable:**

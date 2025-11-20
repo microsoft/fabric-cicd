@@ -79,6 +79,15 @@ key_value_replace:
         PPE: false
         PROD: true
       file_path: "**/.schedules"
+    # Example with $items notation for dynamic item references
+    - find_key: $.lakehouse.id
+      replace_value:
+      # Variable: $items.type.name.$attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+        PPE: "$items.Lakehouse.WithoutSchema.$id"
+        PROD: "$items.Lakehouse.WithoutSchema.$id"
+      # Optional fields:
+      item_type: "Notebook"
+
 
 spark_pool:
     # CapacityPool_Large
