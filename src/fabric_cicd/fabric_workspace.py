@@ -359,10 +359,10 @@ class FabricWorkspace:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                 )
-            if item_type in ["Lakehouse"]:
-                sql_endpoint_id = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
-                )
+                if item_type == "Lakehouse":
+                    sql_endpoint_id = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
+                    )
             if item_type in ["Eventhouse"]:
                 query_service_uri = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
