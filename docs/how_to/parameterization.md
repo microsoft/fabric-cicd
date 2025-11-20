@@ -105,14 +105,16 @@ Example with `$items` notation:
 
 ```yaml
 key_value_replace:
-    - find_key: $.lakehouse.id
+    - find_key: $.properties.activities[?(@.name=="Run Notebook")].typeProperties.notebookId
       replace_value:
-          PPE: "$items.Lakehouse.Sample_LH.$id" # PPE Sample_LH Lakehouse GUID
-          PROD: "$items.Lakehouse.Sample_LH.$id" # PROD Sample_LH Lakehouse GUID
-    - find_key: $.connection.sqlendpoint
+          PPE: "$items.Notebook.Hello World.$id" # PPE Hello World Notebook GUID
+          PROD: "$items.Notebook.Hello World.$id" # PROD Hello World Notebook GUID
+      item_type: "DataPipeline"
+    - find_key: $.properties.activities[?(@.name=="Run Notebook")].typeProperties.workspaceId
       replace_value:
-          PPE: "$items.Warehouse.Sample_WH.$sqlendpoint" # PPE warehouse SQL endpoint
-          PROD: "$items.Warehouse.Sample_WH.$sqlendpoint" # PROD warehouse SQL endpoint
+          PPE: "$workspace.$id" # PPE workspace ID
+          PROD: "$workspace.$id" # PROD workspace ID
+      item_type: "DataPipeline"
 ```
 
 ### `spark_pool`

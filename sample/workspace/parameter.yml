@@ -80,13 +80,14 @@ key_value_replace:
         PROD: true
       file_path: "**/.schedules"
     # Example with $items notation for dynamic item references
-    - find_key: $.lakehouse.id
+    - find_key: $.properties.activities[?(@.name=="Run Hello World")].typeProperties.notebookId
       replace_value:
       # Variable: $items.type.name.$attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
-        PPE: "$items.Lakehouse.WithoutSchema.$id"
-        PROD: "$items.Lakehouse.WithoutSchema.$id"
+        PPE: "$items.Notebook.Hello World.$id"
+        PROD: "$items.Notebook.Hello World.$id"
       # Optional fields:
-      item_type: "Notebook"
+      item_type: "DataPipeline"
+      item_name: "Run Hello World"
 
 
 spark_pool:
