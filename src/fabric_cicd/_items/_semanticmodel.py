@@ -30,16 +30,16 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
 
     # Build connection mapping from semantic_model_binding parameter
     binding_mapping = {}
-    if model_with_binding_dict:
-        for model in model_with_binding_dict:
-            model_name = model.get("semantic_model_name", [])
-            connection_id = model.get("connection_id")
 
-            if isinstance(model_name, str):
-                model_name = [model_name]
+    for model in model_with_binding_dict:
+        model_name = model.get("semantic_model_name", [])
+        connection_id = model.get("connection_id")
 
-            for name in model_name:
-                binding_mapping[name] = connection_id
+        if isinstance(model_name, str):
+            model_name = [model_name]
+
+        for name in model_name:
+            binding_mapping[name] = connection_id
 
     connections = get_connections(fabric_workspace_obj)
 
@@ -62,7 +62,8 @@ def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
     connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/connections"
 
     try:
-        connections_list = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)["body"]["value"]
+        response = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)
+        connections_list = response.get("body", {}).get("value", [])
 
         connections_dict = {}
         for connection in connections_list:

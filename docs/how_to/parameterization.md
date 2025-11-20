@@ -49,7 +49,7 @@ spark_pool:
               type: "Capacity"
               name: "PROD-Pool-name"
 
-dataset_binding:
+semantic_model_binding:
     - connection_id: "connection_id"
       semantic_model_name: "semantic_model_name"
 ```

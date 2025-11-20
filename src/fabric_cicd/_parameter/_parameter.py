@@ -366,11 +366,10 @@ class Parameter:
                     }
                     for entry in gw_list
                 )
-                # Remove original gateway_binding
                 self.environment_parameter["semantic_model_binding"] = sm_list
-                if "gateway_binding" in self.environment_parameter:
-                    del self.environment_parameter["gateway_binding"]
-                    logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
+                # Remove original gateway_binding after merging
+                del self.environment_parameter["gateway_binding"]
+                logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
 
         """Validate the parameter file."""
         validation_steps = [
@@ -378,7 +377,7 @@ class Parameter:
             ("parameter names", self._validate_parameter_names),
             ("parameter file structure", self._validate_parameter_structure),
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
-            ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
+            # ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
         ]
@@ -466,7 +465,7 @@ class Parameter:
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-            # Special case to skip environment validation for dataset_binding
+            # Special case to skip environment validation for semantic_model_binding
             if param_name in ["semantic_model_binding"]:
                 continue
             # Check if replacement will be skipped for a given find value
@@ -559,7 +558,13 @@ class Parameter:
         return True, constants.PARAMETER_MSGS["valid required values"].format(param_name)
 
     def _validate_semantic_model_name(self) -> tuple[bool, str]:
-        # Duplicate detection (after merge)
+        """
+        Validate that semantic model names are unique across all semantic_model_binding entries.
+
+        Returns:
+            Tuple of (is_valid, message) where is_valid indicates if validation passed
+            and message contains either success or error details.
+        """
         names = []
         for entry in self.environment_parameter.get("semantic_model_binding", []):
             raw = entry.get("semantic_model_name", [])
@@ -781,7 +786,6 @@ class Parameter:
     def _validate_item_name(self, input_name: str) -> tuple[bool, str]:
         """Validate the item name is found in the repository directory."""
         item_name_list = []
-
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
             # valid item directory with .platform file within
