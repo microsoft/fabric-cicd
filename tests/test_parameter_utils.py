@@ -811,6 +811,108 @@ class TestParameterUtilities:
         with pytest.raises(ValueError, match="Expecting property name"):
             replace_key_value(mock_workspace, param_dict, "{invalid json}", "dev")
 
+    def test_replace_key_value_with_items_notation(self, mock_workspace):
+        """Test replace_key_value function with $items notation."""
+        # Mock the workspace to return item attributes
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "TestLakehouse": {
+                    "id": "test-lakehouse-id-12345",
+                    "sqlendpoint": "test-lakehouse.database.windows.net",
+                }
+            },
+            "Warehouse": {
+                "TestWarehouse": {
+                    "id": "test-warehouse-id-67890",
+                    "sqlendpoint": "test-warehouse.database.windows.net",
+                }
+            },
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        # Test JSON with item references
+        test_json = '{"lakehouse": {"id": "placeholder-id", "endpoint": "placeholder-endpoint"}}'
+
+        # Test with $items notation for lakehouse id
+        param_dict = {
+            "find_key": "$.lakehouse.id",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$id",
+                "prod": "$items.Lakehouse.TestLakehouse.$id",
+            },
+        }
+
+        # Test successful replacement with $items notation
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["lakehouse"]["id"] == "test-lakehouse-id-12345"
+        assert result_data["lakehouse"]["endpoint"] == "placeholder-endpoint"  # Unchanged
+
+        # Test with $items notation for sqlendpoint
+        param_dict = {
+            "find_key": "$.lakehouse.endpoint",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$sqlendpoint",
+                "prod": "$items.Warehouse.TestWarehouse.$sqlendpoint",
+            },
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["lakehouse"]["endpoint"] == "test-lakehouse.database.windows.net"
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "prod")
+        result_data = json.loads(result)
+        assert result_data["lakehouse"]["endpoint"] == "test-warehouse.database.windows.net"
+
+    def test_replace_key_value_with_items_notation_and_non_string_values(self, mock_workspace):
+        """Test replace_key_value function with $items notation mixed with other value types."""
+        # Mock the workspace to return item attributes
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "TestLakehouse": {
+                    "id": "test-lakehouse-id-12345",
+                }
+            },
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        # Test JSON with mixed value types
+        test_json = '{"config": {"enabled": false, "count": 100, "lakehouse_id": "placeholder"}}'
+
+        # Test with boolean value (should not process as $items)
+        param_dict = {
+            "find_key": "$.config.enabled",
+            "replace_value": {"dev": True, "prod": False},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["config"]["enabled"] is True
+
+        # Test with integer value (should not process as $items)
+        param_dict = {
+            "find_key": "$.config.count",
+            "replace_value": {"dev": 200, "prod": 300},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["config"]["count"] == 200
+
+        # Test with string $items notation
+        param_dict = {
+            "find_key": "$.config.lakehouse_id",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$id",
+                "prod": "$items.Lakehouse.TestLakehouse.$id",
+            },
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["config"]["lakehouse_id"] == "test-lakehouse-id-12345"
+
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
         # Set up test environment variables
