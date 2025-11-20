@@ -176,22 +176,27 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
 -   **Supported variables:**
 
     -   **Workspace variable:**
-        -   `$workspace.id` or `$workspace.$id`, replaces a value with the workspace ID of the **target environment**.
-        -   `$workspace.<name>`, replaces a value with the workspace ID of the specified **workspace name**, e.g. `$workspace.TestWorkspace`.
-        -   `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, replaces a value with the **attribute value** of the specified item in a specified workspace (see **supported attributes** below), e.g. `$workspace.TestWorkspace.Lakehouse.Example_LH.$id` or `$workspace.TestWorkspace.Warehouse.Example_WH.$sqlendpoint`
-        -   **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+
+        | Workspace Variable                                                    | Description                                                                                                                                              | Example                                                                 |
+        | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+        | `$workspace.$id` or `$workspace.id`                                   | Workspace ID of the target environment                                                                                                                   | `$workspace.$id`                                                        |
+        | `$workspace.<name>`                                                   | Workspace ID of the specified workspace name                                                                                                             | `$workspace.TestWorkspace`                                              |
+        | `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`       | Attribute value of the specified item in a specified workspace (see supported attributes above)                                                          | `$workspace.TestWorkspace.$items.Lakehouse.Example_LH.$id`              |
+
+        **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+
     -   **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
 
         -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
         -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
         -   **Supported attributes:**
 
-        | Attribute Variable                                | Description                                | Applicable Item Types | Example Variable                                  | Sample Replace Value                                           |
-        | ------------------------------------------------- | ------------------------------------------ | --------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
-        | `$items.<item_type>.<item_name>.$id`              | Item ID of the deployed item               | All                   | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
-        | `$items.<item_type>.<item_name>.$sqlendpoint`     | SQL connection string of the deployed item | Lakehouse, Warehouse  | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
-        | `$items.<item_type>.<item_name>.$sqlendpointid`   | SQL endpoint ID of the deployed item       | Lakehouse             | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
-        | `$items.<item_type>.<item_name>.$queryserviceuri` | Query service URI of the deployed item     | Eventhouse            | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+        | Attribute Variable                                | Supported Items      | Example                                           | Sample Replace Value                                           |
+        | ------------------------------------------------- | -------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+        | `$items.<item_type>.<item_name>.$id`              | All                  | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
+        | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
+        | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse            | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
+        | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse           | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
 
         -   Attributes should be **lowercase**.
         -   Item type and name are **case-sensitive**.
