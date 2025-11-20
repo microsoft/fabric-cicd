@@ -182,7 +182,7 @@ The `replace_value` field in the `find_replace` parameter supports fabric-cicd d
     -   **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
         -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
-        -   **Supported attributes**: `id` (item ID of the deployed item), `sqlendpoint` (sql connection string of the deployed item, only applicable to lakehouse and warehouse items), and `queryserviceuri` (query uri of the deployed item, only applicable to eventhouse item). Attributes should be lowercase.
+        -   **Supported attributes**: `id` (item ID of the deployed item), `sqlendpoint` (sql connection string of the deployed item, only applicable to lakehouse and warehouse items), `sqlendpointid` (sql endpoint ID of the deployed item, only applicable to lakehouse items), and `queryserviceuri` (query uri of the deployed item, only applicable to eventhouse item). Attributes should be lowercase.
         -   Item type and name are **case-sensitive**.
         -   Item type must be valid and in scope.
         -   Item name must be an **exact match** (include spaces, if present).
@@ -208,6 +208,10 @@ find_replace:
       replace_value:
           PPE: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
           PROD: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
+    - find_value: "37dc8a41-dea9-465d-b528-3e95043b2356" # SQL endpoint ID
+      replace_value:
+          PPE: "$items.Lakehouse.Sample_LH.$sqlendpointid" # PPE Sample_LH Lakehouse SQL endpoint ID
+          PROD: "$items.Lakehouse.Sample_LH.$sqlendpointid" # PROD Sample_LH Lakehouse SQL endpoint ID
     - find_value: "https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com" # Eventhouse query service URI
       replace_value:
           PPE: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PPE Sample_EH Eventhouse query service URI
@@ -672,6 +676,64 @@ display(df)
 # META {
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
+# META }
+```
+
+#### TSQL Notebook with SQL Endpoint Parameterization Case
+
+**Case:** A TSQL Notebook is attached to a Lakehouse SQL Endpoint. When deploying the Notebook to a target environment (PPE/PROD/etc), the SQL Endpoint ID referenced in the Notebook must be updated to point to the corresponding Lakehouse SQL Endpoint in the new environment.
+
+**Solution:** Use the `$sqlendpointid` attribute to dynamically retrieve the SQL Endpoint ID associated with a deployed Lakehouse. The SQL Endpoint is automatically created when a Lakehouse is deployed and has its own unique ID (different from the Lakehouse ID).
+
+**Note:** To reference a Lakehouse's SQL Endpoint ID, use `$items.Lakehouse.<lakehouse_name>.$sqlendpointid`. This is different from:
+- `$items.Lakehouse.<lakehouse_name>.$id` - returns the Lakehouse item ID
+- `$items.Lakehouse.<lakehouse_name>.$sqlendpoint` - returns the SQL Endpoint connection string
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    # SQL endpoint ID to be replaced
+    - find_value: "37dc8a41-dea9-465d-b528-3e95043b2356"
+      replace_value:
+          PPE: "$items.Lakehouse.Example_LH.$sqlendpointid" # PPE Example_LH SQL endpoint ID (dynamic)
+          PROD: "$items.Lakehouse.Example_LH.$sqlendpointid" # PROD Example_LH SQL endpoint ID (dynamic)
+      item_type: "Notebook" # filter on notebook files
+      item_name: ["TSQL Notebook"] # filter on specific TSQL notebook
+```
+
+<span class="md-h4-nonanchor">notebook-content.py file</span>
+
+```python
+# Fabric notebook source
+
+# METADATA ********************
+
+# META {
+# META   "kernel_info": {
+# META     "name": "synapse_sql"
+# META   },
+# META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse": "123e4567-e89b-12d3-a456-426614174000",
+# META       "default_lakehouse_name": "Example_LH",
+# META       "default_lakehouse_workspace_id": "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c",
+# META       "default_lakehouse_sql_endpoint": "37dc8a41-dea9-465d-b528-3e95043b2356"
+# META     }
+# META   }
+# META }
+
+# CELL ********************
+
+-- Create view in SQL Endpoint
+CREATE OR ALTER VIEW dbo.SampleView AS
+SELECT * FROM Example_LH.dbo.Table1;
+
+# METADATA ********************
+
+# META {
+# META   "language": "sql",
+# META   "language_group": "synapse_sql"
 # META }
 ```
 
