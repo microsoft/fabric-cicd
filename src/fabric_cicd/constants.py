@@ -60,6 +60,7 @@ ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
 PROPERTY_PATH_ATTR_MAPPING = {
     "Lakehouse": {
         "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+        "sqlendpointid": "body/properties/sqlEndpointProperties/id",
     },
     "Warehouse": {
         "sqlendpoint": "body/properties/connectionString",
@@ -71,7 +72,7 @@ PROPERTY_PATH_ATTR_MAPPING = {
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
-ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
