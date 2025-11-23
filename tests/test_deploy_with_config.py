@@ -316,6 +316,31 @@ class TestPublishSettingsExtraction:
         settings = extract_publish_settings(config, "dev")
         assert settings["skip"] is True
 
+    def test_extract_publish_settings_with_shortcut_exclude_regex(self):
+        """Test extracting publish settings with shortcut_exclude_regex."""
+        config = {
+            "publish": {
+                "shortcut_exclude_regex": "^temp_.*",
+            }
+        }
+
+        settings = extract_publish_settings(config, "dev")
+        assert settings["shortcut_exclude_regex"] == "^temp_.*"
+
+    def test_extract_publish_settings_with_environment_specific_shortcut_exclude_regex(self):
+        """Test extracting publish settings with environment-specific shortcut_exclude_regex."""
+        config = {
+            "publish": {
+                "shortcut_exclude_regex": {"dev": "^dev_temp_.*", "prod": "^staging_.*"},
+            }
+        }
+
+        settings = extract_publish_settings(config, "dev")
+        assert settings["shortcut_exclude_regex"] == "^dev_temp_.*"
+
+        settings = extract_publish_settings(config, "prod")
+        assert settings["shortcut_exclude_regex"] == "^staging_.*"
+
 
 class TestUnpublishSettingsExtraction:
     """Test unpublish settings extraction from config."""
