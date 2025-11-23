@@ -353,6 +353,9 @@ def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_con
                 if isinstance(processed_value, str):
                     processed_value = extract_replace_value(workspace_obj, processed_value)
                 match.full_path.update(data, processed_value)
+                logger.debug(
+                    f"Replace value: {processed_value} set for value: {match.value} found at path: {match.full_path}"
+                )
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 

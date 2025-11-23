@@ -1,6 +1,11 @@
 {
-    "version": "1.0",
-    "logicalId": "123e4567-e89b-12d3-a456-426614174000",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
     "type": "UserDataFunction",
     "displayName": "SampleUserDataFunction"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "ee3a4088-9b35-8f20-4977-ffbae687acc4"
+  }
 }
