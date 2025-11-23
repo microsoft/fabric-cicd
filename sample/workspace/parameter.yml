@@ -79,6 +79,34 @@ key_value_replace:
         PPE: false
         PROD: true
       file_path: "**/.schedules"
+    # Semantic Model parameter replacement by name
+    # Replace a Semantic Model parameter (M query parameter) by its name
+    - find_key: $.model.expressions[?(@.name=="DatabaseServer")].expression
+      replace_value:
+        PPE: '"sql-ppe.contoso.net" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+        PROD: '"sql-prod.contoso.net" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+      # Optional fields:
+      item_type: "SemanticModel"
+      item_name: "SalesModel"
+      file_path: "SalesModel.SemanticModel/model.bim"
+    # Replace another Semantic Model parameter by name
+    - find_key: $.model.expressions[?(@.name=="DatabaseName")].expression
+      replace_value:
+        PPE: '"SalesDW_PPE" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+        PROD: '"SalesDW_PROD" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+      # Optional fields:
+      item_type: "SemanticModel"
+      item_name: "SalesModel"
+      file_path: "SalesModel.SemanticModel/model.bim"
+    # Replace Semantic Model connection string by data source name
+    - find_key: $.model.dataSources[?(@.name=="SQL Server")].connectionDetails.address.server
+      replace_value:
+        PPE: "sql-ppe.contoso.net"
+        PROD: "sql-prod.contoso.net"
+      # Optional fields:
+      item_type: "SemanticModel"
+      item_name: "SalesModel"
+      file_path: "SalesModel.SemanticModel/model.bim"
 
 spark_pool:
     # CapacityPool_Large

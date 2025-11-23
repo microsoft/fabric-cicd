@@ -99,6 +99,54 @@ key_value_replace:
       file_path: <file-path-filter-value>
 ```
 
+#### Semantic Model Parameter Replacement by Name
+
+A powerful use case for `key_value_replace` is replacing Semantic Model parameters **by name** rather than by value. This is especially useful when you don't know the current parameter value in advance, or when deploying across multiple environments with different configurations.
+
+**Semantic Models can have parameters in different formats:**
+
+1. **M Query Parameters (expressions)** - Stored as expressions in the model
+2. **Connection Properties** - Stored in dataSources configuration
+
+**Example: Replace M Query Parameters by Name**
+
+Replace a parameter's value without knowing its current value:
+
+```yaml
+key_value_replace:
+    # Replace a Semantic Model parameter by its name
+    - find_key: $.model.expressions[?(@.name=="DatabaseServer")].expression
+      replace_value:
+          PPE: '"sql-ppe.contoso.net" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+          PROD: '"sql-prod.contoso.net" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+      item_type: "SemanticModel"
+      item_name: "SalesModel"
+```
+
+**Example: Replace Connection Properties by Data Source Name**
+
+Update connection server addresses by targeting the data source by name:
+
+```yaml
+key_value_replace:
+    # Replace connection server by data source name
+    - find_key: $.model.dataSources[?(@.name=="SQL Server")].connectionDetails.address.server
+      replace_value:
+          PPE: "sql-ppe.contoso.net"
+          PROD: "sql-prod.contoso.net"
+      item_type: "SemanticModel"
+      item_name: "SalesModel"
+```
+
+**Benefits of Name-Based Parameter Replacement:**
+
+- **No need to know current values** - Target parameters by their stable name identifier
+- **Reliable across environments** - Works even when different developers have different local values
+- **Supports multiple environments** - Easily define environment-specific values (dev/test/prod)
+- **Flexible targeting** - Use JSONPath to target any parameter or connection property by name
+
+For more information on Semantic Model structure and parameters, see the [Microsoft Fabric documentation](https://learn.microsoft.com/en-us/fabric/data-warehouse/semantic-models).
+
 ### `spark_pool`
 
 Environments attached to custom spark pools need to be parameterized because the `instance_pool_id` in the `Sparkcompute.yml` file isn't supported in the create/update environment APIs. Provide the `instance_pool_id` value, and the pool `type` and `name` values as the `replace_value` for each environment (e.g., PPE, PROD). An optional field, `item_name`, can be used to filter the specific environment item where the replacement will occur.
