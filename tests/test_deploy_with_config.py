@@ -432,6 +432,7 @@ class TestDeployWithConfig:
             item_name_exclude_regex="^DONT_DEPLOY.*",
             folder_path_exclude_regex=None,
             items_to_include=None,
+            shortcut_exclude_regex=None,
         )
         mock_unpublish.assert_called_once_with(
             mock_workspace_instance,

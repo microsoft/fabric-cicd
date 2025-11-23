@@ -128,6 +128,7 @@ class FabricWorkspace:
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.publish_folder_path_exclude_regex = None
+        self.shortcut_exclude_regex = None
         self.items_to_include = None
         self.responses = None
         self.repository_folders = {}
