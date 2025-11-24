@@ -62,20 +62,10 @@ class FabricEndpoint:
                     "Authorization": f"Bearer {self.aad_token}",
                     "User-Agent": f"{constants.USER_AGENT}",
                 }
-
-                # Merge custom headers from kwargs if provided
-                if "headers" in kwargs:
-                    headers.update(kwargs.pop("headers"))
-
-                # Set default Content-Type if not already set and no files
-                if files is None and "Content-Type" not in headers:
+                if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
 
-                # Use data= for bytes, json= for dict/str
-                if isinstance(body, bytes):
-                    response = self.requests.request(method=method, url=url, headers=headers, data=body, files=files)
-                else:
-                    response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
+                response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
 
                 iteration_count += 1
 
@@ -370,20 +360,12 @@ def _format_invoke_log(response: requests.Response, method: str, url: str, body:
         response: The response object from the HTTP request.
         method: The HTTP method used in the request.
         url: The URL used in the request.
-        body: The JSON body or bytes used in the request.
+        body: The JSON body used in the request.
     """
-    # Format body for logging
-    if isinstance(body, bytes):
-        body_str = f"<bytes: {len(body)} bytes>"
-    elif body:
-        body_str = f"Request Body:\n{json.dumps(body, indent=4)}"
-    else:
-        body_str = "Request Body: None"
-
     message = [
         f"\nURL: {url}",
         f"Method: {method}",
-        body_str,
+        (f"Request Body:\n{json.dumps(body, indent=4)}" if body else "Request Body: None"),
     ]
     if response is not None:
         message.extend([
