@@ -452,6 +452,8 @@ class FabricWorkspace:
                         if is_regex:
                             # For regex patterns, use re.sub with lambda to replace only the captured group
                             # Use string slicing to precisely replace only the captured group (group 1)
+                            # The slicing calculates relative positions: match.start(1) - match.start(0) gives
+                            # the start position of group 1 within the full match, and similarly for end position
                             raw_file = re.sub(
                                 pattern,
                                 lambda match, repl=replace_value: (
