@@ -811,6 +811,219 @@ class TestParameterUtilities:
         with pytest.raises(ValueError, match="Expecting property name"):
             replace_key_value(mock_workspace, param_dict, "{invalid json}", "dev")
 
+    def test_replace_key_value_with_regex_jsonpath_prefix_match(self, mock_workspace):
+        """Test replace_key_value with regex JSONPath expression for prefix matching."""
+        # Simulate lakehouse shortcuts with naming convention
+        test_json = json.dumps({
+            "shortcuts": [
+                {"name": "crm__customers", "target": {"oneLake": {"itemId": "old-crm-id-1"}}},
+                {"name": "crm__orders", "target": {"oneLake": {"itemId": "old-crm-id-2"}}},
+                {"name": "hr__employees", "target": {"oneLake": {"itemId": "old-hr-id-1"}}},
+                {"name": "other_data", "target": {"oneLake": {"itemId": "old-other-id"}}},
+            ]
+        })
+
+        # Use regex JSONPath to match all shortcuts starting with "crm__"
+        param_dict = {
+            "find_key": '$.shortcuts[?(@.name =~ "^crm__.*")].target.oneLake.itemId',
+            "replace_value": {"dev": "new-crm-lakehouse-id", "prod": "prod-crm-lakehouse-id"},
+        }
+
+        # Test replacement for dev environment
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify only crm__ prefixed shortcuts were updated
+        assert result_data["shortcuts"][0]["target"]["oneLake"]["itemId"] == "new-crm-lakehouse-id"
+        assert result_data["shortcuts"][1]["target"]["oneLake"]["itemId"] == "new-crm-lakehouse-id"
+        # Verify other shortcuts remain unchanged
+        assert result_data["shortcuts"][2]["target"]["oneLake"]["itemId"] == "old-hr-id-1"
+        assert result_data["shortcuts"][3]["target"]["oneLake"]["itemId"] == "old-other-id"
+
+    def test_replace_key_value_with_regex_jsonpath_suffix_match(self, mock_workspace):
+        """Test replace_key_value with regex JSONPath expression for suffix matching."""
+        test_json = json.dumps({
+            "endpoints": [
+                {"name": "endpoint_dev", "url": "http://dev.example.com"},
+                {"name": "endpoint_prod", "url": "http://prod.example.com"},
+                {"name": "endpoint_test", "url": "http://test.example.com"},
+                {"name": "static_endpoint", "url": "http://static.example.com"},
+            ]
+        })
+
+        # Use regex to match endpoints ending with "_dev" or "_test"
+        param_dict = {
+            "find_key": '$.endpoints[?(@.name =~ ".*(dev|test)$")].url',
+            "replace_value": {"dev": "http://new-dev.example.com"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify matching endpoints were updated
+        assert result_data["endpoints"][0]["url"] == "http://new-dev.example.com"
+        assert result_data["endpoints"][2]["url"] == "http://new-dev.example.com"
+        # Verify non-matching endpoints remain unchanged
+        assert result_data["endpoints"][1]["url"] == "http://prod.example.com"
+        assert result_data["endpoints"][3]["url"] == "http://static.example.com"
+
+    def test_replace_key_value_with_regex_jsonpath_contains_match(self, mock_workspace):
+        """Test replace_key_value with regex JSONPath expression for contains matching."""
+        test_json = json.dumps({
+            "databases": [
+                {"name": "sales_db_primary", "connection": "conn1"},
+                {"name": "sales_db_replica", "connection": "conn2"},
+                {"name": "analytics_db", "connection": "conn3"},
+                {"name": "archive_db", "connection": "conn4"},
+            ]
+        })
+
+        # Use regex to match database names containing "sales"
+        param_dict = {
+            "find_key": '$.databases[?(@.name =~ ".*sales.*")].connection',
+            "replace_value": {"dev": "new-sales-connection"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify sales databases were updated
+        assert result_data["databases"][0]["connection"] == "new-sales-connection"
+        assert result_data["databases"][1]["connection"] == "new-sales-connection"
+        # Verify other databases remain unchanged
+        assert result_data["databases"][2]["connection"] == "conn3"
+        assert result_data["databases"][3]["connection"] == "conn4"
+
+    def test_replace_key_value_with_regex_jsonpath_no_matches(self, mock_workspace):
+        """Test replace_key_value with regex JSONPath that matches no items."""
+        test_json = json.dumps({"items": [{"name": "item1", "value": "val1"}, {"name": "item2", "value": "val2"}]})
+
+        # Use regex that won't match anything
+        param_dict = {
+            "find_key": '$.items[?(@.name =~ "^nonexistent.*")].value',
+            "replace_value": {"dev": "new-value"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify nothing was changed
+        assert result_data["items"][0]["value"] == "val1"
+        assert result_data["items"][1]["value"] == "val2"
+
+    def test_replace_key_value_with_regex_jsonpath_case_insensitive(self, mock_workspace):
+        """Test replace_key_value with case-insensitive regex JSONPath expression."""
+        test_json = json.dumps({
+            "services": [
+                {"name": "API_Service", "port": 8080},
+                {"name": "api_gateway", "port": 8081},
+                {"name": "Web_Service", "port": 8082},
+            ]
+        })
+
+        # Use case-insensitive regex to match names containing "api"
+        param_dict = {
+            "find_key": '$.services[?(@.name =~ "(?i).*api.*")].port',
+            "replace_value": {"dev": 9090},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify API services were updated
+        assert result_data["services"][0]["port"] == 9090
+        assert result_data["services"][1]["port"] == 9090
+        # Verify non-API service remains unchanged
+        assert result_data["services"][2]["port"] == 8082
+
+    def test_replace_key_value_with_regex_jsonpath_complex_pattern(self, mock_workspace):
+        """Test replace_key_value with complex regex pattern in JSONPath."""
+        test_json = json.dumps({
+            "resources": [
+                {"id": "res-2024-001", "status": "active"},
+                {"id": "res-2024-002", "status": "active"},
+                {"id": "res-2023-999", "status": "inactive"},
+                {"id": "invalid-id", "status": "pending"},
+            ]
+        })
+
+        # Match resources with ID pattern starting with "res-2024-"
+        param_dict = {
+            "find_key": '$.resources[?(@.id =~ "^res-2024-.*")].status',
+            "replace_value": {"dev": "archived"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify 2024 resources were updated
+        assert result_data["resources"][0]["status"] == "archived"
+        assert result_data["resources"][1]["status"] == "archived"
+        # Verify others remain unchanged
+        assert result_data["resources"][2]["status"] == "inactive"
+        assert result_data["resources"][3]["status"] == "pending"
+
+    def test_replace_key_value_with_regex_jsonpath_nested_structure(self, mock_workspace):
+        """Test replace_key_value with regex JSONPath on deeply nested structure."""
+        test_json = json.dumps({
+            "workspaces": [
+                {
+                    "name": "ws_dev_01",
+                    "lakehouses": [
+                        {"name": "bronze_layer", "id": "old-bronze-id"},
+                        {"name": "silver_layer", "id": "old-silver-id"},
+                    ],
+                },
+                {"name": "ws_prod_01", "lakehouses": [{"name": "bronze_layer", "id": "old-bronze-id-prod"}]},
+            ]
+        })
+
+        # Match bronze layer lakehouses in dev workspace
+        param_dict = {
+            "find_key": '$.workspaces[?(@.name =~ ".*_dev_.*")].lakehouses[?(@.name =~ "bronze.*")].id',
+            "replace_value": {"dev": "new-dev-bronze-id"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+
+        # Verify only dev workspace bronze layer was updated
+        assert result_data["workspaces"][0]["lakehouses"][0]["id"] == "new-dev-bronze-id"
+        # Verify silver layer in dev workspace unchanged
+        assert result_data["workspaces"][0]["lakehouses"][1]["id"] == "old-silver-id"
+        # Verify prod workspace unchanged
+        assert result_data["workspaces"][1]["lakehouses"][0]["id"] == "old-bronze-id-prod"
+
+    def test_replace_key_value_with_regex_jsonpath_multiple_environments(self, mock_workspace):
+        """Test replace_key_value with regex JSONPath across multiple environments."""
+        test_json = json.dumps({
+            "shortcuts": [
+                {"name": "staging__data", "target": {"oneLake": {"itemId": "old-id-1"}}},
+                {"name": "staging__logs", "target": {"oneLake": {"itemId": "old-id-2"}}},
+            ]
+        })
+
+        param_dict = {
+            "find_key": '$.shortcuts[?(@.name =~ "^staging__.*")].target.oneLake.itemId',
+            "replace_value": {
+                "dev": "dev-staging-lakehouse-id",
+                "test": "test-staging-lakehouse-id",
+                "prod": "prod-staging-lakehouse-id",
+            },
+        }
+
+        # Test dev environment
+        result_dev = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data_dev = json.loads(result_dev)
+        assert result_data_dev["shortcuts"][0]["target"]["oneLake"]["itemId"] == "dev-staging-lakehouse-id"
+        assert result_data_dev["shortcuts"][1]["target"]["oneLake"]["itemId"] == "dev-staging-lakehouse-id"
+
+        # Test prod environment
+        result_prod = replace_key_value(mock_workspace, param_dict, test_json, "prod")
+        result_data_prod = json.loads(result_prod)
+        assert result_data_prod["shortcuts"][0]["target"]["oneLake"]["itemId"] == "prod-staging-lakehouse-id"
+        assert result_data_prod["shortcuts"][1]["target"]["oneLake"]["itemId"] == "prod-staging-lakehouse-id"
+
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
         # Set up test environment variables
