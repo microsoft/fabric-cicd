@@ -197,7 +197,7 @@ The `key_value_replace` parameter supports extended JSONPath expressions with re
 ```yaml
 key_value_replace:
     # Match shortcuts with names starting with "crm__" prefix
-    - find_key: '$[?(@.name =~ "^crm__.*")].target.oneLake.itemId'
+    - find_key: '$.shortcuts[?(@.name =~ "^crm__.*")].target.oneLake.itemId'
       replace_value:
           DEV: "$items.Lakehouse.CRM_Dev.$id"
           PROD: "$items.Lakehouse.CRM_Prod.$id"

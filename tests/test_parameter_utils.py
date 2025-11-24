@@ -979,6 +979,9 @@ class TestParameterUtilities:
         })
 
         # Match bronze layer lakehouses in dev workspace
+        # This uses chained regex filters:
+        # 1. First filter: workspaces with names containing "_dev_" (matches ws_dev_01)
+        # 2. Second filter: lakehouses within those workspaces with names starting with "bronze" (matches bronze_layer)
         param_dict = {
             "find_key": '$.workspaces[?(@.name =~ ".*_dev_.*")].lakehouses[?(@.name =~ "bronze.*")].id',
             "replace_value": {"dev": "new-dev-bronze-id"},
