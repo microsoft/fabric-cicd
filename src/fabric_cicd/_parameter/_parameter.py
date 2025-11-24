@@ -377,7 +377,7 @@ class Parameter:
             ("parameter names", self._validate_parameter_names),
             ("parameter file structure", self._validate_parameter_structure),
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
-            # ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
+            ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
         ]
