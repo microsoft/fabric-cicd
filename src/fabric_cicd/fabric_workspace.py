@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 import dpath
 from azure.core.credentials import TokenCredential
@@ -450,22 +450,17 @@ class FabricWorkspace:
                         is_regex = find_info["is_regex"]
 
                         if is_regex:
-                            # For regex patterns, use re.sub to replace only the captured group
-                            import re
-
-                            # Create a replacement function that replaces only the captured group
-                            def create_replacement_func(replacement_val: str) -> "Callable[[re.Match[str]], str]":
-                                def replace_captured_group(match: re.Match[str]) -> str:
-                                    # Replace the captured group (group 1) with the replacement value
-                                    # Keep the rest of the match intact
-                                    full_match = match.group(0)
-                                    captured_group = match.group(1)
-                                    # Replace the captured group within the full match
-                                    return full_match.replace(captured_group, replacement_val)
-
-                                return replace_captured_group
-
-                            raw_file = re.sub(pattern, create_replacement_func(replace_value), raw_file)
+                            # For regex patterns, use re.sub with lambda to replace only the captured group
+                            # Use string slicing to precisely replace only the captured group (group 1)
+                            raw_file = re.sub(
+                                pattern,
+                                lambda match, repl=replace_value: (
+                                    match.group(0)[: match.start(1) - match.start(0)]
+                                    + repl
+                                    + match.group(0)[match.end(1) - match.start(0) :]
+                                ),
+                                raw_file,
+                            )
                             logger.debug(
                                 f"Replacing regex pattern '{pattern}' captured groups with '{replace_value}' in {item_name}.{item_type}"
                             )
