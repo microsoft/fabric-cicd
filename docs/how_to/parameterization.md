@@ -84,6 +84,8 @@ find_replace:
 
 Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
+**Regex JSONPath Support:** The `find_key` supports extended JSONPath expressions including regex pattern matching. This allows you to match multiple items that follow naming conventions using a single configuration entry. See [Regex JSONPath Expressions](#regex-jsonpath-expressions) for examples.
+
 Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, Schedules files, etc. The function automatically detects and processes any file containing valid JSON content, regardless of file extension (e.g., `.schedules`, `.platform` files).
 
 ```yaml
@@ -164,6 +166,91 @@ find_replace:
       is_regex: "true" # "<true|True>"
       item_type: "Notebook" # filter on notebook files
       item_name: ["Hello World", "Goodbye World"] # filter on specific notebook files
+```
+
+### Regex JSONPath Expressions
+
+The `key_value_replace` parameter supports extended JSONPath expressions with regex pattern matching. This powerful feature allows you to match multiple items following naming conventions using a single configuration entry, significantly reducing the number of parameter entries needed.
+
+-   **How to** use this feature:
+    -   Set the `find_key` to a JSONPath expression that includes a regex pattern using the `=~` operator
+    -   The regex pattern should be wrapped in quotes within the JSONPath expression
+    -   No additional flags are needed - regex support is built into the JSONPath parser
+-   **Supported regex patterns:**
+    -   **Prefix matching:** `^pattern` - Matches items starting with a specific prefix
+    -   **Suffix matching:** `pattern$` - Matches items ending with a specific suffix
+    -   **Contains matching:** `.*pattern.*` - Matches items containing a specific substring
+    -   **Case-insensitive:** `(?i)pattern` - Case-insensitive pattern matching
+    -   **Multiple patterns:** `(pattern1|pattern2)` - Matches multiple alternative patterns
+-   **Common use cases:**
+    -   Replace lakehouse item IDs for shortcuts following naming conventions (e.g., all shortcuts starting with `crm__`)
+    -   Update connection strings for services following naming patterns (e.g., all services containing `api`)
+    -   Parameterize configurations for resources matching specific ID patterns
+-   **Important:**
+    -   Regex patterns in JSONPath are evaluated by the JSONPath parser, not as standalone regex
+    -   All matching items found by the JSONPath expression will be replaced
+    -   If no items match the regex pattern, the replacement is skipped (no error)
+    -   Can be combined with file filters (`item_type`, `item_name`, `file_path`) for precise control
+
+**Example:** Replace lakehouse IDs for all shortcuts with names starting with `crm__`
+
+```yaml
+key_value_replace:
+    # Match shortcuts with names starting with "crm__" prefix
+    - find_key: '$[?(@.name =~ "^crm__.*")].target.oneLake.itemId'
+      replace_value:
+          DEV: "$items.Lakehouse.CRM_Dev.$id"
+          PROD: "$items.Lakehouse.CRM_Prod.$id"
+      item_type: "Lakehouse"
+      item_name: "SourceLakehouse"
+```
+
+**Before (without regex):** Required separate entries for each shortcut
+
+```yaml
+key_value_replace:
+    - find_key: '$[?(@.name=="crm__customers")].target.oneLake.itemId'
+      replace_value:
+          DEV: "$items.Lakehouse.CRM_Dev.$id"
+    - find_key: '$[?(@.name=="crm__orders")].target.oneLake.itemId'
+      replace_value:
+          DEV: "$items.Lakehouse.CRM_Dev.$id"
+    - find_key: '$[?(@.name=="crm__products")].target.oneLake.itemId'
+      replace_value:
+          DEV: "$items.Lakehouse.CRM_Dev.$id"
+    # ... more entries for each shortcut
+```
+
+**After (with regex):** Single entry handles all matching shortcuts
+
+```yaml
+key_value_replace:
+    - find_key: '$[?(@.name =~ "^crm__.*")].target.oneLake.itemId'
+      replace_value:
+          DEV: "$items.Lakehouse.CRM_Dev.$id"
+          PROD: "$items.Lakehouse.CRM_Prod.$id"
+```
+
+**Additional examples:**
+
+```yaml
+key_value_replace:
+    # Match database connections containing "sales" (case-insensitive)
+    - find_key: '$.databases[?(@.name =~ "(?i).*sales.*")].connection'
+      replace_value:
+          DEV: "dev-sales-connection-string"
+          PROD: "prod-sales-connection-string"
+    
+    # Match API endpoints ending with "_dev" or "_test"
+    - find_key: '$.endpoints[?(@.name =~ ".*(dev|test)$")].url'
+      replace_value:
+          DEV: "https://dev-api.example.com"
+    
+    # Match resources with specific ID pattern (starting with "res-2024-")
+    - find_key: '$.resources[?(@.id =~ "^res-2024-.*")].status'
+      replace_value:
+          DEV: "active"
+          PROD: "archived"
 ```
 
 ### Dynamic Replacement
