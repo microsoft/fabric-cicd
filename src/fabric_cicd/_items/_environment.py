@@ -63,7 +63,7 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
     fabric_workspace_obj.endpoint.invoke(
         method="POST",
-        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish?preview=False",
+        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish?beta=False",
     )
 
     logger.info(f"{constants.INDENT}Publish Submitted")
