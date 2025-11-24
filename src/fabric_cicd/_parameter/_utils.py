@@ -27,6 +27,31 @@ logger = logging.getLogger(__name__)
 """Functions to extract parameter values"""
 
 
+def _validate_regex_pattern(matches: list, find_value: str) -> None:
+    """
+    Validates regex pattern matches to ensure they have exactly one capturing group
+    and that the captured value is not empty.
+
+    Args:
+        matches: List of regex match objects
+        find_value: The regex pattern string for error messages
+
+    Raises:
+        InputError: If validation fails
+    """
+    if matches:
+        # Check if the regex has exactly one capturing group by testing the first match
+        if len(matches[0].groups()) != 1:
+            msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
+            raise InputError(msg, logger)
+
+        # Check if the captured group is empty (which would be invalid)
+        captured_value = matches[0].group(1)
+        if not captured_value:
+            msg = f"Regex pattern '{find_value}' captured an empty value."
+            raise InputError(msg, logger)
+
+
 def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> dict:
     """
     Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided.
@@ -54,18 +79,9 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
             regex = re.compile(find_value)
             matches = list(re.finditer(regex, file_content))
 
+            _validate_regex_pattern(matches, find_value)
+
             if matches:
-                # Check if the regex has exactly one capturing group by testing the first match
-                if len(matches[0].groups()) != 1:
-                    msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
-                    raise InputError(msg, logger)
-
-                # Check if the captured group is empty (which would be invalid)
-                captured_value = matches[0].group(1)
-                if not captured_value:
-                    msg = f"Regex pattern '{find_value}' captured an empty value."
-                    raise InputError(msg, logger)
-
                 # Return the regex pattern for use with re.sub()
                 return {
                     "pattern": find_value,
@@ -85,16 +101,7 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
             regex = re.compile(find_value)
             matches = list(re.finditer(regex, file_content))
 
-            if matches:
-                if len(matches[0].groups()) != 1:
-                    msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
-                    raise InputError(msg, logger)
-
-                # Check if the captured group is empty (which would be invalid)
-                captured_value = matches[0].group(1)
-                if not captured_value:
-                    msg = f"Regex pattern '{find_value}' captured an empty value."
-                    raise InputError(msg, logger)
+            _validate_regex_pattern(matches, find_value)
 
             # Return as non-regex for non-filter cases but check for matches
             return {
