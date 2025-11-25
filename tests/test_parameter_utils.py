@@ -123,8 +123,8 @@ class TestParameterUtilities:
         # Test with non-matching regex
         expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
         assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
-        # Test with regex but filter_match=False
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": False, "has_matches": True}
+        # Test with regex but filter_match=False - should still return is_regex=True
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
         assert extract_find_value(param_dict, "content with id=abc-123", False) == expected
 
     def test_extract_find_value_invalid_regex(self):
@@ -143,6 +143,17 @@ class TestParameterUtilities:
         param_dict = {"find_value": "id=()", "is_regex": "true"}
         with pytest.raises(InputError):
             extract_find_value(param_dict, "content with id=", True)
+
+        # Test that structure validation happens even when there are no matches
+        # (regex with no capturing groups should still fail even if no matches)
+        param_dict = {"find_value": "id=\\w+", "is_regex": "true"}
+        with pytest.raises(InputError):
+            extract_find_value(param_dict, "unrelated content without matches", True)
+
+        # Test that structure validation happens with filter_match=False too
+        param_dict = {"find_value": "(id)=([\\w-]+)", "is_regex": "true"}
+        with pytest.raises(InputError):
+            extract_find_value(param_dict, "unrelated content without matches", False)
 
     def test_extract_find_value_multiple_matches(self):
         """Tests extract_find_value with regex pattern that has multiple matches."""
