@@ -1,0 +1,19 @@
+find_replace:
+    # Lakehouse Connection Guid regex
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+        PPE: "$items.Lakehouse.WithoutSchema.id"   
+        PROD: "$items.Lakehouse.WithoutSchema.id" 
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Lakehouse workspace id regex
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+      # Variable: $workspace.id -> target workspace id
+        PPE: "$workspace.id"
+        PROD: "$workspace.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"

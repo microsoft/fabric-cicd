@@ -338,6 +338,132 @@ Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, man
 
 **Deployment:** At the start of a deployment, an automated validation checks the validity of the `parameter.yml` file, if it is present. This step ensures that valid parameters are loaded, allowing deployment to run smoothly with correctly applied parameterized configurations. If the parameter file is invalid, the deployment will NOT proceed.
 
+## Parameter File Templates
+
+This option supports splitting a large parameter file into smaller parameter file "templates". Create template YAML files in any location (in the following example, the files are located in a `templates` directory within the repository directory). In the main `parameter.yml` file, add the `extend` key with a list of template parameter file paths **relative to the main parameter file location.**
+
+<span class="md-h4-nonanchor">Repository directory</span>
+
+```
+C:/dev/workspace
+    /HelloWorld.Notebook
+        ...
+    /GoodbyeWorld.Notebook
+        ...
+    /parameter.yml
+        ...
+    /templates
+        /nb_parameters.yml
+        /pl_parameters.yml
+        /df_parameters.yml
+```
+
+<span class="md-h4-nonanchor">Main `parameter.yml` file</span>
+
+```yaml
+extend:
+    - "./templates/nb_parameters.yml"
+    # - "./templates/pl_parameters.yml"
+    # - "./templates/df_parameters.yml"
+
+find_replace:
+    # Lakehouse Connection Guid
+    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+      replace_value:
+          PPE: "81bbb339-8d0b-46e8-bfa6-289a159c0733"
+          PROD: "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+      # Optional fields:
+      item_type: "Notebook"
+      item_name: ["Hello World", "Hello World Subfolder"]
+      file_path:
+          - "/Hello World.Notebook/notebook-content.py"
+          - "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
+
+spark_pool:
+    # CapacityPool_Large
+    - instance_pool_id: "72c68dbc-0775-4d59-909d-a47896f4573b"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "CapacityPool_Large_PPE"
+          PROD:
+              type: "Capacity"
+              name: "CapacityPool_Large_PROD"
+      # Optional field:
+      item_name: "World"
+```
+
+<span class="md-h4-nonanchor">`nb_parameters.yml` file</span>
+
+```yaml
+find_replace:
+    # Lakehouse Connection Guid regex
+    - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+          PPE: "$items.Lakehouse.WithoutSchema.id"
+          PROD: "$items.Lakehouse.WithoutSchema.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Lakehouse workspace id regex
+    - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+      replace_value:
+          # Variable: $workspace.id -> target workspace id
+          PPE: "$workspace.id"
+          PROD: "$workspace.id"
+      # Optional fields:
+      is_regex: "true"
+      file_path: "/Example Notebook.Notebook/notebook-content.py"
+```
+
+<span class="md-h4-nonanchor">Parameter dictionary</span>
+
+```json
+{
+    "find_replace": [
+        {
+            "find_value": "db52be81-c2b2-4261-84fa-840c67f4bbd0",
+            "replace_value": {
+                "PPE": "81bbb339-8d0b-46e8-bfa6-289a159c0733",
+                "PROD": "5d6a1b16-447f-464a-b959-45d0fed35ca0"
+            },
+            "item_type": "Notebook",
+            "item_name": ["Hello World", "Hello World Subfolder"],
+            "file_path": [
+                "/Hello World.Notebook/notebook-content.py",
+                "/subfolder/Hello World Subfolder.Notebook/notebook-content.py"
+            ]
+        },
+        {
+            "find_value": "\\#\\s*META\\s+\"default_lakehouse\":\\s*\"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\"",
+            "replace_value": {
+                "PPE": "$items.Lakehouse.WithoutSchema.id",
+                "PROD": "$items.Lakehouse.WithoutSchema.id"
+            },
+            "is_regex": "true",
+            "file_path": "/Example Notebook.Notebook/notebook-content.py"
+        },
+        {
+            "find_value": "\\#\\s*META\\s+\"default_lakehouse_workspace_id\":\\s*\"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\"",
+            "replace_value": { "PPE": "$workspace.id", "PROD": "$workspace.id" },
+            "is_regex": "true",
+            "file_path": "/Example Notebook.Notebook/notebook-content.py"
+        }
+    ],
+    "spark_pool": [
+        {
+            "instance_pool_id": "72c68dbc-0775-4d59-909d-a47896f4573b",
+            "replace_value": {
+                "PPE": { "type": "Capacity", "name": "CapacityPool_Large_PPE" },
+                "PROD": { "type": "Capacity", "name": "CapacityPool_Large_PROD" }
+            },
+            "item_name": "World"
+        }
+    ]
+}
+```
+
 ## Sample Parameter File
 
 An exhaustive example of all capabilities currently supported in the `parameter.yml` file.
@@ -833,14 +959,14 @@ find_replace:
       replace_value:
           PPE: "76a8f5c3-e4b2-48d1-9c7f-382d69a5e7b0" # PPE Cluster ID
           PROD: "f297e14d-6c83-42a5-b718-59d40e3f8c2d" # PROD Cluster ID
-      file_path: "/Sample Dataflow.Dataflow/mashup.pq"
+      file_path: "/Sample Dataflow.Dataflow/queryMetadata.json"
 
     # Connection ID - Datasource ID
     - find_value: "d12c5f7b-90a3-47e6-8d2c-3fb59e01d47a"
       replace_value:
           PPE: "25b9a417-3d8e-4f62-901c-75de6ba84f35" # PPE Datasource ID
           PROD: "cb718d96-5ae2-47fc-8b93-1d24c0f5e8a7" # PROD Datasource ID
-      file_path: "/Sample Dataflow.Dataflow/mashup.pq"
+      file_path: "/Sample Dataflow.Dataflow/queryMetadata.json"
 ```
 
 <span class="md-h4-nonanchor">queryMetadata.json file</span>
