@@ -25,9 +25,9 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
     """
-    logger.warning("The underlying legacy Microsoft Fabric Environment APIs will be deprecated by March 2026.")
+    logger.warning("The underlying legacy Microsoft Fabric Environment APIs will be deprecated by March 1, 2026.")
     logger.warning(
-        "Please upgrade to the latest fabric-cicd version before March 2026 to prevent broken Environment item deployments."
+        "Please upgrade to the latest fabric-cicd version before March 1, 2026 to prevent broken Environment item deployments."
     )
 
     # Check for ongoing publish
@@ -115,7 +115,7 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
 
     This process involves two steps:
     1. Check for ongoing publish.
-    2. Update compute settings.
+    2. Updating the compute settings.
     3. Publish the updated settings and libraries.
 
     Args:
@@ -205,9 +205,9 @@ def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace,
             key_components = key.split("_")
             new_key = key_components[0] + "".join(x.title() for x in key_components[1:])
 
-            # Recursively update dictionary values if they are dictionaries
-            if isinstance(value, dict):
-                value = _convert_environment_compute_to_camel(fabric_workspace_obj, value)
+        # Recursively update dictionary values if they are dictionaries
+        if isinstance(value, dict):
+            value = _convert_environment_compute_to_camel(fabric_workspace_obj, value)
 
         new_input_dict[new_key] = value
 
