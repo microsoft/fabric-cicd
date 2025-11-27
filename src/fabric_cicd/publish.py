@@ -323,6 +323,7 @@ def unpublish_all_orphan_items(
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
+    is_items_to_include_list = False
     regex_pattern = check_regex(item_name_exclude_regex)
 
     fabric_workspace_obj._refresh_deployed_items()
@@ -340,7 +341,7 @@ def unpublish_all_orphan_items(
         logger.warning(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
-        fabric_workspace_obj.items_to_include = items_to_include
+        is_items_to_include_list = True
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
@@ -394,18 +395,23 @@ def unpublish_all_orphan_items(
         repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
         to_delete_set = deployed_names - repository_names
-        to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type == "DataPipeline":
-            find_referenced_items_func = items.find_referenced_datapipelines
+        if is_items_to_include_list:
+            to_delete_list = [name for name in to_delete_set if f"{name}.{item_type}" in items_to_include]
+            logger.debug(f"Items to include for unpublishing: {to_delete_list}")
+        else:
+            to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-            # Determine order to delete w/o dependencies
-            to_delete_list = items.set_unpublish_order(
-                fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
-            )
+            if item_type == "DataPipeline":
+                find_referenced_items_func = items.find_referenced_datapipelines
 
-        for item_name in to_delete_list:
-            fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
+                # Determine order to delete w/o dependencies
+                to_delete_list = items.set_unpublish_order(
+                    fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
+                )
+
+    for item_name in to_delete_list:
+        fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_deployed_folders()
