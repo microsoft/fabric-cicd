@@ -398,20 +398,20 @@ def unpublish_all_orphan_items(
 
         if is_items_to_include_list:
             to_delete_list = [name for name in to_delete_set if f"{name}.{item_type}" in items_to_include]
-            logger.debug(f"Items to include for unpublishing: {to_delete_list}")
+            logger.debug(f"Items to include for unpublishing ({item_type}): {to_delete_list}")
         else:
             to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-            if item_type == "DataPipeline":
-                find_referenced_items_func = items.find_referenced_datapipelines
+        if item_type == "DataPipeline":
+            find_referenced_items_func = items.find_referenced_datapipelines
 
-                # Determine order to delete w/o dependencies
-                to_delete_list = items.set_unpublish_order(
-                    fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
-                )
+            # Determine order to delete w/o dependencies
+            to_delete_list = items.set_unpublish_order(
+                fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
+            )
 
-    for item_name in to_delete_list:
-        fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
+        for item_name in to_delete_list:
+            fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_deployed_folders()
