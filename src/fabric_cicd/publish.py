@@ -35,6 +35,7 @@ def publish_all_items(
     item_name_exclude_regex: Optional[str] = None,
     folder_path_exclude_regex: Optional[str] = None,
     items_to_include: Optional[list[str]] = None,
+    shortcut_exclude_regex: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
@@ -44,6 +45,7 @@ def publish_all_items(
         item_name_exclude_regex: Regex pattern to exclude specific items from being published.
         folder_path_exclude_regex: Regex pattern to exclude items based on their folder path.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
+        shortcut_exclude_regex: Regex pattern to exclude specific shortcuts from being published in lakehouses.
 
     Returns:
         Dict containing all API responses if the "enable_response_collection" feature flag is enabled and responses were collected, otherwise None.
@@ -101,6 +103,17 @@ def publish_all_items(
         ... )
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
         >>> publish_all_items(workspace, items_to_include=items_to_include)
+
+        With shortcut exclusion
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> append_feature_flag("enable_shortcut_publish")
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Lakehouse"]
+        ... )
+        >>> shortcut_exclude_regex = "^temp_.*"  # Exclude shortcuts starting with "temp_"
+        >>> publish_all_items(workspace, shortcut_exclude_regex=shortcut_exclude_regex)
 
         With response collection
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
@@ -176,6 +189,12 @@ def publish_all_items(
             "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
         )
         fabric_workspace_obj.items_to_include = items_to_include
+
+    if shortcut_exclude_regex:
+        logger.warning(
+            "Using shortcut_exclude_regex will selectively exclude shortcuts from being deployed to lakehouses. Use with caution."
+        )
+        fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
     def _should_publish_item_type(item_type: str) -> bool:
         """Check if an item type should be published based on scope and repository content."""
@@ -515,6 +534,7 @@ def deploy_with_config(
             item_name_exclude_regex=publish_settings.get("exclude_regex"),
             folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
             items_to_include=publish_settings.get("items_to_include"),
+            shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
         )
     else:
         logger.info(f"Skipping publish operation for environment '{environment}'")
