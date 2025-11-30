@@ -71,62 +71,31 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
     find_value = param_dict.get("find_value")
     is_regex = param_dict.get("is_regex", "").lower() == "true"
 
-    # Process regex patterns
+    # No find value -> nothing to do
+    if not find_value:
+        return {"pattern": "", "is_regex": False, "has_matches": False}
+
+    # If this file is not in the filter scope, do not search or validate regexes
+    if not filter_match:
+        return {"pattern": find_value, "is_regex": False, "has_matches": False}
+
+    # File is in scope: handle regex and plain string cases
     if is_regex:
-        # If processing regex for filtering, validate and check matches
-        if filter_match:
-            # Search for matches with the valid regex (validated in the parameter file validation step)
-            regex = re.compile(find_value)
-            matches = list(re.finditer(regex, file_content))
-
-            _validate_regex_pattern(matches, find_value)
-
-            if matches:
-                # Return the regex pattern for use with re.sub()
-                return {
-                    "pattern": find_value,
-                    "is_regex": True,
-                    "has_matches": True,
-                }
-
-            logger.debug(f"No match found for regex '{find_value}' in the file content.")
-            return {
-                "pattern": find_value,
-                "is_regex": True,
-                "has_matches": False,
-            }
-
-        # When not filtering by match, still validate regex pattern
         try:
-            regex = re.compile(find_value)
-            matches = list(re.finditer(regex, file_content))
+            compiled = re.compile(find_value)
+        except re.error as re_err:
+            msg = f"Invalid regex '{find_value}': {re_err}"
+            raise InputError(msg, logger) from re_err
 
-            _validate_regex_pattern(matches, find_value)
+        matches = list(re.finditer(compiled, file_content))
 
-            # Return as non-regex for non-filter cases but check for matches
-            return {
-                "pattern": find_value,
-                "is_regex": False,
-                "has_matches": len(matches) > 0,
-            }
-        except re.error as err:
-            # Invalid regex pattern
-            msg = f"Invalid regex pattern: '{find_value}'"
-            raise InputError(msg, logger) from err
+        # Reuse central validation (checks groups and empty capture when matches exist)
+        _validate_regex_pattern(matches, find_value)
 
-    # For non-regex patterns, return the original value
-    if find_value:
-        return {
-            "pattern": find_value,
-            "is_regex": False,
-            "has_matches": find_value in file_content,
-        }
+        return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches)}
 
-    return {
-        "pattern": "",
-        "is_regex": False,
-        "has_matches": False,
-    }
+    # Non-regex plain string search
+    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content}
 
 
 def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:

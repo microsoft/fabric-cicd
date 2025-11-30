@@ -469,7 +469,7 @@ class FabricWorkspace:
                                 raw_file,
                             )
                             logger.debug(
-                                f"Replacing regex pattern '{pattern}' captured groups with '{replace_value}' in {item_name}.{item_type}"
+                                f"Replacing regex pattern '{pattern}' captured group with '{replace_value}' in {item_name}.{item_type}"
                             )
                         else:
                             # For non-regex matches, replace as before
