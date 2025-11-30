@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 import json
+import re
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -1079,3 +1080,34 @@ def test_lookup_item_attribute(patched_fabric_workspace, valid_workspace_id, tem
         assert "target-workspace-id" in str(exc_info.value)
         assert "NonExistentType" in str(exc_info.value)
         assert "Test Item" in str(exc_info.value)
+
+
+def test_kqldatabase_folder_regex_root_eventhouse():
+    """KQLDatabase under top-level Eventhouse .children: group(1) is empty string."""
+    pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
+    relative_path = "/SampleEventhouse.Eventhouse/.children/TaxiDB.KQLDatabase"
+    match = pattern.match(relative_path)
+    assert match is not None, "Regex should match a top-level Eventhouse .children path"
+    assert match.group(1) == "", "Expected empty string for group(1) when Eventhouse is at repository root"
+
+
+def test_kqldatabase_folder_regex_nested_subfolder():
+    """KQLDatabase nested under a subfolder before Eventhouse: group(1) captures the subfolder path."""
+    pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
+    relative_path = "/subfolder/EventhouseName.Eventhouse/.children/DB.KQLDatabase"
+    match = pattern.match(relative_path)
+    assert match is not None, "Regex should match nested Eventhouse .children path"
+    assert match.group(1) == "/subfolder", "Expected '/subfolder' captured as the parent path"
+
+
+def test_kqldatabase_folder_regex_no_match_edge_case():
+    """Edge case: paths that do not follow the Eventhouse/.children pattern should not match."""
+    pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
+    # Missing '.Eventhouse/.children' sequence
+    bad_paths = [
+        "/SomeFolder/TaxiDB.KQLDatabase",  # no Eventhouse container
+        "/Another.Eventhouse/TaxiDB.KQLDatabase",  # missing '.children'
+        "/prefix/.children/TaxiDB.KQLDatabase",  # missing Eventhouse segment
+    ]
+    for p in bad_paths:
+        assert pattern.match(p) is None, f"Regex should not match path: {p}"
