@@ -40,7 +40,7 @@ ACCEPTED_ITEM_TYPES = (
 )
 
 # Publish
-SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
+SHELL_ONLY_PUBLISH = ["Lakehouse", "Warehouse", "SQLDatabase"]
 
 # Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
@@ -60,6 +60,7 @@ ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
 PROPERTY_PATH_ATTR_MAPPING = {
     "Lakehouse": {
         "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+        "sqlendpointid": "body/properties/sqlEndpointProperties/id",
     },
     "Warehouse": {
         "sqlendpoint": "body/properties/connectionString",
@@ -71,7 +72,7 @@ PROPERTY_PATH_ATTR_MAPPING = {
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
-ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
@@ -129,6 +130,7 @@ PARAMETER_MSGS = {
     "param_count": "{} {} parameters found",
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
+    "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",
