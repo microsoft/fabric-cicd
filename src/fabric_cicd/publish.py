@@ -255,6 +255,9 @@ def publish_all_items(
     if _should_publish_item_type("DataAgent"):
         print_header("Publishing Data Agents")
         items.publish_dataagents(fabric_workspace_obj)
+    if _should_publish_item_type("MLExperiment"):
+        print_header("Publishing ML Experiments")
+        items.publish_mlexperiments(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -354,6 +357,7 @@ def unpublish_all_orphan_items(
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "MLExperiment",
         "DataAgent",
         "OrgApp",
         "MountedDataFactory",
