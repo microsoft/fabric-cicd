@@ -12,7 +12,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_warehouse_unpublish`              | Set to enable the deletion of Warehouses                              |              |
 | `enable_sqldatabase_unpublish`            | Set to enable the deletion of SQL Databases                           |              |
 | `enable_eventhouse_unpublish`             | Set to enable the deletion of Eventhouses                             |              |
-| `enable_kqldatabase_unpublish`            | Set to enable the deletion of KQL Databases (attached to Eventhouses) |
+| `enable_kqldatabase_unpublish`            | Set to enable the deletion of KQL Databases (attached to Eventhouses) |              |
 | `disable_print_identity`                  | Set to disable printing the executing identity name                   |              |
 | `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the lakehouse                  |              |
 | `enable_environment_variable_replacement` | Set to enable the use of pipeline variables                           |              |
