@@ -49,9 +49,9 @@ spark_pool:
               type: "Capacity"
               name: "PROD-Pool-name"
 
-gateway_binding:
-    - gateway_id: "gateway_id"
-      dataset_name: "dataset_name"
+semantic_model_binding:
+    - connection_id: "connection_id"
+      semantic_model_name: "semantic_model_name"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
@@ -82,9 +82,11 @@ find_replace:
 
 ### `key_value_replace`
 
-Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
+Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_key` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
 Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, Schedules files, etc. The function automatically detects and processes any file containing valid JSON content, regardless of file extension (e.g., `.schedules`, `.platform` files).
+
+The `replace_value` field supports the same dynamic replacement variables as `find_replace`, including `$items` and `$workspace` notation. See the **Dynamic Replacement** section under `find_replace` for details on supported variables and attributes.
 
 ```yaml
 key_value_replace:
@@ -97,6 +99,22 @@ key_value_replace:
       item_type: <item-type-filter-value>
       item_name: <item-name-filter-value>
       file_path: <file-path-filter-value>
+```
+
+Example with `$items` notation:
+
+```yaml
+key_value_replace:
+    - find_key: $.properties.activities[?(@.name=="Run Notebook")].typeProperties.notebookId
+      replace_value:
+          PPE: "$items.Notebook.Hello World.$id" # PPE Hello World Notebook GUID
+          PROD: "$items.Notebook.Hello World.$id" # PROD Hello World Notebook GUID
+      item_type: "DataPipeline"
+    - find_key: $.properties.activities[?(@.name=="Run Notebook")].typeProperties.workspaceId
+      replace_value:
+          PPE: "$workspace.$id" # PPE workspace ID
+          PROD: "$workspace.$id" # PROD workspace ID
+      item_type: "DataPipeline"
 ```
 
 ### `spark_pool`
@@ -118,20 +136,19 @@ spark_pool:
       item_name: <item-name-filter-value>
 ```
 
-### `gateway_binding`
+### `semantic_model_binding`
 
-Gateway binding is used to connect semantic models (datasets) that require on-premises data sources to the appropriate data gateway after deployment. The `gateway_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from on-premises sources in the target environment.
-
-**Only supports the on-premises data gateway**
+Semantic model binding is used to connect semantic models that require cloud or on-premises data sources to the appropriate connection after deployment. The `semantic_model_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
 
 ```yaml
-gateway_binding:
+semantic_model_binding:
     # Required field: value must be a string (GUID)
-    - gateway_id: <gateway_id>
+    # Connection Ids can be found from the Fabric UI under Settings -> Manage Connections and gateways -> Settings pane of the connection
+    - connection_id: <connection_id>
     # Required field: value must be a string or a list of strings
-      dataset_name: <dataset_name>
+      semantic_model_name: <semantic_model_name>
     # OR
-      dataset_name: [<dataset_name1>,<dataset_name2>,...]
+      semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
 ```
 
 ## Advanced Find and Replace
@@ -168,51 +185,49 @@ find_replace:
 
 ### Dynamic Replacement
 
-The `replace_value` field in the `find_replace` parameter supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
+The `replace_value` field in the `find_replace` and `key_value_replace` parameters supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
 
 -   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
--   Dynamic replacement works in tandem with `find_value` as either a regex or a literal string.
+-   Dynamic replacement works in tandem with `find_value` (for `find_replace`) as either a regex or a literal string, or with `find_key` (for `key_value_replace`) as a JSONPath expression.
 -   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
 -   **Supported variables:**
+
     -   **Workspace variable:**
-        -   `$workspace.id` or `$workspace.$id`, replaces a value with the workspace ID of the **target environment**.
-        -   `$workspace.<name>`, replaces a value with the workspace ID of the specified **workspace name**, e.g. `$workspace.TestWorkspace`.
-        -   `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, replaces a value with the **attribute value** of the specified item in a specified workspace (see **supported attributes** below), e.g. `$workspace.TestWorkspace.Lakehouse.Example_LH.$id` or `$workspace.TestWorkspace.Warehouse.Example_WH.$sqlendpoint`
-        -   **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+
+        | Workspace Variable                                              | Description                                                                               | Example                                                    |
+        | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+        | `$workspace.$id` or `$workspace.id`                             | Workspace ID of the target environment                                                    | `$workspace.$id` or `$workspace.id`                        |
+        | `$workspace.<name>`                                             | Workspace ID of the specified workspace name                                              | `$workspace.TestWorkspace`                                 |
+        | `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` | Attribute value of the specified item in a specified workspace (see supported attributes) | `$workspace.TestWorkspace.$items.Lakehouse.Example_LH.$id` |
+
+        **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+
     -   **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
+
         -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
         -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
-        -   **Supported attributes**: `id` (item ID of the deployed item), `sqlendpoint` (sql connection string of the deployed item, only applicable to lakehouse and warehouse items), and `queryserviceuri` (query uri of the deployed item, only applicable to eventhouse item). Attributes should be lowercase.
+        -   **Supported attributes:**
+
+        | Attribute Variable                                | Supported Items      | Example                                           | Sample Replace Value                                           |
+        | ------------------------------------------------- | -------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+        | `$items.<item_type>.<item_name>.$id`              | All                  | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
+        | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
+        | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse            | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
+        | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse           | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+
+        -   Attributes should be **lowercase**.
         -   Item type and name are **case-sensitive**.
         -   Item type must be valid and in scope.
         -   Item name must be an **exact match** (include spaces, if present).
         -   **Example:** set `$items.Notebook.Hello World.$id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
--   **Important**: Deployment will fail in the following cases:
-    -   Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.$id` instead of `$items.Notebook.Hello World.$id`.
-    -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
-    -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
-    -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
--   For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
+        -   **Important**: Deployment will fail in the following cases:
 
-```yaml
-find_replace:
-    - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0" # Lakehouse GUID
-      replace_value:
-          PPE: "$items.Lakehouse.Sample_LH.$id" # PPE Sample_LH Lakehouse GUID
-          PROD: "$items.Lakehouse.Sample_LH.$id" # PROD Sample_LH Lakehouse GUID
-    - find_value: "123e4567-e89b-12d3-a456-426614174000" # Workspace ID
-      replace_value:
-          PPE: "$workspace.$id" # PPE workspace ID
-          PROD: "$workspace.Prod_Workspace" # PROD workspace ID
-    - find_value: "serverconnectionstringexample.com" # SQL endpoint connection string
-      replace_value:
-          PPE: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PPE Sample_LH Lakehouse sql endpoint
-          PROD: "$items.Lakehouse.Sample_LH.$sqlendpoint" # PROD Sample_LH Lakehouse sql endpoint
-    - find_value: "https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com" # Eventhouse query service URI
-      replace_value:
-          PPE: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PPE Sample_EH Eventhouse query service URI
-          PROD: "$items.Eventhouse.Sample_EH.$queryserviceuri" # PROD Sample_EH Eventhouse query service URI
-```
+            -   Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.$id` instead of `$items.Notebook.Hello World.$id`.
+            -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
+            -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
+            -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
+
+        -   For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
 
 ### Environment Variable Replacement
 
@@ -672,6 +687,37 @@ display(df)
 # META {
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
+# META }
+```
+
+#### TSQL Notebook with SQL Endpoint Parameterization Case
+
+**Case:** A TSQL Notebook is attached to a Lakehouse SQL Endpoint. The SQL Endpoint ID in the Notebook needs to be updated to point to the corresponding SQL Endpoint in the target environment.
+
+**Solution:** Use `$items.Lakehouse.<lakehouse_name>.$sqlendpointid` to dynamically retrieve the SQL Endpoint ID.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    - find_value: "37dc8a41-dea9-465d-b528-3e95043b2356"
+      replace_value:
+          PPE: "$items.Lakehouse.Example_LH.$sqlendpointid"
+          PROD: "$items.Lakehouse.Example_LH.$sqlendpointid"
+      item_type: "Notebook"
+```
+
+<span class="md-h4-nonanchor">notebook-content.py file</span>
+
+```python
+# META {
+# META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse": "123e4567-e89b-12d3-a456-426614174000",
+# META       "default_lakehouse_name": "Example_LH",
+# META       "default_lakehouse_sql_endpoint": "37dc8a41-dea9-465d-b528-3e95043b2356"
+# META     }
+# META   }
 # META }
 ```
 

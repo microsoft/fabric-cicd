@@ -343,12 +343,19 @@ def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_con
 
     # Extract the jsonpath expression from the find_key attribute of the param_dict
     jsonpath_expr = parse(param_dict["find_key"])
-    replace_value = process_environment_key(workspace_obj, param_dict["replace_value"])
+    replace_value_dict = process_environment_key(workspace_obj, param_dict["replace_value"])
     for match in jsonpath_expr.find(data):
         # If the env is present in the replace_value array perform the replacement
-        if env in replace_value:
+        if env in replace_value_dict:
             try:
-                match.full_path.update(data, replace_value[env])
+                # Process the replace value to handle $items notation
+                processed_value = replace_value_dict[env]
+                if isinstance(processed_value, str):
+                    processed_value = extract_replace_value(workspace_obj, processed_value)
+                match.full_path.update(data, processed_value)
+                logger.debug(
+                    f"Replace value: {processed_value} set for value: {match.value} found at path: {match.full_path}"
+                )
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 
