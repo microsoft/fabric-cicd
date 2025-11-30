@@ -255,6 +255,9 @@ def publish_all_items(
     if _should_publish_item_type("DataAgent"):
         print_header("Publishing Data Agents")
         items.publish_dataagents(fabric_workspace_obj)
+    if _should_publish_item_type("MLExperiment"):
+        print_header("Publishing ML Experiments")
+        items.publish_mlexperiments(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
@@ -323,6 +326,7 @@ def unpublish_all_orphan_items(
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
+    is_items_to_include_list = False
     regex_pattern = check_regex(item_name_exclude_regex)
 
     fabric_workspace_obj._refresh_deployed_items()
@@ -340,7 +344,7 @@ def unpublish_all_orphan_items(
         logger.warning(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
-        fabric_workspace_obj.items_to_include = items_to_include
+        is_items_to_include_list = True
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
@@ -348,11 +352,13 @@ def unpublish_all_orphan_items(
         "SQLDatabase": "enable_sqldatabase_unpublish",
         "Warehouse": "enable_warehouse_unpublish",
         "Eventhouse": "enable_eventhouse_unpublish",
+        "KQLDatabase": "enable_kqldatabase_unpublish",
     }
 
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
+        "MLExperiment",
         "DataAgent",
         "OrgApp",
         "MountedDataFactory",
@@ -394,7 +400,12 @@ def unpublish_all_orphan_items(
         repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
         to_delete_set = deployed_names - repository_names
-        to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
+
+        if is_items_to_include_list:
+            to_delete_list = [name for name in to_delete_set if f"{name}.{item_type}" in items_to_include]
+            logger.debug(f"Items to include for unpublishing ({item_type}): {to_delete_list}")
+        else:
+            to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
         if item_type == "DataPipeline":
             find_referenced_items_func = items.find_referenced_datapipelines
