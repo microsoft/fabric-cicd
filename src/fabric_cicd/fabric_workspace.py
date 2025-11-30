@@ -685,19 +685,6 @@ class FabricWorkspace:
         """
         item_guid = self.deployed_items[item_type][item_name].guid
 
-        # Skip unpublishing if the item is not in the include list
-        if self.items_to_include:
-            current_item = f"{item_name}.{item_type}"
-
-            # Normalize include list to a lowercase set for efficient lookups
-            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
-
-            # Check for exact match or case-insensitive match
-            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
-            if not match_found:
-                logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
-                return
-
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 
         # Delete the item from the workspace
