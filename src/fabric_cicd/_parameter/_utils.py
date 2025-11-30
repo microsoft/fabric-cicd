@@ -87,7 +87,7 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
     if not find_value:
         return {"pattern": "", "is_regex": False, "has_matches": False}
 
-    # Regex path
+    # Regex find_value
     if is_regex:
         try:
             compiled = re.compile(find_value)
@@ -107,7 +107,7 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
 
         return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches)}
 
-    # Non-regex path
+    # Non-regex find_value
     if not filter_match:
         return {"pattern": find_value, "is_regex": False, "has_matches": False}
 
