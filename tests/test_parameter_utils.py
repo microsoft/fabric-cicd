@@ -134,8 +134,8 @@ class TestParameterUtilities:
         # Test with non-matching regex
         expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
         assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
-        # Test with regex but filter_match=False
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": False, "has_matches": True}
+        # Test with regex but filter_match=False -> file excluded, do not search
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": False, "has_matches": False}
         assert extract_find_value(param_dict, "content with id=abc-123", False) == expected
 
     def test_extract_find_value_invalid_regex(self):
