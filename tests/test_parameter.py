@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+import json
+import re
 from pathlib import Path
 from unittest import mock
 
@@ -1403,3 +1405,647 @@ def test_set_parameter_file_path_error_handling():
 
         # The method should have caught the exception and set parameter_file_path to None
         assert param.parameter_file_path is None
+
+
+def test_basic_template_processing(tmp_path):
+    """Test basic template parameter file processing with valid files."""
+    # Setup repository structure
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - ./templates/template1.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+          PROD: "prod-base"
+    """
+    base_file.write_text(base_content)
+
+    # Create template file
+    template_file = templates_dir / "template1.yml"
+    template_content = """
+    find_replace:
+      - find_value: "template-id"
+        replace_value:
+          DEV: "dev-template"
+          PROD: "prod-template"
+    spark_pool:
+      - instance_pool_id: "pool-id"
+        replace_value:
+          DEV:
+            type: "Workspace"
+            name: "dev-pool"
+    """
+    template_file.write_text(template_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Verify template processing results
+    assert "extend" not in param.environment_parameter
+    assert len(param.environment_parameter["find_replace"]) == 2
+    assert "spark_pool" in param.environment_parameter
+
+    # Verify specific values were merged correctly
+    find_values = [item["find_value"] for item in param.environment_parameter["find_replace"]]
+    assert "base-id" in find_values
+    assert "template-id" in find_values
+
+
+def test_missing_templates_directory(tmp_path):
+    """Test handling of missing templates directory."""
+    # Setup repository without templates directory
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - template1.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Verify base parameters remain but extend key is removed
+    assert "extend" not in param.environment_parameter
+    assert len(param.environment_parameter["find_replace"]) == 1
+    assert param.environment_parameter["find_replace"][0]["find_value"] == "base-id"
+
+
+def test_nested_template_prevention(tmp_path):
+    """Test prevention of nested template extensions."""
+    # Setup repository structure
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - parent.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    # Create parent template with nested extend
+    parent_file = templates_dir / "parent.yml"
+    parent_content = """
+    extend:
+      - child.yml
+    find_replace:
+      - find_value: "parent-id"
+        replace_value:
+          DEV: "dev-parent"
+    """
+    parent_file.write_text(parent_content)
+
+    # Create child template
+    child_file = templates_dir / "child.yml"
+    child_content = """
+    find_replace:
+      - find_value: "child-id"
+        replace_value:
+          DEV: "dev-child"
+    """
+    child_file.write_text(child_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Verify nested template was prevented
+    assert "extend" not in param.environment_parameter  # extend key should be removed regardless
+    assert len(param.environment_parameter["find_replace"]) == 1  # only base parameters should be processed
+    find_values = [item["find_value"] for item in param.environment_parameter["find_replace"]]
+    assert "base-id" in find_values
+    assert "parent-id" not in find_values  # parent template should be skipped due to nested extend
+    assert "child-id" not in find_values  # child template should not be processed
+
+
+def test_template_path_resolution(tmp_path):
+    """Test that template files are resolved relative to the parameter file location."""
+    # Setup repository structure
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+
+    # Create a directory at the same level as repo for "outside" templates
+    shared_dir = tmp_path / "shared"
+    shared_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - normal.yml          # Same directory
+      - ../shared/shared.yml  # Outside repo (should work now)
+      - /absolute/path.yml   # Absolute path that doesn't exist (should fail)
+      - nonexistent.yml      # File doesn't exist (should fail)
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    # Create template in same directory
+    normal_file = repo_dir / "normal.yml"
+    normal_content = """
+    find_replace:
+      - find_value: "normal-id"
+        replace_value:
+          DEV: "dev-normal"
+    """
+    normal_file.write_text(normal_content)
+
+    # Create shared template outside repo
+    shared_file = shared_dir / "shared.yml"
+    shared_content = """
+    find_replace:
+      - find_value: "shared-id"
+        replace_value:
+          DEV: "dev-shared"
+    """
+    shared_file.write_text(shared_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Verify template processing results
+    assert "extend" not in param.environment_parameter
+    # Should have: base, normal, and shared (3 total)
+    assert len(param.environment_parameter["find_replace"]) == 3
+    find_values = {item["find_value"] for item in param.environment_parameter["find_replace"]}
+    assert find_values == {"base-id", "normal-id", "shared-id"}
+
+
+def test_missing_template_files(tmp_path):
+    """Test that missing template files are handled gracefully."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - existing.yml
+      - missing.yml
+      - /absolute/missing.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    existing_file = repo_dir / "existing.yml"
+    existing_file.write_text("""
+    find_replace:
+      - find_value: "existing-id"
+        replace_value:
+          DEV: "dev-existing"
+    """)
+
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Only base and existing should be loaded
+    assert len(param.environment_parameter["find_replace"]) == 2
+    find_values = {item["find_value"] for item in param.environment_parameter["find_replace"]}
+    assert find_values == {"base-id", "existing-id"}
+
+
+def test_template_merge_validation(tmp_path):
+    """Test validation of merged template content."""
+    # Setup repository structure
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - ./templates/template1.yml
+      - ./templates/invalid.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    # Create valid template
+    template1_file = templates_dir / "template1.yml"
+    template1_content = """
+    find_replace:
+      - find_value: "template-id"
+        replace_value:
+          DEV: "dev-template"
+    """
+    template1_file.write_text(template1_content)
+
+    # Create invalid template
+    invalid_file = templates_dir / "invalid.yml"
+    invalid_content = """
+    find_replace:
+      - replace_value:
+          DEV: "dev-invalid"
+        optional_field: "value"
+    """
+    invalid_file.write_text(invalid_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Verify all content was initially merged
+    assert "extend" not in param.environment_parameter
+    assert len(param.environment_parameter["find_replace"]) == 3  # All entries are merged
+
+    # Verify the merged content includes both valid and invalid entries (by design)
+    entries = param.environment_parameter["find_replace"]
+    assert any(e.get("find_value") == "base-id" for e in entries)  # Base entry
+    assert any(e.get("find_value") == "template-id" for e in entries)  # Valid template
+    assert any(e.get("optional_field") == "value" for e in entries)  # Invalid template entry
+
+    # Verify that validation fails due to invalid content
+    is_valid, message = param._validate_parameter("find_replace")
+    assert is_valid == False
+    assert message == constants.PARAMETER_MSGS["missing key"].format("find_replace")
+    assert param._validate_parameter_file() == False
+
+
+def test_circular_template_reference(tmp_path):
+    """Test handling of circular template references."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file that references template1
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - template1.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    # Create template1 that references template2
+    template1_file = templates_dir / "template1.yml"
+    template1_content = """
+    extend:
+      - template2.yml
+    find_replace:
+      - find_value: "template1-id"
+        replace_value:
+          DEV: "dev-template1"
+    """
+    template1_file.write_text(template1_content)
+
+    # Create template2 that references template1 (circular)
+    template2_file = templates_dir / "template2.yml"
+    template2_content = """
+    extend:
+      - template1.yml
+    find_replace:
+      - find_value: "template2-id"
+        replace_value:
+          DEV: "dev-template2"
+    """
+    template2_file.write_text(template2_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Verify only base content remains due to circular reference detection
+    assert "extend" not in param.environment_parameter
+    assert len(param.environment_parameter["find_replace"]) == 1
+    assert param.environment_parameter["find_replace"][0]["find_value"] == "base-id"
+
+
+def test_multiple_template_references(tmp_path):
+    """Test handling of multiple template references with various scenarios."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create different types of template files
+    template_configs = [
+        # Basic template with single find_replace
+        (
+            "template1.yml",
+            """
+find_replace:
+  - find_value: "template1-id"
+    replace_value:
+      DEV: "dev-template1"
+      PROD: "prod-template1"
+""",
+        ),
+        # Template with multiple find_replace entries
+        (
+            "template2.yml",
+            """
+find_replace:
+  - find_value: "template2-id1"
+    replace_value:
+      DEV: "dev-template2-1"
+  - find_value: "template2-id2"
+    replace_value:
+      DEV: "dev-template2-2"
+""",
+        ),
+        # Template with regex and item filters
+        (
+            "template3.yml",
+            """
+find_replace:
+  - find_value: "template3-.*"
+    is_regex: "true"
+    item_type: "Notebook"
+    item_name: "Test Notebook"
+    replace_value:
+      DEV: "dev-template3"
+""",
+        ),
+        # Template with _ALL_ environment
+        (
+            "template4.yml",
+            """
+find_replace:
+  - find_value: "template4-id"
+    replace_value:
+      _ALL_: "all-template4"
+""",
+        ),
+        # Template with key_value_replace
+        (
+            "template5.yml",
+            """
+key_value_replace:
+  - find_key: "connectionString"
+    replace_value:
+      DEV: "dev-connection"
+      PROD: "prod-connection"
+""",
+        ),
+    ]
+
+    # Create template files
+    template_refs = []
+    for template_name, content in template_configs:
+        template_refs.append(template_name)
+        template_file = templates_dir / template_name
+        template_file.write_text(content.strip(), encoding="utf-8")
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    template_refs_with_path = [f"./templates/{ref}" for ref in template_refs]
+    base_content = """
+find_replace:
+  - find_value: "base-id"
+    replace_value:
+      DEV: "dev-base"
+      PROD: "prod-base"
+  - find_value: "base-regex-.*"
+    is_regex: "true"
+    replace_value:
+      DEV: "dev-base-regex"
+key_value_replace:
+  - find_key: "baseKey"
+    replace_value:
+      DEV: "dev-base-value"
+extend:
+""" + yaml.safe_dump(template_refs_with_path, allow_unicode=True, indent=2)
+
+    base_file.write_text(base_content.strip(), encoding="utf-8")
+
+    # Create a test notebook item for validation
+    notebook_dir = repo_dir / "TestNotebook"
+    notebook_dir.mkdir()
+    platform_file = notebook_dir / ".platform"
+    platform_content = {"metadata": {"type": "Notebook", "displayName": "Test Notebook"}}
+    platform_file.write_text(json.dumps(platform_content), encoding="utf-8")
+
+    # Test with DEV environment
+    param_dev = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Validate basic file operations
+    assert param_dev._validate_parameter_file_exists(), "Parameter file does not exist"
+    is_valid, message = param_dev._validate_load_parameters_to_dict()
+    assert is_valid, f"Failed to load parameters: {message}"
+
+    # Validate merged parameters
+    find_replace_params = param_dev.environment_parameter["find_replace"]
+    key_value_params = param_dev.environment_parameter.get("key_value_replace", [])
+
+    # Test base parameter presence
+    assert any(p["find_value"] == "base-id" for p in find_replace_params), "Base find_replace missing"
+    assert any(p["find_value"] == "base-regex-.*" for p in find_replace_params), "Base regex find_replace missing"
+    assert any(p["find_key"] == "baseKey" for p in key_value_params), "Base key_value_replace missing"
+
+    # Test template merging
+    assert any(p["find_value"] == "template1-id" for p in find_replace_params), "Template1 not merged"
+    assert any(p["find_value"] == "template2-id1" for p in find_replace_params), "Template2 first entry not merged"
+    assert any(p["find_value"] == "template2-id2" for p in find_replace_params), "Template2 second entry not merged"
+    assert any(p["find_value"] == "template3-.*" for p in find_replace_params), "Template3 regex not merged"
+    assert any(p["find_value"] == "template4-id" for p in find_replace_params), "Template4 _ALL_ not merged"
+    assert any(p["find_key"] == "connectionString" for p in key_value_params), "Template5 key_value_replace not merged"
+
+    # Test regex validation
+    regex_entries = [p for p in find_replace_params if p.get("is_regex") == "true"]
+    assert len(regex_entries) == 2, "Expected exactly 2 regex entries"
+    for entry in regex_entries:
+        assert re.compile(entry["find_value"]), f"Invalid regex pattern: {entry['find_value']}"
+
+    # Test item filtering
+    filtered_entries = [p for p in find_replace_params if p.get("item_name") or p.get("item_type")]
+    assert len(filtered_entries) == 1, "Expected exactly 1 filtered entry"
+    filtered_entry = filtered_entries[0]
+    assert filtered_entry["item_type"] == "Notebook", "Incorrect item type filter"
+    assert filtered_entry["item_name"] == "Test Notebook", "Incorrect item name filter"
+
+    # Test _ALL_ environment handling
+    all_env_entries = [p for p in find_replace_params if "_ALL_" in p["replace_value"]]
+    assert len(all_env_entries) == 1, "Expected exactly 1 _ALL_ environment entry"
+    assert all_env_entries[0]["replace_value"]["_ALL_"] == "all-template4", "Incorrect _ALL_ value"
+
+    # Test with PROD environment
+    param_prod = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="PROD")
+    assert param_prod._validate_parameter_file_exists(), "Parameter file does not exist for PROD"
+    is_valid, message = param_prod._validate_parameter("find_replace")
+    assert is_valid, f"Parameter validation failed for PROD: {message}"
+
+    # Verify environment-specific values
+    prod_params = param_prod.environment_parameter["find_replace"]
+    assert any(
+        p["find_value"] == "template1-id" and p["replace_value"]["PROD"] == "prod-template1" for p in prod_params
+    ), "PROD environment value not correctly loaded"
+
+
+def test_template_merge_behavior(tmp_path):
+    """Test template merging behavior including order, duplicates, and identical entries."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - ./templates/template1.yml
+      - ./templates/template1.yml  # Duplicate reference
+      - ./templates/template2.yml
+    find_replace:
+      - find_value: "id-1"
+        replace_value:
+          DEV: "base-1"
+          PROD: "base-2"
+    """
+    base_file.write_text(base_content)
+
+    # Create template1 with identical and different entries
+    template1_file = templates_dir / "template1.yml"
+    template1_content = """
+    find_replace:
+      - find_value: "id-1"    # Identical to base
+        replace_value:
+          DEV: "base-1"
+          PROD: "base-2"
+      - find_value: "id-2"    # Unique entry
+        replace_value:
+          DEV: "template1-1"
+          PROD: "template1-2"
+    """
+    template1_file.write_text(template1_content)
+
+    # Create template2 with different values
+    template2_file = templates_dir / "template2.yml"
+    template2_content = """
+    find_replace:
+      - find_value: "id-1"    # Different values
+        replace_value:
+          DEV: "template2-1"
+          PROD: "template2-2"
+    """
+    template2_file.write_text(template2_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Test 1: Template deduplication
+    find_values = {item["find_value"] for item in param.environment_parameter["find_replace"]}
+    assert len(find_values) == 2, "Duplicate template references should be processed only once"
+
+    # Test 2: Merge order preservation
+    find_replace_entries = param.environment_parameter["find_replace"]
+    assert find_replace_entries[0]["find_value"] == "id-1"  # Base entry first
+    assert find_replace_entries[-1]["find_value"] == "id-1"  # Template2 entry last
+
+    # Test 3: Value preservation
+    dev_values = {item["replace_value"]["DEV"] for item in find_replace_entries if item["find_value"] == "id-1"}
+    assert "base-1" in dev_values, "Base values should be preserved"
+    assert "template2-1" in dev_values, "Template values should be preserved"
+
+
+def test_template_reference_handling(tmp_path):
+    """Test template reference handling including circular references and deep nesting."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+    extend:
+      - circular1.yml
+      - deep1.yml
+    find_replace:
+      - find_value: "base-id"
+        replace_value:
+          DEV: "dev-base"
+    """
+    base_file.write_text(base_content)
+
+    # Create circular reference templates
+    circular1_content = """
+    extend:
+      - circular2.yml
+    find_replace:
+      - find_value: "circular1-id"
+        replace_value:
+          DEV: "dev-circular1"
+    """
+    (templates_dir / "circular1.yml").write_text(circular1_content)
+
+    circular2_content = """
+    extend:
+      - circular1.yml
+    find_replace:
+      - find_value: "circular2-id"
+        replace_value:
+          DEV: "dev-circular2"
+    """
+    (templates_dir / "circular2.yml").write_text(circular2_content)
+
+    # Create deep nesting templates
+    for i in range(1, 6):
+        template_content = f"""
+        extend:
+          - deep{i + 1}.yml
+        find_replace:
+          - find_value: "deep{i}-id"
+            replace_value:
+              DEV: "dev-deep{i}"
+        """
+        (templates_dir / f"deep{i}.yml").write_text(template_content)
+
+    # Create final template in deep chain
+    final_content = """
+    find_replace:
+      - find_value: "deep6-id"
+        replace_value:
+          DEV: "dev-deep6"
+    """
+    (templates_dir / "deep6.yml").write_text(final_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Test 1: Circular reference handling
+    circular_values = {
+        item["find_value"] for item in param.environment_parameter["find_replace"] if "circular" in item["find_value"]
+    }
+    assert not circular_values, "Circular references should be prevented"
+
+    # Test 2: Deep nesting limit
+    deep_entries = [item for item in param.environment_parameter["find_replace"] if "deep" in item["find_value"]]
+    assert len(deep_entries) <= 5, "Deep nesting should be limited"
+
+    # Test 3: Base content preservation
+    assert any(item["find_value"] == "base-id" for item in param.environment_parameter["find_replace"]), (
+        "Base content should be preserved"
+    )

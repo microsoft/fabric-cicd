@@ -183,7 +183,7 @@ def _handle_response(
         url = response.headers.get("Location")
         method = "GET"
         body = "{}"
-        response_json = response.json()
+        response_json = response.json() if response.text else {}
 
         if long_running:
             status = response_json.get("status")
@@ -210,8 +210,12 @@ def _handle_response(
                     prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
-            time.sleep(1)
-            long_running = True
+            if url is None:
+                # No Location header means operation completed immediately
+                exit_loop = True
+            else:
+                time.sleep(1)
+                long_running = True
 
     # Handle successful responses
     elif response.status_code in {200, 201} or (

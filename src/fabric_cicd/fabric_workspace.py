@@ -344,6 +344,7 @@ class FabricWorkspace:
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
             sql_endpoint = ""
+            sql_endpoint_id = ""
             query_service_uri = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
@@ -357,6 +358,9 @@ class FabricWorkspace:
             if item_type in ["Lakehouse", "Warehouse"]:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                )
+                sql_endpoint_id = self._get_item_attribute(
+                    self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
                 )
             if item_type in ["Eventhouse"]:
                 query_service_uri = self._get_item_attribute(
@@ -376,6 +380,7 @@ class FabricWorkspace:
             self.workspace_items[item_type][item_name] = {
                 "id": item_guid,
                 "sqlendpoint": sql_endpoint,
+                "sqlendpointid": sql_endpoint_id,
                 "queryserviceuri": query_service_uri,
             }
 
@@ -463,8 +468,8 @@ class FabricWorkspace:
         return re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
-                match.group(0).replace(constants.DEFAULT_WORKSPACE_ID, self.workspace_id)
-                if match.group(2) == constants.DEFAULT_WORKSPACE_ID
+                match.group(0).replace(constants.DEFAULT_GUID, self.workspace_id)
+                if match.group(2) == constants.DEFAULT_GUID
                 else match.group(0)
             ),
             raw_file,
