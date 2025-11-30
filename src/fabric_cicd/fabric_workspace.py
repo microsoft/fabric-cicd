@@ -294,7 +294,13 @@ class FabricWorkspace:
 
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
-                relative_parent_path = "/".join(relative_path.split("/")[:-1])
+                # Special handling for KQLDatabase items (child of Eventhouse) to get parent folder path
+                if item_type == "KQLDatabase":
+                    pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
+                    match = pattern.match(relative_path)
+                    relative_parent_path = f"{match.group(1)}" if match else None
+                else:
+                    relative_parent_path = "/".join(relative_path.split("/")[:-1])
                 if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
                     item_folder_id = self.repository_folders.get(relative_parent_path, "")
                 else:

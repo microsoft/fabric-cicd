@@ -52,6 +52,7 @@ DATAFLOW_SOURCE_REGEX = (
     r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
+KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
 
 # Item Type to File Mapping (to check for item dependencies)
 ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}

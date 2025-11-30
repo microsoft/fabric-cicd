@@ -348,6 +348,7 @@ def unpublish_all_orphan_items(
         "SQLDatabase": "enable_sqldatabase_unpublish",
         "Warehouse": "enable_warehouse_unpublish",
         "Eventhouse": "enable_eventhouse_unpublish",
+        "KQLDatabase": "enable_kqldatabase_unpublish",
     }
 
     # Define order to unpublish items
