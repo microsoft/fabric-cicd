@@ -185,12 +185,12 @@ def get_source_dataflow_name(
         # Extract values from the parameter
         input_type, input_name, input_path = extract_parameter_filters(workspace_obj, param)
         filter_match = check_replacement(input_type, input_name, input_path, "Dataflow", item_name, file_path)
-        find_value = extract_find_value(param, file_content, filter_match)
+        find_info = extract_find_value(param, file_content, filter_match)
 
         # Skip if this parameter doesn't match the dataflow ID
-        if find_value != dataflow_id:
+        if find_info["pattern"] != dataflow_id:
             logger.debug(
-                f"Find value: {find_value} does not match the dataflow ID: {dataflow_id}, skipping this parameter"
+                f"Find value: {find_info['pattern']} does not match the dataflow ID: {dataflow_id}, skipping this parameter"
             )
             continue
 
