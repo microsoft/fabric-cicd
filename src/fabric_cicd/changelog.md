@@ -17,7 +17,7 @@ The following contains all major, minor, and patch version release notes.
 -   ✨ Enable linking of Semantic Models to both cloud and gateway connections ([#602](https://github.com/microsoft/fabric-cicd/issues/602))
 -   ✨ Allow use of the $items variable within the key_value_replace parameter ([#567](https://github.com/microsoft/fabric-cicd/issues/567))
 -   ✨ Add support for parameter template files ([#499](https://github.com/microsoft/fabric-cicd/issues/499))
--   📝 Update the advanced Dataflow parameterization example with the correct file_path value ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
+-   📝 Update the advanced Dataflow parameterization example with the correct file_path value ([#633](https://github.com/microsoft/fabric-cicd/issues/633))
 -   🔧 Fix publishing issues for KQL Database items in folders ([#657](https://github.com/microsoft/fabric-cicd/issues/657))
 -   🔧 Separate logic for 'items to include' feature between publish and unpublish operations ([#650](https://github.com/microsoft/fabric-cicd/issues/650))
 -   🔧 Fix parameterization logic to properly handle find_value regex patterns and replacements ([#639](https://github.com/microsoft/fabric-cicd/issues/639))
@@ -30,7 +30,7 @@ The following contains all major, minor, and patch version release notes.
 
 -   ✨ Add support for binding semantic models to on-premise gateways in Fabric workspaces ([#569](https://github.com/microsoft/fabric-cicd/issues/569))
 -   ✨ Add support for publishing and managing Data Agent items ([#556](https://github.com/microsoft/fabric-cicd/issues/556))
--   ✨ Add OrgApp item type support ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
+-   ✨ Add OrgApp item type support ([#586](https://github.com/microsoft/fabric-cicd/issues/586))
 -   ⚡ Enhance cross-workspace variable support to allow referencing other attributes ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
 -   🔧 Fix workspace name extraction bug for non-ID attrs using ITEM_ATTR_LOOKUP ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
 -   🔧 Fix capacity requirement check ([#593](https://github.com/microsoft/fabric-cicd/issues/593))
