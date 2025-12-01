@@ -16,7 +16,7 @@ The following contains all major, minor, and patch version release notes.
 -   ✨ Enable dynamic replacement of Lakehouse SQL Endpoint IDs ([#616](https://github.com/microsoft/fabric-cicd/issues/616))
 -   ✨ Enable linking of Semantic Models to both cloud and gateway connections ([#602](https://github.com/microsoft/fabric-cicd/issues/602))
 -   ✨ Allow use of the $items variable within the key_value_replace parameter ([#567](https://github.com/microsoft/fabric-cicd/issues/567))
--   ✨ Add support for parameter template files ([#499](https://github.com/microsoft/fabric-cicd/issues/499))
+-   ✨ Add support for parameter file templates ([#499](https://github.com/microsoft/fabric-cicd/issues/499))
 -   📝 Update the advanced Dataflow parameterization example with the correct file_path value ([#633](https://github.com/microsoft/fabric-cicd/issues/633))
 -   🔧 Fix publishing issues for KQL Database items in folders ([#657](https://github.com/microsoft/fabric-cicd/issues/657))
 -   🔧 Separate logic for 'items to include' feature between publish and unpublish operations ([#650](https://github.com/microsoft/fabric-cicd/issues/650))
