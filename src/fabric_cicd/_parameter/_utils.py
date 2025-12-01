@@ -379,7 +379,7 @@ def process_environment_key(workspace_obj: FabricWorkspace, replace_value_dict: 
 """Functions to replace key values in JSON"""
 
 
-def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_content: str, env: str) -> Union[dict]:
+def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_content: str, env: str) -> str:
     """A function to replace key values in a JSON using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
 
     Args:
