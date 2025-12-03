@@ -36,8 +36,8 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
 
     item_type = "Environment"
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
-        # Shell-only deployment for Environment item with spark settings only
-        is_shell_only = set_environment_deployment_type(item_name, item)
+        # Only deploy the environment shell when it just contains spark compute settings
+        is_shell_only = set_environment_deployment_type(item)
         logger.debug(f"Environment '{item_name}'; shell_only deployment:{is_shell_only}")
 
         # Exclude Sparkcompute.yml from environment definition deployment (requires special handling)
