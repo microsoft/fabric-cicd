@@ -6,6 +6,12 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.32
+
+<span class="md-h2-subheader">Release Date: 2025-12-03</span>
+
+-   🔧 Fix publish bug for Environment items that contain only spark settings ([#664](https://github.com/microsoft/fabric-cicd/issues/664))
+
 ## Version 0.1.31
 
 <span class="md-h2-subheader">Release Date: 2025-12-01</span>
