@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from fabric_cicd import constants
 from fabric_cicd._items import _environment as env_module
 
 
@@ -175,7 +174,7 @@ def test_end_to_end_environment_setting_only(tmp_path):
         def _publish_item(self, item_name, item_type, **kwargs):
             # Simulate the create/update logic sufficiently for this test
             item = self.repository_items[item_type][item_name]
-            kwargs.pop("shell_only_publish", item_type in constants.SHELL_ONLY_PUBLISH)
+            kwargs.pop("shell_only_publish", None)
             # If item not deployed yet, simulate creation
             if not item.guid:
                 resp = self.endpoint.invoke(method="POST", url=f"{self.base_api_url}/items", body={})
@@ -247,7 +246,7 @@ def test_end_to_end_environment_with_libraries(tmp_path):
 
         def _publish_item(self, item_name, item_type, **kwargs):
             item = self.repository_items[item_type][item_name]
-            kwargs.pop("shell_only_publish", item_type in constants.SHELL_ONLY_PUBLISH)
+            kwargs.pop("shell_only_publish", None)
             # For non-shell we simulate creation then update definition path
             if not item.guid:
                 resp = self.endpoint.invoke(method="POST", url=f"{self.base_api_url}/items", body={})
