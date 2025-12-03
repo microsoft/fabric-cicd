@@ -12,6 +12,7 @@ import yaml
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._fabric_endpoint import handle_retry
+from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,10 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
 
     item_type = "Environment"
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+        # Shell-only deployment for Environment item with spark settings only
+        is_shell_only = set_environment_deployment_type(item_name, item)
+        logger.debug(f"Environment '{item_name}'; shell_only deployment:{is_shell_only}")
+
         # Exclude Sparkcompute.yml from environment definition deployment (requires special handling)
         exclude_path = r"\Setting"
         fabric_workspace_obj._publish_item(
@@ -42,10 +47,50 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
             item_type=item_type,
             exclude_path=exclude_path,
             skip_publish_logging=True,
+            shell_only_publish=is_shell_only,
         )
         if item.skip_publish:
             continue
         _publish_environment_metadata(fabric_workspace_obj, item_name)
+
+
+def set_environment_deployment_type(item: Item) -> bool:
+    """
+    Return True if this Environment deployment should be treated as "shell-only".
+
+    Shell-only when `Setting/Sparkcompute.yml` exists and there are no other
+    non-`.platform` repository files under the environment root.
+
+    Args:
+        item: The Item object representing the Environment.
+    """
+    root = Path(item.path) if item.path else None
+    shell_only = False
+
+    for file in item.item_files:
+        fp = file.file_path
+
+        # Ignore .platform metadata file
+        if fp.name == ".platform":
+            continue
+
+        # Use the path relative to the environment root, or full path if root is None
+        try:
+            rel_path = fp.relative_to(root) if root else fp
+        except Exception:
+            rel_path = fp
+
+        path_parts = [p.lower() for p in rel_path.parts]
+        # Detect Setting/Sparkcompute.yml
+        if len(path_parts) >= 2 and path_parts[0] == "setting" and path_parts[1] == "sparkcompute.yml":
+            shell_only = True
+            # Continue checking for other non-.platform files
+            continue
+
+        # Any other files -> not shell-only
+        return False
+
+    return shell_only
 
 
 def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
