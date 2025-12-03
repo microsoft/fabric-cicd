@@ -77,12 +77,13 @@ def set_environment_deployment_type(item: Item) -> bool:
         # Use the path relative to the environment root, or full path if root is None
         try:
             rel_path = fp.relative_to(root) if root else fp
-        except Exception:
+        except ValueError:
+            logger.debug(f"Path '{fp}' is not relative to root '{root}'; using full path")
             rel_path = fp
 
-        path_parts = [p.lower() for p in rel_path.parts]
-        # Detect Setting/Sparkcompute.yml
-        if len(path_parts) >= 2 and path_parts[0] == "setting" and path_parts[1] == "sparkcompute.yml":
+        path_parts = list(rel_path.parts)
+        # Detect Setting/Sparkcompute.yml (case-sensitive)
+        if len(path_parts) >= 2 and path_parts[0] == "Setting" and path_parts[1] == "Sparkcompute.yml":
             shell_only = True
             # Continue checking for other non-.platform files
             continue
