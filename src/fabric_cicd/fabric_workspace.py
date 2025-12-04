@@ -605,8 +605,8 @@ class FabricWorkspace:
 
         metadata_body = {"displayName": item_name, "type": item_type}
 
-        # Only shell deployment, no definition support
-        shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
+        # Only shell deployment, no definition support (item_type can be overridden via kwargs)
+        shell_only_publish = kwargs.get("shell_only_publish", item_type in constants.SHELL_ONLY_PUBLISH)
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
