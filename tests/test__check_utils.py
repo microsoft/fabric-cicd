@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from fabric_cicd._common._check_utils import check_file_type, check_valid_json_content
+from fabric_cicd._common._check_utils import check_file_type, check_valid_json_content, check_valid_yaml_content
 
 
 @pytest.fixture
@@ -168,3 +168,80 @@ def test_check_valid_json_content_with_schedules_structure():
         "schedules": [{"jobType": "Execute", "enabled": True, "cronExpression": "0 0 12 * * ?"}]
     })
     assert check_valid_json_content(schedules_json) is True
+
+
+def test_check_valid_yaml_content_with_valid_yaml():
+    """Test check_valid_yaml_content with valid YAML string."""
+    valid_yaml = """
+server:
+  host: localhost
+  port: 8080
+"""
+    assert check_valid_yaml_content(valid_yaml) is True
+
+
+def test_check_valid_yaml_content_with_invalid_yaml():
+    """Test check_valid_yaml_content with invalid YAML string."""
+    invalid_yaml = "invalid: yaml: [unclosed"
+    assert check_valid_yaml_content(invalid_yaml) is False
+
+
+def test_check_valid_yaml_content_with_empty_string():
+    """Test check_valid_yaml_content with empty string."""
+    # Empty string is valid YAML (represents null/empty document)
+    assert check_valid_yaml_content("") is True
+
+
+def test_check_valid_yaml_content_with_spark_compute_structure():
+    """Test check_valid_yaml_content with realistic SparkCompute.yml structure."""
+    spark_compute_yaml = """
+enable_native_execution_engine: false
+driver_cores: 8
+driver_memory: 56g
+executor_cores: 8
+executor_memory: 56g
+dynamic_executor_allocation:
+  enabled: true
+  min_executors: 1
+  max_executors: 9
+runtime_version: "1.2"
+"""
+    assert check_valid_yaml_content(spark_compute_yaml) is True
+
+
+def test_check_valid_yaml_content_with_complex_structure():
+    """Test check_valid_yaml_content with complex nested YAML structure."""
+    complex_yaml = """
+config:
+  database:
+    host: localhost
+    port: 5432
+    credentials:
+      username: admin
+      password: secret
+  features:
+    - name: feature1
+      enabled: true
+    - name: feature2
+      enabled: false
+  limits:
+    max_connections: 100
+    timeout: 30.5
+"""
+    assert check_valid_yaml_content(complex_yaml) is True
+
+
+def test_check_valid_yaml_content_vs_json_content():
+    """Test that JSON is also valid YAML (JSON is a subset of YAML)."""
+    json_content = '{"key": "value", "number": 123}'
+    # JSON is valid YAML
+    assert check_valid_yaml_content(json_content) is True
+    assert check_valid_json_content(json_content) is True
+
+    # YAML-only content is not valid JSON
+    yaml_only_content = """
+key: value
+number: 123
+"""
+    assert check_valid_yaml_content(yaml_only_content) is True
+    assert check_valid_json_content(yaml_only_content) is False

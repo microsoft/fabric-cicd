@@ -64,6 +64,7 @@ from fabric_cicd._parameter._utils import (
     process_environment_key,
     process_input_path,
     replace_key_value,
+    replace_key_value_yaml,
     replace_variables_in_parameter_file,
 )
 
@@ -978,6 +979,184 @@ class TestParameterUtilities:
         result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
         result_data = json.loads(result)
         assert result_data["config"]["lakehouse_id"] == "test-lakehouse-id-12345"
+
+    def test_replace_key_value_yaml_valid(self, mock_workspace):
+        """Tests replace_key_value_yaml with valid YAML content and environment."""
+        import yaml
+
+        # Test YAML with server host configuration
+        test_yaml = """server:
+  host: localhost
+  port: 8080
+"""
+        param_dict = {
+            "find_key": "$.server.host",
+            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
+        }
+
+        # Test successful replacement for dev environment
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result_data = yaml.safe_load(result)
+        assert result_data["server"]["host"] == "dev-server.example.com"
+        assert result_data["server"]["port"] == 8080  # Verify other values unchanged
+
+        # Test successful replacement for prod environment
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "prod")
+        result_data = yaml.safe_load(result)
+        assert result_data["server"]["host"] == "prod-server.example.com"
+
+    def test_replace_key_value_yaml_environment_not_found(self, mock_workspace):
+        """Tests replace_key_value_yaml when environment is not in the replace_value dictionary."""
+        import yaml
+
+        test_yaml = """server:
+  host: localhost
+  port: 8080
+"""
+        param_dict = {
+            "find_key": "$.server.host",
+            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
+        }
+
+        # Test when environment not in replace_value
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "test")
+        result_data = yaml.safe_load(result)
+        assert result_data["server"]["host"] == "localhost"  # Original value unchanged
+
+    def test_replace_key_value_yaml_invalid(self, mock_workspace):
+        """Tests replace_key_value_yaml with invalid YAML content."""
+        invalid_yaml = "invalid: yaml: content: [unclosed"
+        param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
+
+        # YAMLError will be raised for invalid YAML and wrapped in ValueError
+        with pytest.raises(ValueError, match="mapping values are not allowed"):
+            replace_key_value_yaml(mock_workspace, param_dict, invalid_yaml, "dev")
+
+    def test_replace_key_value_yaml_empty_content(self, mock_workspace):
+        """Tests replace_key_value_yaml with empty YAML content."""
+        empty_yaml = ""
+        param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
+
+        # Empty YAML should return as-is
+        result = replace_key_value_yaml(mock_workspace, param_dict, empty_yaml, "dev")
+        assert result == empty_yaml
+
+    def test_replace_key_value_yaml_nested_structure(self, mock_workspace):
+        """Tests replace_key_value_yaml with nested YAML structure like SparkCompute.yml."""
+        import yaml
+
+        # Test YAML similar to SparkCompute.yml
+        test_yaml = """enable_native_execution_engine: false
+driver_cores: 8
+driver_memory: 56g
+executor_cores: 8
+executor_memory: 56g
+dynamic_executor_allocation:
+  enabled: true
+  min_executors: 1
+  max_executors: 9
+runtime_version: "1.2"
+"""
+        # Test replacing a nested value
+        param_dict = {
+            "find_key": "$.dynamic_executor_allocation.max_executors",
+            "replace_value": {"dev": 5, "prod": 20},
+        }
+
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result_data = yaml.safe_load(result)
+        assert result_data["dynamic_executor_allocation"]["max_executors"] == 5
+        assert result_data["dynamic_executor_allocation"]["min_executors"] == 1  # Unchanged
+
+        # Test replacing a top-level value
+        param_dict = {
+            "find_key": "$.driver_cores",
+            "replace_value": {"dev": 4, "prod": 16},
+        }
+
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "prod")
+        result_data = yaml.safe_load(result)
+        assert result_data["driver_cores"] == 16
+
+    def test_replace_key_value_yaml_with_items_notation(self, mock_workspace):
+        """Test replace_key_value_yaml function with $items notation."""
+        import yaml
+
+        # Mock the workspace to return item attributes
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "TestLakehouse": {
+                    "id": "test-lakehouse-id-12345",
+                    "sqlendpoint": "test-lakehouse.database.windows.net",
+                }
+            },
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        # Test YAML with item references
+        test_yaml = """lakehouse:
+  id: placeholder-id
+  endpoint: placeholder-endpoint
+"""
+
+        # Test with $items notation for lakehouse id
+        param_dict = {
+            "find_key": "$.lakehouse.id",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$id",
+                "prod": "$items.Lakehouse.TestLakehouse.$id",
+            },
+        }
+
+        # Test successful replacement with $items notation
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result_data = yaml.safe_load(result)
+        assert result_data["lakehouse"]["id"] == "test-lakehouse-id-12345"
+        assert result_data["lakehouse"]["endpoint"] == "placeholder-endpoint"  # Unchanged
+
+    def test_replace_key_value_yaml_with_non_string_values(self, mock_workspace):
+        """Test replace_key_value_yaml function with non-string value types."""
+        import yaml
+
+        # Test YAML with mixed value types
+        test_yaml = """config:
+  enabled: false
+  count: 100
+  threshold: 0.5
+  items:
+    - item1
+    - item2
+"""
+
+        # Test with boolean value
+        param_dict = {
+            "find_key": "$.config.enabled",
+            "replace_value": {"dev": True, "prod": False},
+        }
+
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result_data = yaml.safe_load(result)
+        assert result_data["config"]["enabled"] is True
+
+        # Test with integer value
+        param_dict = {
+            "find_key": "$.config.count",
+            "replace_value": {"dev": 200, "prod": 300},
+        }
+
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result_data = yaml.safe_load(result)
+        assert result_data["config"]["count"] == 200
+
+        # Test with float value
+        param_dict = {
+            "find_key": "$.config.threshold",
+            "replace_value": {"dev": 0.8, "prod": 0.95},
+        }
+
+        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result_data = yaml.safe_load(result)
+        assert result_data["config"]["threshold"] == 0.8
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
