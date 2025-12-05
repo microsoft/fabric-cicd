@@ -143,3 +143,18 @@ def check_valid_json_content(content: str) -> bool:
         return True
     except json.JSONDecodeError:
         return False
+
+
+def check_valid_guid(guid: str) -> bool:
+    """
+    Check if the given string is a valid GUID format.
+
+    Args:
+        guid: The string to validate as a GUID.
+
+    Returns:
+        bool: True if the string is a valid GUID format, False otherwise.
+    """
+    if not isinstance(guid, str):
+        return False
+    return bool(re.match(constants.VALID_GUID_REGEX, guid))
