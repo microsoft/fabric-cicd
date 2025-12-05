@@ -106,6 +106,8 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
         item_obj: The item object to publish shortcuts for
     """
+    from fabric_cicd._common._check_utils import check_regex
+
     deployed_shortcuts = list_deployed_shortcuts(fabric_workspace_obj, item_obj)
 
     shortcut_file_obj = next((file for file in item_obj.item_files if file.name == "shortcuts.metadata.json"), None)
@@ -119,6 +121,17 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
     else:
         logger.debug("No shortcuts.metadata.json found")
         shortcuts = []
+
+    # Filter shortcuts based on exclude regex if provided
+    if hasattr(fabric_workspace_obj, "shortcut_exclude_regex") and fabric_workspace_obj.shortcut_exclude_regex:
+        regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
+        original_count = len(shortcuts)
+        shortcuts = [s for s in shortcuts if not regex_pattern.match(s["name"])]
+        excluded_count = original_count - len(shortcuts)
+        if excluded_count > 0:
+            logger.info(
+                f"{constants.INDENT}Excluded {excluded_count} shortcut(s) from deployment based on regex pattern"
+            )
 
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 

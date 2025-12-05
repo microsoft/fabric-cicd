@@ -97,6 +97,12 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
             else:
                 settings["items_to_include"] = publish_config["items_to_include"]
 
+        if "shortcut_exclude_regex" in publish_config:
+            if isinstance(publish_config["shortcut_exclude_regex"], dict):
+                settings["shortcut_exclude_regex"] = publish_config["shortcut_exclude_regex"][environment]
+            else:
+                settings["shortcut_exclude_regex"] = publish_config["shortcut_exclude_regex"]
+
         if "skip" in publish_config:
             if isinstance(publish_config["skip"], dict):
                 settings["skip"] = publish_config["skip"].get(environment, False)
