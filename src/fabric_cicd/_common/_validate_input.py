@@ -52,9 +52,13 @@ def validate_item_type_in_scope(input_value: list) -> list:
     Validate the item type in scope.
 
     Args:
-        input_value: The input value to validate.
+        input_value: The input value to validate. If None, defaults to all supported item types.
     """
     accepted_item_types = constants.ACCEPTED_ITEM_TYPES
+
+    # If None, return all accepted item types
+    if input_value is None:
+        return list(accepted_item_types)
 
     validate_data_type("list[string]", "item_type_in_scope", input_value)
 
