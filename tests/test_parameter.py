@@ -2049,3 +2049,140 @@ def test_template_reference_handling(tmp_path):
     assert any(item["find_value"] == "base-id" for item in param.environment_parameter["find_replace"]), (
         "Base content should be preserved"
     )
+
+
+@pytest.fixture
+def empty_parameter(tmp_path):
+    # Parameter expects a repository directory; use an empty temporary path.
+    return Parameter(repository_directory=tmp_path, item_type_in_scope=["Notebook"], environment="DEV")
+
+
+def test_validate_key_value_find_key_valid_dot_notation(empty_parameter):
+    param = {"find_key": "$.server.host"}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is True
+    assert msg == "Valid JSONPath"
+
+
+def test_validate_key_value_find_key_valid_filter_syntax(empty_parameter):
+    param = {"find_key": '$.variables[?(@.name=="SQL_Server")].value'}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is True
+    assert msg == "Valid JSONPath"
+
+
+def test_validate_key_value_find_key_missing_key(empty_parameter):
+    param = {}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is False
+    assert "Missing or empty 'find_key'" in msg
+
+
+def test_validate_key_value_find_key_non_string(empty_parameter):
+    param = {"find_key": 123}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is False
+    assert "Missing or empty 'find_key'" in msg
+
+
+def test_validate_key_value_find_key_empty_string(empty_parameter):
+    param = {"find_key": ""}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is False
+    assert "Missing or empty 'find_key'" in msg
+
+
+def test_validate_key_value_find_key_requires_root(empty_parameter):
+    param = {"find_key": 'variables[?(@.name=="SQL_Server")].value'}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is False
+    assert "must be an absolute JSONPath" in msg
+
+
+def test_validate_key_value_find_key_unbalanced_filter(empty_parameter):
+    param = {"find_key": '$.variables[?(@.name=="SQL_Server"].value'}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is False
+    assert "Invalid JSONPath expression" in msg
+
+
+def test_validate_key_value_find_key_unsupported_regex_operator(empty_parameter):
+    # expressions using =~ are commonly unsupported by jsonpath_ng; ensure validator rejects them
+    param = {"find_key": "$.variables[?(@.name =~ /SQL_.*/)].value"}
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is False
+    assert "Invalid JSONPath expression" in msg
+
+
+def test_validate_required_values_integration_calls_find_key_validator(empty_parameter):
+    # Integration: ensure _validate_required_values uses the find_key validator for key_value_replace
+    param_dict = {"find_key": "no-root", "replace_value": {"DEV": "x"}}
+    ok, msg = empty_parameter._validate_required_values("key_value_replace", param_dict)
+    assert ok is False
+    assert "must be an absolute JSONPath" in msg
+
+
+def test_validate_and_evaluate_bracket_key_with_yaml(empty_parameter):
+    """JSONPath with bracket notation should parse and match YAML keys with spaces."""
+    import yaml
+    from jsonpath_ng.ext import parse
+
+    yaml_str = """
+"my key":
+  value: 42
+"""
+    param = {"find_key": '$["my key"].value'}
+
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is True
+    assert msg == "Valid JSONPath"
+
+    data = yaml.safe_load(yaml_str)
+    matches = parse(param["find_key"]).find(data)
+    assert len(matches) == 1
+    assert matches[0].value == 42
+
+
+def test_yaml_boolean_filter_evaluation(empty_parameter):
+    """JSONPath filter on boolean YAML scalars should evaluate correctly."""
+    import yaml
+    from jsonpath_ng.ext import parse
+
+    yaml_str = """
+servers:
+  - name: "a"
+    enabled: true
+  - name: "b"
+    enabled: false
+"""
+    param = {"find_key": "$.servers[?(@.enabled==true)].name"}
+
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is True
+    assert msg == "Valid JSONPath"
+
+    data = yaml.safe_load(yaml_str)
+    matches = parse(param["find_key"]).find(data)
+    # Expect exactly one matching server name ("a")
+    assert len(matches) == 1
+    assert matches[0].value == "a"
+
+
+def test_yaml_no_match_is_no_op(empty_parameter):
+    """A JSONPath that matches nothing in YAML should be a no-op (no exception)."""
+    import yaml
+    from jsonpath_ng.ext import parse
+
+    yaml_str = """
+config:
+  flag: false
+"""
+    param = {"find_key": "$.config.nonexistent"}
+
+    ok, msg = empty_parameter._validate_key_value_find_key(param)
+    assert ok is True
+    assert msg == "Valid JSONPath"
+
+    data = yaml.safe_load(yaml_str)
+    matches = parse(param["find_key"]).find(data)
+    assert len(matches) == 0

@@ -555,7 +555,32 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
+        if param_name == "key_value_replace":
+            is_valid, msg = self._validate_key_value_find_key(param_dict)
+            if not is_valid:
+                return False, msg
+
         return True, constants.PARAMETER_MSGS["valid required values"].format(param_name)
+
+    def _validate_key_value_find_key(self, param_dict: dict) -> tuple[bool, str]:
+        """Validate the `find_key` JSONPath for key_value_replace (compile-only)."""
+        find_key = param_dict.get("find_key")
+        if not find_key or not isinstance(find_key, str) or not find_key.strip():
+            return False, "Missing or empty 'find_key' for key_value_replace"
+
+        # Require absolute JSONPath root to avoid ambiguous relative paths
+        if not find_key.strip().startswith("$"):
+            return False, "find_key must be an absolute JSONPath starting with '$'"
+
+        try:
+            # jsonpath_ng.ext.parse supports extended JSONPath (dot/bracket)
+            from jsonpath_ng.ext import parse
+
+            parse(find_key)
+        except Exception as e:
+            return False, f"Invalid JSONPath expression '{find_key}': {e}"
+
+        return True, "Valid JSONPath"
 
     def _validate_semantic_model_name(self) -> tuple[bool, str]:
         """
