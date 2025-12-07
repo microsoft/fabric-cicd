@@ -16,6 +16,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
+import yaml
 
 import fabric_cicd.constants as constants
 
@@ -981,8 +982,6 @@ class TestParameterUtilities:
 
     def test_replace_key_value_yaml_valid(self, mock_workspace):
         """Tests replace_key_value_yaml with valid YAML content and environment."""
-        import yaml
-
         # Test YAML with server host configuration
         test_yaml = """server:
   host: localhost
@@ -1006,8 +1005,6 @@ class TestParameterUtilities:
 
     def test_replace_key_value_yaml_environment_not_found(self, mock_workspace):
         """Tests replace_key_value_yaml when environment is not in the replace_value dictionary."""
-        import yaml
-
         test_yaml = """server:
   host: localhost
   port: 8080
@@ -1042,8 +1039,6 @@ class TestParameterUtilities:
 
     def test_replace_key_value_yaml_nested_structure(self, mock_workspace):
         """Tests replace_key_value_yaml with nested YAML structure like SparkCompute.yml."""
-        import yaml
-
         # Test YAML similar to SparkCompute.yml
         test_yaml = """enable_native_execution_engine: false
 driver_cores: 8
@@ -1079,8 +1074,6 @@ runtime_version: "1.2"
 
     def test_replace_key_value_yaml_with_items_notation(self, mock_workspace):
         """Test replace_key_value_yaml function with $items notation."""
-        import yaml
-
         # Mock the workspace to return item attributes
         mock_workspace.workspace_items = {
             "Lakehouse": {
@@ -1115,8 +1108,6 @@ runtime_version: "1.2"
 
     def test_replace_key_value_yaml_with_non_string_values(self, mock_workspace):
         """Test replace_key_value_yaml function with non-string value types."""
-        import yaml
-
         # Test YAML with mixed value types
         test_yaml = """config:
   enabled: false

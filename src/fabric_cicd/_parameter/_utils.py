@@ -376,13 +376,13 @@ def process_environment_key(workspace_obj: FabricWorkspace, replace_value_dict: 
     return replace_value_dict
 
 
-"""Functions to replace key values in JSON"""
+"""Functions to replace key values in JSON or YAML"""
 
 
 def replace_key_value(
     workspace_obj: FabricWorkspace, param_dict: dict, content: str, env: str, is_yaml: bool = False
 ) -> str:
-    """A function to replace key values in a JSON using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
+    """A function to replace key values in a JSON or YAML using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
 
     Args:
         workspace_obj: The FabricWorkspace object.
@@ -391,7 +391,7 @@ def replace_key_value(
         env: The environment variable to be used for replacement.
         is_yaml: A boolean indicating if the content is YAML (default is False for JSON).
     """
-    # Try to load the yaml content to a dictionary
+    # Parse content to a dictionary based on format (YAML or JSON)
     if is_yaml:
         try:
             data = yaml.safe_load(content)
@@ -401,8 +401,6 @@ def replace_key_value(
         # Handle empty YAML files
         if data is None:
             return content
-
-    # Otherwise, try to load the json content to a dictionary
     else:
         try:
             data = json.loads(content)

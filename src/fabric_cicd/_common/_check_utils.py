@@ -10,6 +10,7 @@ from pathlib import Path
 
 import filetype
 import requests
+import yaml
 from packaging import version
 
 import fabric_cicd.constants as constants
@@ -155,8 +156,6 @@ def check_valid_yaml_content(content: str) -> bool:
     Returns:
         bool: True if the content is valid YAML, False otherwise.
     """
-    import yaml
-
     try:
         yaml.safe_load(content)
         return True
