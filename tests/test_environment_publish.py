@@ -294,3 +294,85 @@ def test_update_compute_settings_replaces_instance_pool(tmp_path):
     # call _update_compute_settings with FakeWS, path, guid, name and assert it runs without error
     ws_instance = FakeWS()
     _update_compute_settings(ws_instance, env_dir, "guid", "EnvPool")
+
+
+def test_publish_environments_does_not_block_on_ongoing_publish(tmp_path):
+    """
+    Test that publish_environments() does not block when there's an ongoing
+    publish operation. This addresses the issue where deployments would hang
+    when custom libraries were being published (which can take 20+ minutes).
+    """
+    env_dir = tmp_path / "EnvWithLibs"
+    setting_dir = env_dir / "Setting"
+    libs_dir = env_dir / "Libraries" / "CustomLibraries"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    libs_dir.mkdir(parents=True, exist_ok=True)
+    spark_yaml = setting_dir / "Sparkcompute.yml"
+    spark_yaml.write_text("driver_cores: 4\n", encoding="utf-8")
+    (libs_dir / "custom.jar").write_text("dummy jar content", encoding="utf-8")
+
+    # Track whether any GET /environments/ calls were made
+    get_environments_calls = []
+
+    class FakeEndpoint:
+        def invoke(self, method=None, url=None, **_kwargs):
+            if method == "GET" and url.endswith("/environments/"):
+                # Simulate an ongoing publish operation for this environment
+                get_environments_calls.append(method)
+                return {
+                    "body": {
+                        "value": [
+                            {
+                                "displayName": "EnvWithLibs",
+                                "properties": {"publishDetails": {"state": "Running"}},
+                            }
+                        ]
+                    }
+                }
+            if method == "POST" and url.endswith("/items"):
+                return {"body": {"id": "guid-789"}}
+            if method == "POST" and "updateDefinition" in url:
+                return {"status": 200}
+            if method == "PATCH" and "sparkcompute" in url:
+                return {"status": 200}
+            if method == "POST" and url.endswith("/staging/publish?beta=False"):
+                return {"status": 202}
+            return {}
+
+    class FakeWorkspace:
+        def __init__(self):
+            p_set = spark_yaml
+            p_lib = libs_dir / "custom.jar"
+            self.repository_items = {"Environment": {"EnvWithLibs": DummyItem("EnvWithLibs", [p_set, p_lib])}}
+            self.publish_item_name_exclude_regex = None
+            self.publish_folder_path_exclude_regex = None
+            self.items_to_include = None
+            self.base_api_url = "https://api.example"
+            self.endpoint = FakeEndpoint()
+            self.repository_directory = tmp_path
+            self.responses = None
+            self.environment_parameter = {}
+
+        def _publish_item(self, item_name, item_type, **kwargs):
+            item = self.repository_items[item_type][item_name]
+            kwargs.pop("shell_only_publish", None)
+            if not item.guid:
+                resp = self.endpoint.invoke(method="POST", url=f"{self.base_api_url}/items", body={})
+                item.guid = resp["body"]["id"]
+            self.endpoint.invoke(
+                method="POST",
+                url=f"{self.base_api_url}/items/{item.guid}/updateDefinition?updateMetadata=True",
+                body={},
+            )
+
+    ws = FakeWorkspace()
+    # This should NOT block even though the environment has state="Running"
+    env_module.publish_environments(ws)
+
+    # Verify that NO initial check was made (which would have blocked)
+    # The only GET /environments/ call should be from check_environment_publish_state
+    # after publishing, which is called separately in publish_all_items
+    assert len(get_environments_calls) == 0, (
+        "publish_environments() should not call check_environment_publish_state() "
+        "at the beginning, which would block deployments"
+    )
