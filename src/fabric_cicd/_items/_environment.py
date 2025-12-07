@@ -31,9 +31,6 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
         "Please upgrade to the latest fabric-cicd version before March 1, 2026 to prevent broken Environment item deployments."
     )
 
-    # Check for ongoing publish
-    check_environment_publish_state(fabric_workspace_obj, True)
-
     item_type = "Environment"
     for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
         # Only deploy the environment shell when it just contains spark compute settings
