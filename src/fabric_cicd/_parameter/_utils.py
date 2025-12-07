@@ -379,63 +379,35 @@ def process_environment_key(workspace_obj: FabricWorkspace, replace_value_dict: 
 """Functions to replace key values in JSON"""
 
 
-def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_content: str, env: str) -> str:
+def replace_key_value(
+    workspace_obj: FabricWorkspace, param_dict: dict, content: str, env: str, is_yaml: bool = False
+) -> str:
     """A function to replace key values in a JSON using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
 
     Args:
         workspace_obj: The FabricWorkspace object.
         param_dict: The parameter dictionary.
-        json_content: the JSON content to be modified.
+        content: the JSON/YAML content to be modified.
         env: The environment variable to be used for replacement.
-    """
-    # Try to load the json content to a dictionary
-    try:
-        data = json.loads(json_content)
-    except json.JSONDecodeError as jde:
-        raise ValueError(jde) from jde
-
-    # Extract the jsonpath expression from the find_key attribute of the param_dict
-    jsonpath_expr = parse(param_dict["find_key"])
-    replace_value_dict = process_environment_key(workspace_obj, param_dict["replace_value"])
-    for match in jsonpath_expr.find(data):
-        # If the env is present in the replace_value array perform the replacement
-        if env in replace_value_dict:
-            try:
-                # Process the replace value to handle $items notation
-                processed_value = replace_value_dict[env]
-                if isinstance(processed_value, str):
-                    processed_value = extract_replace_value(workspace_obj, processed_value)
-                match.full_path.update(data, processed_value)
-                logger.debug(
-                    f"Replace value: {processed_value} set for value: {match.value} found at path: {match.full_path}"
-                )
-            except Exception as match_e:
-                raise ValueError(match_e) from match_e
-
-    return json.dumps(data)
-
-
-"""Functions to replace key values in YAML"""
-
-
-def replace_key_value_yaml(workspace_obj: FabricWorkspace, param_dict: dict, yaml_content: str, env: str) -> str:
-    """A function to replace key values in a YAML file using parameterization. It uses jsonpath_ng to find and replace values in the YAML.
-
-    Args:
-        workspace_obj: The FabricWorkspace object.
-        param_dict: The parameter dictionary.
-        yaml_content: the YAML content to be modified.
-        env: The environment variable to be used for replacement.
+        is_yaml: A boolean indicating if the content is YAML (default is False for JSON).
     """
     # Try to load the yaml content to a dictionary
-    try:
-        data = yaml.safe_load(yaml_content)
-    except yaml.YAMLError as ye:
-        raise ValueError(ye) from ye
+    if is_yaml:
+        try:
+            data = yaml.safe_load(content)
+        except yaml.YAMLError as ye:
+            raise ValueError(ye) from ye
 
-    # Handle empty YAML files
-    if data is None:
-        return yaml_content
+        # Handle empty YAML files
+        if data is None:
+            return content
+
+    # Otherwise, try to load the json content to a dictionary
+    else:
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as jde:
+            raise ValueError(jde) from jde
 
     # Extract the jsonpath expression from the find_key attribute of the param_dict
     jsonpath_expr = parse(param_dict["find_key"])
@@ -455,7 +427,7 @@ def replace_key_value_yaml(workspace_obj: FabricWorkspace, param_dict: dict, yam
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 
-    return yaml.dump(data, default_flow_style=False, allow_unicode=True)
+    return yaml.dump(data, default_flow_style=False, allow_unicode=True) if is_yaml else json.dumps(data)
 
 
 def replace_variables_in_parameter_file(raw_file: str) -> str:

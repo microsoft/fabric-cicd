@@ -430,7 +430,6 @@ class FabricWorkspace:
             extract_replace_value,
             process_environment_key,
             replace_key_value,
-            replace_key_value_yaml,
         )
 
         # Parse the file_obj and item_obj
@@ -450,7 +449,7 @@ class FabricWorkspace:
                     if check_valid_json_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
                     elif check_valid_yaml_content(raw_file):
-                        raw_file = replace_key_value_yaml(self, parameter_dict, raw_file, self.environment)
+                        raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):

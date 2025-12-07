@@ -64,7 +64,6 @@ from fabric_cicd._parameter._utils import (
     process_environment_key,
     process_input_path,
     replace_key_value,
-    replace_key_value_yaml,
     replace_variables_in_parameter_file,
 )
 
@@ -995,13 +994,13 @@ class TestParameterUtilities:
         }
 
         # Test successful replacement for dev environment
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["server"]["host"] == "dev-server.example.com"
         assert result_data["server"]["port"] == 8080  # Verify other values unchanged
 
         # Test successful replacement for prod environment
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "prod")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "prod", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["server"]["host"] == "prod-server.example.com"
 
@@ -1019,7 +1018,7 @@ class TestParameterUtilities:
         }
 
         # Test when environment not in replace_value
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "test")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "test", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["server"]["host"] == "localhost"  # Original value unchanged
 
@@ -1030,7 +1029,7 @@ class TestParameterUtilities:
 
         # YAMLError will be raised for invalid YAML and wrapped in ValueError
         with pytest.raises(ValueError, match="mapping values are not allowed"):
-            replace_key_value_yaml(mock_workspace, param_dict, invalid_yaml, "dev")
+            replace_key_value(mock_workspace, param_dict, invalid_yaml, "dev", is_yaml=True)
 
     def test_replace_key_value_yaml_empty_content(self, mock_workspace):
         """Tests replace_key_value_yaml with empty YAML content."""
@@ -1038,7 +1037,7 @@ class TestParameterUtilities:
         param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
 
         # Empty YAML should return as-is
-        result = replace_key_value_yaml(mock_workspace, param_dict, empty_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, empty_yaml, "dev", is_yaml=True)
         assert result == empty_yaml
 
     def test_replace_key_value_yaml_nested_structure(self, mock_workspace):
@@ -1063,7 +1062,7 @@ runtime_version: "1.2"
             "replace_value": {"dev": 5, "prod": 20},
         }
 
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["dynamic_executor_allocation"]["max_executors"] == 5
         assert result_data["dynamic_executor_allocation"]["min_executors"] == 1  # Unchanged
@@ -1074,7 +1073,7 @@ runtime_version: "1.2"
             "replace_value": {"dev": 4, "prod": 16},
         }
 
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "prod")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "prod", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["driver_cores"] == 16
 
@@ -1109,7 +1108,7 @@ runtime_version: "1.2"
         }
 
         # Test successful replacement with $items notation
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["lakehouse"]["id"] == "test-lakehouse-id-12345"
         assert result_data["lakehouse"]["endpoint"] == "placeholder-endpoint"  # Unchanged
@@ -1134,7 +1133,7 @@ runtime_version: "1.2"
             "replace_value": {"dev": True, "prod": False},
         }
 
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["config"]["enabled"] is True
 
@@ -1144,7 +1143,7 @@ runtime_version: "1.2"
             "replace_value": {"dev": 200, "prod": 300},
         }
 
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["config"]["count"] == 200
 
@@ -1154,7 +1153,7 @@ runtime_version: "1.2"
             "replace_value": {"dev": 0.8, "prod": 0.95},
         }
 
-        result = replace_key_value_yaml(mock_workspace, param_dict, test_yaml, "dev")
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["config"]["threshold"] == 0.8
 
