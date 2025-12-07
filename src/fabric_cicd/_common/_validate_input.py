@@ -10,6 +10,7 @@ any user input throughout the package
 import logging
 import re
 from pathlib import Path
+from typing import Optional
 
 from azure.core.credentials import TokenCredential
 
@@ -47,7 +48,7 @@ def validate_data_type(expected_type: str, variable_name: str, input_value: any)
     return input_value
 
 
-def validate_item_type_in_scope(input_value: list) -> list:
+def validate_item_type_in_scope(input_value: Optional[list]) -> list:
     """
     Validate the item type in scope.
 
