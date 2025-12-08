@@ -420,7 +420,7 @@ def replace_key_value(
                     processed_value = extract_replace_value(workspace_obj, processed_value)
                 match.full_path.update(data, processed_value)
                 logger.debug(
-                    f"Replace value: {processed_value} set for value: {match.value} found at path: {match.full_path}"
+                    f"Value: {match.value} found at path: {match.full_path} to be replaced with value: {processed_value}"
                 )
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
