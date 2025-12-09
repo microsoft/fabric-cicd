@@ -597,9 +597,10 @@ class FabricWorkspace:
                 return
 
         item_guid = item.guid
+        item_description = item.description
         item_files = item.item_files
 
-        metadata_body = {"displayName": item_name, "type": item_type}
+        metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
 
         # Only shell deployment, no definition support (item_type can be overridden via kwargs)
         shell_only_publish = kwargs.get("shell_only_publish", item_type in constants.SHELL_ONLY_PUBLISH)
