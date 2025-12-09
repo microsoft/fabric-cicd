@@ -11,6 +11,7 @@ import dpath
 import yaml
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._exceptions import MissingFileError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
 
@@ -195,13 +196,24 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: s
     """
     from fabric_cicd._parameter._utils import process_environment_key
 
+    yaml_contents = None
+
     item = fabric_workspace_obj.repository_items["Environment"][item_name]
     item_files = item.item_files
     for file in item_files:
         if file.file_path.name == "Sparkcompute.yml" and file.file_path.parent.name == "Setting":
             file.contents = fabric_workspace_obj._replace_parameters(file, item)
-            yaml_body = yaml.safe_load(file.contents)
+            yaml_contents = file.contents
             break
+
+    if not yaml_contents:
+        msg = (
+            "Required file missing: Setting/Sparkcompute.yml for Environment "
+            f"'{item_name}'. Each Environment must include Setting/Sparkcompute.yml."
+        )
+        raise MissingFileError(msg, logger)
+
+    yaml_body = yaml.safe_load(yaml_contents)
 
     # Update instance pool settings if present
     if "instance_pool_id" in yaml_body:
