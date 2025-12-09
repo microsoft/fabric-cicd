@@ -342,7 +342,13 @@ def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_con
         raise ValueError(jde) from jde
 
     # Extract the jsonpath expression from the find_key attribute of the param_dict
-    jsonpath_expr = parse(param_dict["find_key"])
+    try:
+        jsonpath_expr = parse(param_dict["find_key"])
+    except Exception as e:
+        fk = param_dict.get("find_key")
+        msg = f"Invalid JSONPath expression in 'find_key': {fk!s}. Error: {e}"
+        raise InputError(msg, logger) from e
+
     replace_value = process_environment_key(workspace_obj, param_dict["replace_value"])
     for match in jsonpath_expr.find(data):
         # If the env is present in the replace_value array perform the replacement
