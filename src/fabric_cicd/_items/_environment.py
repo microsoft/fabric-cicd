@@ -196,8 +196,8 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: s
     """
     from fabric_cicd._parameter._utils import process_environment_key
 
+    # Get Setting/Sparkcompute.yml content from repository
     yaml_contents = None
-
     item = fabric_workspace_obj.repository_items["Environment"][item_name]
     item_files = item.item_files
     for file in item_files:
