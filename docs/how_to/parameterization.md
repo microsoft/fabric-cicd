@@ -103,10 +103,19 @@ key_value_replace:
 
 A powerful use case for `key_value_replace` is replacing Semantic Model parameters **by name** rather than by value. This is especially useful when you don't know the current parameter value in advance, or when deploying across multiple environments with different configurations.
 
+**Supported File Formats:**
+
+`key_value_replace` works with Semantic Model files that contain valid JSON:
+- ✅ `.bim` files (BIM/Tabular model JSON format) - primary location for parameters
+- ✅ `.platform` files (metadata)
+- ✅ `.pbism` files (settings)
+- ✅ `.json` files (various configurations)
+- ❌ `.tmdl` files (Tabular Model Definition Language) - not JSON format, use `find_replace` instead
+
 **Semantic Models can have parameters in different formats:**
 
-1. **M Query Parameters (expressions)** - Stored as expressions in the model
-2. **Connection Properties** - Stored in dataSources configuration
+1. **M Query Parameters (expressions)** - Stored as expressions in the model (`.bim` files)
+2. **Connection Properties** - Stored in dataSources configuration (`.bim` files)
 
 **Example: Replace M Query Parameters by Name**
 
