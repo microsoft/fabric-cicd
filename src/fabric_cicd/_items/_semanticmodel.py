@@ -20,14 +20,21 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "SemanticModel"
 
+    # Check if destructive change detection is enabled
+    enable_destructive_change_detection = "enable_semantic_model_destructive_change_detection" in constants.FEATURE_FLAG
+
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
         exclude_path = r".*\.pbi[/\\].*"
-        _publish_semanticmodel_with_retry(
-            fabric_workspace_obj=fabric_workspace_obj,
-            item_name=item_name,
-            item_type=item_type,
-            exclude_path=exclude_path,
-        )
+        if enable_destructive_change_detection:
+            _publish_semanticmodel_with_retry(
+                fabric_workspace_obj=fabric_workspace_obj,
+                item_name=item_name,
+                item_type=item_type,
+                exclude_path=exclude_path,
+            )
+        else:
+            # Use standard publish without destructive change detection
+            fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
 
     model_with_binding_dict = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
 
@@ -279,10 +286,15 @@ def _refresh_semanticmodels_if_configured(fabric_workspace_obj: FabricWorkspace)
     Refresh semantic models if configured in parameter file.
 
     Checks for 'semantic_model_refresh' parameter and refreshes models accordingly.
+    Requires 'enable_semantic_model_refresh' feature flag to be enabled.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object
     """
+    # Check if semantic model refresh feature is enabled
+    if "enable_semantic_model_refresh" not in constants.FEATURE_FLAG:
+        return
+
     refresh_config = fabric_workspace_obj.environment_parameter.get("semantic_model_refresh")
 
     if not refresh_config:

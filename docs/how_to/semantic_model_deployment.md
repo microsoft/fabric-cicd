@@ -4,7 +4,26 @@
 
 Semantic model deployment in fabric-cicd supports advanced features including handling destructive changes and automatic refresh after deployment. This guide covers how to work with semantic models in your CI/CD pipelines.
 
+## Feature Flags
+
+The advanced semantic model features require specific feature flags to be enabled:
+
+-   **`enable_semantic_model_destructive_change_detection`**: Enables detection and guidance for destructive changes
+-   **`enable_semantic_model_refresh`**: Enables automatic refresh after deployment
+
+```python
+from fabric_cicd import append_feature_flag
+
+# Enable destructive change detection
+append_feature_flag("enable_semantic_model_destructive_change_detection")
+
+# Enable semantic model refresh
+append_feature_flag("enable_semantic_model_refresh")
+```
+
 ## Handling Destructive Changes
+
+**⚠️ Requires Feature Flag:** This feature requires the `enable_semantic_model_destructive_change_detection` feature flag to be enabled.
 
 ### What are Destructive Changes?
 
@@ -101,11 +120,21 @@ Review your schema changes and revert any incompatible modifications. Consider u
 
 ## Automatic Refresh After Deployment
 
+**⚠️ Requires Feature Flag:** This feature requires the `enable_semantic_model_refresh` feature flag to be enabled.
+
 fabric-cicd supports automatic refresh of semantic models after successful deployment using the `semantic_model_refresh` parameter.
 
 ### Basic Usage
 
-Add the following to your `parameter.yml` file:
+First, enable the feature flag:
+
+```python
+from fabric_cicd import append_feature_flag
+
+append_feature_flag("enable_semantic_model_refresh")
+```
+
+Then add the following to your `parameter.yml` file:
 
 ```yaml
 semantic_model_refresh:

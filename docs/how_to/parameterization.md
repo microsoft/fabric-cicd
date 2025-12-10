@@ -155,6 +155,8 @@ semantic_model_binding:
 
 Semantic model refresh is used to automatically refresh semantic models after deployment. This is particularly useful for semantic models that have undergone destructive changes (such as schema modifications) or when you need to ensure data is current after deployment. The refresh uses the Power BI REST API and supports custom refresh payloads for advanced scenarios like partition-based or incremental refreshes.
 
+**⚠️ Feature Flag Required:** This feature requires the `enable_semantic_model_refresh` feature flag to be enabled. See [Optional Features](optional_feature.md) for information on enabling feature flags.
+
 **Basic usage with default full refresh:**
 
 ```yaml
@@ -181,6 +183,15 @@ semantic_model_refresh:
           maxParallelism: 2
     # Another model with default refresh
     - semantic_model_name: ["Marketing Model", "Finance Model"]
+```
+
+**Enabling the feature:**
+
+```python
+from fabric_cicd import append_feature_flag
+
+# Enable semantic model refresh
+append_feature_flag("enable_semantic_model_refresh")
 ```
 
 **Notes:**

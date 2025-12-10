@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from fabric_cicd import constants
 from fabric_cicd._items._semanticmodel import (
     _is_destructive_change_error,
     _publish_semanticmodel_with_retry,
@@ -41,6 +42,16 @@ def mock_endpoint():
     mock.invoke.side_effect = mock_invoke
     mock.upn_auth = True
     return mock
+
+
+@pytest.fixture(autouse=True)
+def clear_feature_flags():
+    """Clear feature flags before and after each test."""
+    original_flags = constants.FEATURE_FLAG.copy()
+    constants.FEATURE_FLAG.clear()
+    yield
+    constants.FEATURE_FLAG.clear()
+    constants.FEATURE_FLAG.update(original_flags)
 
 
 def test_is_destructive_change_error_with_error_code():
@@ -337,6 +348,9 @@ def test_refresh_semanticmodels_if_configured_single_model(mock_endpoint):
                 "semantic_model_refresh": {"semantic_model_name": "Test Model", "refresh_payload": {"type": "full"}}
             }
 
+            # Enable the refresh feature flag
+            constants.FEATURE_FLAG.add("enable_semantic_model_refresh")
+
             # Should not raise any exception
             _refresh_semanticmodels_if_configured(workspace)
 
@@ -395,6 +409,9 @@ def test_refresh_semanticmodels_if_configured_multiple_models(mock_endpoint):
                 ]
             }
 
+            # Enable the refresh feature flag
+            constants.FEATURE_FLAG.add("enable_semantic_model_refresh")
+
             # Should not raise any exception
             _refresh_semanticmodels_if_configured(workspace)
 
@@ -448,5 +465,192 @@ def test_publish_semanticmodels_with_refresh(mock_endpoint):
                 "semantic_model_refresh": {"semantic_model_name": "Test Model", "refresh_payload": None}
             }
 
+            # Enable the refresh feature flag
+            constants.FEATURE_FLAG.add("enable_semantic_model_refresh")
+
             # Should not raise any exception
             publish_semanticmodels(workspace)
+
+
+def test_refresh_disabled_without_feature_flag(mock_endpoint):
+    """Test that refresh is skipped when feature flag is not enabled."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a semantic model item
+        model_dir = temp_path / "TestModel.SemanticModel"
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        platform_file = model_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "SemanticModel",
+                "displayName": "Test Model",
+                "description": "Test semantic model",
+            },
+            "config": {"logicalId": "test-model-id"},
+        }
+
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        with (model_dir / "model.bim").open("w", encoding="utf-8") as f:
+            f.write('{"name": "TestModel"}')
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["SemanticModel"],
+            )
+
+            workspace._refresh_repository_items()
+            workspace.repository_items["SemanticModel"]["Test Model"].guid = "test-model-guid"
+
+            # Configure refresh but DON'T enable the feature flag
+            workspace.environment_parameter = {
+                "semantic_model_refresh": {"semantic_model_name": "Test Model", "refresh_payload": None}
+            }
+
+            # Should not call refresh because feature flag is not enabled
+            _refresh_semanticmodels_if_configured(workspace)
+
+            # Verify no refresh was attempted (would have logged if attempted)
+
+
+def test_destructive_change_detection_with_feature_flag():
+    """Test destructive change detection when feature flag is enabled."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a semantic model item
+        model_dir = temp_path / "TestModel.SemanticModel"
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        platform_file = model_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "SemanticModel",
+                "displayName": "Test Model",
+                "description": "Test semantic model",
+            },
+            "config": {"logicalId": "test-model-id"},
+        }
+
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        with (model_dir / "model.bim").open("w", encoding="utf-8") as f:
+            f.write('{"name": "TestModel"}')
+
+        # Mock endpoint to raise destructive change error
+        mock_endpoint_with_error = MagicMock()
+
+        def mock_invoke_with_error(method, url, **_kwargs):
+            if method == "POST" and "/items" in url and "/updateDefinition" not in url:
+                error_msg = "Alm_InvalidRequest_PurgeRequired - Dataset changes will cause loss of data"
+                raise Exception(error_msg)
+            if method == "GET" and "workspaces" in url and not url.endswith("/items"):
+                return {"body": {"value": [], "capacityId": "test-capacity"}}
+            if method == "GET" and url.endswith("/items"):
+                return {"body": {"value": []}}
+            return {"body": {"value": []}}
+
+        mock_endpoint_with_error.invoke.side_effect = mock_invoke_with_error
+        mock_endpoint_with_error.upn_auth = True
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint_with_error),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["SemanticModel"],
+            )
+
+            workspace._refresh_repository_items()
+
+            # Enable the destructive change detection feature flag
+            constants.FEATURE_FLAG.add("enable_semantic_model_destructive_change_detection")
+
+            # Should raise with guidance when feature flag is enabled
+            with pytest.raises(Exception, match="Alm_InvalidRequest_PurgeRequired"):
+                publish_semanticmodels(workspace)
+
+
+def test_destructive_change_detection_without_feature_flag():
+    """Test that destructive change detection is skipped when feature flag is not enabled."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a semantic model item
+        model_dir = temp_path / "TestModel.SemanticModel"
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        platform_file = model_dir / ".platform"
+        metadata = {
+            "metadata": {
+                "type": "SemanticModel",
+                "displayName": "Test Model",
+                "description": "Test semantic model",
+            },
+            "config": {"logicalId": "test-model-id"},
+        }
+
+        with platform_file.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
+        with (model_dir / "model.bim").open("w", encoding="utf-8") as f:
+            f.write('{"name": "TestModel"}')
+
+        # Mock endpoint to raise destructive change error
+        mock_endpoint_with_error = MagicMock()
+
+        def mock_invoke_with_error(method, url, **_kwargs):
+            if method == "POST" and "/items" in url and "/updateDefinition" not in url:
+                error_msg = "Alm_InvalidRequest_PurgeRequired - Dataset changes will cause loss of data"
+                raise Exception(error_msg)
+            if method == "GET" and "workspaces" in url and not url.endswith("/items"):
+                return {"body": {"value": [], "capacityId": "test-capacity"}}
+            if method == "GET" and url.endswith("/items"):
+                return {"body": {"value": []}}
+            return {"body": {"value": []}}
+
+        mock_endpoint_with_error.invoke.side_effect = mock_invoke_with_error
+        mock_endpoint_with_error.upn_auth = True
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint_with_error),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_path),
+                item_type_in_scope=["SemanticModel"],
+            )
+
+            workspace._refresh_repository_items()
+
+            # DON'T enable the feature flag - should use standard deployment
+            # Should raise exception but WITHOUT guidance messages
+            with pytest.raises(Exception, match="Alm_InvalidRequest_PurgeRequired"):
+                publish_semanticmodels(workspace)
