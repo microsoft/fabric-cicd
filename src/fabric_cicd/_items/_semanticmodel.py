@@ -218,7 +218,11 @@ def _is_destructive_change_error(error_message: str, error_code: Optional[str] =
         "requires data to be dropped",
     ]
 
-    error_message_lower = error_message.lower() if error_message else ""
+    # Validate error_message is a string before processing
+    if not isinstance(error_message, str):
+        return False
+
+    error_message_lower = error_message.lower()
     return any(keyword in error_message_lower for keyword in destructive_keywords)
 
 

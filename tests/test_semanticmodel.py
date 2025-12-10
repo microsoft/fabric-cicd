@@ -70,6 +70,10 @@ def test_is_destructive_change_error_no_message():
     """Test handling of None or empty error messages."""
     assert not _is_destructive_change_error(None)
     assert not _is_destructive_change_error("")
+    # Test non-string types
+    assert not _is_destructive_change_error(123)  # type: ignore
+    assert not _is_destructive_change_error([])  # type: ignore
+    assert not _is_destructive_change_error({})  # type: ignore
 
 
 def test_publish_semanticmodel_with_retry_success(mock_endpoint):

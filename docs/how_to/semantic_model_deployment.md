@@ -43,7 +43,7 @@ Before redeploying, connect to the semantic model via the XMLA endpoint and exec
 **Using Tabular Editor or SSMS:**
 
 1. Connect to your Power BI workspace via XMLA endpoint:
-    - Endpoint URL: `powerbi://api.powerbi.com/v1.0/myorg/[WorkspaceName]`
+    - Endpoint URL: `powerbi://api.powerbi.com/v1.0/myorg/<WorkspaceName>`
 2. Execute the following TMSL command:
 
 ```json
@@ -64,8 +64,9 @@ Before redeploying, connect to the semantic model via the XMLA endpoint and exec
 **Using PowerShell:**
 
 ```powershell
-# Install Analysis Services PowerShell module if not already installed
-Install-Module -Name Az.AnalysisServices
+# Install SqlServer PowerShell module if not already installed
+# This module provides the Invoke-ASCmd cmdlet for Analysis Services
+Install-Module -Name SqlServer -AllowClobber
 
 # Define the XMLA endpoint and model
 $workspaceName = "YourWorkspace"
