@@ -151,6 +151,45 @@ semantic_model_binding:
       semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
 ```
 
+### `semantic_model_refresh`
+
+Semantic model refresh is used to automatically refresh semantic models after deployment. This is particularly useful for semantic models that have undergone destructive changes (such as schema modifications) or when you need to ensure data is current after deployment. The refresh uses the Power BI REST API and supports custom refresh payloads for advanced scenarios like partition-based or incremental refreshes.
+
+**Basic usage with default full refresh:**
+
+```yaml
+semantic_model_refresh:
+    # Required field: value must be a string or a list of strings
+    - semantic_model_name: <semantic_model_name>
+    # OR
+      semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
+```
+
+**Advanced usage with custom refresh payload:**
+
+```yaml
+semantic_model_refresh:
+    # Single model with custom refresh payload
+    - semantic_model_name: "Sales Model"
+      refresh_payload:
+          type: "full"
+          objects:
+              - table: "Sales"
+              - table: "Products"
+                partition: "Products-2024"
+          commitMode: "transactional"
+          maxParallelism: 2
+    # Another model with default refresh
+    - semantic_model_name: ["Marketing Model", "Finance Model"]
+```
+
+**Notes:**
+
+-   If `refresh_payload` is not specified, a default full refresh (`{"type": "full"}`) is performed.
+-   The refresh is initiated asynchronously (returns HTTP 202), meaning the deployment will continue while the refresh runs in the background.
+-   For enhanced refresh features (partition-based refresh, custom commit modes, etc.), your workspace must be in a Premium capacity.
+-   For detailed information about refresh payload options, see the [Power BI REST API documentation](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset).
+
 ## Advanced Find and Replace
 
 ### `find_value` Regex
