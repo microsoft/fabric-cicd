@@ -456,7 +456,7 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
 
 def validate_parameter_file(
     repository_directory: str,
-    item_type_in_scope: list,
+    item_type_in_scope: Optional[list] = None,
     environment: str = "N/A",
     parameter_file_name: str = "parameter.yml",
     parameter_file_path: Optional[str] = None,
@@ -468,7 +468,7 @@ def validate_parameter_file(
 
     Args:
         repository_directory: The directory containing the items and parameter.yml file.
-        item_type_in_scope: A list of item types to validate.
+        item_type_in_scope: A list of item types to validate. If omitted, defaults to all supported item types.
         environment: The target environment.
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
         parameter_file_path: The path to the parameter file, if different from the default.

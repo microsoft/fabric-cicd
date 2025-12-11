@@ -10,6 +10,7 @@ any user input throughout the package
 import logging
 import re
 from pathlib import Path
+from typing import Optional
 
 from azure.core.credentials import TokenCredential
 
@@ -47,14 +48,18 @@ def validate_data_type(expected_type: str, variable_name: str, input_value: any)
     return input_value
 
 
-def validate_item_type_in_scope(input_value: list) -> list:
+def validate_item_type_in_scope(input_value: Optional[list]) -> list:
     """
     Validate the item type in scope.
 
     Args:
-        input_value: The input value to validate.
+        input_value: The input value to validate. If None, defaults to all supported item types.
     """
     accepted_item_types = constants.ACCEPTED_ITEM_TYPES
+
+    # If None, return all accepted item types
+    if input_value is None:
+        return list(accepted_item_types)
 
     validate_data_type("list[string]", "item_type_in_scope", input_value)
 

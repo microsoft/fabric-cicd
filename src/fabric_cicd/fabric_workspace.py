@@ -119,12 +119,7 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
-
-        # Handle None case for item_type_in_scope by defaulting to all available item types
-        if item_type_in_scope is None:
-            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES)
-        else:
-            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
+        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.publish_folder_path_exclude_regex = None
@@ -599,9 +594,10 @@ class FabricWorkspace:
                 return
 
         item_guid = item.guid
+        item_description = item.description
         item_files = item.item_files
 
-        metadata_body = {"displayName": item_name, "type": item_type}
+        metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
 
         # Only shell deployment, no definition support (item_type can be overridden via kwargs)
         shell_only_publish = kwargs.get("shell_only_publish", item_type in constants.SHELL_ONLY_PUBLISH)

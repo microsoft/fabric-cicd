@@ -761,7 +761,7 @@ class Parameter:
                             is_valid, msg = validation_methods[param](item)
 
                     if not is_valid:
-                        logger.debug(msg)
+                        logger.error(msg)
                         return False, "no match"
 
         return True, constants.PARAMETER_MSGS["valid optional"].format(param_name)
