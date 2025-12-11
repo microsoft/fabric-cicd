@@ -84,8 +84,8 @@ class FabricEndpoint:
                     logger.info(f"{constants.INDENT}AAD token expired. Refreshing token.")
                     self._refresh_token()
                 # Handle long-running operations without polling (e.g., for environment item publish)
-                if response.status_code == 202 and not poll_long_running:
-                    # Accept 202, do no poll
+                elif response.status_code == 202 and not poll_long_running:
+                    # Accept 202, do not poll
                     exit_loop = True
                 else:
                     exit_loop, method, url, body, long_running = _handle_response(
