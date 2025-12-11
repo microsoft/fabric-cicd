@@ -20,6 +20,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_experimental_features`            | Set to enable experimental features, such as selective deployments    |              |
 | `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items              | ☑️           |
 | `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish operations        | ☑️           |
+| `enable_shortcut_exclude`                 | Set to enable shortcut-based exclusion during publish/unpublish operations | ☑️           |
 | `enable_config_deploy`                    | Set to enable config file-based deployment                            | ☑️           |
 | `enable_response_collection`              | Set to enable collection of API responses during publish operations   |              |
 
