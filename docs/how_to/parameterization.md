@@ -1091,6 +1091,8 @@ When Reports and Semantic Models are deployed separately (e.g., models first, th
 
 This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This is useful when you want to replace specific parts while keeping the rest of the connection string unchanged.
 
+**Note:** The examples below use placeholder values (e.g., `MyReport`, `YourSemanticModelName`). Replace these with your actual report and semantic model names. For a working example, see `sample/workspace/parameter.yml` which references the `ByConnection.Report` and `ABC.SemanticModel` items.
+
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
 ```yaml
@@ -1140,6 +1142,8 @@ find_replace:
 <span class="md-h4-nonanchor">Option 2: Using `key_value_replace` for entire connection string</span>
 
 This approach replaces the entire connection string with environment-specific values. This is useful when the entire connection string format differs between environments.
+
+**Note:** This example uses placeholder values. For a working example, see `sample/workspace/parameter.yml`.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
