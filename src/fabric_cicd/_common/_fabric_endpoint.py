@@ -39,7 +39,15 @@ class FabricEndpoint:
         self.requests = requests_module
         self._refresh_token()
 
-    def invoke(self, method: str, url: str, body: str = "{}", files: Optional[dict] = None, **kwargs) -> dict:
+    def invoke(
+        self,
+        method: str,
+        url: str,
+        body: str = "{}",
+        files: Optional[dict] = None,
+        poll_long_running: bool = True,
+        **kwargs,
+    ) -> dict:
         """
         Sends an HTTP request to the specified URL with the given method and body.
 
@@ -48,6 +56,7 @@ class FabricEndpoint:
             url: URL to send the request to.
             body: The JSON body to include in the request. Defaults to an empty JSON object.
             files: The file path to be included in the request. Defaults to None.
+            poll_long_running: A flag to poll for long-running operations. Defaults to True.
             **kwargs: Additional keyword arguments to pass to the method.
         """
         exit_loop = False
@@ -74,6 +83,10 @@ class FabricEndpoint:
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
                     logger.info(f"{constants.INDENT}AAD token expired. Refreshing token.")
                     self._refresh_token()
+                # Handle long-running operations without polling (e.g., for environment item publish)
+                if response.status_code == 202 and not poll_long_running:
+                    # Accept 202, do no poll
+                    exit_loop = True
                 else:
                     exit_loop, method, url, body, long_running = _handle_response(
                         response,

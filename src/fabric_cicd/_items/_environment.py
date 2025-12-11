@@ -107,7 +107,6 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
     iteration = 1
 
     environments = fabric_workspace_obj.repository_items.get("Environment", {})
-
     filtered_environments = [
         k
         for k in environments
@@ -128,6 +127,9 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
 
     while ongoing_publish:
         ongoing_publish = False
+        completed = []
+        running = []
+        failed = []
 
         response_state = fabric_workspace_obj.endpoint.invoke(
             method="GET", url=f"{fabric_workspace_obj.base_api_url}/environments/"
@@ -138,11 +140,18 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
             item_state = dpath.get(item, "properties/publishDetails/state", default="").lower()
             if item_name in filtered_environments:
                 if item_state == "running":
+                    running.append(item_name)
                     ongoing_publish = True
-                elif item_state in ["failed", "cancelled"] and not initial_check:
-                    msg = f"Publish {item_state} for {item_name}"
-                    raise Exception(msg)
-
+                elif item_state == "success":
+                    completed.append(item_name)
+                elif item_state in ["failed", "cancelled"]:
+                    failed.append(item_name)
+                    if not initial_check:
+                        msg = f"Publish {item_state} for Environment '{item_name}'"
+                        raise Exception(msg)
+        logger.debug(
+            f"Environment publish states - Running: {running}, Succeeded: {completed}, Failed/Cancelled: {failed}"
+        )
         if ongoing_publish:
             handle_retry(
                 attempt=iteration,
@@ -153,7 +162,7 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
             iteration += 1
 
     if not initial_check:
-        logger.info(f"{constants.INDENT}Published.")
+        logger.info(f"{constants.INDENT}Published: {completed}")
 
 
 def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
@@ -176,13 +185,14 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     # Update compute settings
     _update_compute_settings(fabric_workspace_obj, item_guid, item_name)
 
-    # Publish updated settings - compute settings and libraries
+    # Publish updated settings - compute settings and libraries (long-running operation)
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
     fabric_workspace_obj.endpoint.invoke(
         method="POST",
         url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/publish?beta=False",
+        poll_long_running=False,
     )
-    logger.info(f"{constants.INDENT}Publish Submitted")
+    logger.info(f"{constants.INDENT}Publish Submitted for Environment '{item_name}'")
 
 
 def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: str, item_name: str) -> None:
