@@ -170,7 +170,7 @@ CONFIG_SECTIONS = {
         "type": dict,
         "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "shortcut_exclude_regex", "skip"],
     },
-    "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
+    "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "shortcut_exclude_regex", "skip"]},
     "features": {"type": (list, dict), "settings": []},
     "constants": {"type": dict, "settings": []},
 }
