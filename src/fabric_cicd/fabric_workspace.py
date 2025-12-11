@@ -15,7 +15,7 @@ from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import constants
-from fabric_cicd._common._check_utils import check_regex, check_valid_json_content
+from fabric_cicd._common._check_utils import check_regex, check_valid_json_content, check_valid_yaml_content
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
@@ -119,12 +119,7 @@ class FabricWorkspace:
 
         # Validate and set class variables
         self.repository_directory: Path = validate_repository_directory(repository_directory)
-
-        # Handle None case for item_type_in_scope by defaulting to all available item types
-        if item_type_in_scope is None:
-            self.item_type_in_scope = list(constants.ACCEPTED_ITEM_TYPES)
-        else:
-            self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
+        self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
         self.publish_item_name_exclude_regex = None
         self.publish_folder_path_exclude_regex = None
@@ -295,7 +290,17 @@ class FabricWorkspace:
 
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
-                relative_parent_path = "/".join(relative_path.split("/")[:-1])
+                # Special handling for KQLDatabase items:
+                # .Eventhouse/.children/ directory structure, requires extracting the
+                # parent folder path before the Eventhouse container, not just
+                # the immediate parent directory
+                if item_type == "KQLDatabase":
+                    pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
+                    match = pattern.match(relative_path)
+                    relative_parent_path = match.group(1) if match else None
+                else:
+                    relative_parent_path = "/".join(relative_path.split("/")[:-1])
+
                 if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
                     item_folder_id = self.repository_folders.get(relative_parent_path, "")
                 else:
@@ -345,6 +350,7 @@ class FabricWorkspace:
             item_guid = item["id"]
             item_folder_id = item.get("folderId", "")
             sql_endpoint = ""
+            sql_endpoint_id = ""
             query_service_uri = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
@@ -358,6 +364,9 @@ class FabricWorkspace:
             if item_type in ["Lakehouse", "Warehouse"]:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                )
+                sql_endpoint_id = self._get_item_attribute(
+                    self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
                 )
             if item_type in ["Eventhouse"]:
                 query_service_uri = self._get_item_attribute(
@@ -377,6 +386,7 @@ class FabricWorkspace:
             self.workspace_items[item_type][item_name] = {
                 "id": item_guid,
                 "sqlendpoint": sql_endpoint,
+                "sqlendpointid": sql_endpoint_id,
                 "queryserviceuri": query_service_uri,
             }
 
@@ -429,9 +439,12 @@ class FabricWorkspace:
                 input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
-                # Perform replacement if condition is met and file contains valid JSON
-                if filter_match and check_valid_json_content(raw_file):
-                    raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
+                # Perform replacement if condition is met and file contains valid JSON or YAML
+                if filter_match:
+                    if check_valid_json_content(raw_file):
+                        raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
+                    elif check_valid_yaml_content(raw_file):
+                        raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):
@@ -439,16 +452,38 @@ class FabricWorkspace:
                 input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
-                # Extract the find_value and replace_value_dict
-                find_value = extract_find_value(parameter_dict, raw_file, filter_match)
+                # Extract the find_pattern and replace_value_dict
+                find_info = extract_find_value(parameter_dict, raw_file, filter_match)
                 replace_value_dict = process_environment_key(self, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
-                if find_value in raw_file and self.environment in replace_value_dict and filter_match:
+                if filter_match and self.environment in replace_value_dict and find_info["has_matches"]:
                     replace_value = extract_replace_value(self, replace_value_dict[self.environment])
                     if replace_value:
-                        raw_file = raw_file.replace(find_value, replace_value)
-                        logger.debug(f"Replacing '{find_value}' with '{replace_value}' in {item_name}.{item_type}")
+                        pattern = find_info["pattern"]
+                        is_regex = find_info["is_regex"]
+
+                        if is_regex:
+                            # For regex patterns, use re.sub with lambda to replace only the captured group
+                            # Use string slicing to precisely replace only the captured group (group 1)
+                            # The slicing calculates relative positions: match.start(1) - match.start(0) gives
+                            # the start position of group 1 within the full match, and similarly for end position
+                            raw_file = re.sub(
+                                pattern,
+                                lambda match, repl=replace_value: (
+                                    match.group(0)[: match.start(1) - match.start(0)]
+                                    + repl
+                                    + match.group(0)[match.end(1) - match.start(0) :]
+                                ),
+                                raw_file,
+                            )
+                            logger.debug(
+                                f"Replacing regex pattern '{pattern}' captured group with '{replace_value}' in {item_name}.{item_type}"
+                            )
+                        else:
+                            # For non-regex matches, replace as before
+                            raw_file = raw_file.replace(pattern, replace_value)
+                            logger.debug(f"Replacing '{pattern}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
 
@@ -560,12 +595,13 @@ class FabricWorkspace:
                 return
 
         item_guid = item.guid
+        item_description = item.description
         item_files = item.item_files
 
-        metadata_body = {"displayName": item_name, "type": item_type}
+        metadata_body = {"displayName": item_name, "type": item_type, "description": item_description}
 
-        # Only shell deployment, no definition support
-        shell_only_publish = item_type in constants.SHELL_ONLY_PUBLISH
+        # Only shell deployment, no definition support (item_type can be overridden via kwargs)
+        shell_only_publish = kwargs.get("shell_only_publish", item_type in constants.SHELL_ONLY_PUBLISH)
 
         if kwargs.get("creation_payload"):
             creation_payload = {"creationPayload": kwargs["creation_payload"]}
@@ -669,19 +705,6 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
         """
         item_guid = self.deployed_items[item_type][item_name].guid
-
-        # Skip unpublishing if the item is not in the include list
-        if self.items_to_include:
-            current_item = f"{item_name}.{item_type}"
-
-            # Normalize include list to a lowercase set for efficient lookups
-            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
-
-            # Check for exact match or case-insensitive match
-            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
-            if not match_found:
-                logger.info(f"Skipping unpublishing of {item_type} '{item_name}' as it is not in the include list.")
-                return
 
         logger.info(f"Unpublishing {item_type} '{item_name}'")
 

@@ -6,13 +6,37 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.32
+
+<span class="md-h2-subheader">Release Date: 2025-12-03</span>
+
+-   🔧 Fix publish bug for Environment items that contain only spark settings ([#664](https://github.com/microsoft/fabric-cicd/issues/664))
+
+## Version 0.1.31
+
+<span class="md-h2-subheader">Release Date: 2025-12-01</span>
+
+-   💥 Migrate to the latest Fabric Environment item APIs to simplify deployment and improve compatibility ([#173](https://github.com/microsoft/fabric-cicd/issues/173))
+-   ✨ Add support for the ML Experiment item type ([#600](https://github.com/microsoft/fabric-cicd/issues/600))
+-   ✨ Add support for the User Data Function item type ([#588](https://github.com/microsoft/fabric-cicd/issues/588))
+-   ✨ Enable dynamic replacement of Lakehouse SQL Endpoint IDs ([#616](https://github.com/microsoft/fabric-cicd/issues/616))
+-   ✨ Enable linking of Semantic Models to both cloud and gateway connections ([#602](https://github.com/microsoft/fabric-cicd/issues/602))
+-   ✨ Allow use of the dynamic replacement variables within the key_value_replace parameter ([#567](https://github.com/microsoft/fabric-cicd/issues/567))
+-   ✨ Add support for parameter file templates ([#499](https://github.com/microsoft/fabric-cicd/issues/499))
+-   📝 Update the advanced Dataflow parameterization example with the correct file_path value ([#633](https://github.com/microsoft/fabric-cicd/issues/633))
+-   🔧 Fix publishing issues for KQL Database items in folders ([#657](https://github.com/microsoft/fabric-cicd/issues/657))
+-   🔧 Separate logic for 'items to include' feature between publish and unpublish operations ([#650](https://github.com/microsoft/fabric-cicd/issues/650))
+-   🔧 Fix parameterization logic to properly handle find_value regex patterns and replacements ([#639](https://github.com/microsoft/fabric-cicd/issues/639))
+-   🔧 Correct the publish order of Data Agent and Semantic Model items ([#628](https://github.com/microsoft/fabric-cicd/issues/628))
+-   🔧 Fix Lakehouse item publishing errors when shortcuts refer to the default Lakehouse ID ([#610](https://github.com/microsoft/fabric-cicd/issues/610))
+
 ## Version 0.1.30
 
 <span class="md-h2-subheader">Release Date: 2025-10-20</span>
 
 -   ✨ Add support for binding semantic models to on-premise gateways in Fabric workspaces ([#569](https://github.com/microsoft/fabric-cicd/issues/569))
 -   ✨ Add support for publishing and managing Data Agent items ([#556](https://github.com/microsoft/fabric-cicd/issues/556))
--   ✨ Add OrgApp item type support ([#520](https://github.com/microsoft/fabric-cicd/issues/520))
+-   ✨ Add OrgApp item type support ([#586](https://github.com/microsoft/fabric-cicd/issues/586))
 -   ⚡ Enhance cross-workspace variable support to allow referencing other attributes ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
 -   🔧 Fix workspace name extraction bug for non-ID attrs using ITEM_ATTR_LOOKUP ([#583](https://github.com/microsoft/fabric-cicd/issues/583))
 -   🔧 Fix capacity requirement check ([#593](https://github.com/microsoft/fabric-cicd/issues/593))

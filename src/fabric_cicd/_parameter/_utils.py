@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 from typing import Optional, Union
 
+import yaml
 from azure.core.credentials import TokenCredential
 from jsonpath_ng.ext import parse
 
@@ -27,39 +28,91 @@ logger = logging.getLogger(__name__)
 """Functions to extract parameter values"""
 
 
-def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> str:
+def _validate_regex_structure(pattern: re.Pattern, find_value: str) -> None:
+    """
+    Validates regex pattern structure to ensure it has exactly one capturing group.
+    This validation is performed independently of whether the pattern matches any content.
+
+    Args:
+        pattern: Compiled regex pattern
+        find_value: The regex pattern string for error messages
+
+    Raises:
+        InputError: If the regex doesn't have exactly one capturing group
+    """
+    # Check the number of capturing groups in the pattern
+    if pattern.groups != 1:
+        msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
+        raise InputError(msg, logger)
+
+
+def _validate_regex_pattern(matches: list, find_value: str) -> None:
+    """
+    Validates regex pattern matches to ensure the captured value is not empty.
+
+    Args:
+        matches: List of regex match objects
+        find_value: The regex pattern string for error messages
+
+    Raises:
+        InputError: If validation fails
+    """
+    if matches:
+        # Check if the captured group is empty (which would be invalid)
+        captured_value = matches[0].group(1)
+        if not captured_value:
+            msg = f"Regex pattern '{find_value}' captured an empty value."
+            raise InputError(msg, logger)
+
+
+def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> dict:
     """
     Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided.
+    Returns replacement information for use with re.sub() or string replace().
 
     Args:
         param_dict: The parameter dictionary containing the find_value and is_regex keys.
         file_content: The content of the file where the find_value will be searched.
         filter_match: A boolean to check for a regex match in filtered files only.
+
+    Returns:
+        Dictionary with keys:
+        - 'pattern': The find pattern (original string or regex pattern)
+        - 'is_regex': Whether this is a regex pattern
+        - 'has_matches': Whether any matches were found
     """
     find_value = param_dict.get("find_value")
     is_regex = param_dict.get("is_regex", "").lower() == "true"
 
-    # Only process regex if enabled and file meets filter criteria
-    if is_regex and filter_match:
-        # Search for a match with the valid regex (validated in the parameter file validation step)
-        regex = re.compile(find_value)
-        match = re.search(regex, file_content)
-        if match:
-            if len(match.groups()) != 1:
-                msg = f"Regex pattern '{find_value}' must contain exactly one capturing group."
-                raise InputError(msg, logger)
+    # No find value -> nothing to do
+    if not find_value:
+        return {"pattern": "", "is_regex": False, "has_matches": False}
 
-            matched_value = match.group(1)
-            if matched_value:
-                return matched_value
+    # Regex find_value
+    if is_regex:
+        try:
+            compiled = re.compile(find_value)
+        except re.error as re_err:
+            msg = f"Invalid regex '{find_value}': {re_err}"
+            raise InputError(msg, logger) from re_err
 
-            msg = f"Regex pattern '{find_value}' captured an empty value."
-            raise InputError(msg, logger)
+        # Validate structure (to catch bad patterns early)
+        _validate_regex_structure(compiled, find_value)
 
-        logger.debug(f"No match found for regex '{find_value}' in the file content.")
+        # If file excluded by filters, do not search — return no-match but keep validation
+        if not filter_match:
+            return {"pattern": find_value, "is_regex": True, "has_matches": False}
 
-    # For non-regex or non-matching filters, return the original value
-    return find_value
+        matches = list(re.finditer(compiled, file_content))
+        _validate_regex_pattern(matches, find_value)
+
+        return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches)}
+
+    # Non-regex find_value
+    if not filter_match:
+        return {"pattern": find_value, "is_regex": False, "has_matches": False}
+
+    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content}
 
 
 def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:
@@ -323,36 +376,56 @@ def process_environment_key(workspace_obj: FabricWorkspace, replace_value_dict: 
     return replace_value_dict
 
 
-"""Functions to replace key values in JSON"""
+"""Functions to replace key values in JSON or YAML"""
 
 
-def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_content: str, env: str) -> Union[dict]:
-    """A function to replace key values in a JSON using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
+def replace_key_value(
+    workspace_obj: FabricWorkspace, param_dict: dict, content: str, env: str, is_yaml: bool = False
+) -> str:
+    """A function to replace key values in a JSON or YAML using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
 
     Args:
         workspace_obj: The FabricWorkspace object.
         param_dict: The parameter dictionary.
-        json_content: the JSON content to be modified.
+        content: the JSON/YAML content to be modified.
         env: The environment variable to be used for replacement.
+        is_yaml: A boolean indicating if the content is YAML (default is False for JSON).
     """
-    # Try to load the json content to a dictionary
-    try:
-        data = json.loads(json_content)
-    except json.JSONDecodeError as jde:
-        raise ValueError(jde) from jde
+    # Parse content to a dictionary based on format (YAML or JSON)
+    if is_yaml:
+        try:
+            data = yaml.safe_load(content)
+        except yaml.YAMLError as ye:
+            raise ValueError(ye) from ye
+
+        # Handle empty YAML files
+        if data is None:
+            return content
+    else:
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as jde:
+            raise ValueError(jde) from jde
 
     # Extract the jsonpath expression from the find_key attribute of the param_dict
     jsonpath_expr = parse(param_dict["find_key"])
-    replace_value = process_environment_key(workspace_obj, param_dict["replace_value"])
+    replace_value_dict = process_environment_key(workspace_obj, param_dict["replace_value"])
     for match in jsonpath_expr.find(data):
         # If the env is present in the replace_value array perform the replacement
-        if env in replace_value:
+        if env in replace_value_dict:
             try:
-                match.full_path.update(data, replace_value[env])
+                # Process the replace value to handle $items notation
+                processed_value = replace_value_dict[env]
+                if isinstance(processed_value, str):
+                    processed_value = extract_replace_value(workspace_obj, processed_value)
+                match.full_path.update(data, processed_value)
+                logger.debug(
+                    f"Value: {match.value} found at path: {match.full_path} to be replaced with value: {processed_value}"
+                )
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 
-    return json.dumps(data)
+    return yaml.dump(data, default_flow_style=False, allow_unicode=True) if is_yaml else json.dumps(data)
 
 
 def replace_variables_in_parameter_file(raw_file: str) -> str:
@@ -383,7 +456,7 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
 
 def validate_parameter_file(
     repository_directory: str,
-    item_type_in_scope: list,
+    item_type_in_scope: Optional[list] = None,
     environment: str = "N/A",
     parameter_file_name: str = "parameter.yml",
     parameter_file_path: Optional[str] = None,
@@ -395,7 +468,7 @@ def validate_parameter_file(
 
     Args:
         repository_directory: The directory containing the items and parameter.yml file.
-        item_type_in_scope: A list of item types to validate.
+        item_type_in_scope: A list of item types to validate. If omitted, defaults to all supported item types.
         environment: The target environment.
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
         parameter_file_path: The path to the parameter file, if different from the default.

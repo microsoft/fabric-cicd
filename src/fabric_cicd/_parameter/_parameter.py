@@ -44,6 +44,10 @@ class Parameter:
             "minimum": {"gateway_id", "dataset_name"},
             "maximum": {"gateway_id", "dataset_name"},
         },
+        "semantic_model_binding": {
+            "minimum": {"connection_id", "semantic_model_name"},
+            "maximum": {"connection_id", "semantic_model_name"},
+        },
         "extend": {"minimum": set(), "maximum": set()},
     }
 
@@ -347,6 +351,26 @@ class Parameter:
         return True, constants.PARAMETER_MSGS["valid load"]
 
     def _validate_parameter_file(self) -> bool:
+        """This code will be removed in future releases, after deprecating 'gateway_binding' support."""
+        # first, extend semantic_model_binding by adding gateway_binding into one dict
+        if "gateway_binding" in self.environment_parameter or "semantic_model_binding" in self.environment_parameter:
+            sm_list = self.environment_parameter.get("semantic_model_binding", [])
+            gw_list = self.environment_parameter.get("gateway_binding", [])
+
+            if gw_list:
+                # Transform gateway entries to semantic_model_binding shape
+                sm_list.extend(
+                    {
+                        "connection_id": entry.get("gateway_id"),
+                        "semantic_model_name": entry.get("dataset_name", []),
+                    }
+                    for entry in gw_list
+                )
+                self.environment_parameter["semantic_model_binding"] = sm_list
+                # Remove original gateway_binding after merging
+                del self.environment_parameter["gateway_binding"]
+                logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
+
         """Validate the parameter file."""
         validation_steps = [
             ("parameter file load", self._validate_parameter_load),
@@ -355,7 +379,7 @@ class Parameter:
             ("find_replace parameter", lambda: self._validate_parameter("find_replace")),
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
-            ("gateway_binding parameter", lambda: self._validate_parameter("gateway_binding")),
+            ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -372,7 +396,7 @@ class Parameter:
                         "find_replace parameter",
                         "key_value_replace parameter",
                         "spark_pool parameter",
-                        "gateway_binding parameter",
+                        "semantic_model_binding parameter",
                     )
                     and msg == "parameter not found"
                 ):
@@ -395,7 +419,7 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:5]
+        params = list(self.PARAMETER_KEYS.keys())[:6]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
@@ -425,8 +449,8 @@ class Parameter:
             key_name = "find_key"
         elif param_name == "spark_pool":
             key_name = "instance_pool_id"
-        elif param_name == "gateway_binding":
-            key_name = "gateway_id"
+        elif param_name == "semantic_model_binding":
+            key_name = "connection_id"
         else:
             key_name = "find_value"
 
@@ -434,15 +458,15 @@ class Parameter:
             param_num_str = str(param_num) if multiple_param else ""
             find_value = parameter_dict.get(key_name)
             for step, validation_func in validation_steps:
-                if param_name == "gateway_binding" and step == "replace_value":
+                if param_name in ["semantic_model_binding"] and step == "replace_value":
                     continue
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-            # Special case to skip environment validation for gateway_binding
-            if param_name == "gateway_binding":
+            # Special case to skip environment validation for semantic_model_binding
+            if param_name in ["semantic_model_binding"]:
                 continue
             # Check if replacement will be skipped for a given find value
             is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
@@ -511,7 +535,7 @@ class Parameter:
 
             if key == "replace_value":
                 expected_type = "dictionary"
-            elif key == "dataset_name":
+            elif key in ["semantic_model_name"]:
                 expected_type = "string or list[string]"
             else:
                 expected_type = "string"
@@ -526,7 +550,58 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
+        if param_name == "semantic_model_binding":
+            is_valid, msg = self._validate_semantic_model_name()
+            if not is_valid:
+                return False, msg
+
+        if param_name == "key_value_replace":
+            is_valid, msg = self._validate_key_value_find_key(param_dict)
+            if not is_valid:
+                return False, msg
+
         return True, constants.PARAMETER_MSGS["valid required values"].format(param_name)
+
+    def _validate_key_value_find_key(self, param_dict: dict) -> tuple[bool, str]:
+        """Validate the `find_key` JSONPath for key_value_replace (compile-only)."""
+        find_key = param_dict.get("find_key")
+        if not find_key or not isinstance(find_key, str) or not find_key.strip():
+            return False, "Missing or empty 'find_key' for key_value_replace"
+
+        # Require absolute JSONPath root to avoid ambiguous relative paths
+        if not find_key.strip().startswith("$"):
+            return False, "find_key must be an absolute JSONPath starting with '$'"
+
+        try:
+            # jsonpath_ng.ext.parse supports extended JSONPath (dot/bracket)
+            from jsonpath_ng.ext import parse
+
+            parse(find_key)
+        except Exception as e:
+            return False, f"Invalid JSONPath expression '{find_key}': {e}"
+
+        return True, "Valid JSONPath"
+
+    def _validate_semantic_model_name(self) -> tuple[bool, str]:
+        """
+        Validate that semantic model names are unique across all semantic_model_binding entries.
+
+        Returns:
+            Tuple of (is_valid, message) where is_valid indicates if validation passed
+            and message contains either success or error details.
+        """
+        names = []
+        for entry in self.environment_parameter.get("semantic_model_binding", []):
+            raw = entry.get("semantic_model_name", [])
+            if isinstance(raw, str):
+                names.append(raw)
+            elif isinstance(raw, list):
+                names.extend(n for n in raw if isinstance(n, str))
+        duplicates = {n for n in names if names.count(n) > 1}
+        if duplicates:
+            msg = f"Duplicate semantic model names found: {', '.join(sorted(duplicates))}"
+            return False, msg
+        return True, "No duplicate semantic model names found"
 
     def _validate_find_regex(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
         """Validate the find_value is a valid regex if is_regex is set to true."""
@@ -686,7 +761,7 @@ class Parameter:
                             is_valid, msg = validation_methods[param](item)
 
                     if not is_valid:
-                        logger.debug(msg)
+                        logger.error(msg)
                         return False, "no match"
 
         return True, constants.PARAMETER_MSGS["valid optional"].format(param_name)
@@ -736,7 +811,6 @@ class Parameter:
     def _validate_item_name(self, input_name: str) -> tuple[bool, str]:
         """Validate the item name is found in the repository directory."""
         item_name_list = []
-
         for root, _dirs, files in os.walk(self.repository_directory):
             directory = Path(root)
             # valid item directory with .platform file within

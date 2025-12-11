@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.30"
+VERSION = "0.1.32"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -37,10 +37,11 @@ ACCEPTED_ITEM_TYPES = (
     "DataAgent",
     "UserDataFunction",
     "OrgApp",
+    "MLExperiment",
 )
 
 # Publish
-SHELL_ONLY_PUBLISH = ["Environment", "Lakehouse", "Warehouse", "SQLDatabase"]
+SHELL_ONLY_PUBLISH = ["Lakehouse", "Warehouse", "SQLDatabase", "MLExperiment"]
 
 # Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
@@ -52,6 +53,7 @@ DATAFLOW_SOURCE_REGEX = (
     r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
+KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
 
 # Item Type to File Mapping (to check for item dependencies)
 ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
@@ -60,6 +62,7 @@ ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
 PROPERTY_PATH_ATTR_MAPPING = {
     "Lakehouse": {
         "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+        "sqlendpointid": "body/properties/sqlEndpointProperties/id",
     },
     "Warehouse": {
         "sqlendpoint": "body/properties/connectionString",
@@ -71,7 +74,7 @@ PROPERTY_PATH_ATTR_MAPPING = {
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
-ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "queryserviceuri"]
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
@@ -129,6 +132,7 @@ PARAMETER_MSGS = {
     "param_count": "{} {} parameters found",
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
+    "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",

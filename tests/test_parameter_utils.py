@@ -16,6 +16,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
+import yaml
 
 import fabric_cicd.constants as constants
 
@@ -79,18 +80,29 @@ class TestParameterUtilities:
         mock_ws.workspace_id = "mock-workspace-id"
         mock_ws.workspace_items = {
             "Notebook": {
-                "Test Notebook": {"id": "notebook-id", "sqlendpoint": "", "queryserviceuri": ""},
+                "Test Notebook": {"id": "notebook-id", "sqlendpoint": "", "sqlendpointid": "", "queryserviceuri": ""},
             },
             "Warehouse": {
-                "TestWarehouse": {"id": "warehouse-id", "sqlendpoint": "warehouse-endpoint", "queryserviceuri": ""},
+                "TestWarehouse": {
+                    "id": "warehouse-id",
+                    "sqlendpoint": "warehouse-endpoint",
+                    "sqlendpointid": "",
+                    "queryserviceuri": "",
+                },
             },
             "Lakehouse": {
-                "Test_Lakehouse": {"id": "lakehouse-id", "sqlendpoint": "lakehouse-endpoint", "queryserviceuri": ""},
+                "Test_Lakehouse": {
+                    "id": "lakehouse-id",
+                    "sqlendpoint": "lakehouse-endpoint",
+                    "sqlendpointid": "lakehouse-sql-endpoint-id",
+                    "queryserviceuri": "",
+                },
             },
             "Eventhouse": {
                 "Test Eventhouse": {
                     "id": "eventhouse-id",
                     "sqlendpoint": "",
+                    "sqlendpointid": "",
                     "queryserviceuri": "eventhouse-query-uri",
                 },
             },
@@ -108,19 +120,24 @@ class TestParameterUtilities:
         """Tests extract_find_value with string."""
         # Test with plain text
         param_dict = {"find_value": "test-value"}
-        assert extract_find_value(param_dict, "content with test-value", True) == "test-value"
-        assert extract_find_value(param_dict, "unrelated content", True) == "test-value"
+        expected = {"pattern": "test-value", "is_regex": False, "has_matches": True}
+        assert extract_find_value(param_dict, "content with test-value", True) == expected
+        expected_no_match = {"pattern": "test-value", "is_regex": False, "has_matches": False}
+        assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
 
     def test_extract_find_value_valid_regex(self):
         """Tests extract_find_value with regex pattern."""
         param_dict = {"find_value": "id=([\\w-]+)", "is_regex": "true"}
 
         # Test with regex
-        assert extract_find_value(param_dict, "content with id=abc-123", True) == "abc-123"
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        assert extract_find_value(param_dict, "content with id=abc-123", True) == expected
         # Test with non-matching regex
-        assert extract_find_value(param_dict, "unrelated content", True) == "id=([\\w-]+)"
-        # Test with regex but filter_match=False
-        assert extract_find_value(param_dict, "content with id=abc-123", False) == "id=([\\w-]+)"
+        expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
+        assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
+        # Test with regex but filter_match=False - should still return is_regex=True
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
+        assert extract_find_value(param_dict, "content with id=abc-123", False) == expected
 
     def test_extract_find_value_invalid_regex(self):
         """Tests extract_find_value with invalid regex capturing groups."""
@@ -138,6 +155,33 @@ class TestParameterUtilities:
         param_dict = {"find_value": "id=()", "is_regex": "true"}
         with pytest.raises(InputError):
             extract_find_value(param_dict, "content with id=", True)
+
+        # Test that structure validation happens even when there are no matches
+        # (regex with no capturing groups should still fail even if no matches)
+        param_dict = {"find_value": "id=\\w+", "is_regex": "true"}
+        with pytest.raises(InputError):
+            extract_find_value(param_dict, "unrelated content without matches", True)
+
+        # Test that structure validation happens with filter_match=False too
+        param_dict = {"find_value": "(id)=([\\w-]+)", "is_regex": "true"}
+        with pytest.raises(InputError):
+            extract_find_value(param_dict, "unrelated content without matches", False)
+
+    def test_extract_find_value_multiple_matches(self):
+        """Tests extract_find_value with regex pattern that has multiple matches."""
+        param_dict = {"find_value": "id=([\\w-]+)", "is_regex": "true"}
+
+        # Test with multiple matches in content - now returns simple dict format
+        content_with_multiple = "content with id=abc-123 and id=def-456 and id=ghi-789"
+        result = extract_find_value(param_dict, content_with_multiple, True)
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        assert result == expected
+
+        # Test that content is detected as having matches
+        content_with_duplicates = "content with id=abc-123 and id=def-456 and id=abc-123"
+        result = extract_find_value(param_dict, content_with_duplicates, True)
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        assert result == expected
 
     def test_extract_replace_value_default(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=False."""
@@ -205,6 +249,12 @@ class TestParameterUtilities:
         assert result == "lakehouse-endpoint"
         result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.$sqlendpoint", False)
         assert result == "lakehouse-endpoint"
+
+        # Test with valid lakehouse sqlendpointid attribute
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.sqlendpointid", False)
+        assert result == "lakehouse-sql-endpoint-id"
+        result = _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.$sqlendpointid", False)
+        assert result == "lakehouse-sql-endpoint-id"
 
         # Test with valid warehouse item
         result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.id", False)
@@ -437,6 +487,23 @@ class TestParameterUtilities:
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
         mock_workspace._lookup_item_attribute.assert_called_once_with(
             "resolved-workspace-id", "Eventhouse", "Test Eventhouse", "queryserviceuri"
+        )
+
+    def test_extract_workspace_id_with_item_lookup_sqlendpointid(self, mock_workspace):
+        """Tests _extract_workspace_id resolves sqlendpointid from another workspace via $items reference."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
+        mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="lakehouse-sql-endpoint-id-value")
+
+        result = _extract_workspace_id(
+            mock_workspace, "$workspace.test_workspace.$items.Lakehouse.Test_Lakehouse.$sqlendpointid"
+        )
+
+        assert result == "lakehouse-sql-endpoint-id-value"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+        mock_workspace._lookup_item_attribute.assert_called_once_with(
+            "resolved-workspace-id", "Lakehouse", "Test_Lakehouse", "sqlendpointid"
         )
 
     def test_extract_parameter_filters(self, mock_workspace):
@@ -704,6 +771,47 @@ class TestParameterUtilities:
         )
         mock_param_instance._validate_parameter_file.assert_called_once()
 
+    @mock.patch("fabric_cicd._parameter._parameter.Parameter")
+    @mock.patch("fabric_cicd._common._validate_input.validate_repository_directory")
+    @mock.patch("fabric_cicd._common._validate_input.validate_item_type_in_scope")
+    @mock.patch("fabric_cicd._common._validate_input.validate_environment")
+    def test_validate_parameter_file_with_none_item_type_in_scope(
+        self, mock_validate_env, mock_validate_item_type, mock_validate_repo, mock_param
+    ):
+        """Tests validate_parameter_file function when item_type_in_scope is omitted (None)."""
+        # Setup mocks
+        mock_validate_repo.return_value = Path("/mock/repo")
+        # Mock validate_item_type_in_scope to return all supported types when None is passed
+        mock_validate_item_type.return_value = list(constants.ACCEPTED_ITEM_TYPES)
+        mock_validate_env.return_value = "Test"
+        mock_param_instance = mock.MagicMock()
+        mock_param.return_value = mock_param_instance
+        mock_param_instance._validate_parameter_file.return_value = True
+
+        # Call the function
+        from fabric_cicd._parameter._utils import validate_parameter_file
+
+        # Patch the FabricEndpoint inside the test since we need it to run successfully
+        with mock.patch("fabric_cicd._common._fabric_endpoint.FabricEndpoint", return_value=mock.MagicMock()):
+            result = validate_parameter_file(
+                repository_directory=Path("/mock/repo"),
+                environment="Test",
+            )
+
+        # Verify the result
+        assert result is True
+        # Verify that validate_item_type_in_scope was called with None
+        mock_validate_item_type.assert_called_once_with(None)
+        # Verify Parameter was called with all supported item types
+        mock_param.assert_called_once_with(
+            repository_directory=Path("/mock/repo"),
+            item_type_in_scope=list(constants.ACCEPTED_ITEM_TYPES),
+            environment="Test",
+            parameter_file_name="parameter.yml",
+            parameter_file_path=None,
+        )
+        mock_param_instance._validate_parameter_file.assert_called_once()
+
     def test_find_match(self):
         """Tests _find_match function with various inputs."""
         # Test with None param_value
@@ -810,6 +918,276 @@ class TestParameterUtilities:
         # Test with invalid JSON content
         with pytest.raises(ValueError, match="Expecting property name"):
             replace_key_value(mock_workspace, param_dict, "{invalid json}", "dev")
+
+    def test_replace_key_value_with_items_notation(self, mock_workspace):
+        """Test replace_key_value function with $items notation."""
+        # Mock the workspace to return item attributes
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "TestLakehouse": {
+                    "id": "test-lakehouse-id-12345",
+                    "sqlendpoint": "test-lakehouse.database.windows.net",
+                }
+            },
+            "Warehouse": {
+                "TestWarehouse": {
+                    "id": "test-warehouse-id-67890",
+                    "sqlendpoint": "test-warehouse.database.windows.net",
+                }
+            },
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        # Test JSON with item references
+        test_json = '{"lakehouse": {"id": "placeholder-id", "endpoint": "placeholder-endpoint"}}'
+
+        # Test with $items notation for lakehouse id
+        param_dict = {
+            "find_key": "$.lakehouse.id",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$id",
+                "prod": "$items.Lakehouse.TestLakehouse.$id",
+            },
+        }
+
+        # Test successful replacement with $items notation
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["lakehouse"]["id"] == "test-lakehouse-id-12345"
+        assert result_data["lakehouse"]["endpoint"] == "placeholder-endpoint"  # Unchanged
+
+        # Test with $items notation for sqlendpoint
+        param_dict = {
+            "find_key": "$.lakehouse.endpoint",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$sqlendpoint",
+                "prod": "$items.Warehouse.TestWarehouse.$sqlendpoint",
+            },
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["lakehouse"]["endpoint"] == "test-lakehouse.database.windows.net"
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "prod")
+        result_data = json.loads(result)
+        assert result_data["lakehouse"]["endpoint"] == "test-warehouse.database.windows.net"
+
+    def test_replace_key_value_with_items_notation_and_non_string_values(self, mock_workspace):
+        """Test replace_key_value function with $items notation mixed with other value types."""
+        # Mock the workspace to return item attributes
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "TestLakehouse": {
+                    "id": "test-lakehouse-id-12345",
+                }
+            },
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        # Test JSON with mixed value types
+        test_json = '{"config": {"enabled": false, "count": 100, "lakehouse_id": "placeholder"}}'
+
+        # Test with boolean value (should not process as $items)
+        param_dict = {
+            "find_key": "$.config.enabled",
+            "replace_value": {"dev": True, "prod": False},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["config"]["enabled"] is True
+
+        # Test with integer value (should not process as $items)
+        param_dict = {
+            "find_key": "$.config.count",
+            "replace_value": {"dev": 200, "prod": 300},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["config"]["count"] == 200
+
+        # Test with string $items notation
+        param_dict = {
+            "find_key": "$.config.lakehouse_id",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$id",
+                "prod": "$items.Lakehouse.TestLakehouse.$id",
+            },
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_json, "dev")
+        result_data = json.loads(result)
+        assert result_data["config"]["lakehouse_id"] == "test-lakehouse-id-12345"
+
+    def test_replace_key_value_yaml_valid(self, mock_workspace):
+        """Tests replace_key_value_yaml with valid YAML content and environment."""
+        # Test YAML with server host configuration
+        test_yaml = """server:
+  host: localhost
+  port: 8080
+"""
+        param_dict = {
+            "find_key": "$.server.host",
+            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
+        }
+
+        # Test successful replacement for dev environment
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["server"]["host"] == "dev-server.example.com"
+        assert result_data["server"]["port"] == 8080  # Verify other values unchanged
+
+        # Test successful replacement for prod environment
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "prod", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["server"]["host"] == "prod-server.example.com"
+
+    def test_replace_key_value_yaml_environment_not_found(self, mock_workspace):
+        """Tests replace_key_value_yaml when environment is not in the replace_value dictionary."""
+        test_yaml = """server:
+  host: localhost
+  port: 8080
+"""
+        param_dict = {
+            "find_key": "$.server.host",
+            "replace_value": {"dev": "dev-server.example.com", "prod": "prod-server.example.com"},
+        }
+
+        # Test when environment not in replace_value
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "test", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["server"]["host"] == "localhost"  # Original value unchanged
+
+    def test_replace_key_value_yaml_invalid(self, mock_workspace):
+        """Tests replace_key_value_yaml with invalid YAML content."""
+        invalid_yaml = "invalid: yaml: content: [unclosed"
+        param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
+
+        # YAMLError will be raised for invalid YAML and wrapped in ValueError
+        with pytest.raises(ValueError, match="mapping values are not allowed"):
+            replace_key_value(mock_workspace, param_dict, invalid_yaml, "dev", is_yaml=True)
+
+    def test_replace_key_value_yaml_empty_content(self, mock_workspace):
+        """Tests replace_key_value_yaml with empty YAML content."""
+        empty_yaml = ""
+        param_dict = {"find_key": "$.server.host", "replace_value": {"dev": "test-server"}}
+
+        # Empty YAML should return as-is
+        result = replace_key_value(mock_workspace, param_dict, empty_yaml, "dev", is_yaml=True)
+        assert result == empty_yaml
+
+    def test_replace_key_value_yaml_nested_structure(self, mock_workspace):
+        """Tests replace_key_value_yaml with nested YAML structure like SparkCompute.yml."""
+        # Test YAML similar to SparkCompute.yml
+        test_yaml = """enable_native_execution_engine: false
+driver_cores: 8
+driver_memory: 56g
+executor_cores: 8
+executor_memory: 56g
+dynamic_executor_allocation:
+  enabled: true
+  min_executors: 1
+  max_executors: 9
+runtime_version: "1.2"
+"""
+        # Test replacing a nested value
+        param_dict = {
+            "find_key": "$.dynamic_executor_allocation.max_executors",
+            "replace_value": {"dev": 5, "prod": 20},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["dynamic_executor_allocation"]["max_executors"] == 5
+        assert result_data["dynamic_executor_allocation"]["min_executors"] == 1  # Unchanged
+
+        # Test replacing a top-level value
+        param_dict = {
+            "find_key": "$.driver_cores",
+            "replace_value": {"dev": 4, "prod": 16},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "prod", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["driver_cores"] == 16
+
+    def test_replace_key_value_yaml_with_items_notation(self, mock_workspace):
+        """Test replace_key_value_yaml function with $items notation."""
+        # Mock the workspace to return item attributes
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "TestLakehouse": {
+                    "id": "test-lakehouse-id-12345",
+                    "sqlendpoint": "test-lakehouse.database.windows.net",
+                }
+            },
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        # Test YAML with item references
+        test_yaml = """lakehouse:
+  id: placeholder-id
+  endpoint: placeholder-endpoint
+"""
+
+        # Test with $items notation for lakehouse id
+        param_dict = {
+            "find_key": "$.lakehouse.id",
+            "replace_value": {
+                "dev": "$items.Lakehouse.TestLakehouse.$id",
+                "prod": "$items.Lakehouse.TestLakehouse.$id",
+            },
+        }
+
+        # Test successful replacement with $items notation
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["lakehouse"]["id"] == "test-lakehouse-id-12345"
+        assert result_data["lakehouse"]["endpoint"] == "placeholder-endpoint"  # Unchanged
+
+    def test_replace_key_value_yaml_with_non_string_values(self, mock_workspace):
+        """Test replace_key_value_yaml function with non-string value types."""
+        # Test YAML with mixed value types
+        test_yaml = """config:
+  enabled: false
+  count: 100
+  threshold: 0.5
+  items:
+    - item1
+    - item2
+"""
+
+        # Test with boolean value
+        param_dict = {
+            "find_key": "$.config.enabled",
+            "replace_value": {"dev": True, "prod": False},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["config"]["enabled"] is True
+
+        # Test with integer value
+        param_dict = {
+            "find_key": "$.config.count",
+            "replace_value": {"dev": 200, "prod": 300},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["config"]["count"] == 200
+
+        # Test with float value
+        param_dict = {
+            "find_key": "$.config.threshold",
+            "replace_value": {"dev": 0.8, "prod": 0.95},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result)
+        assert result_data["config"]["threshold"] == 0.8
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
@@ -953,6 +1331,37 @@ class TestParameterUtilities:
         # Dictionary should remain unchanged
         assert result == replace_value_dict_5
         assert "TEST" not in result
+
+    def test_validate_item_type_in_scope_with_none(self):
+        """Tests validate_item_type_in_scope function when None is passed."""
+        from fabric_cicd._common._validate_input import validate_item_type_in_scope
+
+        # Test with None - should return all accepted item types
+        result = validate_item_type_in_scope(None)
+        assert result == list(constants.ACCEPTED_ITEM_TYPES)
+        assert len(result) > 0  # Ensure we got some types back
+        # Verify a few expected types are in the result
+        assert "Notebook" in result
+        assert "DataPipeline" in result
+        assert "Environment" in result
+
+    def test_validate_item_type_in_scope_with_valid_list(self):
+        """Tests validate_item_type_in_scope function with a valid list."""
+        from fabric_cicd._common._validate_input import validate_item_type_in_scope
+
+        # Test with valid list
+        valid_types = ["Notebook", "Lakehouse", "Environment"]
+        result = validate_item_type_in_scope(valid_types)
+        assert result == valid_types
+
+    def test_validate_item_type_in_scope_with_invalid_type(self):
+        """Tests validate_item_type_in_scope function with invalid item type."""
+        from fabric_cicd._common._validate_input import validate_item_type_in_scope
+
+        # Test with invalid item type
+        invalid_types = ["Notebook", "InvalidType", "Environment"]
+        with pytest.raises(InputError, match="Invalid or unsupported item type: 'InvalidType'"):
+            validate_item_type_in_scope(invalid_types)
 
 
 class TestPathUtilities:

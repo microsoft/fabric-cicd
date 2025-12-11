@@ -10,6 +10,7 @@ from pathlib import Path
 
 import filetype
 import requests
+import yaml
 from packaging import version
 
 import fabric_cicd.constants as constants
@@ -142,4 +143,21 @@ def check_valid_json_content(content: str) -> bool:
         json.loads(content)
         return True
     except json.JSONDecodeError:
+        return False
+
+
+def check_valid_yaml_content(content: str) -> bool:
+    """
+    Check if the given string content is valid YAML.
+
+    Args:
+        content: The string content to validate as YAML.
+
+    Returns:
+        bool: True if the content is valid YAML, False otherwise.
+    """
+    try:
+        yaml.safe_load(content)
+        return True
+    except yaml.YAMLError:
         return False
