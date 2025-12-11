@@ -11,15 +11,15 @@ set -e
 PACKAGES=""
 if ! command -v python &> /dev/null; then PACKAGES="$PACKAGES python3"; fi
 if ! command -v pip &> /dev/null; then PACKAGES="$PACKAGES python3-pip"; fi
+if ! command -v ruff &> /dev/null; then PACKAGES="$PACKAGES ruff"; fi
 if [ ! -z "$PACKAGES" ]; then
     sudo apt-get update 2>&1 > /dev/null
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $PACKAGES 2>&1 > /dev/null
 fi
-
-if ! command -v uv &> /dev/null; then pip install --break-system-packages uv; fi
-if ! command -v ruff &> /dev/null; then pip install --break-system-packages ruff; fi
+command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$PATH:$HOME/.local/bin"
+[[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]] && export PATH="$PATH:$HOME/.cargo/bin"
 
 uv sync --python 3.11
 [ -f .venv/bin/activate ] && source .venv/bin/activate
