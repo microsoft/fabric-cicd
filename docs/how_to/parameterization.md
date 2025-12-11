@@ -1112,10 +1112,11 @@ find_replace:
       file_path: "/MyReport.Report/definition.pbir"
     
     # Replace semantic model ID in connection string with dynamic replacement
+    # Note: Replace 'YourSemanticModelName' with the actual semantic model name from your repository
     - find_value: "00000000-0000-0000-0000-000000000000"
       replace_value:
-          PPE: "$items.SemanticModel.MyModel.$id"
-          PROD: "$items.SemanticModel.MyModel.$id"
+          PPE: "$items.SemanticModel.YourSemanticModelName.$id"
+          PROD: "$items.SemanticModel.YourSemanticModelName.$id"
       item_type: "Report"
       file_path: "/MyReport.Report/definition.pbir"
 ```

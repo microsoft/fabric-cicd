@@ -61,6 +61,7 @@ find_replace:
       item_type: "Report"
       file_path: "/ByConnection.Report/definition.pbir"
     # Report byConnection - semantic model id in connection string using dynamic replacement
+    # This example references ABC.SemanticModel from the sample workspace
     - find_value: "00000000-0000-0000-0000-000000000000"
       replace_value:
       # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
