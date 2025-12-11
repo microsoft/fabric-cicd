@@ -123,7 +123,7 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         shortcuts = []
 
     # Filter shortcuts based on exclude regex if provided
-    if hasattr(fabric_workspace_obj, "shortcut_exclude_regex") and fabric_workspace_obj.shortcut_exclude_regex:
+    if fabric_workspace_obj.shortcut_exclude_regex:
         regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
         original_count = len(shortcuts)
         shortcuts = [s for s in shortcuts if not regex_pattern.match(s["name"])]
@@ -186,7 +186,7 @@ def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, s
 
     # Filter shortcuts based on exclude regex if provided
     filtered_paths = shortcut_paths
-    if hasattr(fabric_workspace_obj, "shortcut_exclude_regex") and fabric_workspace_obj.shortcut_exclude_regex:
+    if fabric_workspace_obj.shortcut_exclude_regex:
         regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
         original_count = len(shortcut_paths)
         # Extract shortcut name from path (format: "path/name")
