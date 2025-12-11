@@ -1068,3 +1068,107 @@ shared Table_DataDestination = let
 in
   TableNavigation;
 ```
+
+### Reports
+
+Reports can reference Semantic Models in two ways: `byPath` (relative path to a model in the same repository) or `byConnection` (connection string to a model in Power BI service). 
+
+#### `byPath` Parameterization
+
+When a Report uses `byPath` to reference a Semantic Model in the same repository, the library automatically converts it to a `byConnection` format during deployment. The Semantic Model must exist in the repository for this to work.
+
+**No parameterization is needed** for `byPath` references when the Semantic Model is deployed in the same workspace - the library handles this automatically.
+
+#### `byConnection` Parameterization
+
+When Reports and Semantic Models are deployed separately (e.g., models first, then reports), or when Reports need to connect to models in Power BI Online service, use `byConnection` with parameterization to rebind reports to different semantic models across environments.
+
+**Case:** A Report uses `byConnection` to reference a Semantic Model that is deployed to Power BI Online. The connection string contains environment-specific workspace IDs, semantic model names, and semantic model IDs that need to be updated when deploying to different environments (PPE/PROD/etc).
+
+**Solution:** Use `find_replace` or `key_value_replace` in the `parameter.yml` file to parameterize the connection string components.
+
+<span class="md-h4-nonanchor">Option 1: Using `find_replace` for individual components</span>
+
+This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This is useful when you want to replace specific parts while keeping the rest of the connection string unchanged.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    # Replace workspace ID in connection string
+    - find_value: "dev-workspace-id"
+      replace_value:
+          PPE: "ppe-workspace-guid"
+          PROD: "prod-workspace-guid"
+      item_type: "Report"
+      file_path: "/MyReport.Report/definition.pbir"
+    
+    # Replace semantic model name in connection string
+    - find_value: "dev-semantic-model"
+      replace_value:
+          PPE: "ppe-semantic-model-name"
+          PROD: "prod-semantic-model-name"
+      item_type: "Report"
+      file_path: "/MyReport.Report/definition.pbir"
+    
+    # Replace semantic model ID in connection string with dynamic replacement
+    - find_value: "00000000-0000-0000-0000-000000000000"
+      replace_value:
+          PPE: "$items.SemanticModel.MyModel.$id"
+          PROD: "$items.SemanticModel.MyModel.$id"
+      item_type: "Report"
+      file_path: "/MyReport.Report/definition.pbir"
+```
+
+<span class="md-h4-nonanchor">definition.pbir file (source control)</span>
+
+```json
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
+  "version": "4.0",
+  "datasetReference": {
+    "byConnection": {
+      "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev-workspace-id;initial catalog=dev-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=00000000-0000-0000-0000-000000000000"
+    }
+  }
+}
+```
+
+**Note:** Using dynamic replacement (`$items.SemanticModel.MyModel.$id`) requires the Semantic Model to exist in the repository and be deployed to the target workspace before the Report is deployed.
+
+<span class="md-h4-nonanchor">Option 2: Using `key_value_replace` for entire connection string</span>
+
+This approach replaces the entire connection string with environment-specific values. This is useful when the entire connection string format differs between environments.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+key_value_replace:
+    - find_key: $.datasetReference.byConnection.connectionString
+      replace_value:
+          PPE: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/ppe-workspace-guid;initial catalog=ppe-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=ppe-model-guid"
+          PROD: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/prod-workspace-guid;initial catalog=prod-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=prod-model-guid"
+      item_type: "Report"
+      item_name: "MyReport"
+```
+
+<span class="md-h4-nonanchor">definition.pbir file (source control)</span>
+
+```json
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
+  "version": "4.0",
+  "datasetReference": {
+    "byConnection": {
+      "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev-workspace-id;initial catalog=dev-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=00000000-0000-0000-0000-000000000000"
+    }
+  }
+}
+```
+
+**Important Considerations:**
+
+-   Reports with `byConnection` references are deployed as-is to the target workspace with the parameterized connection string.
+-   The connection string format shown above is the standard Power BI connection string format for connecting to semantic models.
+-   When using `find_replace`, be specific with your find values to avoid unintended replacements (e.g., use unique placeholder values like "dev-workspace-id" rather than just "dev").
+-   When using `key_value_replace`, the JSONPath expression `$.datasetReference.byConnection.connectionString` targets the connectionString field within the byConnection object.

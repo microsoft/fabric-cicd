@@ -44,6 +44,31 @@ find_replace:
         PROD: "$items.Eventhouse.SampleEventhouse.queryserviceuri" 
       # Optional fields:
       file_path: "/Example Notebook.Notebook/notebook-content.py"
+    # Report byConnection - workspace id in connection string
+    - find_value: "dev-workspace-id"
+      replace_value:
+        PPE: "ppe-workspace-guid"
+        PROD: "prod-workspace-guid"
+      # Optional fields:
+      item_type: "Report"
+      file_path: "/ByConnection.Report/definition.pbir"
+    # Report byConnection - semantic model name in connection string
+    - find_value: "dev-semantic-model"
+      replace_value:
+        PPE: "ppe-semantic-model-name"
+        PROD: "prod-semantic-model-name"
+      # Optional fields:
+      item_type: "Report"
+      file_path: "/ByConnection.Report/definition.pbir"
+    # Report byConnection - semantic model id in connection string using dynamic replacement
+    - find_value: "00000000-0000-0000-0000-000000000000"
+      replace_value:
+      # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
+        PPE: "$items.SemanticModel.ABC.$id"
+        PROD: "$items.SemanticModel.ABC.$id"
+      # Optional fields:
+      item_type: "Report"
+      file_path: "/ByConnection.Report/definition.pbir"
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
@@ -79,6 +104,14 @@ key_value_replace:
         PPE: false
         PROD: true
       file_path: "**/.schedules"
+    # Report byConnection - Replace entire connection string using JSONPath
+    - find_key: $.datasetReference.byConnection.connectionString
+      replace_value:
+        PPE: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/ppe-workspace-guid;initial catalog=ppe-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=ppe-model-guid"
+        PROD: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/prod-workspace-guid;initial catalog=prod-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=prod-model-guid"
+      # Optional fields:
+      item_type: "Report"
+      item_name: "ByConnection"
 
 spark_pool:
     # CapacityPool_Large
