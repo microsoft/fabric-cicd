@@ -13,8 +13,8 @@ if ! command -v python &> /dev/null; then PACKAGES="$PACKAGES python3"; fi
 if ! command -v pip &> /dev/null; then PACKAGES="$PACKAGES python3-pip"; fi
 if ! command -v ruff &> /dev/null; then PACKAGES="$PACKAGES ruff"; fi
 if [ ! -z "$PACKAGES" ]; then
-    sudo apt-get update 2>&1 > /dev/null
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $PACKAGES 2>&1 > /dev/null
+    sudo apt-get update > /dev/null 2>&1
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $PACKAGES > /dev/null 2>&1
 fi
 command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 
