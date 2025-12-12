@@ -550,11 +550,6 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
-        if param_name == "semantic_model_binding":
-            is_valid, msg = self._validate_semantic_model_name()
-            if not is_valid:
-                return False, msg
-
         if param_name == "key_value_replace":
             is_valid, msg = self._validate_key_value_find_key(param_dict)
             if not is_valid:

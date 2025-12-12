@@ -74,6 +74,9 @@ PROPERTY_PATH_ATTR_MAPPING = {
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+# Parameters to validate
+PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
+
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
