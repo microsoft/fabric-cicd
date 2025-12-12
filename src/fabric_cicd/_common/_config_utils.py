@@ -97,6 +97,12 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
             else:
                 settings["items_to_include"] = publish_config["items_to_include"]
 
+        if "shortcut_exclude_regex" in publish_config:
+            if isinstance(publish_config["shortcut_exclude_regex"], dict):
+                settings["shortcut_exclude_regex"] = publish_config["shortcut_exclude_regex"][environment]
+            else:
+                settings["shortcut_exclude_regex"] = publish_config["shortcut_exclude_regex"]
+
         if "skip" in publish_config:
             if isinstance(publish_config["skip"], dict):
                 settings["skip"] = publish_config["skip"].get(environment, False)
@@ -124,6 +130,12 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
                 settings["items_to_include"] = unpublish_config["items_to_include"][environment]
             else:
                 settings["items_to_include"] = unpublish_config["items_to_include"]
+
+        if "shortcut_exclude_regex" in unpublish_config:
+            if isinstance(unpublish_config["shortcut_exclude_regex"], dict):
+                settings["shortcut_exclude_regex"] = unpublish_config["shortcut_exclude_regex"][environment]
+            else:
+                settings["shortcut_exclude_regex"] = unpublish_config["shortcut_exclude_regex"]
 
         if "skip" in unpublish_config:
             if isinstance(unpublish_config["skip"], dict):

@@ -106,6 +106,8 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
         item_obj: The item object to publish shortcuts for
     """
+    from fabric_cicd._common._check_utils import check_regex
+
     deployed_shortcuts = list_deployed_shortcuts(fabric_workspace_obj, item_obj)
 
     shortcut_file_obj = next((file for file in item_obj.item_files if file.name == "shortcuts.metadata.json"), None)
@@ -119,6 +121,17 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
     else:
         logger.debug("No shortcuts.metadata.json found")
         shortcuts = []
+
+    # Filter shortcuts based on exclude regex if provided
+    if fabric_workspace_obj.shortcut_exclude_regex:
+        regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
+        original_count = len(shortcuts)
+        shortcuts = [s for s in shortcuts if not regex_pattern.match(s["name"])]
+        excluded_count = original_count - len(shortcuts)
+        if excluded_count > 0:
+            logger.info(
+                f"{constants.INDENT}Excluded {excluded_count} shortcut(s) from deployment based on regex pattern"
+            )
 
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 
@@ -169,7 +182,22 @@ def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, s
         item_obj: The item object to publish shortcuts for
         shortcut_paths: The list of shortcut paths to unpublish
     """
-    for deployed_shortcut_path in shortcut_paths:
+    from fabric_cicd._common._check_utils import check_regex
+
+    # Filter shortcuts based on exclude regex if provided
+    filtered_paths = shortcut_paths
+    if fabric_workspace_obj.shortcut_exclude_regex:
+        regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
+        original_count = len(shortcut_paths)
+        # Extract shortcut name from path (format: "path/name")
+        filtered_paths = [path for path in shortcut_paths if not regex_pattern.match(path.split("/")[-1])]
+        excluded_count = original_count - len(filtered_paths)
+        if excluded_count > 0:
+            logger.info(
+                f"{constants.INDENT}Excluded {excluded_count} shortcut(s) from unpublish based on regex pattern"
+            )
+
+    for deployed_shortcut_path in filtered_paths:
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/delete-shortcut
         fabric_workspace_obj.endpoint.invoke(
             method="DELETE",
