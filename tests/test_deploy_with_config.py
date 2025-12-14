@@ -643,6 +643,8 @@ class TestDeployWithConfig:
             items_to_include=None,
             shortcut_exclude_regex="^temp_.*",
         )
+        # Verify unpublish was also called (but without shortcut_exclude_regex since it's publish-only)
+        mock_unpublish.assert_called_once()
 
 
 class TestConfigIntegration:
