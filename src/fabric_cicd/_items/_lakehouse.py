@@ -126,7 +126,7 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
     if fabric_workspace_obj.shortcut_exclude_regex:
         regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
         original_count = len(shortcuts)
-        shortcuts = [s for s in shortcuts if not regex_pattern.match(s["name"])]
+        shortcuts = [s for s in shortcuts if "name" in s and not regex_pattern.match(s["name"])]
         excluded_count = original_count - len(shortcuts)
         if excluded_count > 0:
             logger.info(
@@ -190,7 +190,9 @@ def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, s
         regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
         original_count = len(shortcut_paths)
         # Extract shortcut name from path (format: "path/name")
-        filtered_paths = [path for path in shortcut_paths if not regex_pattern.match(path.split("/")[-1])]
+        filtered_paths = [
+            path for path in shortcut_paths if path and "/" in path and not regex_pattern.match(path.rsplit("/", 1)[-1])
+        ]
         excluded_count = original_count - len(filtered_paths)
         if excluded_count > 0:
             logger.info(

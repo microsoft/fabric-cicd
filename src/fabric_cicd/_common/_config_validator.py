@@ -785,8 +785,13 @@ class ConfigValidator:
                     )
                 )
 
-        # Validate shortcut_exclude_regex if present
+        # Validate shortcut_exclude_regex if present (publish only)
         if "shortcut_exclude_regex" in section:
+            if section_name != "publish":
+                self.errors.append(
+                    f"'{section_name}.shortcut_exclude_regex' is not supported - shortcut exclusion is only available in the 'publish' section"
+                )
+
             shortcut_exclude_regex = section["shortcut_exclude_regex"]
             if isinstance(shortcut_exclude_regex, str):
                 if not shortcut_exclude_regex.strip():
