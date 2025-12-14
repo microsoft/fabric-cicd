@@ -603,6 +603,47 @@ class TestDeployWithConfig:
         mock_publish.assert_called_once()
         mock_unpublish.assert_called_once()
 
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_shortcut_exclude_regex(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test deployment with shortcut_exclude_regex in config."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file with shortcut_exclude_regex
+        config_data = {
+            "core": {
+                "workspace_id": "12345678-1234-1234-1234-123456789abc",
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Lakehouse"],
+            },
+            "publish": {
+                "shortcut_exclude_regex": "^temp_.*",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        deploy_with_config(str(config_file), "dev")
+
+        # Verify publish was called with shortcut_exclude_regex parameter
+        mock_publish.assert_called_once_with(
+            mock_workspace_instance,
+            item_name_exclude_regex=None,
+            folder_path_exclude_regex=None,
+            items_to_include=None,
+            shortcut_exclude_regex="^temp_.*",
+        )
+
 
 class TestConfigIntegration:
     """Integration tests for config functionality."""
