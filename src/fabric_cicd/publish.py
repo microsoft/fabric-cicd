@@ -309,7 +309,6 @@ def unpublish_all_orphan_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: str = "^$",
     items_to_include: Optional[list[str]] = None,
-    shortcut_exclude_regex: Optional[str] = None,
 ) -> None:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
@@ -318,7 +317,6 @@ def unpublish_all_orphan_items(
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished. Default is '^$' which will exclude nothing.
         items_to_include: List of items in the format "item_name.item_type" that should be unpublished.
-        shortcut_exclude_regex: Regex pattern to exclude specific shortcuts from being unpublished from lakehouses.
 
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing is not recommended due to item dependencies.
@@ -380,19 +378,6 @@ def unpublish_all_orphan_items(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
         is_items_to_include_list = True
-
-    if shortcut_exclude_regex:
-        if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_shortcut_exclude" not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_shortcut_exclude' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Shortcut exclusion is enabled for unpublish.")
-        logger.warning(
-            "Using shortcut_exclude_regex will selectively exclude shortcuts from being unpublished from lakehouses. Use with caution."
-        )
-        fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
@@ -584,7 +569,6 @@ def deploy_with_config(
             workspace,
             item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
             items_to_include=unpublish_settings.get("items_to_include"),
-            shortcut_exclude_regex=unpublish_settings.get("shortcut_exclude_regex"),
         )
     else:
         logger.info(f"Skipping unpublish operation for environment '{environment}'")

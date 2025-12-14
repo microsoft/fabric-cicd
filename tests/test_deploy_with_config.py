@@ -368,31 +368,6 @@ class TestUnpublishSettingsExtraction:
         settings = extract_unpublish_settings(config, "dev")
         assert settings == {}
 
-    def test_extract_unpublish_settings_with_shortcut_exclude_regex(self):
-        """Test extracting unpublish settings with shortcut_exclude_regex."""
-        config = {
-            "unpublish": {
-                "shortcut_exclude_regex": "^temp_.*",
-            }
-        }
-
-        settings = extract_unpublish_settings(config, "dev")
-        assert settings["shortcut_exclude_regex"] == "^temp_.*"
-
-    def test_extract_unpublish_settings_with_environment_specific_shortcut_exclude_regex(self):
-        """Test extracting unpublish settings with environment-specific shortcut_exclude_regex."""
-        config = {
-            "unpublish": {
-                "shortcut_exclude_regex": {"dev": "^dev_temp_.*", "prod": "^staging_.*"},
-            }
-        }
-
-        settings = extract_unpublish_settings(config, "dev")
-        assert settings["shortcut_exclude_regex"] == "^dev_temp_.*"
-
-        settings = extract_unpublish_settings(config, "prod")
-        assert settings["shortcut_exclude_regex"] == "^staging_.*"
-
 
 class TestConfigOverrides:
     """Test feature flags and constants overrides."""
@@ -488,7 +463,6 @@ class TestDeployWithConfig:
             mock_workspace_instance,
             item_name_exclude_regex="^DEBUG.*",
             items_to_include=None,
-            shortcut_exclude_regex=None,
         )
 
     @patch("fabric_cicd.publish.FabricWorkspace")

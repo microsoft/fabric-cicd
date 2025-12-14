@@ -131,12 +131,6 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
             else:
                 settings["items_to_include"] = unpublish_config["items_to_include"]
 
-        if "shortcut_exclude_regex" in unpublish_config:
-            if isinstance(unpublish_config["shortcut_exclude_regex"], dict):
-                settings["shortcut_exclude_regex"] = unpublish_config["shortcut_exclude_regex"][environment]
-            else:
-                settings["shortcut_exclude_regex"] = unpublish_config["shortcut_exclude_regex"]
-
         if "skip" in unpublish_config:
             if isinstance(unpublish_config["skip"], dict):
                 settings["skip"] = unpublish_config["skip"].get(environment, False)

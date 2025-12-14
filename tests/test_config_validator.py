@@ -1750,14 +1750,6 @@ class TestOperationSectionValidation:
 
         assert self.validator.errors == []
 
-    def test_validate_operation_section_with_shortcut_exclude_regex_in_unpublish(self):
-        """Test _validate_operation_section with shortcut_exclude_regex in unpublish section."""
-        section = {"shortcut_exclude_regex": "^temp_.*"}
-
-        self.validator._validate_operation_section(section, "unpublish")
-
-        assert self.validator.errors == []
-
 
 class TestFeaturesSectionValidation:
     """Tests for features section validation."""
