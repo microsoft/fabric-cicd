@@ -511,6 +511,10 @@ class Parameter:
                     )
                 )
 
+        # Validate semantic model names are unique (once after all entries processed)
+        if param_name == "semantic_model_binding":
+            self._validate_semantic_model_name()
+
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
     def _validate_parameter_keys(self, param_name: str, param_keys: list) -> tuple[bool, str]:
@@ -577,14 +581,8 @@ class Parameter:
 
         return True, "Valid JSONPath"
 
-    def _validate_semantic_model_name(self) -> tuple[bool, str]:
-        """
-        Validate that semantic model names are unique across all semantic_model_binding entries.
-
-        Returns:
-            Tuple of (is_valid, message) where is_valid indicates if validation passed
-            and message contains either success or error details.
-        """
+    def _validate_semantic_model_name(self) -> None:
+        """Validate that semantic model names are unique across all semantic_model_binding entries."""
         names = []
         for entry in self.environment_parameter.get("semantic_model_binding", []):
             raw = entry.get("semantic_model_name", [])
@@ -594,9 +592,7 @@ class Parameter:
                 names.extend(n for n in raw if isinstance(n, str))
         duplicates = {n for n in names if names.count(n) > 1}
         if duplicates:
-            msg = f"Duplicate semantic model names found: {', '.join(sorted(duplicates))}"
-            return False, msg
-        return True, "No duplicate semantic model names found"
+            logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
 
     def _validate_find_regex(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
         """Validate the find_value is a valid regex if is_regex is set to true."""
