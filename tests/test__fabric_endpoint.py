@@ -143,6 +143,94 @@ def test_invoke_exception(setup_mocks):
         endpoint.invoke("GET", "http://example.com")
 
 
+def test_invoke_poll_long_running_false_with_202(setup_mocks):
+    """Test invoke method with poll_long_running=False exits early on 202 response."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=202,
+        headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
+        json=Mock(return_value={}),
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    response = endpoint.invoke("POST", "http://example.com", poll_long_running=False)
+
+    # Should exit immediately without polling
+    assert response["status_code"] == 202
+    assert mock_requests.call_count == 1  # Only one request, no polling
+
+
+def test_invoke_poll_long_running_true_with_202(setup_mocks, monkeypatch):
+    """Test invoke method with poll_long_running=True polls on 202 response."""
+    _, mock_requests = setup_mocks
+
+    # First call returns 202 with Location header, second call returns 200 with Succeeded status
+    mock_requests.side_effect = [
+        Mock(
+            status_code=202,
+            headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
+            json=Mock(return_value={}),
+            text="{}",
+        ),
+        Mock(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            json=Mock(return_value={"status": "Succeeded"}),
+            text='{"status": "Succeeded"}',
+        ),
+    ]
+
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Mock time.sleep to avoid delays in tests
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    response = endpoint.invoke("POST", "http://example.com", poll_long_running=True)
+
+    # Should poll and return final status
+    assert response["status_code"] == 200
+    assert mock_requests.call_count == 2  # Initial request + polling request
+
+
+def test_invoke_poll_long_running_default_with_202(setup_mocks, monkeypatch):
+    """Test invoke method with default poll_long_running (True) polls on 202 response."""
+    _, mock_requests = setup_mocks
+
+    # First call returns 202 with Location header, second call returns 200 with Succeeded status
+    mock_requests.side_effect = [
+        Mock(
+            status_code=202,
+            headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
+            json=Mock(return_value={}),
+            text="{}",
+        ),
+        Mock(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            json=Mock(return_value={"status": "Succeeded"}),
+            text='{"status": "Succeeded"}',
+        ),
+    ]
+
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Mock time.sleep to avoid delays in tests
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    # Don't pass poll_long_running, should default to True
+    response = endpoint.invoke("POST", "http://example.com")
+
+    # Should poll and return final status
+    assert response["status_code"] == 200
+    assert mock_requests.call_count == 2  # Initial request + polling request
+
+
 @pytest.mark.parametrize(
     ("auth_type", "expected_msg", "expected_upn_auth"),
     [

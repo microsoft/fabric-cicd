@@ -41,6 +41,7 @@ Before you begin, ensure you have the following installed:
         .\activate.ps1
         ```
         _Note that this is technically optional and is designed to work with PowerShell. You can execute these steps manually as well, this is merely a helper_
+        _For Linux, run `activate.sh` instead_
 
 1. **Select Python Interpreter**:
 
