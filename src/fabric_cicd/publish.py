@@ -204,12 +204,12 @@ def publish_all_items(
     if _should_publish_item_type("UserDataFunction"):
         print_header("Publishing User Data Functions")
         items.publish_userdatafunctions(fabric_workspace_obj)
-    if _should_publish_item_type("Notebook"):
-        print_header("Publishing Notebooks")
-        items.publish_notebooks(fabric_workspace_obj)
     if _should_publish_item_type("Eventhouse"):
         print_header("Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
+    if _should_publish_item_type("Notebook"):
+        print_header("Publishing Notebooks")
+        items.publish_notebooks(fabric_workspace_obj)
     if _should_publish_item_type("SemanticModel"):
         print_header("Publishing Semantic Models")
         items.publish_semanticmodels(fabric_workspace_obj)
@@ -366,21 +366,21 @@ def unpublish_all_orphan_items(
         "GraphQLApi",
         "DataPipeline",
         "Dataflow",
+        "KQLDashboard",
         "Eventstream",
         "Reflex",
-        "KQLDashboard",
         "KQLQueryset",
         "KQLDatabase",
         "CopyJob",
         "Report",
         "SemanticModel",
-        "Eventhouse",
         "Notebook",
+        "Eventhouse",
         "UserDataFunction",
         "Environment",
-        "MirroredDatabase",
         "SQLDatabase",
         "Lakehouse",
+        "MirroredDatabase",
         "Warehouse",
         "VariableLibrary",
     ]:
