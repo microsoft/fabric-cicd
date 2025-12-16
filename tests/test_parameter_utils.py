@@ -553,6 +553,7 @@ class TestParameterUtilities:
             "find_replace": [{"find_value": "test"}],
             "key_value_replace": [{"find_key": "$.test"}],
             "spark_pool": [{"instance_pool_id": "test"}],
+            "semantic_model_binding": [{"connection_id": "test"}],
         }
         assert is_valid_structure(valid_dict) is True
         assert is_valid_structure(valid_dict, "find_replace") is True
@@ -561,6 +562,7 @@ class TestParameterUtilities:
         invalid_dict = {
             "find_replace": "not a list",
             "key_value_replace": [{"find_key": "$.test"}],
+            "semantic_model_binding": "not a list",
         }
         assert is_valid_structure(invalid_dict) is False
         assert is_valid_structure(invalid_dict, "find_replace") is False

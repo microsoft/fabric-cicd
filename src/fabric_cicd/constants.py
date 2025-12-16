@@ -74,6 +74,9 @@ PROPERTY_PATH_ATTR_MAPPING = {
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+# Parameters to validate
+PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
+
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
@@ -133,6 +136,7 @@ PARAMETER_MSGS = {
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
     "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
+    "duplicate_semantic_model": "Duplicate semantic model names found: {}. Multiple connections to the same semantic model are permitted. Ensure this is intentional.",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",
