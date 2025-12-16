@@ -126,12 +126,14 @@ def process_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> 
     if fabric_workspace_obj.shortcut_exclude_regex:
         regex_pattern = check_regex(fabric_workspace_obj.shortcut_exclude_regex)
         original_count = len(shortcuts)
+        excluded_shortcuts = [s["name"] for s in shortcuts if "name" in s and regex_pattern.match(s["name"])]
         shortcuts = [s for s in shortcuts if "name" in s and not regex_pattern.match(s["name"])]
         excluded_count = original_count - len(shortcuts)
         if excluded_count > 0:
             logger.info(
-                f"{constants.INDENT}Excluded {excluded_count} shortcut(s) from deployment based on regex pattern"
+                f"{constants.INDENT}Excluded {excluded_count} shortcut(s) from {item_obj.name} deployment based on regex pattern"
             )
+            logger.info(f"{constants.INDENT}Excluded shortcuts: {excluded_shortcuts}")
 
     shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 
