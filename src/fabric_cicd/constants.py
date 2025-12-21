@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.32"
+VERSION = "0.1.33"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -74,6 +74,9 @@ PROPERTY_PATH_ATTR_MAPPING = {
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+# Parameters to validate
+PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
+
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
@@ -133,6 +136,7 @@ PARAMETER_MSGS = {
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
     "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
+    "duplicate_semantic_model": "Duplicate semantic model names found: {}. Multiple connections to the same semantic model are permitted. Ensure this is intentional.",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",
@@ -166,7 +170,10 @@ CONFIG_SECTIONS = {
         "type": dict,
         "settings": ["workspace_id", "workspace", "repository_directory", "item_types_in_scope", "parameter"],
     },
-    "publish": {"type": dict, "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "skip"]},
+    "publish": {
+        "type": dict,
+        "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "shortcut_exclude_regex", "skip"],
+    },
     "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
     "features": {"type": (list, dict), "settings": []},
     "constants": {"type": dict, "settings": []},

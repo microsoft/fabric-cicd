@@ -511,6 +511,10 @@ class Parameter:
                     )
                 )
 
+        # Validate semantic model names are unique (once after all entries processed)
+        if param_name == "semantic_model_binding":
+            self._validate_semantic_model_name()
+
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
     def _validate_parameter_keys(self, param_name: str, param_keys: list) -> tuple[bool, str]:
@@ -550,21 +554,35 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
-        if param_name == "semantic_model_binding":
-            is_valid, msg = self._validate_semantic_model_name()
+        if param_name == "key_value_replace":
+            is_valid, msg = self._validate_key_value_find_key(param_dict)
             if not is_valid:
                 return False, msg
 
         return True, constants.PARAMETER_MSGS["valid required values"].format(param_name)
 
-    def _validate_semantic_model_name(self) -> tuple[bool, str]:
-        """
-        Validate that semantic model names are unique across all semantic_model_binding entries.
+    def _validate_key_value_find_key(self, param_dict: dict) -> tuple[bool, str]:
+        """Validate the `find_key` JSONPath for key_value_replace (compile-only)."""
+        find_key = param_dict.get("find_key")
+        if not find_key or not isinstance(find_key, str) or not find_key.strip():
+            return False, "Missing or empty 'find_key' for key_value_replace"
 
-        Returns:
-            Tuple of (is_valid, message) where is_valid indicates if validation passed
-            and message contains either success or error details.
-        """
+        # Require absolute JSONPath root to avoid ambiguous relative paths
+        if not find_key.strip().startswith("$"):
+            return False, "find_key must be an absolute JSONPath starting with '$'"
+
+        try:
+            # jsonpath_ng.ext.parse supports extended JSONPath (dot/bracket)
+            from jsonpath_ng.ext import parse
+
+            parse(find_key)
+        except Exception as e:
+            return False, f"Invalid JSONPath expression '{find_key}': {e}"
+
+        return True, "Valid JSONPath"
+
+    def _validate_semantic_model_name(self) -> None:
+        """Validate that semantic model names are unique across all semantic_model_binding entries."""
         names = []
         for entry in self.environment_parameter.get("semantic_model_binding", []):
             raw = entry.get("semantic_model_name", [])
@@ -574,9 +592,7 @@ class Parameter:
                 names.extend(n for n in raw if isinstance(n, str))
         duplicates = {n for n in names if names.count(n) > 1}
         if duplicates:
-            msg = f"Duplicate semantic model names found: {', '.join(sorted(duplicates))}"
-            return False, msg
-        return True, "No duplicate semantic model names found"
+            logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
 
     def _validate_find_regex(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
         """Validate the find_value is a valid regex if is_regex is set to true."""
@@ -736,7 +752,7 @@ class Parameter:
                             is_valid, msg = validation_methods[param](item)
 
                     if not is_valid:
-                        logger.debug(msg)
+                        logger.error(msg)
                         return False, "no match"
 
         return True, constants.PARAMETER_MSGS["valid optional"].format(param_name)

@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 from typing import Optional, Union
 
+import yaml
 from azure.core.credentials import TokenCredential
 from jsonpath_ng.ext import parse
 
@@ -375,23 +376,36 @@ def process_environment_key(workspace_obj: FabricWorkspace, replace_value_dict: 
     return replace_value_dict
 
 
-"""Functions to replace key values in JSON"""
+"""Functions to replace key values in JSON or YAML"""
 
 
-def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_content: str, env: str) -> Union[dict]:
-    """A function to replace key values in a JSON using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
+def replace_key_value(
+    workspace_obj: FabricWorkspace, param_dict: dict, content: str, env: str, is_yaml: bool = False
+) -> str:
+    """A function to replace key values in a JSON or YAML using parameterization. It uses jsonpath_ng to find and replace values in the JSON.
 
     Args:
         workspace_obj: The FabricWorkspace object.
         param_dict: The parameter dictionary.
-        json_content: the JSON content to be modified.
+        content: the JSON/YAML content to be modified.
         env: The environment variable to be used for replacement.
+        is_yaml: A boolean indicating if the content is YAML (default is False for JSON).
     """
-    # Try to load the json content to a dictionary
-    try:
-        data = json.loads(json_content)
-    except json.JSONDecodeError as jde:
-        raise ValueError(jde) from jde
+    # Parse content to a dictionary based on format (YAML or JSON)
+    if is_yaml:
+        try:
+            data = yaml.safe_load(content)
+        except yaml.YAMLError as ye:
+            raise ValueError(ye) from ye
+
+        # Handle empty YAML files
+        if data is None:
+            return content
+    else:
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as jde:
+            raise ValueError(jde) from jde
 
     # Extract the jsonpath expression from the find_key attribute of the param_dict
     jsonpath_expr = parse(param_dict["find_key"])
@@ -406,12 +420,12 @@ def replace_key_value(workspace_obj: FabricWorkspace, param_dict: dict, json_con
                     processed_value = extract_replace_value(workspace_obj, processed_value)
                 match.full_path.update(data, processed_value)
                 logger.debug(
-                    f"Replace value: {processed_value} set for value: {match.value} found at path: {match.full_path}"
+                    f"Value: {match.value} found at path: {match.full_path} to be replaced with value: {processed_value}"
                 )
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 
-    return json.dumps(data)
+    return yaml.dump(data, default_flow_style=False, allow_unicode=True) if is_yaml else json.dumps(data)
 
 
 def replace_variables_in_parameter_file(raw_file: str) -> str:
@@ -442,7 +456,7 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
 
 def validate_parameter_file(
     repository_directory: str,
-    item_type_in_scope: list,
+    item_type_in_scope: Optional[list] = None,
     environment: str = "N/A",
     parameter_file_name: str = "parameter.yml",
     parameter_file_path: Optional[str] = None,
@@ -454,7 +468,7 @@ def validate_parameter_file(
 
     Args:
         repository_directory: The directory containing the items and parameter.yml file.
-        item_type_in_scope: A list of item types to validate.
+        item_type_in_scope: A list of item types to validate. If omitted, defaults to all supported item types.
         environment: The target environment.
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
         parameter_file_path: The path to the parameter file, if different from the default.
@@ -504,11 +518,8 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
     if param_name:
         return _check_parameter_structure(param_dict.get(param_name))
 
-    # Parameters to validate
-    param_names = ["find_replace", "key_value_replace", "spark_pool"]
-
     # Get only parameters that exist in param_dict
-    existing_params = [name for name in param_names if name in param_dict]
+    existing_params = [name for name in constants.PARAM_NAMES if name in param_dict]
 
     # If no parameters found, return False
     if not existing_params:

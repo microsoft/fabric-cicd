@@ -11,7 +11,11 @@ class DummyFile:
         self.relative_path = str(self.file_path).replace("\\", "/")
         self.type = "text"
         self.base64_payload = "payload"
-        self.contents = ""
+        # Read contents from file if it exists, otherwise empty string
+        if self.file_path.exists():
+            self.contents = self.file_path.read_text(encoding="utf-8")
+        else:
+            self.contents = ""
 
 
 class DummyItem:
@@ -188,6 +192,10 @@ def test_end_to_end_environment_setting_only(tmp_path):
                 )
             # leave skip_publish False so metadata publishing runs
 
+        def _replace_parameters(self, file_obj, _item_obj):
+            # Return the file contents unchanged for testing
+            return file_obj.contents
+
     ws = FakeWorkspace()
     env_module.publish_environments(ws)
 
@@ -258,6 +266,10 @@ def test_end_to_end_environment_with_libraries(tmp_path):
                 body={},
             )
 
+        def _replace_parameters(self, file_obj, _item_obj):
+            # Return the file contents unchanged for testing
+            return file_obj.contents
+
     ws = FakeWorkspace()
     env_module.publish_environments(ws)
 
@@ -288,9 +300,15 @@ def test_update_compute_settings_replaces_instance_pool(tmp_path):
             }
             self.endpoint = FakeEndpoint()
             self.base_api_url = "https://api.example"
+            # Create repository_items with Environment containing the item
+            self.repository_items = {"Environment": {"EnvPool": DummyItem("EnvPool", [sc])}}
+
+        def _replace_parameters(self, file_obj, _item_obj):
+            # Return the file contents unchanged for testing
+            return file_obj.contents
 
     from fabric_cicd._items._environment import _update_compute_settings
 
-    # call _update_compute_settings with FakeWS, path, guid, name and assert it runs without error
+    # call _update_compute_settings with FakeWS, guid, name and assert it runs without error
     ws_instance = FakeWS()
-    _update_compute_settings(ws_instance, env_dir, "guid", "EnvPool")
+    _update_compute_settings(ws_instance, "guid", "EnvPool")

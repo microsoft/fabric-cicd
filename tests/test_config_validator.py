@@ -1725,6 +1725,31 @@ class TestOperationSectionValidation:
         # We can't test the negative case (unpublish) directly due to missing error message key
         # So we'll just document that the feature should be restricted to publish section
 
+    def test_validate_operation_section_with_shortcut_exclude_regex(self):
+        """Test _validate_operation_section with shortcut_exclude_regex."""
+        section = {"shortcut_exclude_regex": "^temp_.*"}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert self.validator.errors == []
+
+    def test_validate_operation_section_with_invalid_shortcut_exclude_regex(self):
+        """Test _validate_operation_section with invalid shortcut_exclude_regex."""
+        section = {"shortcut_exclude_regex": "[invalid"}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert "is not a valid regex pattern" in self.validator.errors[0]
+
+    def test_validate_operation_section_with_shortcut_exclude_regex_environment_mapping(self):
+        """Test _validate_operation_section with shortcut_exclude_regex environment mapping."""
+        section = {"shortcut_exclude_regex": {"dev": "^dev_temp_.*", "prod": "^staging_.*"}}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert self.validator.errors == []
+
 
 class TestFeaturesSectionValidation:
     """Tests for features section validation."""
