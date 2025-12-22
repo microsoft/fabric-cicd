@@ -458,7 +458,7 @@ class Parameter:
             param_num_str = str(param_num) if multiple_param else ""
             find_value = parameter_dict.get(key_name)
             for step, validation_func in validation_steps:
-                if param_name in ["semantic_model_binding"] and step == "replace_value":
+                if param_name == "semantic_model_binding" and step == "replace_value":
                     continue
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
@@ -467,7 +467,7 @@ class Parameter:
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
 
             # Special case to skip environment validation for semantic_model_binding with string connection_id
-            if param_name in ["semantic_model_binding"] and isinstance(find_value, str):
+            if param_name == "semantic_model_binding" and isinstance(find_value, str):
                 continue
 
             # For semantic_model_binding with dict connection_id, validate environment
@@ -625,8 +625,6 @@ class Parameter:
         Returns:
             Tuple of (is_valid, message)
         """
-        import re
-
         if not connection_id_dict:
             return False, "connection_id dictionary cannot be empty"
 
