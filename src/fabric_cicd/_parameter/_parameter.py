@@ -465,9 +465,35 @@ class Parameter:
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-            # Special case to skip environment validation for semantic_model_binding
-            if param_name in ["semantic_model_binding"]:
+
+            # Special case to skip environment validation for semantic_model_binding with string connection_id
+            if param_name in ["semantic_model_binding"] and isinstance(find_value, str):
                 continue
+
+            # For semantic_model_binding with dict connection_id, validate environment
+            if param_name == "semantic_model_binding" and isinstance(find_value, dict):
+                is_valid_env, env_type = self._validate_environment(find_value)
+                log_func = logger.warning
+
+                if self.environment != "N/A" and not is_valid_env:
+                    # Return validation error for invalid _ALL_ case (_ALL_ used with other envs)
+                    if env_type.lower() == "_all_":
+                        return False, constants.PARAMETER_MSGS["other target env"].format(env_type, find_value)
+
+                    # Otherwise, binding skipped if target environment is not present
+                    skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
+                    log_func(
+                        constants.PARAMETER_MSGS["skip"].format(
+                            "connection_id", find_value, skip_msg, param_name + " " + param_num_str
+                        )
+                    )
+                    continue
+
+                # Log if _ALL_ environment is present in connection_id
+                if env_type.lower() == "_all_":
+                    logger.warning(constants.PARAMETER_MSGS["all target env"].format(find_value[env_type]))
+                continue
+
             # Check if replacement will be skipped for a given find value
             is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
@@ -541,6 +567,9 @@ class Parameter:
                 expected_type = "dictionary"
             elif key in ["semantic_model_name"]:
                 expected_type = "string or list[string]"
+            elif key == "connection_id" and param_name == "semantic_model_binding":
+                # For semantic_model_binding, connection_id can be string or dictionary
+                expected_type = "string or dictionary"
             else:
                 expected_type = "string"
 
@@ -556,6 +585,12 @@ class Parameter:
 
         if param_name == "key_value_replace":
             is_valid, msg = self._validate_key_value_find_key(param_dict)
+            if not is_valid:
+                return False, msg
+
+        # Validate connection_id dictionary structure if it's a dict in semantic_model_binding
+        if param_name == "semantic_model_binding" and isinstance(param_dict.get("connection_id"), dict):
+            is_valid, msg = self._validate_connection_id_dict(param_dict.get("connection_id"))
             if not is_valid:
                 return False, msg
 
@@ -580,6 +615,35 @@ class Parameter:
             return False, f"Invalid JSONPath expression '{find_key}': {e}"
 
         return True, "Valid JSONPath"
+
+    def _validate_connection_id_dict(self, connection_id_dict: dict) -> tuple[bool, str]:
+        """Validate the connection_id dictionary structure for semantic_model_binding.
+
+        Args:
+            connection_id_dict: Dictionary with environment keys and connection ID values
+
+        Returns:
+            Tuple of (is_valid, message)
+        """
+        import re
+
+        if not connection_id_dict:
+            return False, "connection_id dictionary cannot be empty"
+
+        # Validate each environment key has a valid GUID value
+        for env_key, connection_id_value in connection_id_dict.items():
+            # Check if value is a string
+            if not isinstance(connection_id_value, str):
+                return False, f"connection_id value for environment '{env_key}' must be a string (GUID)"
+
+            # Check if value is a valid GUID format
+            if not re.match(constants.VALID_GUID_REGEX, connection_id_value):
+                return (
+                    False,
+                    f"connection_id value for environment '{env_key}' is not a valid GUID: '{connection_id_value}'",
+                )
+
+        return True, "Valid connection_id dictionary"
 
     def _validate_semantic_model_name(self) -> None:
         """Validate that semantic model names are unique across all semantic_model_binding entries."""
@@ -766,6 +830,7 @@ class Parameter:
             "string or list[string]": lambda x: (isinstance(x, str))
             or (isinstance(x, list) and all(isinstance(item, str) for item in x)),
             "dictionary": lambda x: isinstance(x, dict),
+            "string or dictionary": lambda x: isinstance(x, (str, dict)),
         }
         # Check if the expected type is valid and if the input matches the expected type
         if expected_type not in type_validators or not type_validators[expected_type](input_value):
