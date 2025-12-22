@@ -35,6 +35,28 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         model_name = model.get("semantic_model_name", [])
         connection_id = model.get("connection_id")
 
+        # Resolve environment-specific connection_id if it's a dictionary
+        if isinstance(connection_id, dict):
+            environment = fabric_workspace_obj.environment
+            # Check for _ALL_ key (case insensitive)
+            all_key = None
+            for key in connection_id:
+                if key.lower() == "_all_":
+                    all_key = key
+                    break
+
+            if all_key:
+                connection_id = connection_id[all_key]
+            elif environment in connection_id:
+                connection_id = connection_id[environment]
+            else:
+                # Skip this binding if target environment is not found
+                logger.warning(
+                    f"Skipping semantic model binding for '{model_name}' - "
+                    f"target environment '{environment}' not found in connection_id"
+                )
+                continue
+
         if isinstance(model_name, str):
             model_name = [model_name]
 

@@ -109,5 +109,11 @@ gateway_binding:
       dataset_name: "gateway_sm2"
           
 semantic_model_binding:
-    - connection_id: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+    # Example with environment-specific connection IDs
+    - connection_id:
+        PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+        PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
       semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
+    # Example with single connection ID (backward compatible)
+    - connection_id: "12345678-1234-1234-1234-123456789abc"
+      semantic_model_name: "MySemanticModel_SingleConnection"
