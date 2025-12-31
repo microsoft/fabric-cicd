@@ -860,6 +860,73 @@ key_value_replace:
 
 **Note:** The `.schedules` file contains JSON content but does not have a `.json` file extension. The fabric-cicd library automatically detects and processes files with valid JSON content regardless of their file extension, making this parameterization work seamlessly.
 
+### Reports
+
+#### Cross-Workspace Report Rebinding with `key_value_replace`
+
+**Case:** A Report needs to be bound to a Semantic Model that exists in a different workspace (cross-workspace scenario). The Report's `definition.pbir` file contains a `datasetReference.byConnection` structure with a `connectionString` that includes the workspace reference and semantic model ID.
+
+**Solution:** Use `key_value_replace` to update the `connectionString` field with the correct workspace and semantic model reference for each environment. The fabric-cicd library automatically synchronizes the `pbiModelDatabaseName` field with the `semanticmodelid` found in the `connectionString`, ensuring the report binds correctly to the target semantic model.
+
+**Important Notes:**
+- For Reports with `byPath` references (relative path to semantic model in the same workspace), the library automatically transforms them to `byConnection` format during deployment
+- For cross-workspace rebinding, ensure the `connectionString` contains the full connection details including `semanticmodelid`
+- The `pbiModelDatabaseName` field is automatically synced with the `semanticmodelid` from the `connectionString` after parameterization
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+key_value_replace:
+    # Rebind report to semantic model in different workspace
+    - find_key: $.datasetReference.byConnection.connectionString
+      replace_value:
+          DEV: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev__GlobalDataHouse__WS; initial catalog=Metric_Measure_Catalogue_GDH;access mode=readonly; integrated security=ClaimsToken;semanticmodelid=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+          ACC: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/acc__GlobalDataHouse__WS; initial catalog=Metric_Measure_Catalogue_GDH;access mode=readonly; integrated security=ClaimsToken;semanticmodelid=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          PROD: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/prd__GlobalDataHouse__WS; initial catalog=Metric_Measure_Catalogue_GDH;access mode=readonly; integrated security=ClaimsToken;semanticmodelid=cccccccc-cccc-cccc-cccc-cccccccccccc"
+      item_type: "Report"
+      file_path: "/metric_measure_catalogue.Report/definition.pbir"
+```
+
+<span class="md-h4-nonanchor">definition.pbir file (before parameterization)</span>
+
+```json
+{
+    "version": "4.0",
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/1.0.0/schema.json",
+    "datasetReference": {
+        "byConnection": {
+            "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/local-jpa-GlobalDataHouse__WS; initial catalog=Metric_Measure_Catalogue_GDH;access mode=readonly; integrated security=ClaimsToken;semanticmodelid=684bad0f-a05b-44a1-acd5-86a386708d7a",
+            "pbiServiceModelId": null,
+            "pbiModelVirtualServerName": "sobe_wowvirtualserver",
+            "pbiModelDatabaseName": "684bad0f-a05b-44a1-acd5-86a386708d7a",
+            "name": "EntityDataSource",
+            "connectionType": "pbiServiceXmlaStyleLive"
+        }
+    }
+}
+```
+
+<span class="md-h4-nonanchor">definition.pbir file (after parameterization for DEV)</span>
+
+```json
+{
+    "version": "4.0",
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/1.0.0/schema.json",
+    "datasetReference": {
+        "byConnection": {
+            "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev__GlobalDataHouse__WS; initial catalog=Metric_Measure_Catalogue_GDH;access mode=readonly; integrated security=ClaimsToken;semanticmodelid=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "pbiServiceModelId": null,
+            "pbiModelVirtualServerName": "sobe_wowvirtualserver",
+            "pbiModelDatabaseName": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "name": "EntityDataSource",
+            "connectionType": "pbiServiceXmlaStyleLive"
+        }
+    }
+}
+```
+
+**Note:** The `pbiModelDatabaseName` field is automatically updated to match the `semanticmodelid` extracted from the `connectionString`. This ensures the report correctly binds to the target semantic model in the target workspace.
+
 ### Environments
 
 #### `spark_pool` Parameterization Case
