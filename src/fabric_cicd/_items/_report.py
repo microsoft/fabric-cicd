@@ -5,6 +5,7 @@
 
 import json
 import logging
+import re
 
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ItemDependencyError
@@ -12,6 +13,9 @@ from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 
 logger = logging.getLogger(__name__)
+
+# GUID pattern for matching semantic model IDs in connection strings
+GUID_PATTERN = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
 
 def publish_reports(fabric_workspace_obj: FabricWorkspace) -> None:
@@ -87,8 +91,6 @@ def sync_report_dataset_reference(file_content: str) -> str:
     Returns:
         Updated file content with synchronized dataset reference fields.
     """
-    import re
-
     try:
         definition_body = json.loads(file_content)
 
@@ -104,7 +106,7 @@ def sync_report_dataset_reference(file_content: str) -> str:
             # Extract semanticmodelid from connection string using regex
             # Connection string format: "...semanticmodelid=<guid>..."
             model_id_match = re.search(
-                r"semanticmodelid\s*=\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                rf"semanticmodelid\s*=\s*({GUID_PATTERN})",
                 connection_string,
                 re.IGNORECASE,
             )
