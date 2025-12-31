@@ -18,9 +18,9 @@ if __name__ == "__main__":
     # Step 1: Create Spark Session
     spark = (SparkSession
           .builder
-          .appName("sjdsampleapp") 
+          .appName("sjdsampleapp")
           .getOrCreate())
-    
+
     spark_context = spark.sparkContext
     spark_context.setLogLevel("ERROR")
 
@@ -30,12 +30,7 @@ if __name__ == "__main__":
 
     # Step 2: Sample Data Processing
     df = spark.range(config['range_limit']).collect()
-    
+
     logger.info("=" * 80)
     logger.info("Completing Job")
     logger.info("=" * 80)
-    
-    
-       
-   
-   
