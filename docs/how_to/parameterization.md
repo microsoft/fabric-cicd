@@ -1081,9 +1081,9 @@ When a Report uses `byPath` to reference a Semantic Model in the same repository
 
 #### `byConnection` Parameterization
 
-When Reports and Semantic Models are deployed separately (e.g., models first, then reports), or when Reports need to connect to models in Power BI Online service, use `byConnection` with parameterization to rebind reports to different semantic models across environments.
+When Reports and Semantic Models are deployed separately (e.g., models first, then reports), or when Reports need to connect to models in Power BI Online service, use `byConnection` with parameterization to rebind reports to different semantic models across environments. This approach supports both same-workspace and cross-workspace binding scenarios.
 
-**Case:** A Report uses `byConnection` to reference a Semantic Model that is deployed to Power BI Online. The connection string contains environment-specific workspace IDs, semantic model names, and semantic model IDs that need to be updated when deploying to different environments (PPE/PROD/etc).
+**Case:** A Report uses `byConnection` to reference a Semantic Model that is deployed to Power BI Online. The connection string contains environment-specific workspace IDs, semantic model names, and semantic model IDs that need to be updated when deploying to different environments (PPE/PROD/etc). The semantic model can be in the same workspace as the report or in a different workspace.
 
 **Solution:** Use `find_replace` or `key_value_replace` in the `parameter.yml` file to parameterize the connection string components.
 
@@ -1174,6 +1174,7 @@ key_value_replace:
 **Important Considerations:**
 
 -   Reports with `byConnection` references are deployed as-is to the target workspace with the parameterized connection string.
+-   **Cross-workspace binding is supported:** A report deployed to Workspace A can connect to a semantic model in Workspace B by specifying the target workspace ID in the connection string (the `myorg/{workspace-id}` portion).
 -   The connection string format shown above is the standard Power BI connection string format for connecting to semantic models.
 -   When using `find_replace`, be specific with your find values to avoid unintended replacements (e.g., use unique placeholder values like "dev-workspace-id" rather than just "dev").
 -   When using `key_value_replace`, the JSONPath expression `$.datasetReference.byConnection.connectionString` targets the connectionString field within the byConnection object.
