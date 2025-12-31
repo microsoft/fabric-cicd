@@ -23,6 +23,7 @@ from fabric_cicd._items._notebook import publish_notebooks
 from fabric_cicd._items._orgapp import publish_orgapps
 from fabric_cicd._items._report import publish_reports
 from fabric_cicd._items._semanticmodel import publish_semanticmodels
+from fabric_cicd._items._sparkjobdefinition import publish_sparkjobdefinitions
 from fabric_cicd._items._sqldatabase import publish_sqldatabases
 from fabric_cicd._items._userdatafunction import publish_userdatafunctions
 from fabric_cicd._items._variablelibrary import publish_variablelibraries
@@ -52,6 +53,7 @@ __all__ = [
     "publish_orgapps",
     "publish_reports",
     "publish_semanticmodels",
+    "publish_sparkjobdefinitions",
     "publish_sqldatabases",
     "publish_userdatafunctions",
     "publish_variablelibraries",

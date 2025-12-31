@@ -620,7 +620,10 @@ class FabricWorkspace:
 
                     item_payload.append(file.base64_payload)
 
-            definition_body = {"definition": {"parts": item_payload}}
+            if kwargs.get("format"):
+                definition_body = {"definition": {"format": kwargs["format"], "parts": item_payload}}
+            else:
+                definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
 
         logger.info(f"Publishing {item_type} '{item_name}'")
