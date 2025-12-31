@@ -74,3 +74,57 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
 
             return json.dumps(definition_body, indent=4)
     return file_obj.contents
+
+
+def sync_report_dataset_reference(file_content: str) -> str:
+    """
+    Synchronizes the pbiModelDatabaseName field with the semanticmodelid from the connectionString.
+    This handles cross-workspace report rebinding where the connectionString is parameterized.
+
+    Args:
+        file_content: The JSON content of the definition.pbir file after parameterization.
+
+    Returns:
+        Updated file content with synchronized dataset reference fields.
+    """
+    import re
+
+    try:
+        definition_body = json.loads(file_content)
+
+        # Only process if this is a report with byConnection reference
+        if "datasetReference" not in definition_body or "byConnection" not in definition_body["datasetReference"]:
+            return file_content
+
+        by_connection = definition_body["datasetReference"]["byConnection"]
+        connection_string = by_connection.get("connectionString")
+
+        # If connectionString exists and contains semanticmodelid, sync it with pbiModelDatabaseName
+        if connection_string and isinstance(connection_string, str):
+            # Extract semanticmodelid from connection string using regex
+            # Connection string format: "...semanticmodelid=<guid>..."
+            model_id_match = re.search(
+                r"semanticmodelid\s*=\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                connection_string,
+                re.IGNORECASE,
+            )
+
+            if model_id_match:
+                semantic_model_id = model_id_match.group(1)
+                current_pbi_model_db_name = by_connection.get("pbiModelDatabaseName")
+
+                # Only update if they differ
+                if current_pbi_model_db_name != semantic_model_id:
+                    logger.debug(
+                        f"Syncing pbiModelDatabaseName from '{current_pbi_model_db_name}' to '{semantic_model_id}' "
+                        f"to match semanticmodelid in connectionString"
+                    )
+                    by_connection["pbiModelDatabaseName"] = semantic_model_id
+                    definition_body["datasetReference"]["byConnection"] = by_connection
+                    return json.dumps(definition_body, indent=4)
+
+        return file_content
+
+    except (json.JSONDecodeError, KeyError, AttributeError) as e:
+        logger.debug(f"Could not sync report dataset reference: {e}")
+        return file_content

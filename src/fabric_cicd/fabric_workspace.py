@@ -617,6 +617,11 @@ class FabricWorkspace:
                         file.contents = self._replace_logical_ids(file.contents)
                         file.contents = self._replace_parameters(file, item)
                         file.contents = self._replace_workspace_ids(file.contents)
+                        # Post-process Report files to sync dataset reference after parameterization
+                        if item_type == "Report" and file.name == "definition.pbir":
+                            from fabric_cicd._items._report import sync_report_dataset_reference
+
+                            file.contents = sync_report_dataset_reference(file.contents)
 
                     item_payload.append(file.base64_payload)
 
