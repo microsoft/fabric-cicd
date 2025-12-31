@@ -134,9 +134,15 @@
 
 ## Reports
 
+-   **Semantic Model Binding:**
+    -   Reports can reference Semantic Models using `byPath` (relative path in repository) or `byConnection` (connection string to Power BI service).
+    -   `byPath`: When a Report uses a relative path to a Semantic Model in the same repository, the library automatically converts it to `byConnection` during deployment and re-points to the deployed model in the target workspace.
+    -   `byConnection`: When a Report uses a connection string (e.g., to models deployed separately or in Power BI Online), use parameterization to rebind to different semantic models across environments.
+
 -   **Parameterization:**
-    -   Reports connected to Semantic Models outside of the same workspace always point to the original Semantic Model unless parameterized in the `find_replace` section of the `parameter.yml` file.
-    -   Reports connected to Semantic Models within the same workspace are re-pointed to the new item in the target workspace.
+    -   Reports with `byConnection` references can be parameterized using `find_replace` or `key_value_replace` to update workspace IDs, semantic model names, and semantic model IDs in the connection string. See [Reports parameterization examples](parameterization.md#reports).
+    -   Reports with `byPath` references to Semantic Models within the same workspace are automatically re-pointed to the deployed model - no parameterization needed.
+    -   Reports with `byPath` references to Semantic Models outside the repository will fail deployment unless the model is first added to the repository.
 
 ## Semantic Models
 
