@@ -620,8 +620,8 @@ class FabricWorkspace:
 
                     item_payload.append(file.base64_payload)
             # Some item definitions require specifying the format as multiple API versions exist (i.e. Spark Job Definitions)
-            if kwargs.get("format"):
-                definition_body = {"definition": {"format": kwargs["format"], "parts": item_payload}}
+            if kwargs.get("api_format"):
+                definition_body = {"definition": {"format": kwargs["api_format"], "parts": item_payload}}
             else:
                 definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}

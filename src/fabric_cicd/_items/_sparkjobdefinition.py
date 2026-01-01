@@ -20,4 +20,4 @@ def publish_sparkjobdefinitions(fabric_workspace_obj: FabricWorkspace) -> None:
     item_type = "SparkJobDefinition"
 
     for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, format="SparkJobDefinitionV2")
+        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, api_format="SparkJobDefinitionV2")
