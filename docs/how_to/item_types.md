@@ -149,7 +149,8 @@
 
 -   **Parameterization:**
     -   Spark Job Definitions attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
--   **File Types Supported:** The v2 API which is used only supports Spark Job Definitions with file formats of .py or .scala. The .jar file format isn't supported.
+    -   When connected to an Environment within the same workspace, the deployed Spark Job Definition will be re-pointed to the new Environment in the target workspace.
+-   **File Types Supported:** The v2 API which is used only supports Spark Job Definitions with file formats of `.py` or `.scala`. The `.jar` file format isn't supported.
 
 ## SQL Databases
 
