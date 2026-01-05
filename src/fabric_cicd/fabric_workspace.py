@@ -454,7 +454,7 @@ class FabricWorkspace:
 
                 # Extract the find_pattern and replace_value_dict
                 find_info = extract_find_value(parameter_dict, raw_file, filter_match)
-                replace_value_dict = process_environment_key(self, parameter_dict.get("replace_value", {}))
+                replace_value_dict = process_environment_key(self.environment, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
                 if filter_match and self.environment in replace_value_dict and find_info["has_matches"]:

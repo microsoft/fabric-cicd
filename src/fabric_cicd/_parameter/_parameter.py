@@ -45,8 +45,8 @@ class Parameter:
             "maximum": {"gateway_id", "dataset_name"},
         },
         "semantic_model_binding": {
-            "minimum": {"connection_id", "semantic_model_name"},
-            "maximum": {"connection_id", "semantic_model_name"},
+            "minimum": set(),
+            "maximum": {"connection_id", "semantic_model_name", "connections", "default", "items", "take_over"},
         },
         "extend": {"minimum": set(), "maximum": set()},
     }
@@ -643,15 +643,45 @@ class Parameter:
 
         return True, "Valid connection_id dictionary"
 
+    # def _validate_semantic_model_name(self) -> None:
+
+    #   """Validate that semantic model names are unique across all semantic_model_binding entries."""
+
+    #    names = []
+    #    for entry in self.environment_parameter.get("semantic_model_binding", []):
+    #        raw = entry.get("semantic_model_name", [])
+    #        if isinstance(raw, str):
+    #            names.append(raw)
+    #        elif isinstance(raw, list):
+    #            names.extend(n for n in raw if isinstance(n, str))
+    #    duplicates = {n for n in names if names.count(n) > 1}
+    #    if duplicates:
+    #        logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
+
     def _validate_semantic_model_name(self) -> None:
         """Validate that semantic model names are unique across all semantic_model_binding entries."""
+        parameter = self.environment_parameter.get("semantic_model_binding", [])
         names = []
-        for entry in self.environment_parameter.get("semantic_model_binding", []):
-            raw = entry.get("semantic_model_name", [])
-            if isinstance(raw, str):
-                names.append(raw)
-            elif isinstance(raw, list):
-                names.extend(n for n in raw if isinstance(n, str))
+
+        # Handle new structure (dict with items)
+        if isinstance(parameter, dict):
+            items_list = parameter.get("items", [])
+            for item in items_list:
+                raw = item.get("semantic_model_name", [])
+                if isinstance(raw, str):
+                    names.append(raw)
+                elif isinstance(raw, list):
+                    names.extend(n for n in raw if isinstance(n, str))
+
+        # Handle legacy structure (list)
+        else:
+            for entry in parameter:
+                raw = entry.get("semantic_model_name", [])
+                if isinstance(raw, str):
+                    names.append(raw)
+                elif isinstance(raw, list):
+                    names.extend(n for n in raw if isinstance(n, str))
+
         duplicates = {n for n in names if names.count(n) > 1}
         if duplicates:
             logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
