@@ -11,7 +11,7 @@ import time
 from typing import Optional
 
 import requests
-from azure.core.credentials import TokenCredential
+from azure.core.credentials import AccessToken, TokenCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
 )
@@ -394,3 +394,47 @@ def _format_invoke_log(response: requests.Response, method: str, url: str, body:
         ])
 
     return "\n".join(message)
+
+
+def _is_fabric_runtime() -> bool:
+    """Checks is the execution runtime is Fabric."""
+    try:
+        notebookutils = get_ipython().user_ns.get("notebookutils")  # noqa: F821
+        if notebookutils and hasattr(notebookutils, "runtime") and hasattr(notebookutils.runtime, "context"):
+            context = notebookutils.runtime.context
+            if "productType" in context:
+                return context["productType"].lower() == "fabric"
+        return False
+    except:
+        return False
+
+
+def _generate_fabric_credential() -> TokenCredential:
+    """Generates a TokenCredential for Fabric using notebookutils."""
+    from datetime import datetime, timezone
+
+    class NotebookTokenCredential(TokenCredential):
+        """Custom credential that uses notebookutils to get tokens."""
+
+        def __init__(self, audience: str = "pbi") -> None:
+            self.audience = audience
+
+        def get_token(self, *scopes, **kwargs) -> AccessToken:  # noqa: ANN002, ARG002
+            """Get token using notebookutils."""
+            notebookutils = get_ipython().user_ns.get("notebookutils")  # noqa: F821
+            token_string = notebookutils.credentials.getToken(self.audience)
+
+            # Parse JWT to extract token expiration
+            try:
+                payload = _decode_jwt(token_string)
+                expires_on = payload.get("exp")
+
+                if expires_on:
+                    return AccessToken(token_string, expires_on)
+            except Exception:
+                pass  # Fall back to default expiration if parsing fails
+
+            # Fallback: use current time + 1 hour if exp claim is missing or parsing fails
+            return AccessToken(token_string, int(datetime.now(timezone.utc).timestamp()) + 3600)
+
+    return NotebookTokenCredential("pbi")

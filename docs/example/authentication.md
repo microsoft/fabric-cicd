@@ -91,6 +91,39 @@ This approach utilizes the default credential flow, meaning no explicit TokenCre
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
     ```
 
+=== "Fabric Notebook"
+
+    ```python
+    '''fabric-cicd will automatically generate a TokenCredential based on the user session context.'''
+
+    from pathlib import Path
+
+    from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+    # Assumes your script is one level down from root
+    root_directory = Path(__file__).resolve().parent
+
+    # Sample values for FabricWorkspace parameters
+    workspace_id = "your-workspace-id"
+    environment = "your-environment"
+    repository_directory = str(root_directory / "your-workspace-directory")
+    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+
+    # Initialize the FabricWorkspace object with the required parameters
+    target_workspace = FabricWorkspace(
+        workspace_id=workspace_id,
+        environment=environment,
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+    )
+
+    # Publish all items defined in item_type_in_scope
+    publish_all_items(target_workspace)
+
+    # Unpublish all items defined in item_type_in_scope not found in repository
+    unpublish_all_orphan_items(target_workspace)
+    ```
+
 ## CLI Credential
 
 This approach utilizes the CLI credential flow, meaning it only refers to the authentication established with az login. This is agnostic of the executing user, it can be UPN, SPN, Managed Identity, etc. Whatever is used to log in will be used.
@@ -188,6 +221,12 @@ This approach utilizes the CLI credential flow, meaning it only refers to the au
 
     ```python
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
+    ```
+
+=== "Fabric Notebook"
+
+    ```python
+    '''Unconfirmed example at this time, Default Credential flow is recommended'''
     ```
 
 ## AZ PowerShell Credential
@@ -289,6 +328,12 @@ This approach utilizes the AZ PowerShell credential flow, meaning it only refers
     '''
     Unconfirmed example at this time, however, the Azure DevOps example is a good starting point
     '''
+    ```
+
+=== "Fabric Notebook"
+
+    ```python
+    '''Unconfirmed example at this time, Default Credential flow is recommended'''
     ```
 
 ## Explicit SPN Secret Credential
@@ -397,4 +442,10 @@ This approach utilizes directly passing in SPN Client Id and Client Secret. Alth
 
     ```python
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
+    ```
+
+=== "Fabric Notebook"
+
+    ```python
+    '''Unconfirmed example at this time, Default Credential flow is recommended'''
     ```
