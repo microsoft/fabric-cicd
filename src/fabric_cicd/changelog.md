@@ -6,6 +6,12 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.34 (Unreleased)
+
+<span class="md-h2-subheader">Release Date: TBD</span>
+
+-   🔧 Fix Report rebinding for cross-workspace scenarios - automatically sync pbiModelDatabaseName with semanticmodelid from connectionString ([#694](https://github.com/microsoft/fabric-cicd/issues/694))
+
 ## Version 0.1.33
 
 <span class="md-h2-subheader">Release Date: 2025-12-16</span>
