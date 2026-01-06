@@ -397,7 +397,7 @@ def _format_invoke_log(response: requests.Response, method: str, url: str, body:
 
 
 def _is_fabric_runtime() -> bool:
-    """Checks is the execution runtime is Fabric."""
+    """Checks if the execution runtime is Fabric."""
     try:
         notebookutils = get_ipython().user_ns.get("notebookutils")  # noqa: F821
         if notebookutils and hasattr(notebookutils, "runtime") and hasattr(notebookutils.runtime, "context"):
