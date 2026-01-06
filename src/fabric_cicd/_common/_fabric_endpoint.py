@@ -413,7 +413,7 @@ def _generate_fabric_credential() -> TokenCredential:
     """Generates a TokenCredential for Fabric using notebookutils."""
     from datetime import datetime, timezone
 
-    class NotebookTokenCredential(TokenCredential):
+    class FabricTokenCredential(TokenCredential):
         """Custom credential that uses notebookutils to get tokens."""
 
         def __init__(self, audience: str = "pbi") -> None:
@@ -437,4 +437,4 @@ def _generate_fabric_credential() -> TokenCredential:
             # Fallback: use current time + 1 hour if exp claim is missing or parsing fails
             return AccessToken(token_string, int(datetime.now(timezone.utc).timestamp()) + 3600)
 
-    return NotebookTokenCredential("pbi")
+    return FabricTokenCredential("pbi")
