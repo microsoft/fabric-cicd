@@ -7,12 +7,21 @@ from azure.identity import DefaultAzureCredential
 
 from fabric_cicd import change_log_level, constants
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._validate_input import validate_token_credential
 
 # Uncomment to enable debug
 # change_log_level()
 
 if __name__ == "__main__":
-    fe = FabricEndpoint(DefaultAzureCredential())
+    # Replace None correct value when using SPN auth
+    token_credential = None
+
+    # Create endpoint object
+    fe = FabricEndpoint(  # if credential is not defined, use DefaultAzureCredential
+        token_credential=(
+            DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
+        )
+    )
 
     print("Making API call...")
 
