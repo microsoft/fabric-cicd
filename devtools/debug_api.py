@@ -22,19 +22,16 @@ if __name__ == "__main__":
             DefaultAzureCredential() if token_credential is None else validate_token_credential(token_credential)
         )
     )
-
-    print("Making API call...")
-
     # Set workspace id variable if needed in API url
     workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"
 
     # url placeholder
     api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}..."
 
+    print("Making API call...")
     response = fe.invoke(
         method="POST",
         url=api_url,
         body={},
     )
-
     print("Call completed.")
