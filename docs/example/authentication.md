@@ -95,31 +95,45 @@ This approach utilizes the default credential flow, meaning no explicit TokenCre
 
     ```python
     '''fabric-cicd will automatically generate a TokenCredential based on the user session context.'''
-
-    from pathlib import Path
-
+    
+    import tempfile
+    import subprocess
+    import os
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
-
-    # Assumes your script is one level down from root
-    root_directory = Path(__file__).resolve().parent
-
-    # Sample values for FabricWorkspace parameters
-    workspace_id = "your-workspace-id"
-    environment = "your-environment"
-    repository_directory = str(root_directory / "your-workspace-directory")
-    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
-
+    
+    # Sample configuration values
+    workspace_id = "f3240389-4fbf-4509-83b2-25583d2d6ea0"
+    repo_url = "https://github.com/microsoft/fabric-cicd.git"
+    repo_ref = "main"
+    workspace_path = "sample/workspace"
+    
+    # Create a temporary directory
+    temp_dir = tempfile.mkdtemp(prefix="cloned_repo_")
+    print(f"Created temporary directory: {temp_dir}")
+    
+    # Clone the specific branch
+    print(f"Cloning {repo_url} (ref: {repo_ref})...")
+    result = subprocess.run(
+        ["git", "clone", "--branch", repo_ref, "--single-branch", repo_url, temp_dir],
+        capture_output=True,
+        text=True
+    )
+    
+    workspace_root = os.path.join(temp_dir, workspace_path)
+    
+    # Deploy workspace items from cloned repository
+    item_type_in_scope = ["VariableLibrary"]  # "" , "SparkJobDefinition", "Lakehouse", "Environment", 
+    
     # Initialize the FabricWorkspace object with the required parameters
     target_workspace = FabricWorkspace(
         workspace_id=workspace_id,
-        environment=environment,
-        repository_directory=repository_directory,
-        item_type_in_scope=item_type_in_scope,
+        repository_directory=workspace_root,
+        item_type_in_scope=item_type_in_scope
     )
-
+    
     # Publish all items defined in item_type_in_scope
     publish_all_items(target_workspace)
-
+    
     # Unpublish all items defined in item_type_in_scope not found in repository
     unpublish_all_orphan_items(target_workspace)
     ```
