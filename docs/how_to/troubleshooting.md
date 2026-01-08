@@ -254,6 +254,52 @@ This script will:
 -   Check that all parameters for the specified environment exist
 -   Report any errors or warnings
 
+#### debug_api.py
+
+**Purpose**: Test Fabric REST API calls directly without going through full deployment workflows.
+
+**Use Cases**:
+
+-   Debug and validate Fabric API endpoints
+-   Test API request/response payloads
+-   Prototype new API integrations
+-   Verify authentication and authorization
+-   Troubleshoot API-specific issues
+
+**Configuration**:
+
+```python
+# 1. Configure authentication (optional)
+# Replace None with credential when using SPN auth
+token_credential = None  # Uses DefaultAzureCredential if None
+
+# 2. Set workspace ID if needed
+workspace_id = "your-workspace-id"
+
+# 3. Configure the API endpoint
+api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}..."
+
+# 4. Make the API call
+response = fe.invoke(
+    method="POST",  # GET, POST, PUT, DELETE, PATCH
+    url=api_url,
+    body={},  # Request payload
+)
+```
+
+**Usage**:
+
+```bash
+uv run python devtools/debug_api.py
+```
+
+This script provides direct access to Fabric REST APIs using the `FabricEndpoint` class, allowing you to:
+
+-   Test any Fabric API endpoint
+-   Customize HTTP methods and request bodies
+-   Debug API responses without deployment overhead
+-   Validate API changes during development
+
 #### pypi_build_release_dev.ps1
 
 **Purpose**: Build and publish development versions of the package to TestPyPI for testing.
