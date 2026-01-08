@@ -38,6 +38,7 @@ ACCEPTED_ITEM_TYPES = (
     "UserDataFunction",
     "OrgApp",
     "MLExperiment",
+    "SparkJobDefinition",
 )
 
 # Publish
