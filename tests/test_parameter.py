@@ -2186,3 +2186,80 @@ config:
     data = yaml.safe_load(yaml_str)
     matches = parse(param["find_key"]).find(data)
     assert len(matches) == 0
+
+
+def test_semantic_model_binding_with_string_connection_id(empty_parameter):
+    """Test semantic_model_binding with string connection_id (backward compatible)."""
+    param_dict = {"connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99", "semantic_model_name": ["model1", "model2"]}
+    ok, msg = empty_parameter._validate_required_values("semantic_model_binding", param_dict)
+    assert ok is True
+    assert msg == constants.PARAMETER_MSGS["valid required values"].format("semantic_model_binding")
+
+
+def test_semantic_model_binding_with_dict_connection_id(empty_parameter):
+    """Test semantic_model_binding with dictionary connection_id (environment-specific)."""
+    param_dict = {
+        "connection_id": {
+            "PPE": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+            "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+        },
+        "semantic_model_name": ["model1", "model2"],
+    }
+    ok, msg = empty_parameter._validate_required_values("semantic_model_binding", param_dict)
+    assert ok is True
+    assert msg == constants.PARAMETER_MSGS["valid required values"].format("semantic_model_binding")
+
+
+def test_semantic_model_binding_invalid_connection_id_not_guid(empty_parameter):
+    """Test semantic_model_binding with invalid connection_id (not a GUID)."""
+    param_dict = {
+        "connection_id": {"PPE": "invalid-guid-format", "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab"},
+        "semantic_model_name": ["model1"],
+    }
+    ok, msg = empty_parameter._validate_required_values("semantic_model_binding", param_dict)
+    assert ok is False
+    assert "not a valid GUID" in msg
+
+
+def test_semantic_model_binding_invalid_connection_id_not_string(empty_parameter):
+    """Test semantic_model_binding with invalid connection_id value (not a string)."""
+    param_dict = {
+        "connection_id": {
+            "PPE": 12345,  # Invalid: not a string
+            "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+        },
+        "semantic_model_name": ["model1"],
+    }
+    ok, msg = empty_parameter._validate_required_values("semantic_model_binding", param_dict)
+    assert ok is False
+    assert "must be a string" in msg
+
+
+def test_semantic_model_binding_empty_connection_id_dict(empty_parameter):
+    """Test semantic_model_binding with empty connection_id dictionary."""
+    param_dict = {"connection_id": {}, "semantic_model_name": ["model1"]}
+    ok, msg = empty_parameter._validate_required_values("semantic_model_binding", param_dict)
+    assert ok is False
+    # Empty dict is caught as missing value
+    assert "Missing value" in msg or "cannot be empty" in msg
+
+
+def test_validate_connection_id_dict_valid(empty_parameter):
+    """Test _validate_connection_id_dict with valid GUIDs."""
+    connection_id_dict = {
+        "PPE": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+        "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+        "UAT": "12345678-1234-1234-1234-123456789abc",
+    }
+    ok, msg = empty_parameter._validate_connection_id_dict(connection_id_dict)
+    assert ok is True
+    assert msg == "Valid connection_id dictionary"
+
+
+def test_validate_connection_id_dict_invalid_guid(empty_parameter):
+    """Test _validate_connection_id_dict with invalid GUID format."""
+    connection_id_dict = {"PPE": "not-a-guid", "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab"}
+    ok, msg = empty_parameter._validate_connection_id_dict(connection_id_dict)
+    assert ok is False
+    assert "not a valid GUID" in msg
+    assert "PPE" in msg

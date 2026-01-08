@@ -140,16 +140,47 @@ spark_pool:
 
 Semantic model binding is used to connect semantic models that require cloud or on-premises data sources to the appropriate connection after deployment. The `semantic_model_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
 
+The `connection_id` field supports two formats:
+
+1. **Single connection ID (string)**: Use the same connection across all environments
+2. **Environment-specific connection IDs (dictionary)**: Use different connections per environment (PPE, PROD, etc.)
+
 ```yaml
 semantic_model_binding:
-    # Required field: value must be a string (GUID)
+    # Format 1: Single connection ID (backward compatible)
     # Connection Ids can be found from the Fabric UI under Settings -> Manage Connections and gateways -> Settings pane of the connection
-    - connection_id: <connection_id>
-    # Required field: value must be a string or a list of strings
+    - connection_id: <connection_id_guid>
+      # Required field: value must be a string or a list of strings
       semantic_model_name: <semantic_model_name>
-    # OR
+      # OR
       semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
+    
+    # Format 2: Environment-specific connection IDs
+    - connection_id:
+        <environment-1-key>: <connection_id_guid>
+        <environment-2-key>: <connection_id_guid>
+      semantic_model_name: <semantic_model_name>
 ```
+
+**Example:**
+
+```yaml
+semantic_model_binding:
+    # Environment-specific connection IDs
+    - connection_id:
+        PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+        PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+      semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
+    
+    # Single connection ID for all environments
+    - connection_id: "12345678-1234-1234-1234-123456789abc"
+      semantic_model_name: "MySemanticModel_SingleConnection"
+```
+
+**Notes:**
+- The `_ALL_` environment key (case-insensitive) can be used in the connection_id dictionary to apply the same connection to any target environment.
+- When using environment-specific connection IDs, deployment will be skipped for semantic models if the target environment is not found in the connection_id dictionary.
+- Connection ID values must be valid GUIDs.
 
 ## Advanced Find and Replace
 

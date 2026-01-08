@@ -1290,10 +1290,10 @@ runtime_version: "1.2"
         mock_workspace.environment = "TEST"
 
         # Call the function
-        result_1 = process_environment_key(mock_workspace, replace_value_dict_1)
-        result_2 = process_environment_key(mock_workspace, replace_value_dict_2)
-        result_3 = process_environment_key(mock_workspace, replace_value_dict_3)
-        result_4 = process_environment_key(mock_workspace, replace_value_dict_4)
+        result_1 = process_environment_key(mock_workspace.environment, replace_value_dict_1)
+        result_2 = process_environment_key(mock_workspace.environment, replace_value_dict_2)
+        result_3 = process_environment_key(mock_workspace.environment, replace_value_dict_3)
+        result_4 = process_environment_key(mock_workspace.environment, replace_value_dict_4)
 
         # Verify _ALL_ key is replaced with the target environment
         assert "_ALL_" not in result_1
@@ -1328,7 +1328,7 @@ runtime_version: "1.2"
         mock_workspace.environment = "TEST"
 
         # Call the function
-        result = process_environment_key(mock_workspace, replace_value_dict_5)
+        result = process_environment_key(mock_workspace.environment, replace_value_dict_5)
 
         # Dictionary should remain unchanged
         assert result == replace_value_dict_5
