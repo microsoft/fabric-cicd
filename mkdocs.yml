@@ -15,6 +15,7 @@ nav:
           - Configuration Deployment: how_to/config_deployment.md
           - Parameterization: how_to/parameterization.md
           - Optional Features: how_to/optional_feature.md
+          - Troubleshooting: how_to/troubleshooting.md
     - Examples:
           - Examples: example/index.md
           - Authentication: example/authentication.md
