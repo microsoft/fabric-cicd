@@ -240,6 +240,12 @@ def publish_all_items(
     if _should_publish_item_type("Eventhouse"):
         print_header("Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
+    if _should_publish_item_type("SparkJobDefinition"):
+        print_header("Publishing Spark Job Definitions")
+        items.publish_sparkjobdefinitions(fabric_workspace_obj)
+    if _should_publish_item_type("Notebook"):
+        print_header("Publishing Notebooks")
+        items.publish_notebooks(fabric_workspace_obj)
     if _should_publish_item_type("SemanticModel"):
         print_header("Publishing Semantic Models")
         items.publish_semanticmodels(fabric_workspace_obj)
@@ -273,9 +279,6 @@ def publish_all_items(
     if _should_publish_item_type("GraphQLApi"):
         print_header("Publishing GraphQL APIs")
         items.publish_graphqlapis(fabric_workspace_obj)
-    if _should_publish_item_type("Notebook"):
-        print_header("Publishing Notebooks")
-        items.publish_notebooks(fabric_workspace_obj)
     if _should_publish_item_type("ApacheAirflowJob"):
         print_header("Publishing Apache Airflow Jobs")
         items.publish_apacheairflowjobs(fabric_workspace_obj)
@@ -396,7 +399,6 @@ def unpublish_all_orphan_items(
         "OrgApp",
         "MountedDataFactory",
         "ApacheAirflowJob",
-        "Notebook",
         "GraphQLApi",
         "DataPipeline",
         "Dataflow",
@@ -408,6 +410,8 @@ def unpublish_all_orphan_items(
         "CopyJob",
         "Report",
         "SemanticModel",
+        "Notebook",
+        "SparkJobDefinition",
         "Eventhouse",
         "UserDataFunction",
         "Environment",
