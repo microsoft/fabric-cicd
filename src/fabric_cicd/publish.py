@@ -240,6 +240,9 @@ def publish_all_items(
     if _should_publish_item_type("Eventhouse"):
         print_header("Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
+    if _should_publish_item_type("SparkJobDefinition"):
+        print_header("Publishing Spark Job Definitions")
+        items.publish_sparkjobdefinitions(fabric_workspace_obj)
     if _should_publish_item_type("Notebook"):
         print_header("Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
@@ -408,6 +411,7 @@ def unpublish_all_orphan_items(
         "Report",
         "SemanticModel",
         "Notebook",
+        "SparkJobDefinition",
         "Eventhouse",
         "UserDataFunction",
         "Environment",
