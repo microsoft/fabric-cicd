@@ -177,8 +177,8 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
-    max_duration: int,
-    start_time: float,
+    max_duration: int | None = None,
+    start_time: float | None = None,
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -192,8 +192,8 @@ def _handle_response(
         body: The JSON body used in the request.
         long_running: A boolean indicating if the operation is long-running.
         iteration_count: The current iteration count of the loop.
-        max_duration: Maximum execution duration in seconds.
-        start_time: The start time of the request in seconds since epoch.
+        max_duration: Maximum execution duration in seconds. Defaults to None.
+        start_time: The start time of the request in seconds since epoch. Defaults to None.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
