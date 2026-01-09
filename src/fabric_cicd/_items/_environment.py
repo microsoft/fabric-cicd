@@ -5,6 +5,7 @@
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import dpath
@@ -33,10 +34,11 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
     )
 
     # Check for ongoing publish
+    item_type = "Environment"
     check_environment_publish_state(fabric_workspace_obj, True)
 
-    item_type = "Environment"
-    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+    def _publish(args: tuple) -> None:
+        item_name, item = args
         # Only deploy the environment shell when it just contains spark compute settings
         is_shell_only = set_environment_deployment_type(item)
         logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
@@ -51,8 +53,11 @@ def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
             shell_only_publish=is_shell_only,
         )
         if item.skip_publish:
-            continue
+            return
         _publish_environment_metadata(fabric_workspace_obj, item_name)
+
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(_publish, fabric_workspace_obj.repository_items.get(item_type, {}).items()))
 
 
 def set_environment_deployment_type(item: Item) -> bool:
