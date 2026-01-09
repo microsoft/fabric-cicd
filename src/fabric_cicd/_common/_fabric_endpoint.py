@@ -46,6 +46,7 @@ class FabricEndpoint:
         body: str = "{}",
         files: Optional[dict] = None,
         poll_long_running: bool = True,
+        max_duration: int = 300,
         **kwargs,
     ) -> dict:
         """
@@ -57,6 +58,7 @@ class FabricEndpoint:
             body: The JSON body to include in the request. Defaults to an empty JSON object.
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
+            max_duration: Maximum execution duration in seconds. Defaults to 300 (5 minutes).
             **kwargs: Additional keyword arguments to pass to the method.
         """
         exit_loop = False
@@ -95,6 +97,8 @@ class FabricEndpoint:
                         body,
                         long_running,
                         iteration_count,
+                        max_duration,
+                        start_time,
                         **kwargs,
                     )
 
@@ -173,6 +177,8 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
+    max_duration: int,
+    start_time: float,
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -186,6 +192,8 @@ def _handle_response(
         body: The JSON body used in the request.
         long_running: A boolean indicating if the operation is long-running.
         iteration_count: The current iteration count of the loop.
+        max_duration: Maximum execution duration in seconds.
+        start_time: The start time of the request in seconds since epoch.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
@@ -243,7 +251,8 @@ def _handle_response(
         handle_retry(
             attempt=iteration_count,
             base_delay=10,
-            max_retries=5,
+            max_duration=max_duration,
+            start_time=start_time,
             response_retry_after=retry_after,
             prepend_message="API is throttled.",
         )
@@ -261,7 +270,8 @@ def _handle_response(
         handle_retry(
             attempt=iteration_count,
             base_delay=30,
-            max_retries=5,
+            max_duration=max_duration,
+            start_time=start_time,
             response_retry_after=300,
             prepend_message="Item name is reserved.",
         )
@@ -307,7 +317,8 @@ def handle_retry(
     base_delay: float,
     response_retry_after: float = 60,
     prepend_message: str = "",
-    max_retries: int | None = None,
+    max_duration: int | None = None,
+    start_time: float | None = None,
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response.
@@ -317,9 +328,10 @@ def handle_retry(
         base_delay: Base delay in seconds for backoff.
         response_retry_after: The value of the Retry-After header from the response.
         prepend_message: Message to prepend to the retry log.
-        max_retries: Maximum number of retry attempts. If None, retries indefinitely.
+        max_duration: Maximum execution duration in seconds. If None, retries indefinitely.
+        start_time: The start time of the request in seconds since epoch. Required if max_duration is set.
     """
-    if max_retries is None or attempt < max_retries:
+    if max_duration is None or (start_time is not None and time.time() - start_time < max_duration):
         retry_after = float(response_retry_after)
         base_delay = float(base_delay)
         delay = min(retry_after, base_delay * (2**attempt))
@@ -334,7 +346,8 @@ def handle_retry(
         )
         time.sleep(delay)
     else:
-        msg = f"Maximum retry attempts ({max_retries}) exceeded."
+        elapsed = time.time() - start_time if start_time is not None else 0
+        msg = f"Maximum execution duration ({max_duration} seconds) exceeded after {elapsed:.1f} seconds."
         raise Exception(msg)
 
 

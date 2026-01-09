@@ -5,6 +5,7 @@
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 import dpath
 
@@ -25,7 +26,8 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "Lakehouse"
 
-    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+    def _publish(args: tuple) -> None:
+        item_name, item = args
         creation_payload = next(
             (
                 {"enableSchemas": True}
@@ -44,19 +46,25 @@ def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
 
         # Check if the item is published to avoid any post publish actions
         if item.skip_publish:
-            continue
+            return
 
         check_sqlendpoint_provision_status(fabric_workspace_obj, item)
 
         logger.info(f"{constants.INDENT}Published")
 
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(_publish, fabric_workspace_obj.repository_items.get(item_type, {}).items()))
+
     # Need all lakehouses published first to protect interrelationships
     if "enable_shortcut_publish" in constants.FEATURE_FLAG:
-        for item_obj in fabric_workspace_obj.repository_items.get(item_type, {}).values():
+
+        def _process(item_obj: Item) -> None:
             # Check if the item is published to avoid any post publish actions
-            if item_obj.skip_publish:
-                continue
-            process_shortcuts(fabric_workspace_obj, item_obj)
+            if not item_obj.skip_publish:
+                process_shortcuts(fabric_workspace_obj, item_obj)
+
+        with ThreadPoolExecutor() as executor:
+            list(executor.map(_process, fabric_workspace_obj.repository_items.get(item_type, {}).values()))
 
 
 def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
@@ -154,7 +162,8 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
         item_obj: The item object to publish shortcuts for
         shortcut_dict: The dict of shortcuts to publish
     """
-    for shortcut in shortcut_dict.values():
+
+    def _publish_one(shortcut: dict) -> None:
         shortcut = replace_default_lakehouse_id(shortcut, item_obj)
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
         try:
@@ -170,9 +179,12 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
                     f"Failed to publish '{shortcut['name']}'. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
                 logger.info("The publish process will continue with the other items.")
-                continue
+                return
             msg = f"Failed to publish '{shortcut['name']}' for lakehouse {item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger) from e
+
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(_publish_one, shortcut_dict.values()))
 
 
 def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
