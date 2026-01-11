@@ -107,7 +107,13 @@ Before reporting a new bug or suggesting a feature, please search the [GitHub Is
 
 All reported bugs or feature suggestions must start with creating an issue in the GitHub Issues pane. Please add as much information as possible to help us with triage and understanding. Once the issue is triaged, labels will be added to indicate its status (e.g., "need more info", "help wanted").
 
-When creating an issue please select the relevant topic - bug, new feature or general question - and provide all required input.
+When creating an issue please select the relevant template, e.g., bug, new feature or general question - and provide all required input:
+
+-   [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
+-   [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
+-   [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
+-   [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
+-   [Technical Debt](https://github.com/microsoft/fabric-cicd/issues/new?template=5-tech-debt.yml)
 
 We aim to respond to new issues promptly, but response times may vary depending on workload and priority.
 
@@ -140,7 +146,7 @@ Please review [engineering guidelines](https://github.com/microsoft/fabric-cicd/
 
 ### Pull request process
 
-**All pull requests must be linked to an approved issue.** See [PR Title Format](#pr-title-format). This ensures proper tracking and context for changes. Before creating a pull request:
+**All pull requests must be linked to an approved issue,** see [PR Title Format](#pr-title-format). This ensures proper tracking and context for changes. Before creating a pull request:
 
 1. **Create or identify an existing issue** that describes the problem, feature request, or change you're addressing
 2. **Comment on the issue** to express interest and get team acknowledgment before starting work
@@ -168,16 +174,6 @@ Verify that:
 -   Address and resolve all review comments before merge
 -   PRs will be labeled as "need author feedback" when there are comments to resolve
 -   Approved PRs will be merged by the fabric-cicd team
-
-#### Creating an Issue
-
-If you need to create an issue, use the appropriate template:
-
--   [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
--   [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
--   [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
--   [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
--   [Technical Debt](https://github.com/microsoft/fabric-cicd/issues/new?template=5-tech-debt.yml)
 
 ## Resources to help you get started
 
