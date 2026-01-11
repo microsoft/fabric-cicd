@@ -29,7 +29,7 @@ We welcome several types of contributions:
 
 Before you begin, ensure you have the following installed:
 
--   [Python](https://www.python.org/downloads/) (see [Installation](index.md#installation) for version requirements)
+-   [Python](https://www.python.org/downloads/) (see [Installation](https://microsoft.github.io/fabric-cicd/#installation) for version requirements)
 -   [PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
 -   [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows) or [Az.Accounts PowerShell module](https://www.powershellgallery.com/packages/Az.Accounts/2.2.3)
 -   [Visual Studio Code (VS Code)](https://code.visualstudio.com/)
@@ -61,7 +61,7 @@ Before you begin, ensure you have the following installed:
 1. **Select Python Interpreter**:
 
     - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`
-    - Choose the interpreter from the `venv` directory
+    - Choose the interpreter from the `.venv` directory
 
 1. **Ensure All VS Code Extensions Are Installed**:
 
@@ -86,11 +86,11 @@ Before you begin, ensure you have the following installed:
 
 -   The python code within this project is maintained by `ruff`
 -   If you install the recommended extensions, `ruff` will auto format on save of any file
--   Before being able to merge a PR, `ruff` is ran in a Github Action to ensure the files are properly formatted and maintained
+-   Before being able to merge a PR, `ruff` is ran in a GitHub Action to ensure the files are properly formatted and maintained
 -   To force linting, run the following
     ```sh
-    ruff format
-    ruff check
+    uv run ruff format
+    uv run ruff check
     ```
 
 ## Contribution process
