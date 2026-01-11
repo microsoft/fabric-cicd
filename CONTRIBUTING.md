@@ -17,10 +17,10 @@ or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any addi
 
 We welcome several types of contributions:
 
--   🐛 **Bug fixes** - Fix issues and improve reliability
+-   🔧 **Bug fixes** - Fix issues and improve reliability
 -   ✨ **New features** - Add new commands or functionality
 -   🆕 **New Items Support** - Onboard new Fabric item types
--   📖 **Documentation** - Improve guides, examples, and API docs
+-   📝 **Documentation** - Improve guides, examples, and API docs
 -   🧪 **Tests** - Add or improve test coverage
 -   💬 **Help others** - Answer questions and provide support
 -   💡 **Feature suggestions** - Propose new capabilities
@@ -38,20 +38,20 @@ Before you begin, ensure you have the following installed:
 
 1. **Fork the Repository on GitHub**:
 
-    - Go to the repository [fabric-cicd](https://github.com/microsoft/fabric-cicd) on GitHub.
-    - In the top right corner, click on the **Fork** button.
-    - This will create a copy of the repository in your own GitHub account.
+    - Go to the repository [fabric-cicd](https://github.com/microsoft/fabric-cicd) on GitHub
+    - In the top right corner, click on the **Fork** button
+    - This will create a copy of the repository in your own GitHub account
 
 1. **Clone Your Forked Repository**:
 
-    - Once the fork is complete, go to your GitHub account and open the forked repository.
-    - Click on the **Code** button, and clone to VS Code.
+    - Once the fork is complete, go to your GitHub account and open the forked repository
+    - Click on the **Code** button, and clone to VS Code
 
 1. **Run activate.ps1**:
 
     - Open the Project in VS Code
     - Open PowerShell terminal
-    - Run activate.ps1 which will install uv, and ruff if not already found. And set up the default environment leveraging uv sync.
+    - Run `activate.ps1` which will install `uv`, and `ruff` if not already found. And set up the default environment leveraging `uv sync`
         ```powershell
         .\activate.ps1
         ```
@@ -60,19 +60,19 @@ Before you begin, ensure you have the following installed:
 
 1. **Select Python Interpreter**:
 
-    - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`.
-    - Choose the interpreter from the `venv` directory.
+    - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`
+    - Choose the interpreter from the `venv` directory
 
 1. **Ensure All VS Code Extensions Are Installed**:
 
-    - Open the Command Palette (Ctrl+Shift+P) and select `Extensions: Show Recommended Extensions`.
-    - Install all extensions recommended for the workspace.
+    - Open the Command Palette (Ctrl+Shift+P) and select `Extensions: Show Recommended Extensions`
+    - Install all extensions recommended for the workspace
 
 ## Development
 
 ### Managing Dependencies
 
--   All dependencies in this project are managed by uv which will resolve all dependencies and lock the versions to speed up virtual environment creation.
+-   All dependencies in this project are managed by `uv` which will resolve all dependencies and lock the versions to speed up virtual environment creation
 -   For additions, run:
     ```sh
     uv add <package-name>
@@ -84,10 +84,10 @@ Before you begin, ensure you have the following installed:
 
 ### Code Formatting & Linting
 
--   The python code within this project is maintained by ruff.
--   If you install the recommended extensions, ruff will auto format on save of any file.
--   Before being able to merge a PR, ruff is ran in a Github Action to ensure the files are properly formatted and maintained.
--   To force linting, run the following.
+-   The python code within this project is maintained by `ruff`
+-   If you install the recommended extensions, `ruff` will auto format on save of any file
+-   Before being able to merge a PR, `ruff` is ran in a Github Action to ensure the files are properly formatted and maintained
+-   To force linting, run the following
     ```sh
     ruff format
     ruff check
@@ -140,7 +140,7 @@ Please review [engineering guidelines](https://github.com/microsoft/fabric-cicd/
 
 ### Pull request process
 
-**All pull requests must be linked to an approved issue.** Please start the PR title with `- Resolves|Closes|Fixes #issue-number`. This ensures proper tracking and context for changes. Before creating a pull request:
+**All pull requests must be linked to an approved issue.** See [PR Title Format](#pr-title-format). This ensures proper tracking and context for changes. Before creating a pull request:
 
 1. **Create or identify an existing issue** that describes the problem, feature request, or change you're addressing
 2. **Comment on the issue** to express interest and get team acknowledgment before starting work
@@ -167,7 +167,7 @@ Verify that:
 -   Use a descriptive title and provide a clear summary of your changes
 -   Address and resolve all review comments before merge
 -   PRs will be labeled as "need author feedback" when there are comments to resolve
--   Approved PRs will be merged by the Fabric CICD team
+-   Approved PRs will be merged by the fabric-cicd team
 
 #### Creating an Issue
 
@@ -183,7 +183,7 @@ If you need to create an issue, use the appropriate template:
 
 Here are some resources to help you get started:
 
--   A good place to start learning about Fabric CICD is the [Fabric CICD documentation](https://microsoft.github.io/fabric-cicd/)
+-   A good place to start learning about fabric-cicd is the [fabric-cicd documentation](https://microsoft.github.io/fabric-cicd/)
 -   If you want to contribute code, please check more details about coding guidelines, major code flows and code building block in [Engineering guidelines](https://github.com/microsoft/fabric-cicd/wiki)
 
 ## Engineering guidelines
@@ -198,8 +198,8 @@ Before contributing code, please review these guidelines to ensure your contribu
 
 Some areas require special consideration:
 
--   **Authentication module** - Changes preferred to be made by Fabric CLI team due to security implications
--   **Core infrastructure** - Major architectural changes require team discussion
+-   **Core infrastructure** - Major architectural changes require team discussion, including within `FabricEndpoint` and `FabricWorkspace` classes
+-   **Parameterization framework** - Changes require team discussion due to complex validation and parameter replacement logic
 
 ## Need Help?
 
@@ -215,4 +215,4 @@ Some areas require special consideration:
 -   **Be specific** - Provide clear, detailed information
 -   **Be collaborative** - Work together to improve the project
 
-Thank you for contributing to Microsoft Fabric CLI! Your contributions help make this tool better for the entire Fabric community.
+Thank you for contributing to Microsoft fabric-cicd! Your contributions help make this tool better for the entire Fabric community.
