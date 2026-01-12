@@ -404,22 +404,31 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
         ),
         (
             500,
-            1,
+            5,
             False,
             {"Content-Type": "application/json"},
             {"message": "Internal Server Error"},
-            "Unhandled error occurred calling GET on 'http://example.com'. Message: Internal Server Error",
-            None,
-            None,
+            r"Maximum execution duration \(0 seconds\) exceeded",
+            0,
+            0.0,
         ),
-        (429, 5, True, {"Retry-After": "10"}, {}, r"Maximum execution duration \(0 seconds\) exceeded", 0, 0.0),
+        (   
+            429, 
+            5, 
+            True, 
+            {"Retry-After": "10"}, 
+            {}, 
+            r"Maximum execution duration \(0 seconds\) exceeded", 
+            0, 
+            0.0
+        ),
     ],
     ids=[
         "unauthorized",
         "principal_type_not_supported",
         "failed_library_removal",
-        "unexpected_error",
-        "retry",
+        "retry_500",
+        "retry_429",
     ],
 )
 def test_handle_response_exceptions(
