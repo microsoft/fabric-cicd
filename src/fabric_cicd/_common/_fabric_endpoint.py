@@ -256,6 +256,18 @@ def _handle_response(
             response_retry_after=retry_after,
             prepend_message="API is throttled.",
         )
+    
+    # Handle internal server errors via retry,
+    # rather than failing the deployment run
+    elif response.status_code == 500:
+        handle_retry(
+            attempt=iteration_count,
+            base_delay=10,
+            max_duration=max_duration,
+            start_time=start_time,
+            response_retry_after=retry_after,
+            prepend_message="Server error encountered.",
+        )
 
     # Handle unauthorized access
     elif response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "Unauthorized":
