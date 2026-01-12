@@ -4,6 +4,7 @@
 """Functions to process and deploy Notebook item."""
 
 import logging
+from multiprocessing.pool import ThreadPool
 
 from fabric_cicd import FabricWorkspace
 
@@ -19,5 +20,8 @@ def publish_notebooks(fabric_workspace_obj: FabricWorkspace) -> None:
     """
     item_type = "Notebook"
 
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
+    with ThreadPool(fabric_workspace_obj.max_parallel_requests) as pool:
+        pool.map(
+            lambda item_name: fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type),
+            fabric_workspace_obj.repository_items.get(item_type, {}),
+        )
