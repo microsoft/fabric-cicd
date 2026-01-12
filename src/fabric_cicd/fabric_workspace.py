@@ -135,6 +135,9 @@ class FabricWorkspace:
         self.deployed_folders = {}
         self.deployed_items = {}
 
+        # Max threads to use in parallel
+        self.max_parallel_requests = kwargs.get("max_parallel_requests", 4)
+
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
