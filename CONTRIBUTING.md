@@ -60,12 +60,12 @@ Before you begin, ensure you have the following installed:
 
 1. **Select Python Interpreter**:
 
-    - Open the Command Palette (Ctrl+Shift+P) and select `Python: Select Interpreter`
+    - Open the Command Palette (`Ctrl+Shift+P`) and select `Python: Select Interpreter`
     - Choose the interpreter from the `.venv` directory
 
 1. **Ensure All VS Code Extensions Are Installed**:
 
-    - Open the Command Palette (Ctrl+Shift+P) and select `Extensions: Show Recommended Extensions`
+    - Open the Command Palette (`Ctrl+Shift+P`) and select `Extensions: Show Recommended Extensions`
     - Install all extensions recommended for the workspace
 
 ## Development
@@ -107,13 +107,13 @@ Before reporting a new bug or suggesting a feature, please search the [GitHub Is
 
 All reported bugs or feature suggestions must start with creating an issue in the GitHub Issues pane. Please add as much information as possible to help us with triage and understanding. Once the issue is triaged, labels will be added to indicate its status (e.g., "need more info", "help wanted").
 
-When creating an issue please select the relevant template, e.g., bug, new feature or general question - and provide all required input:
+When creating an issue please select the relevant template, e.g., bug, new feature, general question, etc. - and provide all required input:
 
 -   [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
 -   [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
 -   [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
 -   [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
--   [Technical Debt](https://github.com/microsoft/fabric-cicd/issues/new?template=5-tech-debt.yml)
+-   [Copilot](https://github.com/microsoft/fabric-cicd/issues/new?template=5-copilot.yml)
 
 We aim to respond to new issues promptly, but response times may vary depending on workload and priority.
 
