@@ -41,6 +41,33 @@ fabric-cicd includes several debug scripts in the `devtools/` directory that all
 
 **Tip:** Using these scripts locally can catch configuration errors early, saving time in your CI/CD pipeline.
 
+### Sample Workspace Directory
+
+fabric-cicd includes the `sample/workspace/` directory that demonstrates the recommended repository structure for Fabric item source control files. It contains sample items of various supported item types (e.g., Environment, Notebook, Data Pipeline, etc.).
+
+**Repository Directory Structure:**
+
+```
+sample/workspace/
+├── Sample Pipeline.DataPipeline/
+│   ├── .platform
+│   └── pipeline-content.json
+├── Sample_Notebook.Notebook/
+│   ├── .platform
+│   └── notebook-content.py
+...
+└── parameter.yml
+```
+
+Each item folder follows the naming convention `ItemName.ItemType/` and contains:
+
+-   `.platform` file which contains the item metadata
+-   Item definition files (e.g., `pipeline-content.json`, `notebook-content.py`)
+
+**Using the Sample:**
+
+Use this sample structure as a template for organizing your Fabric items. To test deployments with the items found in the sample workspace, set `repository_directory = "sample/workspace"` in `debug_local.py` or in `config.yml` when running `debug_local config.py`.
+
 ### Understanding Error Logs
 
 fabric-cicd automatically creates a `fabric_cicd.error.log` file in your working directory. This file contains:
