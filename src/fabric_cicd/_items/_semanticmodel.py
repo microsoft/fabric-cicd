@@ -54,7 +54,7 @@ def build_binding_mapping(fabric_workspace_obj: FabricWorkspace, item_type: str,
         binding_config: The semantic_model_binding configuration
 
     Returns:
-        Dictionary mapping model names to tuple of (list of connection IDs, is_from_default, take_over)
+        Dictionary mapping model names to tuple of (list of connection IDs, is_from_default)
     """
     environment = fabric_workspace_obj.environment
     binding_mapping = {}
@@ -64,9 +64,6 @@ def build_binding_mapping(fabric_workspace_obj: FabricWorkspace, item_type: str,
     has_new_structure = any(key in binding_config for key in ["default", "items"])
 
     if has_new_structure:
-        # Get default take_over value
-        default_take_over = binding_config.get("default", {}).get("take_over", False)
-
         # Track models with explicit item configurations
         configured_models = set()
 
@@ -83,16 +80,13 @@ def build_binding_mapping(fabric_workspace_obj: FabricWorkspace, item_type: str,
 
             connection_ids = _resolve_connections(connections_config, environment)
             if connection_ids:
-                # Get take_over from item, fallback to default
-                item_take_over = item.get("take_over", default_take_over)
-
                 for model_name in model_names:
                     # Check if model exists in repository
                     if model_name not in repository_models:
                         logger.warning(f"Semantic model '{model_name}' configured in items but not found in repository")
                         continue
 
-                    binding_mapping[model_name] = (connection_ids, False, item_take_over)
+                    binding_mapping[model_name] = (connection_ids, False)
                     configured_models.add(model_name)
 
         # Apply default to all models NOT explicitly configured
@@ -102,7 +96,7 @@ def build_binding_mapping(fabric_workspace_obj: FabricWorkspace, item_type: str,
             if default_connection_ids:
                 for model_name in repository_models:
                     if model_name not in configured_models:
-                        binding_mapping[model_name] = (default_connection_ids, True, default_take_over)
+                        binding_mapping[model_name] = (default_connection_ids, True)
     else:
         # Legacy structure - backward compatibility (list format)
         for item in binding_config:
@@ -130,7 +124,7 @@ def build_binding_mapping(fabric_workspace_obj: FabricWorkspace, item_type: str,
                     logger.warning(f"Semantic model '{model_name}' not found in repository")
                     continue
 
-                binding_mapping[model_name] = (connection_ids, False, False)
+                binding_mapping[model_name] = (connection_ids, False)
 
     return binding_mapping
 
@@ -217,18 +211,14 @@ def bind_semanticmodel_to_connection(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         item_type: The item type (should be "SemanticModel")
-        binding_mapping: Dictionary mapping dataset names to tuple of (list of connection IDs, is_default, take_over).
+        binding_mapping: Dictionary mapping dataset names to tuple of (list of connection IDs, is_default).
         connections: Dictionary of connection objects with connection ID as key.
     """
     # Loop through each semantic model in the binding mapping
-    for dataset_name, (connection_ids, is_default, take_over) in binding_mapping.items():
+    for dataset_name, (connection_ids, is_default) in binding_mapping.items():
         # Get the semantic model object
         item_obj = fabric_workspace_obj.repository_items[item_type][dataset_name]
         model_id = item_obj.guid
-
-        # Take over ownership if enabled for this specific model
-        if take_over:
-            _take_over_dataset(fabric_workspace_obj, model_id, dataset_name)
 
         # Get the existing connections for this semantic model
         try:
@@ -310,34 +300,6 @@ def bind_semanticmodel_to_connection(
             except Exception as e:
                 logger.error(f"Failed to bind semantic model '{dataset_name}' to connection '{connection_id}': {e!s}")
                 continue
-
-
-def _take_over_dataset(fabric_workspace_obj: FabricWorkspace, model_id: str, dataset_name: str) -> None:
-    """
-    Take over ownership of a semantic model/dataset.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object
-        model_id: The semantic model GUID
-        dataset_name: The semantic model name (for logging)
-    """
-    try:
-        # Power BI API endpoint (must use api.powerbi.com, not configurable)
-        takeover_url = f"https://api.powerbi.com/v1.0/myorg/groups/{fabric_workspace_obj.workspace_id}/datasets/{model_id}/Default.TakeOver"
-        logger.info(f"Taking over ownership of semantic model '{dataset_name}' (ID: {model_id})")
-
-        response = fabric_workspace_obj.endpoint.invoke(method="POST", url=takeover_url)
-        status_code = response.get("status_code")
-
-        if status_code == 200:
-            logger.info(f"Successfully took over ownership of semantic model '{dataset_name}'")
-        else:
-            logger.warning(
-                f"Failed to take over ownership of semantic model '{dataset_name}'. Status code: {status_code}"
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to take over ownership of semantic model '{dataset_name}': {e!s}")
 
 
 def _build_request_body(body: dict) -> dict:
