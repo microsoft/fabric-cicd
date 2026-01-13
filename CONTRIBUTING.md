@@ -107,7 +107,7 @@ Before reporting a new bug or suggesting a feature, please search the [GitHub Is
 
 All reported bugs or feature suggestions must start with creating an issue in the GitHub Issues pane. Please add as much information as possible to help us with triage and understanding. Once the issue is triaged, labels will be added to indicate its status (e.g., "need more info", "help wanted").
 
-When creating an issue please select the relevant template, e.g., bug, new feature, general question, etc. - and provide all required input:
+When creating an issue please select the relevant template, e.g., bug, new feature, general question, etc. and provide all required input:
 
 -   [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
 -   [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
