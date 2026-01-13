@@ -2,9 +2,9 @@
 
 This guide provides comprehensive debugging and troubleshooting resources for both users deploying with fabric-cicd and contributors developing within the repository.
 
-## For Users: Debugging Deployments
+## Debugging Deployments
 
-### Enabling Debug Logging
+### Enable Debug Logging
 
 fabric-cicd includes a debug logging feature that provides detailed visibility into all operations, including API calls made during deployment.
 
@@ -13,26 +13,41 @@ To enable debug logging, add the following to your deployment script:
 ```python
 from fabric_cicd import change_log_level
 
-# Enable debug logging (must be called before other fabric-cicd operations)
-change_log_level("DEBUG")
+# Enable debug logging (call before other fabric-cicd operations)
+change_log_level()
 ```
 
 When debug logging is enabled:
 
 -   All API calls are logged to the console with detailed request/response information
--   Complete execution traces are written to `fabric_cicd.error.log`
 -   Additional context about internal operations is displayed
 
-!!! tip "Best Practice"
-    Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration.
+**Important:** Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration.
+
+### Testing Deployments Locally
+
+Before running deployments via CI/CD pipelines, users can test the deployment workflow locally by running the provided debug scripts. This helps with:
+
+-   Validating configuration changes without affecting production
+-   Testing parameter file configurations
+-   Debugging deployment issues
+-   Verifying authentication and permissions
+
+fabric-cicd includes several debug scripts in the `devtools/` directory that allow users to run deployments against real workspaces in a controlled environment. See [Debug Scripts](#debug-scripts) for detailed information on:
+
+-   `debug_local.py` or `debug_local config.py` - Test full deployment workflows
+-   `debug_parameterization.py` - Validate parameter files without deploying
+-   `debug_api.py` - Test Fabric REST API calls directly
+
+**Tip:** Using these scripts locally can catch configuration errors early, saving time in your CI/CD pipeline.
 
 ### Understanding Error Logs
 
 fabric-cicd automatically creates a `fabric_cicd.error.log` file in your working directory. This file contains:
 
 -   **Full stack traces** for all errors encountered
--   **Complete API request/response details** including URLs, headers, and payloads
--   **Additional diagnostic information** not shown in console output
+-   **API request/response details** including URLs, headers, and payloads
+-   **Complete diagnostic information** not always shown in console output
 
 #### Accessing API Traces
 
@@ -93,7 +108,6 @@ Traceback (most recent call last):
     ```
 2. Check that your account has appropriate permissions on the target workspace
 3. If using Service Principal authentication, verify client ID, secret, and tenant ID are correct
-4. Enable debug logging to see which credential is being used
 
 #### Item Deployment Failures
 
@@ -103,20 +117,22 @@ Traceback (most recent call last):
 
 1. Enable debug logging to see the exact API error
 2. Check `fabric_cicd.error.log` for detailed API response
-3. Verify the item definition files are properly formatted
-4. Ensure item names don't contain special characters or exceed length limits
-5. Check if the item type is included in your `item_type_in_scope` list
+3. Verify the item definition files exist and are properly formatted
+4. Check if the item type is included in your `item_type_in_scope` list
+5. Ensure item dependencies exist (e.g., a Data Pipeline referencing a Notebook must be deployed along with the Notebook)
+6. If deleting and recreating an item with the same name, wait 5 minutes between operations due to Fabric API item name reservation
 
 #### Parameter Substitution Issues
 
-**Symptom**: Deployed items contain literal `@{parameter_name}` instead of values
+**Symptom**: Deployed items contain literal find value instead of the proper replace value
 
 **Solution**:
 
 1. Verify your `parameter.yml` file is in the correct location (repository directory by default)
-2. Check that parameter names in your files exactly match those in `parameter.yml`
+2. Check that find values in your files exactly match those in `parameter.yml`
 3. Ensure the environment name matches between your script and `parameter.yml`
-4. Use the [debug_parameterization.py](#debug_parameterizationpy) script to validate parameter files
+4. Validate the find value regex and/or dynamic replacement variables in `parameter.yml`
+5. Use the [debug_parameterization.py](#debug_parameterizationpy) script to validate parameter files
 
 #### API Rate Limiting
 
@@ -124,33 +140,22 @@ Traceback (most recent call last):
 
 **Solution**:
 
-1. Add delays between operations if deploying many items
-2. Consider deploying in smaller batches
-3. Check `fabric_cicd.error.log` for retry-after headers in API responses
-
-## For Contributors: Development Tools
-
-The `devtools/` directory contains several scripts to help contributors test and debug their code changes before submitting pull requests.
+1. Consider deploying in smaller batches
+2. Check `fabric_cicd.error.log` for retry-after headers in API responses
 
 ### Debug Scripts
 
 #### debug_local.py
 
-**Purpose**: Test full deployment workflows locally against a real Microsoft Fabric workspace.
-
-**Use Cases**:
-
--   Validate changes to publish/unpublish logic
--   Test against different workspace configurations
--   Debug item type-specific deployment issues
--   Verify feature flag behavior
+**Purpose**: Test full deployment workflows locally against a Microsoft Fabric workspace.
 
 **Configuration**:
 
 ```python
-# 1. Set your workspace ID and environment
+# 1. Set your workspace ID, environment, and repository directory path
 workspace_id = "your-workspace-id"
 environment = "DEV"  # Must match environment in parameter.yml
+repository_directory = "root/sample/workspace" # In this example, our workspace content sits within the root/sample/workspace directory
 
 # 2. Configure authentication (optional)
 # Uncomment to use Service Principal authentication
@@ -163,45 +168,59 @@ environment = "DEV"  # Must match environment in parameter.yml
 # 3. Enable debug logging (optional)
 # change_log_level()
 
-# 4. Select item types to deploy
-item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+# 4. Set required feature flags, if any (optional)
+# append_feature_flag("feature_flag_1")
+# append_feature_flag("feature_flag_2")
 
-# 5. Uncomment the operation to test
+# 5. Select item types to deploy (optional, otherwise deploys all supported item types)
+# item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+
+# 6. Create the FabricWorkspace object
+target_workspace = FabricWorkspace(
+    workspace_id=workspace_id,
+    environment=environment,
+    repository_directory=repository_directory,
+    # Uncomment to deploy specific item types
+    # item_type_in_scope=item_type_in_scope,
+    # Uncomment to use SPN auth
+    # token_credential=token_credential,
+)
+
+# 7. Uncomment publish operation to test
 # publish_all_items(target_workspace)
+
+# 8. Uncomment unpublish operation to test
 # unpublish_all_orphan_items(target_workspace)
 ```
 
 **Usage**:
 
-```bash
+```powershell
 cd /path/to/fabric-cicd
 uv run python devtools/debug_local.py
 ```
 
 #### debug_local config.py
 
-**Purpose**: Test configuration-based deployment workflows using a `config.yml` file.
-
-**Use Cases**:
-
--   Validate the experimental `deploy_with_config` feature
--   Test selective deployments with include/exclude patterns
--   Debug configuration file parsing and validation
+**Purpose**: Test configuration-based deployment workflows using a `config.yml` file. See [configuration deployment](config_deployment.md) for more information.
 
 **Configuration**:
 
 ```python
-# 1. Enable required feature flags
+# 1. Enable debug logging (optional)
+# change_log_level()
+
+# 2. Enable required feature flags
 append_feature_flag("enable_experimental_features")
 append_feature_flag("enable_config_deploy")
 
-# 2. Point to your config file
+# 3. Point to your config file
 config_file = "path/to/config.yml"
 
-# 3. Set environment
+# 4. Set environment
 environment = "dev"
 
-# 4. Run deployment
+# 5. Run deployment
 deploy_with_config(
     config_file_path=config_file,
     environment=environment
@@ -210,76 +229,76 @@ deploy_with_config(
 
 **Usage**:
 
-```bash
-uv run python devtools/debug_local\ config.py
+```powershell
+uv run python "devtools/debug_local config.py"
 ```
 
 #### debug_parameterization.py
 
-**Purpose**: Validate `parameter.yml` files without performing actual deployments.
-
-**Use Cases**:
-
--   Test parameter file structure and syntax
--   Verify parameter values for specific environments
--   Debug parameter substitution logic
--   Validate parameter files before committing
+**Purpose**: Validate the `parameter.yml` file without running actual deployments. See [parameterization](parameterization.md#parameter-file-validation) for more information.
 
 **Configuration**:
 
 ```python
-# 1. Set repository directory containing parameter.yml
+# 1. Enable debug logging (optional)
+# change_log_level()
+
+# 2. Set repository directory containing parameter.yml
 repository_directory = "path/to/workspace"
 
-# 2. Define item types to validate against
-item_type_in_scope = ["DataPipeline", "Notebook", "Environment"]
+# 3. Define item types to validate against (optional)
+#item_type_in_scope = ["DataPipeline", "Notebook", "Environment"]
 
-# 3. Set target environment
+# 4. Set target environment
 environment = "PPE"
 
-# 4. (Optional) Use custom parameter file location
+# 5. Use custom parameter file location (optional)
 # parameter_file_path = "path/to/custom/parameter.yml"
+
+# 6. Run the validaion function using the defined input
+validate_parameter_file(
+    repository_directory=repository_directory,
+    # Uncomment to consider specific item types
+    # item_type_in_scope=item_type_in_scope,
+    # Comment to exclude target environment in validation
+    environment=environment,
+    # Uncomment to use a different parameter file name within the repository directory (default name: parameter.yml)
+    # Assign to the constant in constants.py or pass in a string directly
+    # parameter_file_name=constants.PARAMETER_FILE_NAME,
+    # Uncomment to use a parameter file from outside the repository (takes precedence over parameter_file_name)
+    # parameter_file_path=parameter_file_path,
+    # Uncomment to use SPN auth
+    # token_credential=token_credential,
+)
 ```
 
 **Usage**:
 
-```bash
+```powershell
 uv run python devtools/debug_parameterization.py
 ```
-
-This script will:
-
--   Parse the parameter file
--   Validate structure and required fields
--   Check that all parameters for the specified environment exist
--   Report any errors or warnings
 
 #### debug_api.py
 
 **Purpose**: Test Fabric REST API calls directly without going through full deployment workflows.
 
-**Use Cases**:
-
--   Debug and validate Fabric API endpoints
--   Test API request/response payloads
--   Prototype new API integrations
--   Verify authentication and authorization
--   Troubleshoot API-specific issues
-
 **Configuration**:
 
 ```python
-# 1. Configure authentication (optional)
+# 1. Enable debug logging (optional)
+# change_log_level()
+
+# 2. Configure authentication (optional)
 # Replace None with credential when using SPN auth
 token_credential = None  # Uses DefaultAzureCredential if None
 
-# 2. Set workspace ID if needed
+# 3. Set workspace ID if needed
 workspace_id = "your-workspace-id"
 
-# 3. Configure the API endpoint
+# 4. Configure the API endpoint
 api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}..."
 
-# 4. Make the API call
+# 5. Make the API call
 response = fe.invoke(
     method="POST",  # GET, POST, PUT, DELETE, PATCH
     url=api_url,
@@ -289,81 +308,9 @@ response = fe.invoke(
 
 **Usage**:
 
-```bash
+```powershell
 uv run python devtools/debug_api.py
 ```
-
-This script provides direct access to Fabric REST APIs using the `FabricEndpoint` class, allowing you to:
-
--   Test any Fabric API endpoint
--   Customize HTTP methods and request bodies
--   Debug API responses without deployment overhead
--   Validate API changes during development
-
-#### pypi_build_release_dev.ps1
-
-**Purpose**: Build and publish development versions of the package to TestPyPI for testing.
-
-**Use Cases**:
-
--   Test package installation and imports before releasing to production PyPI
--   Validate packaging configuration changes
--   Verify distribution includes all necessary files
-
-**Usage**:
-
-```powershell
-# From PowerShell terminal
-cd devtools
-.\pypi_build_release_dev.ps1
-```
-
-!!! warning "Requires TestPyPI Credentials"
-    This script requires TestPyPI credentials configured in your environment. It's typically only used by maintainers preparing releases.
-
-### Testing Your Changes
-
-Before submitting a pull request, always test your changes:
-
-1. **Run Unit Tests**:
-    ```bash
-    uv run pytest -v
-    ```
-
-2. **Check Code Formatting**:
-    ```bash
-    uv run ruff format
-    uv run ruff check
-    ```
-
-3. **Test Import Functionality**:
-    ```bash
-    uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"
-    ```
-
-4. **Use Debug Scripts**: Test your changes against real scenarios using the appropriate debug script from `devtools/`.
-
-### Running Tests with Debug Output
-
-To see detailed test output and debug information:
-
-```bash
-# Run with verbose output
-uv run pytest -v -s
-
-# Run specific test file
-uv run pytest tests/test_specific.py -v
-
-# Run tests matching a pattern
-uv run pytest -k "test_pattern" -v
-```
-
-## Additional Resources
-
--   [Contribution Guide](../contribution.md) - Setup instructions and PR requirements
--   [Feature Flags](optional_feature.md#feature-flags) - Available feature flags for advanced scenarios
--   [Getting Started](getting_started.md) - Basic installation and authentication
--   [Microsoft Fabric API Documentation](https://learn.microsoft.com/en-us/rest/api/fabric/core/) - Official API reference
 
 ## Getting Help
 
@@ -372,10 +319,18 @@ If you're still experiencing issues after following this guide:
 1. **Enable debug logging** and capture the complete error log
 2. **Check existing issues** on [GitHub](https://github.com/microsoft/fabric-cicd/issues)
 3. **Create a new issue** using the appropriate template:
-    -   [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
-    -   [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
+    - [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
+    - [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
 4. **Include the following** in your issue:
-    -   fabric-cicd version (`pip show fabric-cicd`)
-    -   Python version (`python --version`)
-    -   Relevant portions of `fabric_cicd.error.log` (redact sensitive information)
-    -   Minimal code to reproduce the issue
+    - fabric-cicd version (`pip show fabric-cicd`)
+    - Python version (`python --version`)
+    - Relevant portions of `fabric_cicd.error.log` (redact sensitive information)
+    - Minimal code to reproduce the issue
+    - Clear steps to reporduce the issue
+
+## Additional Resources
+
+-   [Contribution Guide](https://github.com/microsoft/fabric-cicd/blob/main/CONTRIBUTING.md) - Setup instructions and PR requirements
+-   [Feature Flags](optional_feature.md#feature-flags) - Available feature flags for advanced scenarios
+-   [Getting Started](getting_started.md) - Basic installation and authentication
+-   [Microsoft Fabric API Documentation](https://learn.microsoft.com/en-us/rest/api/fabric/) - Official API reference
