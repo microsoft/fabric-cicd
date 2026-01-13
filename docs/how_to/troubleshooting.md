@@ -255,7 +255,7 @@ environment = "PPE"
 # 5. Use custom parameter file location (optional)
 # parameter_file_path = "path/to/custom/parameter.yml"
 
-# 6. Run the validaion function using the defined input
+# 6. Run the validation function using the defined input
 validate_parameter_file(
     repository_directory=repository_directory,
     # Uncomment to consider specific item types
@@ -326,7 +326,7 @@ If you're still experiencing issues after following this guide:
     - Python version (`python --version`)
     - Relevant portions of `fabric_cicd.error.log` (redact sensitive information)
     - Minimal code to reproduce the issue
-    - Clear steps to reporduce the issue
+    - Clear steps to reproduce the issue
 
 ## Additional Resources
 
