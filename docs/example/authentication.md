@@ -91,6 +91,53 @@ This approach utilizes the default credential flow, meaning no explicit TokenCre
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
     ```
 
+=== "Fabric Notebook"
+
+    ```python
+    '''fabric-cicd will automatically generate a TokenCredential based on the user session context.'''
+    
+    import tempfile
+    import subprocess
+    import os
+    from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+    
+    # Sample configuration values
+    workspace_id = "f3240389-4fbf-4509-83b2-25583d2d6ea0"
+    repo_url = "https://github.com/microsoft/fabric-cicd.git"
+    repo_ref = "main"
+    workspace_path = "sample/workspace"
+    
+    # Create a temporary directory
+    temp_dir = tempfile.mkdtemp(prefix="cloned_repo_")
+    print(f"Created temporary directory: {temp_dir}")
+    
+    # Clone the specific branch
+    print(f"Cloning {repo_url} (ref: {repo_ref})...")
+    result = subprocess.run(
+        ["git", "clone", "--branch", repo_ref, "--single-branch", repo_url, temp_dir],
+        capture_output=True,
+        text=True
+    )
+    
+    workspace_root = os.path.join(temp_dir, workspace_path)
+    
+    # Deploy workspace items from cloned repository
+    item_type_in_scope = ["VariableLibrary"]  # "" , "SparkJobDefinition", "Lakehouse", "Environment", 
+    
+    # Initialize the FabricWorkspace object with the required parameters
+    target_workspace = FabricWorkspace(
+        workspace_id=workspace_id,
+        repository_directory=workspace_root,
+        item_type_in_scope=item_type_in_scope
+    )
+    
+    # Publish all items defined in item_type_in_scope
+    publish_all_items(target_workspace)
+    
+    # Unpublish all items defined in item_type_in_scope not found in repository
+    unpublish_all_orphan_items(target_workspace)
+    ```
+
 ## CLI Credential
 
 This approach utilizes the CLI credential flow, meaning it only refers to the authentication established with az login. This is agnostic of the executing user, it can be UPN, SPN, Managed Identity, etc. Whatever is used to log in will be used.
@@ -188,6 +235,12 @@ This approach utilizes the CLI credential flow, meaning it only refers to the au
 
     ```python
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
+    ```
+
+=== "Fabric Notebook"
+
+    ```python
+    '''Unconfirmed example at this time, Default Credential flow is recommended'''
     ```
 
 ## AZ PowerShell Credential
@@ -289,6 +342,12 @@ This approach utilizes the AZ PowerShell credential flow, meaning it only refers
     '''
     Unconfirmed example at this time, however, the Azure DevOps example is a good starting point
     '''
+    ```
+
+=== "Fabric Notebook"
+
+    ```python
+    '''Unconfirmed example at this time, Default Credential flow is recommended'''
     ```
 
 ## Explicit SPN Secret Credential
@@ -397,4 +456,10 @@ This approach utilizes directly passing in SPN Client Id and Client Secret. Alth
 
     ```python
     '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
+    ```
+
+=== "Fabric Notebook"
+
+    ```python
+    '''Unconfirmed example at this time, Default Credential flow is recommended'''
     ```

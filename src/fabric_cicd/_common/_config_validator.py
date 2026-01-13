@@ -785,6 +785,49 @@ class ConfigValidator:
                     )
                 )
 
+        # Validate shortcut_exclude_regex if present (publish only)
+        if "shortcut_exclude_regex" in section:
+            if section_name != "publish":
+                self.errors.append(
+                    f"'{section_name}.shortcut_exclude_regex' is not supported - shortcut exclusion is only available in the 'publish' section"
+                )
+
+            shortcut_exclude_regex = section["shortcut_exclude_regex"]
+            if isinstance(shortcut_exclude_regex, str):
+                if not shortcut_exclude_regex.strip():
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                            f"{section_name}.shortcut_exclude_regex"
+                        )
+                    )
+                else:
+                    self._validate_regex(shortcut_exclude_regex, f"{section_name}.shortcut_exclude_regex")
+
+            elif isinstance(shortcut_exclude_regex, dict):
+                # Validate environment mapping
+                if not self._validate_environment_mapping(
+                    shortcut_exclude_regex, f"{section_name}.shortcut_exclude_regex", str
+                ):
+                    return
+
+                # Validate each environment's regex pattern
+                for env, regex_pattern in shortcut_exclude_regex.items():
+                    if not regex_pattern.strip():
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                                f"{section_name}.shortcut_exclude_regex.{env}"
+                            )
+                        )
+                        continue
+
+                    self._validate_regex(regex_pattern, f"{section_name}.shortcut_exclude_regex.{env}")
+            else:
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
+                        f"{section_name}.shortcut_exclude_regex", type(shortcut_exclude_regex).__name__
+                    )
+                )
+
         # Validate skip if present
         if "skip" in section:
             skip_value = section["skip"]

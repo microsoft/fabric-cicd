@@ -52,7 +52,8 @@ def setup_mocks(monkeypatch, mocker):
 def generate_mock_jwt(authtype=""):
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
     payload = (
-        base64.urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
+        base64
+        .urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
         .decode()
         .strip("=")
     )
@@ -141,6 +142,94 @@ def test_invoke_exception(setup_mocks):
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
     with pytest.raises(InvokeError):
         endpoint.invoke("GET", "http://example.com")
+
+
+def test_invoke_poll_long_running_false_with_202(setup_mocks):
+    """Test invoke method with poll_long_running=False exits early on 202 response."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=202,
+        headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
+        json=Mock(return_value={}),
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    response = endpoint.invoke("POST", "http://example.com", poll_long_running=False)
+
+    # Should exit immediately without polling
+    assert response["status_code"] == 202
+    assert mock_requests.call_count == 1  # Only one request, no polling
+
+
+def test_invoke_poll_long_running_true_with_202(setup_mocks, monkeypatch):
+    """Test invoke method with poll_long_running=True polls on 202 response."""
+    _, mock_requests = setup_mocks
+
+    # First call returns 202 with Location header, second call returns 200 with Succeeded status
+    mock_requests.side_effect = [
+        Mock(
+            status_code=202,
+            headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
+            json=Mock(return_value={}),
+            text="{}",
+        ),
+        Mock(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            json=Mock(return_value={"status": "Succeeded"}),
+            text='{"status": "Succeeded"}',
+        ),
+    ]
+
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Mock time.sleep to avoid delays in tests
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    response = endpoint.invoke("POST", "http://example.com", poll_long_running=True)
+
+    # Should poll and return final status
+    assert response["status_code"] == 200
+    assert mock_requests.call_count == 2  # Initial request + polling request
+
+
+def test_invoke_poll_long_running_default_with_202(setup_mocks, monkeypatch):
+    """Test invoke method with default poll_long_running (True) polls on 202 response."""
+    _, mock_requests = setup_mocks
+
+    # First call returns 202 with Location header, second call returns 200 with Succeeded status
+    mock_requests.side_effect = [
+        Mock(
+            status_code=202,
+            headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
+            json=Mock(return_value={}),
+            text="{}",
+        ),
+        Mock(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            json=Mock(return_value={"status": "Succeeded"}),
+            text='{"status": "Succeeded"}',
+        ),
+    ]
+
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value.token = generate_mock_jwt()
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Mock time.sleep to avoid delays in tests
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    # Don't pass poll_long_running, should default to True
+    response = endpoint.invoke("POST", "http://example.com")
+
+    # Should poll and return final status
+    assert response["status_code"] == 200
+    assert mock_requests.call_count == 2  # Initial request + polling request
 
 
 @pytest.mark.parametrize(
@@ -397,3 +486,72 @@ def test_format_invoke_log():
     log_message = _format_invoke_log(response, "GET", "http://example.com", "{}")
     assert "Method: GET" in log_message
     assert "URL: http://example.com" in log_message
+
+
+def test_is_fabric_runtime_returns_false():
+    """Test _is_fabric_runtime returns False when not running in Fabric Notebook environment."""
+    from fabric_cicd._common._fabric_endpoint import _is_fabric_runtime
+
+    # When running tests, we're not in a Fabric Runtime environment
+    # so _is_fabric_runtime should return False
+    assert _is_fabric_runtime() is False
+
+
+def test_generate_fabric_credential(monkeypatch):
+    """Test _generate_fabric_credential returns a TokenCredential that can get tokens."""
+    import builtins
+
+    from fabric_cicd._common._fabric_endpoint import _generate_fabric_credential
+
+    # Mock notebookutils and get_ipython
+    mock_notebookutils = Mock()
+    mock_notebookutils.credentials.getToken.return_value = generate_mock_jwt()
+
+    mock_ipython = Mock()
+    mock_ipython.user_ns.get.return_value = mock_notebookutils
+
+    # Patch get_ipython as a new attribute on builtins module
+    monkeypatch.setattr(builtins, "get_ipython", lambda: mock_ipython, raising=False)
+
+    # Generate the credential
+    credential = _generate_fabric_credential()
+
+    # Verify it's a TokenCredential that can get tokens
+    assert credential is not None
+    token = credential.get_token()
+
+    # Verify the token has the expected structure
+    assert token.token is not None
+    assert token.expires_on is not None
+
+    # Verify notebookutils.credentials.getToken was called
+    mock_notebookutils.credentials.getToken.assert_called_once_with("pbi")
+
+
+def test_generate_fabric_credential_fallback_expiration(monkeypatch):
+    """Test _generate_fabric_credential uses fallback expiration when JWT parsing fails."""
+    import builtins
+    import time
+
+    from fabric_cicd._common._fabric_endpoint import _generate_fabric_credential
+
+    # Mock notebookutils to return an invalid JWT token
+    mock_notebookutils = Mock()
+    mock_notebookutils.credentials.getToken.return_value = "invalid.jwt.token"
+
+    mock_ipython = Mock()
+    mock_ipython.user_ns.get.return_value = mock_notebookutils
+
+    # Patch get_ipython as a new attribute on builtins module
+    monkeypatch.setattr(builtins, "get_ipython", lambda: mock_ipython, raising=False)
+
+    # Generate the credential
+    credential = _generate_fabric_credential()
+
+    # Get token - should use fallback expiration (current time + 1 hour)
+    current_time = int(time.time())
+    token = credential.get_token()
+
+    # Verify the token uses fallback expiration (~1 hour from now)
+    assert token.expires_on >= current_time + 3500  # ~58 minutes
+    assert token.expires_on <= current_time + 3700  # ~62 minutes

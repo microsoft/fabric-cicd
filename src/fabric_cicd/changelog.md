@@ -6,6 +6,19 @@ The following contains all major, minor, and patch version release notes.
 -   📝 Documentation Update
 -   ⚡ Internal Optimization
 
+## Version 0.1.33
+
+<span class="md-h2-subheader">Release Date: 2025-12-16</span>
+
+-   ✨ Add key_value_replace parameter support for YAML files ([#649](https://github.com/microsoft/fabric-cicd/issues/649))
+-   ✨ Support selective shortcut publishing with regex exclusion ([#624](https://github.com/microsoft/fabric-cicd/issues/624))
+-   ⚡ Add Linux development environment bootstrapping script ([#680](https://github.com/microsoft/fabric-cicd/issues/680))
+-   ⚡ Update item types in scope to be an optional parameter in validate parameter file function ([#669](https://github.com/microsoft/fabric-cicd/issues/669))
+-   🔧 Fix publish order for Notebook and Eventhouse dependent items ([#685](https://github.com/microsoft/fabric-cicd/issues/685))
+-   🔧 Enable parameterizing multiple connections in the same Semantic Model item ([#674](https://github.com/microsoft/fabric-cicd/issues/674))
+-   🔧 Fix missing description metadata in item payload for shell-only item deployments ([#672](https://github.com/microsoft/fabric-cicd/issues/672))
+-   🔧 Resolve API long running operation handling when publishing Environment items ([#668](https://github.com/microsoft/fabric-cicd/issues/668))
+
 ## Version 0.1.32
 
 <span class="md-h2-subheader">Release Date: 2025-12-03</span>

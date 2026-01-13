@@ -48,6 +48,7 @@ item_type_in_scope = [
     "KQLQueryset",
     "Reflex",
     "Eventstream",
+    "SparkJobDefinition",
 ]
 
 # Uncomment to use SPN auth

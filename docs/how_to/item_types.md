@@ -151,6 +151,13 @@
     -   Semantic Models connected to sources within the same workspace may or may not be re-pointed; it is best to test this before taking a dependency. Use the `find_replace` section of the `parameter.yml` file as needed.
 -   **Initial deployment** requires manual configuration of the connection after deployment.
 
+## Spark Job Definitions
+
+-   **Parameterization:**
+    -   Spark Job Definitions attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    -   When connected to an Environment within the same workspace, the deployed Spark Job Definition will be re-pointed to the new Environment in the target workspace.
+-   **File Types Supported:** The v2 API which is used only supports Spark Job Definitions with file formats of `.py` or `.scala`. The `.jar` file format isn't supported.
+
 ## SQL Databases
 
 -   **Parameterization:**
