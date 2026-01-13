@@ -42,11 +42,11 @@ To use experimental features, such as selective deployments (e.g., specifying a 
 
 ## Debugging
 
-If an error arises, or you want to have full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal and to the `fabric_cicd.error.log`.
+If an error arises, or you want to have full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal. The logs can also be found in the `fabric_cicd.error.log` file.
 
 ```python
 from fabric_cicd import change_log_level
 change_log_level("DEBUG")
 ```
 
-For comprehensive debugging information, including how to use the error log file and development tools, see the [Troubleshooting Guide](troubleshooting.md).
+For comprehensive debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](troubleshooting.md).
