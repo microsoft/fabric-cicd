@@ -109,11 +109,26 @@ gateway_binding:
       dataset_name: "gateway_sm2"
           
 semantic_model_binding:
-    # Example with environment-specific connection IDs
-    - connection_id:
-        PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
-        PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
-      semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
-    # Example with single connection ID (backward compatible)
-    - connection_id: "12345678-1234-1234-1234-123456789abc"
-      semantic_model_name: "MySemanticModel_SingleConnection"
+    # New format (recommended): Supports default connections and per-item overrides
+    default:
+        connections:
+            PPE: "default-connection-id-ppe"
+            PROD: "default-connection-id-prod"
+    models:
+        - semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
+          connections:
+              PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+              PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+        - semantic_model_name: "MySemanticModel_SingleConnection"
+          connections:
+              PPE: "12345678-1234-1234-1234-123456789abc"
+              PROD: "98765432-4321-4321-4321-ba0987654321"
+    
+    # Legacy format (backward compatible): Direct connection_id mapping
+    # Uncomment to use legacy format instead of new format above
+    # - connection_id:
+    #     PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+    #     PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+    #   semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
+    # - connection_id: "12345678-1234-1234-1234-123456789abc"
+    #   semantic_model_name: "MySemanticModel_SingleConnection"
