@@ -8,6 +8,13 @@ This guide provides comprehensive debugging and troubleshooting resources for bo
 
 fabric-cicd includes a debug logging feature that provides detailed visibility into all operations, including API calls made during deployment.
 
+**Default Behavior:**
+
+-   Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings and errors
+-   Detailed logs can be accessed from the `fabric_cicd.error.log` file
+
+**Enabling Debug Logging:**
+
 To enable debug logging, add the following to your deployment script:
 
 ```python
@@ -172,172 +179,125 @@ Traceback (most recent call last):
 
 ### Debug Scripts
 
+The `devtools/` directory contains pre-built scripts to help test and validate deployments, parameter files, and Fabric REST APIs locally. These scripts already exist in the repository - you just need to configure them for your scenario.
+
 #### debug_local.py
 
 **Purpose**: Test full deployment workflows locally against a Microsoft Fabric workspace.
 
-**Configuration**:
+**Key Configuration Options**:
+
+| Configuration          | Description                                                        | Required |
+| ---------------------- | ------------------------------------------------------------------ | -------- |
+| `workspace_id`         | Target Fabric workspace ID                                         | Yes      |
+| `environment`          | Target environment (used for parameterization)                     | No       |
+| `repository_directory` | Path to Fabric workspace items files (absolute or relative path)   | Yes      |
+| `token_credential`     | Service Principal credentials (defaults to DefaultAzureCredential) | No       |
+| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)    | No       |
+
+**Quick Start**:
+
+1. Open `devtools/debug_local.py`
+2. Set `workspace_id`, `environment`, and `repository_directory` at the top
+3. Uncomment `change_log_level()` to enable debug logging
+4. Add necessary [feature flags](optional_feature.md#feature-flags) required for deployment
+5. Uncomment `publish_all_items(target_workspace)` and/or `unpublish_all_orphan_items(target_workspace)` to test deployment
+6. Run: `uv run python devtools/debug_local.py`
+
+**Common Configurations**:
 
 ```python
-# 1. Set your workspace ID, environment, and repository directory path
-workspace_id = "your-workspace-id"
-environment = "DEV"  # Must match environment in parameter.yml
-repository_directory = "root/sample/workspace" # In this example, our workspace content sits within the root/sample/workspace directory
+# Enable debug logging
+change_log_level()
 
-# 2. Configure authentication (optional)
-# Uncomment to use Service Principal authentication
-# token_credential = ClientSecretCredential(
-#     client_id="your-client-id",
-#     client_secret="your-client-secret",
-#     tenant_id="your-tenant-id"
-# )
+# Add feature flag(s)
+append_feature_flag("enable_shortcut_publish")
 
-# 3. Enable debug logging (optional)
-# change_log_level()
+# Use sample workspace for testing
+repository_directory = "sample/workspace"
 
-# 4. Set required feature flags, if any (optional)
-# append_feature_flag("feature_flag_1")
-# append_feature_flag("feature_flag_2")
+# Deploy only specific item types
+item_type_in_scope = ["Environment", "Notebook", "DataPipeline"]
 
-# 5. Select item types to deploy (optional, otherwise deploys all supported item types)
-# item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
-
-# 6. Create the FabricWorkspace object
-target_workspace = FabricWorkspace(
-    workspace_id=workspace_id,
-    environment=environment,
-    repository_directory=repository_directory,
-    # Uncomment to deploy specific item types
-    # item_type_in_scope=item_type_in_scope,
-    # Uncomment to use SPN auth
-    # token_credential=token_credential,
+# Use Service Principal authentication
+from azure.identity import ClientSecretCredential
+token_credential = ClientSecretCredential(
+    client_id="your-client-id",
+    client_secret="your-client-secret",
+    tenant_id="your-tenant-id"
 )
 
-# 7. Uncomment publish operation to test
-# publish_all_items(target_workspace)
-
-# 8. Uncomment unpublish operation to test
-# unpublish_all_orphan_items(target_workspace)
-```
-
-**Usage**:
-
-```powershell
-cd /path/to/fabric-cicd
-uv run python devtools/debug_local.py
+# Override constant value
+constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 ```
 
 #### debug_local config.py
 
-**Purpose**: Test configuration-based deployment workflows using a `config.yml` file. See [configuration deployment](config_deployment.md) for more information.
+**Purpose**: Test configuration-based deployment workflows using a `config.yml` file.
 
-**Configuration**:
+**Key Configuration Options**:
 
-```python
-# 1. Enable debug logging (optional)
-# change_log_level()
+| Configuration      | Description                                                                         | Required |
+| ------------------ | ----------------------------------------------------------------------------------- | -------- |
+| `config_file`      | Path to your config.yml file                                                        | Yes      |
+| `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
+| `token_credential` | Service Principal credentials (defaults to DefaultAzureCredential)                  | No       |
+| `config_override`  | Dictionary to override configuration values within `config.yml`                     | No       |
 
-# 2. Enable required feature flags
-append_feature_flag("enable_experimental_features")
-append_feature_flag("enable_config_deploy")
+**Quick Start**:
 
-# 3. Point to your config file
-config_file = "path/to/config.yml"
+1. Open `devtools/debug_local config.py`
+2. Set `config_file` path and `environment`
+3. Uncomment `change_log_level()` to enable debug logging
+4. Ensure required feature flags are enabled (already set in script)
+5. Run: `uv run python "devtools/debug_local config.py"`
 
-# 4. Set environment
-environment = "dev"
-
-# 5. Run deployment
-deploy_with_config(
-    config_file_path=config_file,
-    environment=environment
-)
-```
-
-**Usage**:
-
-```powershell
-uv run python "devtools/debug_local config.py"
-```
+See [configuration deployment](config_deployment.md) for details on creating `config.yml`.
 
 #### debug_parameterization.py
 
-**Purpose**: Validate the `parameter.yml` file without running actual deployments. See [parameterization](parameterization.md#parameter-file-validation) for more information.
+**Purpose**: Validate parameter file without deploying items - useful for catching parameterization errors early.
 
-**Configuration**:
+**Key Configuration Options**:
 
-```python
-# 1. Enable debug logging (optional)
-# change_log_level()
+| Configuration          | Description                                                                          | Required |
+| ---------------------- | ------------------------------------------------------------------------------------ | -------- |
+| `repository_directory` | Path to Fabric workspace items files and `parameter.yml` file (default location)     | Yes      |
+| `environment`          | Target environment (used for parameterization)                                       | No       |
+| `item_type_in_scope`   | Item types to validate (defaults to all)                                             | No       |
+| `parameter_file_name`  | Alternate parameter file name within repository directory (default: `parameter.yml`) | No       |
+| `parameter_file_path`  | Alternate location of parameter file                                                 | No       |
+| `token_credential`     | Service Principal credentials (defaults to DefaultAzureCredential)                   | No       |
 
-# 2. Set repository directory containing parameter.yml
-repository_directory = "path/to/workspace"
+**Quick Start**:
 
-# 3. Define item types to validate against (optional)
-#item_type_in_scope = ["DataPipeline", "Notebook", "Environment"]
+1. Open `devtools/debug_parameterization.py`
+2. Set `repository_directory` and `environment`
+3. Uncomment `change_log_level()` to view all the validation steps
+4. Run: `uv run python devtools/debug_parameterization.py`
 
-# 4. Set target environment
-environment = "PPE"
-
-# 5. Use custom parameter file location (optional)
-# parameter_file_path = "path/to/custom/parameter.yml"
-
-# 6. Run the validation function using the defined input
-validate_parameter_file(
-    repository_directory=repository_directory,
-    # Uncomment to consider specific item types
-    # item_type_in_scope=item_type_in_scope,
-    # Comment to exclude target environment in validation
-    environment=environment,
-    # Uncomment to use a different parameter file name within the repository directory (default name: parameter.yml)
-    # Assign to the constant in constants.py or pass in a string directly
-    # parameter_file_name=constants.PARAMETER_FILE_NAME,
-    # Uncomment to use a parameter file from outside the repository (takes precedence over parameter_file_name)
-    # parameter_file_path=parameter_file_path,
-    # Uncomment to use SPN auth
-    # token_credential=token_credential,
-)
-```
-
-**Usage**:
-
-```powershell
-uv run python devtools/debug_parameterization.py
-```
+See [parameterization](parameterization.md#parameter-file-validation) for more information.
 
 #### debug_api.py
 
 **Purpose**: Test Fabric REST API calls directly without going through full deployment workflows.
 
-**Configuration**:
+**Key Configuration Options**:
 
-```python
-# 1. Enable debug logging (optional)
-# change_log_level()
+| Configuration      | Description                                                         | Required |
+| ------------------ | ------------------------------------------------------------------- | -------- |
+| `api_url`          | Full API endpoint URL                                               | Yes      |
+| `method`           | HTTP method (GET, POST, DELETE, PATCH)                              | Yes      |
+| `body`             | Request payload (for POST/PATCH)                                    | Varies   |
+| `token_credential` | Service Principal credentials (defaults to DefaultAzureCredential)  | No       |
+| other              | View `invoke()` in `FabricEndpoint` class for additional parameters | No       |
 
-# 2. Configure authentication (optional)
-# Replace None with credential when using SPN auth
-token_credential = None  # Uses DefaultAzureCredential if None
+**Quick Start**:
 
-# 3. Set workspace ID if needed
-workspace_id = "your-workspace-id"
-
-# 4. Configure the API endpoint
-api_url = f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}..."
-
-# 5. Make the API call
-response = fe.invoke(
-    method="POST",  # GET, POST, PUT, DELETE, PATCH
-    url=api_url,
-    body={},  # Request payload
-)
-```
-
-**Usage**:
-
-```powershell
-uv run python devtools/debug_api.py
-```
+1. Open `devtools/debug_api.py`
+2. Configure the API endpoint, method, body (if any)
+3. Uncomment `change_log_level()` to view API request/response details
+4. Run: `uv run python devtools/debug_api.py`
 
 ## Getting Help
 
@@ -348,12 +308,6 @@ If you're still experiencing issues after following this guide:
 3. **Create a new issue** using the appropriate template:
     - [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
     - [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
-4. **Include the following** in your issue:
-    - fabric-cicd version (`pip show fabric-cicd`)
-    - Python version (`python --version`)
-    - Relevant portions of `fabric_cicd.error.log` (redact sensitive information)
-    - Minimal code to reproduce the issue
-    - Clear steps to reproduce the issue
 
 ## Additional Resources
 

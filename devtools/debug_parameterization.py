@@ -33,6 +33,12 @@ environment = "PPE"
 # or use relative path
 # parameter_file_path = "../config/parameter.yml"
 
+# Uncomment to use SPN auth
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# tenant_id = "your-tenant-id"
+# token_credential = ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
+
 validate_parameter_file(
     repository_directory=repository_directory,
     item_type_in_scope=item_type_in_scope,
