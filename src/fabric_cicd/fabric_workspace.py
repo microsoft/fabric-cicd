@@ -138,6 +138,9 @@ class FabricWorkspace:
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
+        # Initialize cache for _get_item_attribute method
+        self._item_attribute_cache = {}
+
         # Get parameter_file_path from kwargs
         self.parameter_file_path = kwargs.get("parameter_file_path")
 
@@ -191,6 +194,13 @@ class FabricWorkspace:
         if not item_guid:
             return ""
 
+        # Create a cache key for this request
+        cache_key = (workspace_id, item_type, item_guid, item_name, attribute_name)
+
+        # Check if result is already cached
+        if cache_key in self._item_attribute_cache:
+            return self._item_attribute_cache[cache_key]
+
         # Check if this item type has property mappings
         if item_type not in constants.PROPERTY_PATH_ATTR_MAPPING:
             logger.debug(f"No property path mappings defined for {item_type}")
@@ -219,6 +229,8 @@ class FabricWorkspace:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
             raise InputError(msg, logger)
 
+        # Cache the result before returning
+        self._item_attribute_cache[cache_key] = attribute_value
         return attribute_value
 
     def _refresh_parameter_file(self) -> None:
