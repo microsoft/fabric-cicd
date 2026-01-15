@@ -192,8 +192,8 @@ The `devtools/` directory contains pre-built scripts to help test and validate d
 | `workspace_id`         | Target Fabric workspace ID                                         | Yes      |
 | `environment`          | Target environment (used for parameterization)                     | No       |
 | `repository_directory` | Path to Fabric workspace items files (absolute or relative path)   | Yes      |
-| `token_credential`     | Service Principal credentials (defaults to DefaultAzureCredential) | No       |
 | `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)    | No       |
+| `token_credential`     | Service Principal credentials (defaults to DefaultAzureCredential) | No       |
 
 **Quick Start**:
 
