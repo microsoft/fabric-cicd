@@ -15,6 +15,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import MissingFileError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -285,3 +286,11 @@ def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace,
         new_input_dict[new_key] = value
 
     return new_input_dict
+
+
+class EnvironmentPublisher(ItemPublisher):
+    """Publisher for Environment items."""
+
+    def publish(self) -> None:
+        """Publish all Environment items."""
+        publish_environments(self.fabric_workspace_obj)

@@ -7,6 +7,7 @@ import json
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +43,11 @@ def publish_warehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             continue
 
         logger.info(f"{constants.INDENT}Published")
+
+
+class WarehousePublisher(ItemPublisher):
+    """Publisher for Warehouse items."""
+
+    def publish(self) -> None:
+        """Publish all Warehouse items."""
+        publish_warehouses(self.fabric_workspace_obj)

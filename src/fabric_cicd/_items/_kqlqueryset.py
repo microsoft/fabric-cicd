@@ -10,6 +10,7 @@ from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -97,3 +98,11 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
 
     logger.debug("Successfully updated all empty cluster URIs.")
     return json.dumps(json_content_dict, indent=2)
+
+
+class KQLQuerysetPublisher(ItemPublisher):
+    """Publisher for KQL Queryset items."""
+
+    def publish(self) -> None:
+        """Publish all KQL Queryset items."""
+        publish_kqlquerysets(self.fabric_workspace_obj)

@@ -9,6 +9,7 @@ import re
 import dpath
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._items._manage_dependencies import set_publish_order
 
 logger = logging.getLogger(__name__)
@@ -61,3 +62,11 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
                     reference_list.append(referenced_name)
 
     return reference_list
+
+
+class DataPipelinePublisher(ItemPublisher):
+    """Publisher for Data Pipeline items."""
+
+    def publish(self) -> None:
+        """Publish all Data Pipeline items."""
+        publish_datapipelines(self.fabric_workspace_obj)

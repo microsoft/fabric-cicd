@@ -52,8 +52,7 @@ def setup_mocks(monkeypatch, mocker):
 def generate_mock_jwt(authtype=""):
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
     payload = (
-        base64
-        .urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
+        base64.urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
         .decode()
         .strip("=")
     )
@@ -412,16 +411,7 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
             0,
             0.0,
         ),
-        (   
-            429, 
-            5, 
-            True, 
-            {"Retry-After": "10"}, 
-            {}, 
-            r"Maximum execution duration \(0 seconds\) exceeded", 
-            0, 
-            0.0
-        ),
+        (429, 5, True, {"Retry-After": "10"}, {}, r"Maximum execution duration \(0 seconds\) exceeded", 0, 0.0),
     ],
     ids=[
         "unauthorized",
@@ -432,7 +422,14 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
     ],
 )
 def test_handle_response_exceptions(
-    status_code, input_iteration_count, input_long_running, response_header, return_value, exception_match, max_duration, start_time
+    status_code,
+    input_iteration_count,
+    input_long_running,
+    response_header,
+    return_value,
+    exception_match,
+    max_duration,
+    start_time,
 ):
     """Test _handle_response raises appropriate exceptions based on response error codes."""
     response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=return_value))
@@ -466,11 +463,12 @@ def test_handle_response_feature_not_available():
 def test_handle_response_item_display_name_already_in_use(setup_mocks, monkeypatch):
     """
     Test _handle_response logs a retry message when item display name is already in use.
-    
+
     Mocks time.sleep to avoid actual test execution delays.
     """
     import time
-    dl, _mock_requests = setup_mocks    
+
+    dl, _mock_requests = setup_mocks
     monkeypatch.setattr("time.sleep", lambda _: None)
     response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameNotAvailableYet"})
     _handle_response(response, "GET", "http://example.com", "{}", False, 1, max_duration=300, start_time=time.time())

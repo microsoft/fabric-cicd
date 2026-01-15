@@ -6,8 +6,9 @@ from pathlib import Path
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
 
-import fabric_cicd
 from azure.identity import DefaultAzureCredential
+
+import fabric_cicd
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
 
     workspace_id = "b4e2b127-32f1-49e7-a3aa-a87dba44990c"
     environment_key = "PPE"
-    
+
     artifacts_folder = root_directory / "sample" / "workspace"
     item_types_to_deploy = [
         "Lakehouse",
@@ -44,8 +45,8 @@ def main():
         token_credential=token_credential,
     )
     fabric_cicd.publish_all_items(target_workspace)
-    
-    print(f"Publish completed successfully")
+
+    print("Publish completed successfully")
 
 
 if __name__ == "__main__":

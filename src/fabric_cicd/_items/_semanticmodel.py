@@ -6,6 +6,7 @@
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -176,3 +177,11 @@ def build_request_body(body: dict) -> dict:
             },
         }
     }
+
+
+class SemanticModelPublisher(ItemPublisher):
+    """Publisher for Semantic Model items."""
+
+    def publish(self) -> None:
+        """Publish all Semantic Model items."""
+        publish_semanticmodels(self.fabric_workspace_obj)

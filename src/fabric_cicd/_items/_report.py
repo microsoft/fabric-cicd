@@ -10,6 +10,7 @@ from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ItemDependencyError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +75,11 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
 
             return json.dumps(definition_body, indent=4)
     return file_obj.contents
+
+
+class ReportPublisher(ItemPublisher):
+    """Publisher for Report items."""
+
+    def publish(self) -> None:
+        """Publish all Report items."""
+        publish_reports(self.fabric_workspace_obj)

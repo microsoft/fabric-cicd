@@ -8,6 +8,7 @@ import logging
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -60,3 +61,11 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
 
     else:
         logger.warning(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")
+
+
+class VariableLibraryPublisher(ItemPublisher):
+    """Publisher for Variable Library items."""
+
+    def publish(self) -> None:
+        """Publish all Variable Library items."""
+        publish_variablelibraries(self.fabric_workspace_obj)

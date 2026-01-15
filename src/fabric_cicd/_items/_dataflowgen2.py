@@ -10,6 +10,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._parameter._utils import (
     check_replacement,
     extract_find_value,
@@ -254,3 +255,11 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
                 )
 
     return file_obj.contents
+
+
+class DataflowPublisher(ItemPublisher):
+    """Publisher for Dataflow items."""
+
+    def publish(self) -> None:
+        """Publish all Dataflow items."""
+        publish_dataflows(self.fabric_workspace_obj)

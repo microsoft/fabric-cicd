@@ -256,7 +256,7 @@ def _handle_response(
             response_retry_after=retry_after,
             prepend_message="API is throttled.",
         )
-    
+
     # Handle internal server errors via retry,
     # rather than failing the deployment run
     elif response.status_code == 500:

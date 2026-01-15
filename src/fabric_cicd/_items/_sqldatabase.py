@@ -6,6 +6,7 @@
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -31,3 +32,11 @@ def publish_sqldatabases(fabric_workspace_obj: FabricWorkspace) -> None:
             continue
 
         logger.info(f"{constants.INDENT}Published")
+
+
+class SQLDatabasePublisher(ItemPublisher):
+    """Publisher for SQL Database items."""
+
+    def publish(self) -> None:
+        """Publish all SQL Database items."""
+        publish_sqldatabases(self.fabric_workspace_obj)

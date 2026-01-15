@@ -13,6 +13,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +242,11 @@ def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
         shortcut["target"]["oneLake"]["itemId"] = item_obj.guid
 
     return shortcut
+
+
+class LakehousePublisher(ItemPublisher):
+    """Publisher for Lakehouse items."""
+
+    def publish(self) -> None:
+        """Publish all Lakehouse items."""
+        publish_lakehouses(self.fabric_workspace_obj)
