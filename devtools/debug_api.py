@@ -17,8 +17,9 @@ if __name__ == "__main__":
     # client_id = "your-client-id"
     # client_secret = "your-client-secret"
     # tenant_id = "your-tenant-id"
-    token_credential = None
-    # ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
+    token_credential = (
+        None  # ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
+    )
 
     # Create endpoint object
     fe = FabricEndpoint(  # if credential is not defined, use DefaultAzureCredential
