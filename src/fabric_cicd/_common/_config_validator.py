@@ -582,6 +582,12 @@ class ConfigValidator:
 
         # If environment mapping is used and target environment is provided, only process that environment path
         if self.environment and self.environment != "N/A" and isinstance(field_value, dict):
+            if self.environment not in paths_to_resolve:
+                # Skip if environment not in mapping (for parameter field, which is optional)
+                logger.debug(
+                    f"Skipping path resolution for '{field_name}' - environment '{self.environment}' not in mapping"
+                )
+                return
             paths_to_resolve = {self.environment: paths_to_resolve[self.environment]}
 
         for env_key, path_str in paths_to_resolve.items():

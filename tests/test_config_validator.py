@@ -765,6 +765,28 @@ class TestConfigValidator:
         # PROD should remain unchanged since it wasn't the target environment
         assert self.validator.config["test_section"]["test_field"]["PROD"] == "prod_dir"
 
+    def test_resolve_path_field_environment_not_in_mapping(self, tmp_path):
+        """Test _resolve_path_field skips gracefully when environment is not in mapping."""
+        self.validator.environment = "prod"  # Target environment
+
+        # Create directory only for 'dev' environment
+        dev_dir = tmp_path / "dev_dir"
+        dev_dir.mkdir()
+
+        # Parameter mapping only has 'dev', not 'prod'
+        field_value = {"dev": "dev_dir"}
+
+        self.validator.config = {"test_section": {"test_field": field_value}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        # Should NOT raise KeyError - should skip gracefully
+        self.validator._resolve_path_field(field_value, "test_field", "test_section", "directory")
+
+        # No errors should be added (optional field behavior)
+        assert self.validator.errors == []
+        # Config should remain unchanged since resolution was skipped
+        assert self.validator.config["test_section"]["test_field"] == {"dev": "dev_dir"}
+
     def test_resolve_path_field_nonexistent_path(self, tmp_path):
         """Test _resolve_path_field with nonexistent path."""
         self.validator.config = {"test_section": {"test_field": "nonexistent_dir"}}
