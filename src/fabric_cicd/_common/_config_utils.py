@@ -148,7 +148,7 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
     if "skip" in unpublish_config:
         skip_value = unpublish_config["skip"]
         if isinstance(skip_value, dict):
-            settings["skip"] = unpublish_config["skip"].get(environment, False)
+            settings["skip"] = skip_value.get(environment, False)
         else:
             settings["skip"] = skip_value
 
