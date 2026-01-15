@@ -25,7 +25,7 @@ from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
 )
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,7 @@ def publish_all_items(
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
     # Initialize response collection if feature flag is enabled
-    if "enable_response_collection" in constants.FEATURE_FLAG:
+    if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG:
         fabric_workspace_obj.responses = {}
 
     # check if workspace has assigned capacity, if not, exit
@@ -158,7 +158,7 @@ def publish_all_items(
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
 
-    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+    if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
         fabric_workspace_obj._publish_folders()
@@ -174,8 +174,8 @@ def publish_all_items(
 
     if folder_path_exclude_regex:
         if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_exclude_folder" not in constants.FEATURE_FLAG
+            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+            or FeatureFlag.ENABLE_EXCLUDE_FOLDER.value not in constants.FEATURE_FLAG
         ):
             msg = "Feature flags 'enable_experimental_features' and 'enable_exclude_folder' must be set."
             raise InputError(msg, logger)
@@ -200,8 +200,8 @@ def publish_all_items(
 
     if shortcut_exclude_regex:
         if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_shortcut_exclude" not in constants.FEATURE_FLAG
+            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+            or FeatureFlag.ENABLE_SHORTCUT_EXCLUDE.value not in constants.FEATURE_FLAG
         ):
             msg = "Feature flags 'enable_experimental_features' and 'enable_shortcut_exclude' must be set."
             raise InputError(msg, logger)
@@ -304,7 +304,7 @@ def publish_all_items(
     # Return response data if feature flag is enabled and responses were collected
     return (
         fabric_workspace_obj.responses
-        if "enable_response_collection" in constants.FEATURE_FLAG and fabric_workspace_obj.responses
+        if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG and fabric_workspace_obj.responses
         else None
     )
 
@@ -372,8 +372,8 @@ def unpublish_all_orphan_items(
 
     if items_to_include:
         if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_items_to_include" not in constants.FEATURE_FLAG
+            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+            or FeatureFlag.ENABLE_ITEMS_TO_INCLUDE.value not in constants.FEATURE_FLAG
         ):
             msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
             raise InputError(msg, logger)
@@ -385,11 +385,11 @@ def unpublish_all_orphan_items(
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
-        ItemType.LAKEHOUSE.value: "enable_lakehouse_unpublish",
-        ItemType.SQL_DATABASE.value: "enable_sqldatabase_unpublish",
-        ItemType.WAREHOUSE.value: "enable_warehouse_unpublish",
-        ItemType.EVENTHOUSE.value: "enable_eventhouse_unpublish",
-        ItemType.KQL_DATABASE.value: "enable_kqldatabase_unpublish",
+        ItemType.LAKEHOUSE.value: FeatureFlag.ENABLE_LAKEHOUSE_UNPUBLISH.value,
+        ItemType.SQL_DATABASE.value: FeatureFlag.ENABLE_SQLDATABASE_UNPUBLISH.value,
+        ItemType.WAREHOUSE.value: FeatureFlag.ENABLE_WAREHOUSE_UNPUBLISH.value,
+        ItemType.EVENTHOUSE.value: FeatureFlag.ENABLE_EVENTHOUSE_UNPUBLISH.value,
+        ItemType.KQL_DATABASE.value: FeatureFlag.ENABLE_KQLDATABASE_UNPUBLISH.value,
     }
 
     # Define order to unpublish items
@@ -458,7 +458,7 @@ def unpublish_all_orphan_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_deployed_folders()
-    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+    if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         fabric_workspace_obj._unpublish_folders()
 
 
@@ -524,8 +524,8 @@ def deploy_with_config(
     """
     # Experimental feature flags required to enable
     if (
-        "enable_experimental_features" not in constants.FEATURE_FLAG
-        or "enable_config_deploy" not in constants.FEATURE_FLAG
+        FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+        or FeatureFlag.ENABLE_CONFIG_DEPLOY.value not in constants.FEATURE_FLAG
     ):
         msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
         raise InputError(msg, logger)

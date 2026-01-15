@@ -37,6 +37,37 @@ class ItemType(str, Enum):
     SPARK_JOB_DEFINITION = "SparkJobDefinition"
 
 
+class FeatureFlag(str, Enum):
+    """Enumeration of supported feature flags for fabric-cicd."""
+
+    # Unpublish feature flags
+    ENABLE_LAKEHOUSE_UNPUBLISH = "enable_lakehouse_unpublish"
+    ENABLE_WAREHOUSE_UNPUBLISH = "enable_warehouse_unpublish"
+    ENABLE_SQLDATABASE_UNPUBLISH = "enable_sqldatabase_unpublish"
+    ENABLE_EVENTHOUSE_UNPUBLISH = "enable_eventhouse_unpublish"
+    ENABLE_KQLDATABASE_UNPUBLISH = "enable_kqldatabase_unpublish"
+
+    # Publish and deployment feature flags
+    ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
+    DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
+    CONTINUE_ON_SHORTCUT_FAILURE = "continue_on_shortcut_failure"
+
+    # Parameterization feature flags
+    ENABLE_ENVIRONMENT_VARIABLE_REPLACEMENT = "enable_environment_variable_replacement"
+
+    # Experimental feature flags
+    ENABLE_EXPERIMENTAL_FEATURES = "enable_experimental_features"
+    ENABLE_ITEMS_TO_INCLUDE = "enable_items_to_include"
+    ENABLE_EXCLUDE_FOLDER = "enable_exclude_folder"
+    ENABLE_SHORTCUT_EXCLUDE = "enable_shortcut_exclude"
+    ENABLE_CONFIG_DEPLOY = "enable_config_deploy"
+
+    # Utility feature flags
+    ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
+    DISABLE_PRINT_IDENTITY = "disable_print_identity"
+    ENABLE_DEBUG_MODE = "enable_debug_mode"
+
+
 # General
 VERSION = "0.1.33"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"

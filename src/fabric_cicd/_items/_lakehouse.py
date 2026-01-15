@@ -14,7 +14,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
             )
             logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
         except Exception as e:
-            if "continue_on_shortcut_failure" in constants.FEATURE_FLAG:
+            if FeatureFlag.CONTINUE_ON_SHORTCUT_FAILURE.value in constants.FEATURE_FLAG:
                 logger.warning(
                     f"Failed to publish '{shortcut['name']}'. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
@@ -237,7 +237,7 @@ class LakehousePublisher(ItemPublisher):
             list(executor.map(_publish, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items()))
 
         # Need all lakehouses published first to protect interrelationships
-        if "enable_shortcut_publish" in constants.FEATURE_FLAG:
+        if FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value in constants.FEATURE_FLAG:
 
             def _process(item_obj: Item) -> None:
                 # Check if the item is published to avoid any post publish actions

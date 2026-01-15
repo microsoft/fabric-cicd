@@ -19,7 +19,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, Inpu
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _generate_fabric_credential, _is_fabric_runtime
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -306,7 +306,7 @@ class FabricWorkspace:
                 else:
                     relative_parent_path = "/".join(relative_path.split("/")[:-1])
 
-                if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+                if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
                     item_folder_id = self.repository_folders.get(relative_parent_path, "")
                 else:
                     item_folder_id = ""
@@ -669,7 +669,7 @@ class FabricWorkspace:
             )
             api_response = metadata_update_response
 
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+        if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
             deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
             # Check if the folder has changed
             if deployed_item is not None and deployed_item.folder_id != item.folder_id:
