@@ -267,7 +267,6 @@ See [configuration deployment](config_deployment.md) for details on creating `co
 | `item_type_in_scope`   | Item types to validate (defaults to all)                                             | No       |
 | `parameter_file_name`  | Alternate parameter file name within repository directory (default: `parameter.yml`) | No       |
 | `parameter_file_path`  | Alternate location of parameter file                                                 | No       |
-| `token_credential`     | Service Principal credentials (defaults to DefaultAzureCredential)                   | No       |
 
 **Quick Start**:
 

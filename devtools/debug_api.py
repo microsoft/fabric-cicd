@@ -3,7 +3,7 @@
 
 # The following is intended for developers of fabric-cicd to debug and call Fabric REST APIs locally from the github repo
 
-from azure.identity import DefaultAzureCredential
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
 
 from fabric_cicd import change_log_level, constants
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint

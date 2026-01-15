@@ -6,8 +6,6 @@
 import sys
 from pathlib import Path
 
-from azure.identity import ClientSecretCredential
-
 import fabric_cicd.constants as constants
 from fabric_cicd import change_log_level
 from fabric_cicd._parameter._utils import validate_parameter_file
@@ -33,12 +31,6 @@ environment = "PPE"
 # or use relative path
 # parameter_file_path = "../config/parameter.yml"
 
-# Uncomment to use SPN auth
-# client_id = "your-client-id"
-# client_secret = "your-client-secret"
-# tenant_id = "your-tenant-id"
-# token_credential = ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
-
 validate_parameter_file(
     repository_directory=repository_directory,
     item_type_in_scope=item_type_in_scope,
@@ -48,7 +40,5 @@ validate_parameter_file(
     # Assign to the constant in constants.py or pass in a string directly
     # parameter_file_name=constants.PARAMETER_FILE_NAME,
     # Uncomment to use a parameter file from outside the repository (takes precedence over parameter_file_name)
-    # parameter_file_path=parameter_file_path,
-    # Uncomment to use SPN auth
-    # token_credential=token_credential,
+    # parameter_file_path=parameter_file_path
 )
