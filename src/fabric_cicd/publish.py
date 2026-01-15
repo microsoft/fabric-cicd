@@ -211,93 +211,51 @@ def publish_all_items(
         )
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-    def _should_publish_item_type(item_type: str) -> bool:
+    # Define the publishing order and header names for each item type
+    item_type_headers = {
+        ItemType.VARIABLE_LIBRARY: "Publishing Variable Libraries",
+        ItemType.WAREHOUSE: "Publishing Warehouses",
+        ItemType.MIRRORED_DATABASE: "Publishing Mirrored Databases",
+        ItemType.LAKEHOUSE: "Publishing Lakehouses",
+        ItemType.SQL_DATABASE: "Publishing SQL Databases",
+        ItemType.ENVIRONMENT: "Publishing Environments",
+        ItemType.USER_DATA_FUNCTION: "Publishing User Data Functions",
+        ItemType.EVENTHOUSE: "Publishing Eventhouses",
+        ItemType.SPARK_JOB_DEFINITION: "Publishing Spark Job Definitions",
+        ItemType.NOTEBOOK: "Publishing Notebooks",
+        ItemType.SEMANTIC_MODEL: "Publishing Semantic Models",
+        ItemType.REPORT: "Publishing Reports",
+        ItemType.COPY_JOB: "Publishing Copy Jobs",
+        ItemType.KQL_DATABASE: "Publishing KQL Databases",
+        ItemType.KQL_QUERYSET: "Publishing KQL Querysets",
+        ItemType.REFLEX: "Publishing Activators",
+        ItemType.EVENTSTREAM: "Publishing Eventstreams",
+        ItemType.KQL_DASHBOARD: "Publishing KQL Dashboards",
+        ItemType.DATAFLOW: "Publishing Dataflows",
+        ItemType.DATA_PIPELINE: "Publishing Data Pipelines",
+        ItemType.GRAPHQL_API: "Publishing GraphQL APIs",
+        ItemType.APACHE_AIRFLOW_JOB: "Publishing Apache Airflow Jobs",
+        ItemType.MOUNTED_DATA_FACTORY: "Publishing Mounted Data Factories",
+        ItemType.ORG_APP: "Publishing Org Apps",
+        ItemType.DATA_AGENT: "Publishing Data Agents",
+        ItemType.ML_EXPERIMENT: "Publishing ML Experiments",
+    }
+
+    def _should_publish_item_type(item_type: ItemType) -> bool:
         """Check if an item type should be published based on scope and repository content."""
         return (
-            item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.repository_items
+            item_type.value in fabric_workspace_obj.item_type_in_scope
+            and item_type.value in fabric_workspace_obj.repository_items
         )
 
-    if _should_publish_item_type(ItemType.VARIABLE_LIBRARY.value):
-        print_header("Publishing Variable Libraries")
-        items.VariableLibraryPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.WAREHOUSE.value):
-        print_header("Publishing Warehouses")
-        items.WarehousePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.MIRRORED_DATABASE.value):
-        print_header("Publishing Mirrored Databases")
-        items.MirroredDatabasePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.LAKEHOUSE.value):
-        print_header("Publishing Lakehouses")
-        items.LakehousePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.SQL_DATABASE.value):
-        print_header("Publishing SQL Databases")
-        items.SQLDatabasePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.ENVIRONMENT.value):
-        print_header("Publishing Environments")
-        items.EnvironmentPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.USER_DATA_FUNCTION.value):
-        print_header("Publishing User Data Functions")
-        items.UserDataFunctionPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.EVENTHOUSE.value):
-        print_header("Publishing Eventhouses")
-        items.EventhousePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.SPARK_JOB_DEFINITION.value):
-        print_header("Publishing Spark Job Definitions")
-        items.SparkJobDefinitionPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.NOTEBOOK.value):
-        print_header("Publishing Notebooks")
-        items.NotebookPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.SEMANTIC_MODEL.value):
-        print_header("Publishing Semantic Models")
-        items.SemanticModelPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.REPORT.value):
-        print_header("Publishing Reports")
-        items.ReportPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.COPY_JOB.value):
-        print_header("Publishing Copy Jobs")
-        items.CopyJobPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.KQL_DATABASE.value):
-        print_header("Publishing KQL Databases")
-        items.KQLDatabasePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.KQL_QUERYSET.value):
-        print_header("Publishing KQL Querysets")
-        items.KQLQuerysetPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.REFLEX.value):
-        print_header("Publishing Activators")
-        items.ActivatorPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.EVENTSTREAM.value):
-        print_header("Publishing Eventstreams")
-        items.EventstreamPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.KQL_DASHBOARD.value):
-        print_header("Publishing KQL Dashboards")
-        items.KQLDashboardPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.DATAFLOW.value):
-        print_header("Publishing Dataflows")
-        items.DataflowPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.DATA_PIPELINE.value):
-        print_header("Publishing Data Pipelines")
-        items.DataPipelinePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.GRAPHQL_API.value):
-        print_header("Publishing GraphQL APIs")
-        items.GraphQLApiPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.APACHE_AIRFLOW_JOB.value):
-        print_header("Publishing Apache Airflow Jobs")
-        items.ApacheAirflowJobPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.MOUNTED_DATA_FACTORY.value):
-        print_header("Publishing Mounted Data Factories")
-        items.MountedDataFactoryPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.ORG_APP.value):
-        print_header("Publishing Org Apps")
-        items.OrgAppPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.DATA_AGENT.value):
-        print_header("Publishing Data Agents")
-        items.DataAgentPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type(ItemType.ML_EXPERIMENT.value):
-        print_header("Publishing ML Experiments")
-        items.MLExperimentPublisher(fabric_workspace_obj).publish_all()
+    # Publish items in the defined order
+    for item_type, header in item_type_headers.items():
+        if _should_publish_item_type(item_type):
+            print_header(header)
+            items.ItemPublisher.create(item_type, fabric_workspace_obj).publish_all()
 
     # Check Environment Publish
-    if _should_publish_item_type(ItemType.ENVIRONMENT.value):
+    if _should_publish_item_type(ItemType.ENVIRONMENT):
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 

@@ -72,8 +72,8 @@ def test_publish_only_existing_item_types(mock_endpoint):
             patch.object(
                 FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
             ),
-            patch("fabric_cicd._items.NotebookPublisher") as mock_notebook_cls,
-            patch("fabric_cicd._items.EnvironmentPublisher") as mock_env_cls,
+            patch("fabric_cicd._items._notebook.NotebookPublisher") as mock_notebook_cls,
+            patch("fabric_cicd._items._environment.EnvironmentPublisher") as mock_env_cls,
         ):
             mock_notebook_instance = mock_notebook_cls.return_value
 
@@ -425,8 +425,8 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint):
             patch.object(
                 FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
             ),
-            patch("fabric_cicd._items.LakehousePublisher") as mock_lakehouse_cls,
-            patch("fabric_cicd._items.MirroredDatabasePublisher") as mock_mirrored_cls,
+            patch("fabric_cicd._items._lakehouse.LakehousePublisher") as mock_lakehouse_cls,
+            patch("fabric_cicd._items._mirroreddatabase.MirroredDatabasePublisher") as mock_mirrored_cls,
         ):
             mock_lakehouse_instance = mock_lakehouse_cls.return_value
             mock_lakehouse_instance.publish_all.side_effect = mock_publish_lakehouses
