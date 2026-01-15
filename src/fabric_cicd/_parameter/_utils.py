@@ -22,6 +22,7 @@ from jsonpath_ng.ext import parse
 import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import InputError, ParsingError
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +322,7 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
         if get_dataflow_name:
             if (
                 item_type in workspace_obj.repository_items
-                and item_type == "Dataflow"
+                and item_type == ItemType.DATAFLOW.value
                 and item_name in workspace_obj.repository_items[item_type]
                 and attribute == "id"
             ):

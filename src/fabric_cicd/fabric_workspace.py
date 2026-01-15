@@ -299,7 +299,7 @@ class FabricWorkspace:
                 # .Eventhouse/.children/ directory structure, requires extracting the
                 # parent folder path before the Eventhouse container, not just
                 # the immediate parent directory
-                if item_type == "KQLDatabase":
+                if item_type == ItemType.KQL_DATABASE.value:
                     pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
                     match = pattern.match(relative_path)
                     relative_parent_path = match.group(1) if match else None

@@ -168,7 +168,9 @@ def get_source_dataflow_name(
     for param in workspace_obj.environment_parameter.get("find_replace", []):
         # Extract values from the parameter
         input_type, input_name, input_path = extract_parameter_filters(workspace_obj, param)
-        filter_match = check_replacement(input_type, input_name, input_path, "Dataflow", item_name, file_path)
+        filter_match = check_replacement(
+            input_type, input_name, input_path, ItemType.DATAFLOW.value, item_name, file_path
+        )
         find_info = extract_find_value(param, file_content, filter_match)
 
         # Skip if this parameter doesn't match the dataflow ID
@@ -225,7 +227,9 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
             source_dataflow_id = source_dataflow_info["source_id"]
 
             # Get the logical ID of the source dataflow from repository items
-            logical_id = workspace_obj.repository_items.get("Dataflow", {}).get(source_dataflow_name, {}).logical_id
+            logical_id = (
+                workspace_obj.repository_items.get(ItemType.DATAFLOW.value, {}).get(source_dataflow_name, {}).logical_id
+            )
 
             # Replace the dataflow ID with its logical ID and the workspace ID with the default workspace ID
             if logical_id:

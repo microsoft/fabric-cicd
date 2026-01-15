@@ -25,7 +25,11 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
         item_obj: The item object.
         file_obj: The file object.
     """
-    return replace_cluster_uri(workspace_obj, file_obj) if item_obj.type == "KQLQueryset" else file_obj.contents
+    return (
+        replace_cluster_uri(workspace_obj, file_obj)
+        if item_obj.type == ItemType.KQL_QUERYSET.value
+        else file_obj.contents
+    )
 
 
 def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -> str:
@@ -47,7 +51,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
         return file_obj.contents
 
     # Get the KQL Database items from the deployed items
-    database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase", {})
+    database_items = fabric_workspace_obj.deployed_items.get(ItemType.KQL_DATABASE.value, {})
 
     # If the cluster URI is empty, replace it with the cluster URI of the KQL database
     for data_source in data_sources:

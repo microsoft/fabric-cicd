@@ -56,7 +56,7 @@ def bind_semanticmodel_to_connection(
         connections: Dictionary of connection objects with connection ID as key.
         connection_details: Dictionary mapping dataset names to connection IDs from parameter.yml.
     """
-    item_type = "SemanticModel"
+    item_type = ItemType.SEMANTIC_MODEL.value
 
     # Loop through each semantic model in the semantic_model_binding section
     for dataset_name, connection_id in connection_details.items():

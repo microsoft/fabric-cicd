@@ -72,7 +72,7 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
     ongoing_publish = True
     iteration = 1
 
-    environments = fabric_workspace_obj.repository_items.get("Environment", {})
+    environments = fabric_workspace_obj.repository_items.get(ItemType.ENVIRONMENT.value, {})
     filtered_environments = [
         k
         for k in environments
@@ -174,7 +174,7 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: s
 
     # Get Setting/Sparkcompute.yml content from repository
     yaml_contents = None
-    item = fabric_workspace_obj.repository_items["Environment"][item_name]
+    item = fabric_workspace_obj.repository_items[ItemType.ENVIRONMENT.value][item_name]
     item_files = item.item_files
     for file in item_files:
         if file.file_path.name == "Sparkcompute.yml" and file.file_path.parent.name == "Setting":

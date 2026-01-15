@@ -26,7 +26,11 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
         file_obj: The file object.
     """
     # For KQL Dashboard, we do not need to process the file content
-    return replace_cluster_uri(workspace_obj, file_obj) if item_obj.type == "KQLDashboard" else file_obj.contents
+    return (
+        replace_cluster_uri(workspace_obj, file_obj)
+        if item_obj.type == ItemType.KQL_DASHBOARD.value
+        else file_obj.contents
+    )
 
 
 def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -> str:
@@ -44,7 +48,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
     data_sources = json_content_dict.get("dataSources")
 
     # Get the KQL Database items from the deployed items
-    database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase", {})
+    database_items = fabric_workspace_obj.deployed_items.get(ItemType.KQL_DATABASE.value, {})
 
     for data_source in data_sources:
         if not data_source:
