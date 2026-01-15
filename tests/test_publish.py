@@ -76,8 +76,7 @@ def test_publish_only_existing_item_types(mock_endpoint):
             patch("fabric_cicd._items.EnvironmentPublisher") as mock_env_cls,
         ):
             mock_notebook_instance = mock_notebook_cls.return_value
-            mock_env_instance = mock_env_cls.return_value
-            
+
             workspace = FabricWorkspace(
                 workspace_id="12345678-1234-5678-abcd-1234567890ab",
                 repository_directory=str(temp_path),
@@ -433,7 +432,7 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint):
             mock_lakehouse_instance.publish_all.side_effect = mock_publish_lakehouses
             mock_mirrored_instance = mock_mirrored_cls.return_value
             mock_mirrored_instance.publish_all.side_effect = mock_publish_mirroreddatabase
-            
+
             workspace = FabricWorkspace(
                 workspace_id="12345678-1234-5678-abcd-1234567890ab",
                 repository_directory=str(temp_path),

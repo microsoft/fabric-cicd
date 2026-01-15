@@ -227,6 +227,7 @@ class LakehousePublisher(ItemPublisher):
 
     def publish_all(self) -> None:
         """Publish all Lakehouse items."""
+
         def _publish(args: tuple) -> None:
             item_name, item = args
             self.publish_one(item_name, item)
@@ -243,4 +244,6 @@ class LakehousePublisher(ItemPublisher):
                     process_shortcuts(self.fabric_workspace_obj, item_obj)
 
             with ThreadPoolExecutor() as executor:
-                list(executor.map(_process, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values()))
+                list(
+                    executor.map(_process, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values())
+                )

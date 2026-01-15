@@ -88,7 +88,7 @@ class KQLQuerysetPublisher(ItemPublisher):
 
     item_type = "KQLQueryset"
 
-    def publish_one(self, item_name: str, item: Item) -> None:
+    def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single KQL Queryset item."""
         self.fabric_workspace_obj._publish_item(
             item_name=item_name, item_type=self.item_type, func_process_file=func_process_file

@@ -51,7 +51,7 @@ class DataPipelinePublisher(ItemPublisher):
 
     item_type = "DataPipeline"
 
-    def publish_one(self, item_name: str, item: Item) -> None:
+    def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Data Pipeline item."""
         self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
 

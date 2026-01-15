@@ -146,10 +146,12 @@ class SemanticModelPublisher(ItemPublisher):
 
     item_type = "SemanticModel"
 
-    def publish_one(self, item_name: str, item: Item) -> None:
+    def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Semantic Model item."""
         exclude_path = r".*\.pbi[/\\].*"
-        self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type, exclude_path=exclude_path)
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, exclude_path=exclude_path
+        )
 
     def publish_all(self) -> None:
         """Publish all Semantic Model items."""
@@ -178,5 +180,7 @@ class SemanticModelPublisher(ItemPublisher):
 
         if binding_mapping:
             bind_semanticmodel_to_connection(
-                fabric_workspace_obj=self.fabric_workspace_obj, connections=connections, connection_details=binding_mapping
+                fabric_workspace_obj=self.fabric_workspace_obj,
+                connections=connections,
+                connection_details=binding_mapping,
             )

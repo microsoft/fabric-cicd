@@ -63,7 +63,7 @@ class ReportPublisher(ItemPublisher):
 
     item_type = "Report"
 
-    def publish_one(self, item_name: str, item: Item) -> None:
+    def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Report item."""
         exclude_path = r".*\.pbi[/\\].*"
         self.fabric_workspace_obj._publish_item(

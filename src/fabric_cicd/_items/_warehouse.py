@@ -6,12 +6,11 @@
 import json
 import logging
 
-from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd import constants
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
-
 
 
 class WarehousePublisher(ItemPublisher):
