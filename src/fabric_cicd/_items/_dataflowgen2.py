@@ -21,24 +21,6 @@ from fabric_cicd._parameter._utils import (
 logger = logging.getLogger(__name__)
 
 
-def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all dataflow items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "Dataflow"
-
-    # Set the publish order based on dependencies (when dataflow references another dataflow)
-    publish_order = set_dataflow_publish_order(fabric_workspace_obj, item_type)
-
-    for item_name in publish_order:
-        fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=item_type, func_process_file=func_process_file
-        )
-
-
 def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -> list[str]:
     """
     Sets the publish order where the source dataflow, if present always proceeds the referencing dataflow.
@@ -260,6 +242,19 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
 class DataflowPublisher(ItemPublisher):
     """Publisher for Dataflow items."""
 
+    item_type = "Dataflow"
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Dataflow item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
+        )
+
     def publish_all(self) -> None:
         """Publish all Dataflow items."""
-        publish_dataflows(self.fabric_workspace_obj)
+        publish_order = set_dataflow_publish_order(self.fabric_workspace_obj, self.item_type)
+        items_dict = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+
+        for item_name in publish_order:
+            item = items_dict[item_name]
+            self.publish_one(item_name, item)

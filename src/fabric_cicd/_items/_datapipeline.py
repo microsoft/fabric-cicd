@@ -9,29 +9,11 @@ import re
 import dpath
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._items._manage_dependencies import set_publish_order
 
 logger = logging.getLogger(__name__)
-
-
-def publish_datapipelines(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all data pipeline items from the repository in the correct order based on their dependencies.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "DataPipeline"
-
-    # Set the order of data pipelines to be published based on their dependencies
-    publish_order = set_publish_order(fabric_workspace_obj, item_type, find_referenced_datapipelines)
-
-    fabric_workspace_obj._refresh_deployed_items()
-
-    # Publish
-    for item_name in publish_order:
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
 
 
 def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
@@ -67,6 +49,18 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
 class DataPipelinePublisher(ItemPublisher):
     """Publisher for Data Pipeline items."""
 
+    item_type = "DataPipeline"
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Data Pipeline item."""
+        self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
+
     def publish_all(self) -> None:
         """Publish all Data Pipeline items."""
-        publish_datapipelines(self.fabric_workspace_obj)
+        publish_order = set_publish_order(self.fabric_workspace_obj, self.item_type, find_referenced_datapipelines)
+
+        self.fabric_workspace_obj._refresh_deployed_items()
+        items_dict = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+        for item_name in publish_order:
+            item = items_dict[item_name]
+            self.publish_one(item_name, item)

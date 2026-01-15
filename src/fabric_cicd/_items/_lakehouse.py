@@ -18,56 +18,6 @@ from fabric_cicd._items._base_publisher import ItemPublisher
 logger = logging.getLogger(__name__)
 
 
-def publish_lakehouses(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all lakehouse items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-    """
-    item_type = "Lakehouse"
-
-    def _publish(args: tuple) -> None:
-        item_name, item = args
-        creation_payload = next(
-            (
-                {"enableSchemas": True}
-                for file in item.item_files
-                if file.name == "lakehouse.metadata.json" and "defaultSchema" in file.contents
-            ),
-            None,
-        )
-
-        fabric_workspace_obj._publish_item(
-            item_name=item_name,
-            item_type=item_type,
-            creation_payload=creation_payload,
-            skip_publish_logging=True,
-        )
-
-        # Check if the item is published to avoid any post publish actions
-        if item.skip_publish:
-            return
-
-        check_sqlendpoint_provision_status(fabric_workspace_obj, item)
-
-        logger.info(f"{constants.INDENT}Published")
-
-    with ThreadPoolExecutor() as executor:
-        list(executor.map(_publish, fabric_workspace_obj.repository_items.get(item_type, {}).items()))
-
-    # Need all lakehouses published first to protect interrelationships
-    if "enable_shortcut_publish" in constants.FEATURE_FLAG:
-
-        def _process(item_obj: Item) -> None:
-            # Check if the item is published to avoid any post publish actions
-            if not item_obj.skip_publish:
-                process_shortcuts(fabric_workspace_obj, item_obj)
-
-        with ThreadPoolExecutor() as executor:
-            list(executor.map(_process, fabric_workspace_obj.repository_items.get(item_type, {}).values()))
-
-
 def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
     """
     Check the SQL endpoint status of the published lakehouses
@@ -247,6 +197,50 @@ def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
 class LakehousePublisher(ItemPublisher):
     """Publisher for Lakehouse items."""
 
+    item_type = "Lakehouse"
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Lakehouse item."""
+        creation_payload = next(
+            (
+                {"enableSchemas": True}
+                for file in item.item_files
+                if file.name == "lakehouse.metadata.json" and "defaultSchema" in file.contents
+            ),
+            None,
+        )
+
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name,
+            item_type=self.item_type,
+            creation_payload=creation_payload,
+            skip_publish_logging=True,
+        )
+
+        # Check if the item is published to avoid any post publish actions
+        if item.skip_publish:
+            return
+
+        check_sqlendpoint_provision_status(self.fabric_workspace_obj, item)
+
+        logger.info(f"{constants.INDENT}Published")
+
     def publish_all(self) -> None:
         """Publish all Lakehouse items."""
-        publish_lakehouses(self.fabric_workspace_obj)
+        def _publish(args: tuple) -> None:
+            item_name, item = args
+            self.publish_one(item_name, item)
+
+        with ThreadPoolExecutor() as executor:
+            list(executor.map(_publish, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items()))
+
+        # Need all lakehouses published first to protect interrelationships
+        if "enable_shortcut_publish" in constants.FEATURE_FLAG:
+
+            def _process(item_obj: Item) -> None:
+                # Check if the item is published to avoid any post publish actions
+                if not item_obj.skip_publish:
+                    process_shortcuts(self.fabric_workspace_obj, item_obj)
+
+            with ThreadPoolExecutor() as executor:
+                list(executor.map(_process, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values()))

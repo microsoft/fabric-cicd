@@ -6,37 +6,33 @@
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
 
-def publish_sqldatabases(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all SQL Database items from the repository.
 
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-    """
+class SQLDatabasePublisher(ItemPublisher):
+    """Publisher for SQL Database items."""
+
     item_type = "SQLDatabase"
 
-    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
-        fabric_workspace_obj._publish_item(
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single SQL Database item."""
+        self.fabric_workspace_obj._publish_item(
             item_name=item_name,
-            item_type=item_type,
+            item_type=self.item_type,
             skip_publish_logging=True,
         )
 
         # Check if the item is published to avoid any post publish actions
         if item.skip_publish:
-            continue
+            return
 
         logger.info(f"{constants.INDENT}Published")
 
-
-class SQLDatabasePublisher(ItemPublisher):
-    """Publisher for SQL Database items."""
-
     def publish_all(self) -> None:
         """Publish all SQL Database items."""
-        publish_sqldatabases(self.fabric_workspace_obj)
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
+            self.publish_one(item_name, item)

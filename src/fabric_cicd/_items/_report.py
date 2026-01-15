@@ -15,25 +15,6 @@ from fabric_cicd._items._base_publisher import ItemPublisher
 logger = logging.getLogger(__name__)
 
 
-def publish_reports(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all report items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "Report"
-
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        exclude_path = r".*\.pbi[/\\].*"
-        fabric_workspace_obj._publish_item(
-            item_name=item_name,
-            item_type=item_type,
-            exclude_path=exclude_path,
-            func_process_file=func_process_file,
-        )
-
-
 def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
     """
     Custom file processing for report items.
@@ -80,6 +61,19 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
 class ReportPublisher(ItemPublisher):
     """Publisher for Report items."""
 
+    item_type = "Report"
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Report item."""
+        exclude_path = r".*\.pbi[/\\].*"
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name,
+            item_type=self.item_type,
+            exclude_path=exclude_path,
+            func_process_file=func_process_file,
+        )
+
     def publish_all(self) -> None:
         """Publish all Report items."""
-        publish_reports(self.fabric_workspace_obj)
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
+            self.publish_one(item_name, item)

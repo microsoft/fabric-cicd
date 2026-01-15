@@ -20,47 +20,6 @@ from fabric_cicd._items._base_publisher import ItemPublisher
 logger = logging.getLogger(__name__)
 
 
-def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all environment items from the repository.
-
-    Environments are deployed using the updateDefinition API, and then compute settings and libraries are published separately.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    logger.warning("The underlying legacy Microsoft Fabric Environment APIs will be deprecated by March 1, 2026.")
-    logger.warning(
-        "Please upgrade to the latest fabric-cicd version before March 1, 2026 to prevent broken Environment item deployments."
-    )
-
-    # Check for ongoing publish
-    item_type = "Environment"
-    check_environment_publish_state(fabric_workspace_obj, True)
-
-    def _publish(args: tuple) -> None:
-        item_name, item = args
-        # Only deploy the environment shell when it just contains spark compute settings
-        is_shell_only = set_environment_deployment_type(item)
-        logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
-
-        # Exclude Sparkcompute.yml from environment definition deployment (requires special handling)
-        exclude_path = r"\Setting"
-        fabric_workspace_obj._publish_item(
-            item_name=item_name,
-            item_type=item_type,
-            exclude_path=exclude_path,
-            skip_publish_logging=True,
-            shell_only_publish=is_shell_only,
-        )
-        if item.skip_publish:
-            return
-        _publish_environment_metadata(fabric_workspace_obj, item_name)
-
-    with ThreadPoolExecutor() as executor:
-        list(executor.map(_publish, fabric_workspace_obj.repository_items.get(item_type, {}).items()))
-
-
 def set_environment_deployment_type(item: Item) -> bool:
     """
     Return True if this Environment deployment should be treated as "shell-only".
@@ -291,6 +250,37 @@ def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace,
 class EnvironmentPublisher(ItemPublisher):
     """Publisher for Environment items."""
 
+    item_type = "Environment"
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Environment item."""
+        is_shell_only = set_environment_deployment_type(item)
+        logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
+
+        exclude_path = r"\Setting"
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name,
+            item_type=self.item_type,
+            exclude_path=exclude_path,
+            skip_publish_logging=True,
+            shell_only_publish=is_shell_only,
+        )
+        if item.skip_publish:
+            return
+        _publish_environment_metadata(self.fabric_workspace_obj, item_name)
+
     def publish_all(self) -> None:
         """Publish all Environment items."""
-        publish_environments(self.fabric_workspace_obj)
+        logger.warning("The underlying legacy Microsoft Fabric Environment APIs will be deprecated by March 1, 2026.")
+        logger.warning(
+            "Please upgrade to the latest fabric-cicd version before March 1, 2026 to prevent broken Environment item deployments."
+        )
+
+        check_environment_publish_state(self.fabric_workspace_obj, True)
+
+        def _publish(args: tuple) -> None:
+            item_name, item = args
+            self.publish_one(item_name, item)
+
+        with ThreadPoolExecutor() as executor:
+            list(executor.map(_publish, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items()))

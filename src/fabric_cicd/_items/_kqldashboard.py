@@ -15,23 +15,6 @@ from fabric_cicd._items._base_publisher import ItemPublisher
 logger = logging.getLogger(__name__)
 
 
-def publish_kqldashboard(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all Real-Time Dashboard items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "KQLDashboard"
-
-    fabric_workspace_obj._refresh_deployed_items()
-
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=item_type, func_process_file=func_process_file
-        )
-
-
 def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
     """
     Custom file processing for KQL Dashboard items.
@@ -94,6 +77,17 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
 class KQLDashboardPublisher(ItemPublisher):
     """Publisher for KQL Dashboard items."""
 
+    item_type = "KQLDashboard"
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single KQL Dashboard item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
+        )
+
     def publish_all(self) -> None:
         """Publish all KQL Dashboard items."""
-        publish_kqldashboard(self.fabric_workspace_obj)
+        self.fabric_workspace_obj._refresh_deployed_items()
+
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
+            self.publish_one(item_name, item)

@@ -7,21 +7,20 @@ import json
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
 
 logger = logging.getLogger(__name__)
 
 
-def publish_warehouses(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all warehouse items from the repository.
 
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-    """
+class WarehousePublisher(ItemPublisher):
+    """Publisher for Warehouse items."""
+
     item_type = "Warehouse"
 
-    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Warehouse item."""
         creation_payload = next(
             (
                 json.loads(file.contents)["metadata"]["creationPayload"]
@@ -31,23 +30,20 @@ def publish_warehouses(fabric_workspace_obj: FabricWorkspace) -> None:
             None,
         )
 
-        fabric_workspace_obj._publish_item(
+        self.fabric_workspace_obj._publish_item(
             item_name=item_name,
-            item_type=item_type,
+            item_type=self.item_type,
             creation_payload=creation_payload,
             skip_publish_logging=True,
         )
 
         # Check if the item is published to avoid any post publish actions
         if item.skip_publish:
-            continue
+            return
 
         logger.info(f"{constants.INDENT}Published")
 
-
-class WarehousePublisher(ItemPublisher):
-    """Publisher for Warehouse items."""
-
     def publish_all(self) -> None:
         """Publish all Warehouse items."""
-        publish_warehouses(self.fabric_workspace_obj)
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
+            self.publish_one(item_name, item)
