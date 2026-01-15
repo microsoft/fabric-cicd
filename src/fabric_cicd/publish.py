@@ -211,7 +211,7 @@ def publish_all_items(
         )
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-    # Define the publishing order and header names for each item type
+    # Defines the publishing order and header names for each item type
     item_type_headers = {
         ItemType.VARIABLE_LIBRARY: "Publishing Variable Libraries",
         ItemType.WAREHOUSE: "Publishing Warehouses",
