@@ -11,6 +11,7 @@ from fabric_cicd._common._exceptions import ItemDependencyError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
 class ReportPublisher(ItemPublisher):
     """Publisher for Report items."""
 
-    item_type = "Report"
+    item_type = ItemType.REPORT.value
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Report item."""

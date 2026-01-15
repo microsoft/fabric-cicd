@@ -7,6 +7,7 @@ import logging
 
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class NotebookPublisher(ItemPublisher):
     """Publisher for Notebook items."""
 
-    item_type = "Notebook"
+    item_type = ItemType.NOTEBOOK.value
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Notebook item."""

@@ -9,6 +9,7 @@ import logging
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
 class VariableLibraryPublisher(ItemPublisher):
     """Publisher for Variable Library items."""
 
-    item_type = "VariableLibrary"
+    item_type = ItemType.VARIABLE_LIBRARY.value
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Variable Library item."""

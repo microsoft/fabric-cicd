@@ -3,6 +3,40 @@
 
 """Constants for the fabric-cicd package."""
 
+from enum import Enum
+
+
+class ItemType(str, Enum):
+    """Enumeration of supported Microsoft Fabric item types."""
+
+    DATA_PIPELINE = "DataPipeline"
+    ENVIRONMENT = "Environment"
+    NOTEBOOK = "Notebook"
+    REPORT = "Report"
+    SEMANTIC_MODEL = "SemanticModel"
+    LAKEHOUSE = "Lakehouse"
+    MIRRORED_DATABASE = "MirroredDatabase"
+    VARIABLE_LIBRARY = "VariableLibrary"
+    COPY_JOB = "CopyJob"
+    EVENTHOUSE = "Eventhouse"
+    KQL_DATABASE = "KQLDatabase"
+    KQL_QUERYSET = "KQLQueryset"
+    REFLEX = "Reflex"
+    EVENTSTREAM = "Eventstream"
+    WAREHOUSE = "Warehouse"
+    SQL_DATABASE = "SQLDatabase"
+    KQL_DASHBOARD = "KQLDashboard"
+    DATAFLOW = "Dataflow"
+    GRAPHQL_API = "GraphQLApi"
+    APACHE_AIRFLOW_JOB = "ApacheAirflowJob"
+    MOUNTED_DATA_FACTORY = "MountedDataFactory"
+    DATA_AGENT = "DataAgent"
+    USER_DATA_FUNCTION = "UserDataFunction"
+    ORG_APP = "OrgApp"
+    ML_EXPERIMENT = "MLExperiment"
+    SPARK_JOB_DEFINITION = "SparkJobDefinition"
+
+
 # General
 VERSION = "0.1.33"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
@@ -12,40 +46,18 @@ FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 
 # Item Type
-ACCEPTED_ITEM_TYPES = (
-    "DataPipeline",
-    "Environment",
-    "Notebook",
-    "Report",
-    "SemanticModel",
-    "Lakehouse",
-    "MirroredDatabase",
-    "VariableLibrary",
-    "CopyJob",
-    "Eventhouse",
-    "KQLDatabase",
-    "KQLQueryset",
-    "Reflex",
-    "Eventstream",
-    "Warehouse",
-    "SQLDatabase",
-    "KQLDashboard",
-    "Dataflow",
-    "GraphQLApi",
-    "ApacheAirflowJob",
-    "MountedDataFactory",
-    "DataAgent",
-    "UserDataFunction",
-    "OrgApp",
-    "MLExperiment",
-    "SparkJobDefinition",
-)
+ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
 
 # Publish
-SHELL_ONLY_PUBLISH = ["Lakehouse", "Warehouse", "SQLDatabase", "MLExperiment"]
+SHELL_ONLY_PUBLISH = [
+    ItemType.LAKEHOUSE.value,
+    ItemType.WAREHOUSE.value,
+    ItemType.SQL_DATABASE.value,
+    ItemType.ML_EXPERIMENT.value,
+]
 
 # Items that do not require assigned capacity
-NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
+NO_ASSIGNED_CAPACITY_REQUIRED = [ItemType.SEMANTIC_MODEL.value, ItemType.REPORT.value]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
@@ -57,18 +69,18 @@ INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
 
 # Item Type to File Mapping (to check for item dependencies)
-ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
+ITEM_TYPE_TO_FILE = {ItemType.DATA_PIPELINE.value: "pipeline-content.json"}
 
 # Property path to get SQL Endpoint or Eventhouse URI
 PROPERTY_PATH_ATTR_MAPPING = {
-    "Lakehouse": {
+    ItemType.LAKEHOUSE.value: {
         "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
         "sqlendpointid": "body/properties/sqlEndpointProperties/id",
     },
-    "Warehouse": {
+    ItemType.WAREHOUSE.value: {
         "sqlendpoint": "body/properties/connectionString",
     },
-    "Eventhouse": {
+    ItemType.EVENTHOUSE.value: {
         "queryserviceuri": "body/properties/queryServiceUri",
     },
 }

@@ -7,6 +7,7 @@ import logging
 
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class UserDataFunctionPublisher(ItemPublisher):
     """Publisher for User Data Function items."""
 
-    item_type = "UserDataFunction"
+    item_type = ItemType.USER_DATA_FUNCTION.value
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single User Data Function item."""

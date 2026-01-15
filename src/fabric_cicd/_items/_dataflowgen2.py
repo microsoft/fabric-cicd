@@ -17,6 +17,7 @@ from fabric_cicd._parameter._utils import (
     extract_parameter_filters,
     extract_replace_value,
 )
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,7 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
 class DataflowPublisher(ItemPublisher):
     """Publisher for Dataflow items."""
 
-    item_type = "Dataflow"
+    item_type = ItemType.DATAFLOW.value
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Dataflow item."""

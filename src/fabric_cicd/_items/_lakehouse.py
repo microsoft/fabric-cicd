@@ -14,6 +14,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,7 @@ def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
 class LakehousePublisher(ItemPublisher):
     """Publisher for Lakehouse items."""
 
-    item_type = "Lakehouse"
+    item_type = ItemType.LAKEHOUSE.value
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Lakehouse item."""

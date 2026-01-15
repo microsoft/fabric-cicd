@@ -19,6 +19,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, Inpu
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _generate_fabric_credential, _is_fabric_runtime
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -365,14 +366,14 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties
-            if item_type in ["Lakehouse", "Warehouse"]:
+            if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value]:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                 )
                 sql_endpoint_id = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
                 )
-            if item_type in ["Eventhouse"]:
+            if item_type in [ItemType.EVENTHOUSE.value]:
                 query_service_uri = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
                 )

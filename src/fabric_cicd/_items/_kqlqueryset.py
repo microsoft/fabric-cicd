@@ -11,6 +11,7 @@ from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
 class KQLQuerysetPublisher(ItemPublisher):
     """Publisher for KQL Queryset items."""
 
-    item_type = "KQLQueryset"
+    item_type = ItemType.KQL_QUERYSET.value
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single KQL Queryset item."""

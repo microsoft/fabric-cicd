@@ -16,6 +16,7 @@ from fabric_cicd._common._exceptions import MissingFileError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
         item_name: Name of the environment item whose compute settings are to be published.
         is_excluded: Flag indicating if Sparkcompute.yml was excluded from definition deployment.
     """
-    item_type = "Environment"
+    item_type = ItemType.ENVIRONMENT.value
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
 
     # Update compute settings
@@ -250,7 +251,7 @@ def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace,
 class EnvironmentPublisher(ItemPublisher):
     """Publisher for Environment items."""
 
-    item_type = "Environment"
+    item_type = ItemType.ENVIRONMENT.value
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Environment item."""

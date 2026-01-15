@@ -12,6 +12,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._items._manage_dependencies import set_publish_order
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
         file_content: Dict representation of the pipeline-content file.
         lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     """
-    item_type = "DataPipeline"
+    item_type = ItemType.DATA_PIPELINE.value
     reference_list = []
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
@@ -49,7 +50,7 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
 class DataPipelinePublisher(ItemPublisher):
     """Publisher for Data Pipeline items."""
 
-    item_type = "DataPipeline"
+    item_type = ItemType.DATA_PIPELINE.value
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Data Pipeline item."""

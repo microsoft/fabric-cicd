@@ -25,6 +25,7 @@ from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
 )
+from fabric_cicd.constants import ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -216,87 +217,87 @@ def publish_all_items(
             item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.repository_items
         )
 
-    if _should_publish_item_type("VariableLibrary"):
+    if _should_publish_item_type(ItemType.VARIABLE_LIBRARY.value):
         print_header("Publishing Variable Libraries")
         items.VariableLibraryPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Warehouse"):
+    if _should_publish_item_type(ItemType.WAREHOUSE.value):
         print_header("Publishing Warehouses")
         items.WarehousePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("MirroredDatabase"):
+    if _should_publish_item_type(ItemType.MIRRORED_DATABASE.value):
         print_header("Publishing Mirrored Databases")
         items.MirroredDatabasePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Lakehouse"):
+    if _should_publish_item_type(ItemType.LAKEHOUSE.value):
         print_header("Publishing Lakehouses")
         items.LakehousePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("SQLDatabase"):
+    if _should_publish_item_type(ItemType.SQL_DATABASE.value):
         print_header("Publishing SQL Databases")
         items.SQLDatabasePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Environment"):
+    if _should_publish_item_type(ItemType.ENVIRONMENT.value):
         print_header("Publishing Environments")
         items.EnvironmentPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("UserDataFunction"):
+    if _should_publish_item_type(ItemType.USER_DATA_FUNCTION.value):
         print_header("Publishing User Data Functions")
         items.UserDataFunctionPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Eventhouse"):
+    if _should_publish_item_type(ItemType.EVENTHOUSE.value):
         print_header("Publishing Eventhouses")
         items.EventhousePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("SparkJobDefinition"):
+    if _should_publish_item_type(ItemType.SPARK_JOB_DEFINITION.value):
         print_header("Publishing Spark Job Definitions")
         items.SparkJobDefinitionPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Notebook"):
+    if _should_publish_item_type(ItemType.NOTEBOOK.value):
         print_header("Publishing Notebooks")
         items.NotebookPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("SemanticModel"):
+    if _should_publish_item_type(ItemType.SEMANTIC_MODEL.value):
         print_header("Publishing Semantic Models")
         items.SemanticModelPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Report"):
+    if _should_publish_item_type(ItemType.REPORT.value):
         print_header("Publishing Reports")
         items.ReportPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("CopyJob"):
+    if _should_publish_item_type(ItemType.COPY_JOB.value):
         print_header("Publishing Copy Jobs")
         items.CopyJobPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("KQLDatabase"):
+    if _should_publish_item_type(ItemType.KQL_DATABASE.value):
         print_header("Publishing KQL Databases")
         items.KQLDatabasePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("KQLQueryset"):
+    if _should_publish_item_type(ItemType.KQL_QUERYSET.value):
         print_header("Publishing KQL Querysets")
         items.KQLQuerysetPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Reflex"):
+    if _should_publish_item_type(ItemType.REFLEX.value):
         print_header("Publishing Activators")
         items.ActivatorPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Eventstream"):
+    if _should_publish_item_type(ItemType.EVENTSTREAM.value):
         print_header("Publishing Eventstreams")
         items.EventstreamPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("KQLDashboard"):
+    if _should_publish_item_type(ItemType.KQL_DASHBOARD.value):
         print_header("Publishing KQL Dashboards")
         items.KQLDashboardPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("Dataflow"):
+    if _should_publish_item_type(ItemType.DATAFLOW.value):
         print_header("Publishing Dataflows")
         items.DataflowPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("DataPipeline"):
+    if _should_publish_item_type(ItemType.DATA_PIPELINE.value):
         print_header("Publishing Data Pipelines")
         items.DataPipelinePublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("GraphQLApi"):
+    if _should_publish_item_type(ItemType.GRAPHQL_API.value):
         print_header("Publishing GraphQL APIs")
         items.GraphQLApiPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("ApacheAirflowJob"):
+    if _should_publish_item_type(ItemType.APACHE_AIRFLOW_JOB.value):
         print_header("Publishing Apache Airflow Jobs")
         items.ApacheAirflowJobPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("MountedDataFactory"):
+    if _should_publish_item_type(ItemType.MOUNTED_DATA_FACTORY.value):
         print_header("Publishing Mounted Data Factories")
         items.MountedDataFactoryPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("OrgApp"):
+    if _should_publish_item_type(ItemType.ORG_APP.value):
         print_header("Publishing Org Apps")
         items.OrgAppPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("DataAgent"):
+    if _should_publish_item_type(ItemType.DATA_AGENT.value):
         print_header("Publishing Data Agents")
         items.DataAgentPublisher(fabric_workspace_obj).publish_all()
-    if _should_publish_item_type("MLExperiment"):
+    if _should_publish_item_type(ItemType.ML_EXPERIMENT.value):
         print_header("Publishing ML Experiments")
         items.MLExperimentPublisher(fabric_workspace_obj).publish_all()
 
     # Check Environment Publish
-    if _should_publish_item_type("Environment"):
+    if _should_publish_item_type(ItemType.ENVIRONMENT.value):
         print_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 
@@ -384,42 +385,42 @@ def unpublish_all_orphan_items(
 
     # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
     unpublish_flag_mapping = {
-        "Lakehouse": "enable_lakehouse_unpublish",
-        "SQLDatabase": "enable_sqldatabase_unpublish",
-        "Warehouse": "enable_warehouse_unpublish",
-        "Eventhouse": "enable_eventhouse_unpublish",
-        "KQLDatabase": "enable_kqldatabase_unpublish",
+        ItemType.LAKEHOUSE.value: "enable_lakehouse_unpublish",
+        ItemType.SQL_DATABASE.value: "enable_sqldatabase_unpublish",
+        ItemType.WAREHOUSE.value: "enable_warehouse_unpublish",
+        ItemType.EVENTHOUSE.value: "enable_eventhouse_unpublish",
+        ItemType.KQL_DATABASE.value: "enable_kqldatabase_unpublish",
     }
 
     # Define order to unpublish items
     unpublish_order = []
     for item_type in [
-        "MLExperiment",
-        "DataAgent",
-        "OrgApp",
-        "MountedDataFactory",
-        "ApacheAirflowJob",
-        "GraphQLApi",
-        "DataPipeline",
-        "Dataflow",
-        "KQLDashboard",
-        "Eventstream",
-        "Reflex",
-        "KQLQueryset",
-        "KQLDatabase",
-        "CopyJob",
-        "Report",
-        "SemanticModel",
-        "Notebook",
-        "SparkJobDefinition",
-        "Eventhouse",
-        "UserDataFunction",
-        "Environment",
-        "SQLDatabase",
-        "Lakehouse",
-        "MirroredDatabase",
-        "Warehouse",
-        "VariableLibrary",
+        ItemType.ML_EXPERIMENT.value,
+        ItemType.DATA_AGENT.value,
+        ItemType.ORG_APP.value,
+        ItemType.MOUNTED_DATA_FACTORY.value,
+        ItemType.APACHE_AIRFLOW_JOB.value,
+        ItemType.GRAPHQL_API.value,
+        ItemType.DATA_PIPELINE.value,
+        ItemType.DATAFLOW.value,
+        ItemType.KQL_DASHBOARD.value,
+        ItemType.EVENTSTREAM.value,
+        ItemType.REFLEX.value,
+        ItemType.KQL_QUERYSET.value,
+        ItemType.KQL_DATABASE.value,
+        ItemType.COPY_JOB.value,
+        ItemType.REPORT.value,
+        ItemType.SEMANTIC_MODEL.value,
+        ItemType.NOTEBOOK.value,
+        ItemType.SPARK_JOB_DEFINITION.value,
+        ItemType.EVENTHOUSE.value,
+        ItemType.USER_DATA_FUNCTION.value,
+        ItemType.ENVIRONMENT.value,
+        ItemType.SQL_DATABASE.value,
+        ItemType.LAKEHOUSE.value,
+        ItemType.MIRRORED_DATABASE.value,
+        ItemType.WAREHOUSE.value,
+        ItemType.VARIABLE_LIBRARY.value,
     ]:
         if item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.deployed_items:
             unpublish_flag = unpublish_flag_mapping.get(item_type)
@@ -444,7 +445,7 @@ def unpublish_all_orphan_items(
         else:
             to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type == "DataPipeline":
+        if item_type == ItemType.DATA_PIPELINE.value:
             find_referenced_items_func = items.find_referenced_datapipelines
 
             # Determine order to delete w/o dependencies
