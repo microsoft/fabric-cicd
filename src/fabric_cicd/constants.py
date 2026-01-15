@@ -40,32 +40,40 @@ class ItemType(str, Enum):
 class FeatureFlag(str, Enum):
     """Enumeration of supported feature flags for fabric-cicd."""
 
-    # Unpublish feature flags
     ENABLE_LAKEHOUSE_UNPUBLISH = "enable_lakehouse_unpublish"
+    """Set to enable the deletion of Lakehouses."""
     ENABLE_WAREHOUSE_UNPUBLISH = "enable_warehouse_unpublish"
+    """Set to enable the deletion of Warehouses."""
     ENABLE_SQLDATABASE_UNPUBLISH = "enable_sqldatabase_unpublish"
+    """Set to enable the deletion of SQL Databases."""
     ENABLE_EVENTHOUSE_UNPUBLISH = "enable_eventhouse_unpublish"
+    """Set to enable the deletion of Eventhouses."""
     ENABLE_KQLDATABASE_UNPUBLISH = "enable_kqldatabase_unpublish"
-
-    # Publish and deployment feature flags
+    """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
     ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
+    """Set to enable deploying shortcuts with the lakehouse."""
     DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
+    """Set to disable deploying workspace sub folders."""
     CONTINUE_ON_SHORTCUT_FAILURE = "continue_on_shortcut_failure"
-
-    # Parameterization feature flags
+    """Set to allow deployment to continue even when shortcuts fail to publish."""
     ENABLE_ENVIRONMENT_VARIABLE_REPLACEMENT = "enable_environment_variable_replacement"
-
-    # Experimental feature flags
+    """Set to enable the use of pipeline variables."""
     ENABLE_EXPERIMENTAL_FEATURES = "enable_experimental_features"
+    """Set to enable experimental features, such as selective deployments."""
     ENABLE_ITEMS_TO_INCLUDE = "enable_items_to_include"
+    """Set to enable selective publishing/unpublishing of items."""
     ENABLE_EXCLUDE_FOLDER = "enable_exclude_folder"
+    """Set to enable folder-based exclusion during publish operations."""
     ENABLE_SHORTCUT_EXCLUDE = "enable_shortcut_exclude"
+    """Set to enable selective publishing of shortcuts in a Lakehouse."""
     ENABLE_CONFIG_DEPLOY = "enable_config_deploy"
-
-    # Utility feature flags
+    """Set to enable config file-based deployment."""
     ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
+    """Set to enable collection of API responses during publish operations."""
     DISABLE_PRINT_IDENTITY = "disable_print_identity"
+    """Set to disable printing the executing identity name."""
     ENABLE_DEBUG_MODE = "enable_debug_mode"
+    """Set to enable debug mode for detailed logging."""
 
 
 # General
