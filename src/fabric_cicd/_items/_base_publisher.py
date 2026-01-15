@@ -4,11 +4,8 @@
 """Base interface for all item publishers."""
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from fabric_cicd._common._item import Item
-    from fabric_cicd.fabric_workspace import FabricWorkspace
+from fabric_cicd._common._item import Item
+from fabric_cicd.fabric_workspace import FabricWorkspace
 
 
 class ItemPublisher(ABC):
