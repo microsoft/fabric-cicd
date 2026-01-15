@@ -3,7 +3,7 @@
 
 """Base interface for all item publishers."""
 
-from abc import ABC, abstractmethod
+from abc import ABC
 
 from fabric_cicd._common._item import Item
 from fabric_cicd.constants import ItemType
@@ -105,23 +105,25 @@ class ItemPublisher(ABC):
 
         return publisher_class(fabric_workspace_obj)
 
-    @abstractmethod
-    def publish_one(self, item_name: str, item: "Item") -> None:
+    def publish_one(self, item_name: str, _item: "Item") -> None:
         """
         Publish a single item.
 
         Args:
             item_name: The name of the item to publish.
-            item: The Item object to publish.
+            _item: The Item object to publish.
 
-        This method must be implemented by each concrete item publisher.
+        Default implementation publishes the item using _publish_item.
+        Subclasses can override this method for custom publishing logic.
         """
+        self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
 
-    @abstractmethod
     def publish_all(self) -> None:
         """
         Execute the publish operation for this item type.
 
-        This method must be implemented by each concrete item publisher.
+        Default implementation iterates over all items of this type and calls publish_one.
+        Subclasses can override this method for custom batch publishing logic.
         """
-        pass
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
+            self.publish_one(item_name, item)
