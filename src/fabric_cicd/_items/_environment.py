@@ -291,6 +291,6 @@ def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace,
 class EnvironmentPublisher(ItemPublisher):
     """Publisher for Environment items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Environment items."""
         publish_environments(self.fabric_workspace_obj)

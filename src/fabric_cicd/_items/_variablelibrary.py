@@ -66,6 +66,6 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
 class VariableLibraryPublisher(ItemPublisher):
     """Publisher for Variable Library items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Variable Library items."""
         publish_variablelibraries(self.fabric_workspace_obj)

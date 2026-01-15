@@ -27,6 +27,6 @@ def publish_copyjobs(fabric_workspace_obj: FabricWorkspace) -> None:
 class CopyJobPublisher(ItemPublisher):
     """Publisher for Copy Job items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Copy Job items."""
         publish_copyjobs(self.fabric_workspace_obj)

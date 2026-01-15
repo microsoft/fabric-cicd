@@ -28,6 +28,6 @@ def publish_eventhouses(fabric_workspace_obj: FabricWorkspace) -> None:
 class EventhousePublisher(ItemPublisher):
     """Publisher for Eventhouse items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Eventhouse items."""
         publish_eventhouses(self.fabric_workspace_obj)

@@ -27,6 +27,6 @@ def publish_userdatafunctions(fabric_workspace_obj: FabricWorkspace) -> None:
 class UserDataFunctionPublisher(ItemPublisher):
     """Publisher for User Data Function items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all User Data Function items."""
         publish_userdatafunctions(self.fabric_workspace_obj)

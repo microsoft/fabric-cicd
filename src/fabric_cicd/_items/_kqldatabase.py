@@ -27,6 +27,6 @@ def publish_kqldatabases(fabric_workspace_obj: FabricWorkspace) -> None:
 class KQLDatabasePublisher(ItemPublisher):
     """Publisher for KQL Database items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all KQL Database items."""
         publish_kqldatabases(self.fabric_workspace_obj)

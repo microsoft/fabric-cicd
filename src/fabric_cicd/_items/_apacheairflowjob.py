@@ -27,6 +27,6 @@ def publish_apacheairflowjobs(fabric_workspace_obj: FabricWorkspace) -> None:
 class ApacheAirflowJobPublisher(ItemPublisher):
     """Publisher for Apache Airflow Job items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Apache Airflow Job items."""
         publish_apacheairflowjobs(self.fabric_workspace_obj)

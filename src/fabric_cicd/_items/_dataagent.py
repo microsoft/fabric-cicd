@@ -28,6 +28,6 @@ def publish_dataagents(fabric_workspace_obj: FabricWorkspace) -> None:
 class DataAgentPublisher(ItemPublisher):
     """Publisher for Data Agent items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Data Agent items."""
         publish_dataagents(self.fabric_workspace_obj)

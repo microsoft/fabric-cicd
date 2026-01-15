@@ -182,6 +182,6 @@ def build_request_body(body: dict) -> dict:
 class SemanticModelPublisher(ItemPublisher):
     """Publisher for Semantic Model items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Semantic Model items."""
         publish_semanticmodels(self.fabric_workspace_obj)

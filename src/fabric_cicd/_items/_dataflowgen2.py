@@ -260,6 +260,6 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
 class DataflowPublisher(ItemPublisher):
     """Publisher for Dataflow items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Dataflow items."""
         publish_dataflows(self.fabric_workspace_obj)

@@ -27,6 +27,6 @@ def publish_mounteddatafactories(fabric_workspace_obj: FabricWorkspace) -> None:
 class MountedDataFactoryPublisher(ItemPublisher):
     """Publisher for Mounted Data Factory items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Mounted Data Factory items."""
         publish_mounteddatafactories(self.fabric_workspace_obj)

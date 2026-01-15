@@ -23,7 +23,7 @@ class ItemPublisher(ABC):
         self.fabric_workspace_obj = fabric_workspace_obj
 
     @abstractmethod
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """
         Execute the publish operation for this item type.
 

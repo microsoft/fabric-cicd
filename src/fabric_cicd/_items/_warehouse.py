@@ -48,6 +48,6 @@ def publish_warehouses(fabric_workspace_obj: FabricWorkspace) -> None:
 class WarehousePublisher(ItemPublisher):
     """Publisher for Warehouse items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Warehouse items."""
         publish_warehouses(self.fabric_workspace_obj)

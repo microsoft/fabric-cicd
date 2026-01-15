@@ -27,6 +27,6 @@ def publish_sparkjobdefinitions(fabric_workspace_obj: FabricWorkspace) -> None:
 class SparkJobDefinitionPublisher(ItemPublisher):
     """Publisher for Spark Job Definition items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Spark Job Definition items."""
         publish_sparkjobdefinitions(self.fabric_workspace_obj)

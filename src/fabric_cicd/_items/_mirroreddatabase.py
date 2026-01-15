@@ -27,6 +27,6 @@ def publish_mirroreddatabase(fabric_workspace_obj: FabricWorkspace) -> None:
 class MirroredDatabasePublisher(ItemPublisher):
     """Publisher for Mirrored Database items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Mirrored Database items."""
         publish_mirroreddatabase(self.fabric_workspace_obj)

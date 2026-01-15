@@ -27,6 +27,6 @@ def publish_activators(fabric_workspace_obj: FabricWorkspace) -> None:
 class ActivatorPublisher(ItemPublisher):
     """Publisher for Reflex (Activator) items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Reflex items."""
         publish_activators(self.fabric_workspace_obj)

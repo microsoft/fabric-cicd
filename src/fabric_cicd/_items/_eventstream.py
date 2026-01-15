@@ -27,6 +27,6 @@ def publish_eventstreams(fabric_workspace_obj: FabricWorkspace) -> None:
 class EventstreamPublisher(ItemPublisher):
     """Publisher for Eventstream items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Eventstream items."""
         publish_eventstreams(self.fabric_workspace_obj)

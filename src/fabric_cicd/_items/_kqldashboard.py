@@ -94,6 +94,6 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
 class KQLDashboardPublisher(ItemPublisher):
     """Publisher for KQL Dashboard items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all KQL Dashboard items."""
         publish_kqldashboard(self.fabric_workspace_obj)

@@ -27,6 +27,6 @@ def publish_notebooks(fabric_workspace_obj: FabricWorkspace) -> None:
 class NotebookPublisher(ItemPublisher):
     """Publisher for Notebook items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Notebook items."""
         publish_notebooks(self.fabric_workspace_obj)

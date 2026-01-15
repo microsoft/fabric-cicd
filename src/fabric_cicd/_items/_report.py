@@ -80,6 +80,6 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
 class ReportPublisher(ItemPublisher):
     """Publisher for Report items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Report items."""
         publish_reports(self.fabric_workspace_obj)

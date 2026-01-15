@@ -247,6 +247,6 @@ def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
 class LakehousePublisher(ItemPublisher):
     """Publisher for Lakehouse items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Lakehouse items."""
         publish_lakehouses(self.fabric_workspace_obj)

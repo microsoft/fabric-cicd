@@ -103,6 +103,6 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
 class KQLQuerysetPublisher(ItemPublisher):
     """Publisher for KQL Queryset items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all KQL Queryset items."""
         publish_kqlquerysets(self.fabric_workspace_obj)

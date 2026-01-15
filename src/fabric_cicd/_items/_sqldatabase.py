@@ -37,6 +37,6 @@ def publish_sqldatabases(fabric_workspace_obj: FabricWorkspace) -> None:
 class SQLDatabasePublisher(ItemPublisher):
     """Publisher for SQL Database items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all SQL Database items."""
         publish_sqldatabases(self.fabric_workspace_obj)

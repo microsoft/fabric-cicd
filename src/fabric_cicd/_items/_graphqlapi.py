@@ -27,6 +27,6 @@ def publish_graphqlapis(fabric_workspace_obj: FabricWorkspace) -> None:
 class GraphQLApiPublisher(ItemPublisher):
     """Publisher for GraphQL API items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all GraphQL API items."""
         publish_graphqlapis(self.fabric_workspace_obj)

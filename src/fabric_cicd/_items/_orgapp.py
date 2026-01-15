@@ -27,6 +27,6 @@ def publish_orgapps(fabric_workspace_obj: FabricWorkspace) -> None:
 class OrgAppPublisher(ItemPublisher):
     """Publisher for Org App items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Org App items."""
         publish_orgapps(self.fabric_workspace_obj)

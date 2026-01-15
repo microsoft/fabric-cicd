@@ -28,6 +28,6 @@ def publish_mlexperiments(fabric_workspace_obj: FabricWorkspace) -> None:
 class MLExperimentPublisher(ItemPublisher):
     """Publisher for ML Experiment items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all ML Experiment items."""
         publish_mlexperiments(self.fabric_workspace_obj)

@@ -67,6 +67,6 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
 class DataPipelinePublisher(ItemPublisher):
     """Publisher for Data Pipeline items."""
 
-    def publish(self) -> None:
+    def publish_all(self) -> None:
         """Publish all Data Pipeline items."""
         publish_datapipelines(self.fabric_workspace_obj)
