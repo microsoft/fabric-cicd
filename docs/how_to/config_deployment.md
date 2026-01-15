@@ -239,7 +239,89 @@ constants:
         <env..>: <constant_value..>
 ```
 
-### Sample `config.yml` File
+## Environment-Specific Values
+
+All configuration fields support environment-specific values using a mapping format:
+
+```yaml
+core:
+    workspace_id:
+        dev: "dev-workspace-id"
+        test: "test-workspace-id"
+        prod: "prod-workspace-id"
+```
+
+### Required vs Optional Fields
+
+Fields are categorized as **required** or **optional**, which affects how missing environment values are handled:
+
+| Field                                   | Required | Environment Missing Behavior    |
+| --------------------------------------- | -------- | ------------------------------- |
+| `core.workspace_id` or `core.workspace` | ✅       | Validation error                |
+| `core.repository_directory`             | ✅       | Validation error                |
+| `core.item_types_in_scope`              | ❌       | Warning logged, setting skipped |
+| `core.parameter`                        | ❌       | Warning logged, setting skipped |
+| `publish.exclude_regex`                 | ❌       | Debug logged, setting skipped   |
+| `publish.folder_exclude_regex`          | ❌       | Debug logged, setting skipped   |
+| `publish.shortcut_exclude_regex`        | ❌       | Debug logged, setting skipped   |
+| `publish.items_to_include`              | ❌       | Debug logged, setting skipped   |
+| `publish.skip`                          | ❌       | Defaults to `False`             |
+| `unpublish.exclude_regex`               | ❌       | Debug logged, setting skipped   |
+| `unpublish.items_to_include`            | ❌       | Debug logged, setting skipped   |
+| `unpublish.skip`                        | ❌       | Defaults to `False`             |
+| `features`                              | ❌       | Debug logged, setting skipped   |
+| `constants`                             | ❌       | Debug logged, setting skipped   |
+
+### Selective Environment Configuration
+
+Optional fields allow you to apply settings to specific environments without affecting others. This is useful when you want different behavior per environment:
+
+```yaml
+core:
+    workspace_id:
+        dev: "dev-workspace-id"
+        test: "test-workspace-id"
+        prod: "prod-workspace-id"
+    repository_directory: "./workspace" # Same for all environments
+
+publish:
+    # Only exclude test folders in dev environment
+    folder_exclude_regex:
+        dev: "^test_.*"
+        # test and prod not specified - no folder exclusion applied
+
+    # Skip publish in dev, run in test and prod
+    skip:
+        dev: true
+        # test and prod default to false
+```
+
+In this example:
+
+-   Deploying to `dev`: `folder_exclude_regex` = `"^test_.*"`, `skip` = `true`
+-   Deploying to `test`: No folder exclusion applied, `skip` = `false`
+-   Deploying to `prod`: No folder exclusion applied, `skip` = `false`
+
+### Logging Behavior
+
+When an optional field uses environment mapping and does not include the target environment:
+
+-   **Important optional fields** (`item_types_in_scope`, `parameter`): A **warning** is logged to alert users that the setting is being skipped.
+-   **Other optional fields**: A **debug** message is logged, visible only when debug logging is enabled.
+
+Example log output when deploying to `prod` with the config above:
+
+```
+[Debug] - No value for 'folder_exclude_regex' in environment 'prod'. Available environments: ['dev']. This setting will be skipped.
+```
+
+To enable debug logging:
+
+```python
+change_log_level()
+```
+
+## Sample `config.yml` File
 
 ```yaml
 core:
