@@ -3,15 +3,15 @@
 
 """Mock Fabric REST API server for integration testing."""
 
-import csv
+import json
 import logging
 import re
-import sys
 import threading
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import ClassVar, Optional
+from urllib.parse import urlparse
 
 from fabric_cicd._common._http_tracer import HTTPRequest, HTTPResponse
 
@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 MOCK_SERVER_PORT = 8765
 GUID_PATTERN = re.compile(r"[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
-
-csv.field_size_limit(sys.maxsize)
 
 
 class MockFabricAPIHandler(BaseHTTPRequestHandler):
@@ -139,42 +137,55 @@ class MockFabricAPIHandler(BaseHTTPRequestHandler):
     @classmethod
     def load_trace_data(cls, trace_file: Path):
         """
-        Load trace data from CSV file.
+        Load trace data from JSON file.
 
         Args:
-            trace_file: Path to the http_trace.csv file
+            trace_file: Path to the http_trace.json file
         """
         cls.trace_data.clear()
         cls.route_invocations.clear()
 
         with trace_file.open("r") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    request = HTTPRequest.from_b64(row["request_b64"])
-                    response_b64 = row.get("response_b64", "").strip()
+            data = json.load(f)
 
-                    if not response_b64:
-                        continue
+        traces = data.get("traces", [])
+        for trace in traces:
+            try:
+                request_data = trace.get("request")
+                response_data = trace.get("response")
 
-                    response = HTTPResponse.from_b64(response_b64)
-
-                    from urllib.parse import urlparse
-
-                    parsed_url = urlparse(request.url)
-                    route = parsed_url.path
-                    if parsed_url.query:
-                        route += f"?{parsed_url.query}"
-
-                    route_key = f"{request.method} {route}"
-
-                    if route_key not in cls.trace_data:
-                        cls.trace_data[route_key] = []
-
-                    cls.trace_data[route_key].append((request, response))
-                except Exception as e:
-                    logger.warning(f"Failed to parse trace row: {e}")
+                if not request_data or not response_data:
                     continue
+
+                request = HTTPRequest(
+                    method=request_data.get("method", ""),
+                    url=request_data.get("url", ""),
+                    headers=request_data.get("headers", {}),
+                    body=request_data.get("body"),
+                    timestamp=request_data.get("timestamp"),
+                )
+
+                response = HTTPResponse(
+                    status_code=response_data.get("status_code", 200),
+                    headers=response_data.get("headers", {}),
+                    body=response_data.get("body"),
+                    timestamp=response_data.get("timestamp"),
+                )
+
+                parsed_url = urlparse(request.url)
+                route = parsed_url.path
+                if parsed_url.query:
+                    route += f"?{parsed_url.query}"
+
+                route_key = f"{request.method} {route}"
+
+                if route_key not in cls.trace_data:
+                    cls.trace_data[route_key] = []
+
+                cls.trace_data[route_key].append((request, response))
+            except Exception as e:
+                logger.warning(f"Failed to parse trace entry: {e}")
+                continue
 
 
 class MockFabricServer:
@@ -185,7 +196,7 @@ class MockFabricServer:
         Initialize mock server.
 
         Args:
-            trace_file: Path to http_trace.csv
+            trace_file: Path to http_trace.json
             port: Port to listen on
         """
         self.port = port
