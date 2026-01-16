@@ -3,6 +3,7 @@
 
 """Constants for the fabric-cicd package."""
 
+import os
 from enum import Enum
 
 
@@ -76,13 +77,32 @@ class FeatureFlag(str, Enum):
     """Set to enable debug mode for detailed logging."""
 
 
+class EnvVar(str, Enum):
+    """Enumeration of environment variables used by fabric-cicd."""
+
+    HTTP_TRACE_ENABLED = "FABRIC_CICD_HTTP_TRACE_ENABLED"
+    """Set to '1', 'true', or 'yes' to enable HTTP request/response tracing."""
+    HTTP_TRACE_FILE = "FABRIC_CICD_HTTP_TRACE_FILE"
+    """Path to save HTTP trace output. If set, HTTP tracing is enabled."""
+    DEFAULT_API_ROOT_URL = "DEFAULT_API_ROOT_URL"
+    """Override the default Power BI API root URL. Defaults to 'https://api.powerbi.com'."""
+    FABRIC_API_ROOT_URL = "FABRIC_API_ROOT_URL"
+    """Override the Fabric API root URL. Defaults to 'https://api.fabric.microsoft.com'."""
+
+
 # General
 VERSION = "0.1.33"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
-DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
-FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
+DEFAULT_API_ROOT_URL = os.environ.get(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
+FABRIC_API_ROOT_URL = os.environ.get(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
+
+# HTTP Headers
+AUTHORIZATION_HEADER = "authorization"
+
+# HTTP Tracing
+VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 
 # Item Type
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)

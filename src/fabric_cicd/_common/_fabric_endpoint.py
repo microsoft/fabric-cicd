@@ -18,6 +18,7 @@ from azure.core.exceptions import (
 
 import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
+from fabric_cicd._common._http_tracer import HTTPTracer, HTTPTracerFactory
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +26,26 @@ logger = logging.getLogger(__name__)
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
 
-    def __init__(self, token_credential: TokenCredential, requests_module: requests = requests) -> None:
+    def __init__(
+        self,
+        token_credential: TokenCredential,
+        requests_module: requests = requests,
+        http_tracer: Optional[HTTPTracer] = None,
+    ) -> None:
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
 
         Args:
             token_credential: The token credential.
             requests_module: The requests module.
+            http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
         """
         self.aad_token = None
         self.aad_token_expiration = None
         self.token_credential = token_credential
         self.requests = requests_module
+        self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
+
         self._refresh_token()
 
     def invoke(
@@ -75,7 +84,10 @@ class FabricEndpoint:
                 }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
+
+                self.http_tracer.capture_request(method, url, headers, body, files)
                 response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
+                self.http_tracer.capture_response(response)
 
                 iteration_count += 1
 
@@ -112,6 +124,9 @@ class FabricEndpoint:
 
         end_time = time.time()
         logger.debug(f"Request completed in {end_time - start_time} seconds")
+
+        if exit_loop:
+            self.http_tracer.save()
 
         return {
             "header": dict(response.headers),
