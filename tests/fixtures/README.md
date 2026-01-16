@@ -13,7 +13,7 @@ Suppose you need to add payloads for a new resource type.
 Update `item_types_to_deploy` in the script with the item you want to capture HTTP traffic for, then run:
 
 ```bash
-export FABRIC_WORKSPACE_ID="47b132fe-939b-4509-942a-0f615103e916"
+export FABRIC_WORKSPACE_ID="8847d306-2a0c-4dc6-9fda-125b7d4fb966"
 uv run python devtools/debug_trace_publish_all.py
 ```
 

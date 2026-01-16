@@ -34,8 +34,6 @@ def merge_trace_files():
     print(f"Merged {result['merged']} entries from new trace file")
     print(f"Removed {result['duplicates_removed']} duplicate entries")
 
-    new_trace_file.unlink()
-
 
 def main():
     """Capture HTTP trace while publishing all items to Fabric workspace."""
@@ -52,7 +50,20 @@ def main():
 
     artifacts_folder = root_directory / "sample" / "workspace"
     item_types_to_deploy = [
+        "Dataflow",
+        "DataPipeline",
         "Environment",
+        "Eventhouse",
+        "Eventstream",
+        "KQLDatabase",
+        "KQLQueryset",
+        "Lakehouse",
+        "Notebook",
+        "Reflex",
+        "Report",
+        "SemanticModel",
+        "SparkJobDefinition",
+        "VariableLibrary",
     ]
     token_credential = DefaultAzureCredential()
     for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
