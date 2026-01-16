@@ -69,6 +69,7 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
         "Dataflow",
         "DataPipeline",
         "Eventhouse",
+        "Eventstream",
         "KQLDatabase",
         "KQLQueryset",
         "Lakehouse",
