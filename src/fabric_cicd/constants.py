@@ -153,6 +153,36 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
+# Serial execution order for publishing items (determines dependency order)
+SERIAL_EXECUTION_ITEM_ORDER: dict[int, ItemType] = {
+    1: ItemType.VARIABLE_LIBRARY,
+    2: ItemType.WAREHOUSE,
+    3: ItemType.MIRRORED_DATABASE,
+    4: ItemType.LAKEHOUSE,
+    5: ItemType.SQL_DATABASE,
+    6: ItemType.ENVIRONMENT,
+    7: ItemType.USER_DATA_FUNCTION,
+    8: ItemType.EVENTHOUSE,
+    9: ItemType.SPARK_JOB_DEFINITION,
+    10: ItemType.NOTEBOOK,
+    11: ItemType.SEMANTIC_MODEL,
+    12: ItemType.REPORT,
+    13: ItemType.COPY_JOB,
+    14: ItemType.KQL_DATABASE,
+    15: ItemType.KQL_QUERYSET,
+    16: ItemType.REFLEX,
+    17: ItemType.EVENTSTREAM,
+    18: ItemType.KQL_DASHBOARD,
+    19: ItemType.DATAFLOW,
+    20: ItemType.DATA_PIPELINE,
+    21: ItemType.GRAPHQL_API,
+    22: ItemType.APACHE_AIRFLOW_JOB,
+    23: ItemType.MOUNTED_DATA_FACTORY,
+    24: ItemType.ORG_APP,
+    25: ItemType.DATA_AGENT,
+    26: ItemType.ML_EXPERIMENT,
+}
+
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
 INVALID_REPLACE_VALUE_SPARK_POOL = {

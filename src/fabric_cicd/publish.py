@@ -211,36 +211,6 @@ def publish_all_items(
         )
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-    # Defines the publishing order and header names for each item type
-    item_type_headers = {
-        ItemType.VARIABLE_LIBRARY: "Publishing Variable Libraries",
-        ItemType.WAREHOUSE: "Publishing Warehouses",
-        ItemType.MIRRORED_DATABASE: "Publishing Mirrored Databases",
-        ItemType.LAKEHOUSE: "Publishing Lakehouses",
-        ItemType.SQL_DATABASE: "Publishing SQL Databases",
-        ItemType.ENVIRONMENT: "Publishing Environments",
-        ItemType.USER_DATA_FUNCTION: "Publishing User Data Functions",
-        ItemType.EVENTHOUSE: "Publishing Eventhouses",
-        ItemType.SPARK_JOB_DEFINITION: "Publishing Spark Job Definitions",
-        ItemType.NOTEBOOK: "Publishing Notebooks",
-        ItemType.SEMANTIC_MODEL: "Publishing Semantic Models",
-        ItemType.REPORT: "Publishing Reports",
-        ItemType.COPY_JOB: "Publishing Copy Jobs",
-        ItemType.KQL_DATABASE: "Publishing KQL Databases",
-        ItemType.KQL_QUERYSET: "Publishing KQL Querysets",
-        ItemType.REFLEX: "Publishing Activators",
-        ItemType.EVENTSTREAM: "Publishing Eventstreams",
-        ItemType.KQL_DASHBOARD: "Publishing KQL Dashboards",
-        ItemType.DATAFLOW: "Publishing Dataflows",
-        ItemType.DATA_PIPELINE: "Publishing Data Pipelines",
-        ItemType.GRAPHQL_API: "Publishing GraphQL APIs",
-        ItemType.APACHE_AIRFLOW_JOB: "Publishing Apache Airflow Jobs",
-        ItemType.MOUNTED_DATA_FACTORY: "Publishing Mounted Data Factories",
-        ItemType.ORG_APP: "Publishing Org Apps",
-        ItemType.DATA_AGENT: "Publishing Data Agents",
-        ItemType.ML_EXPERIMENT: "Publishing ML Experiments",
-    }
-
     def _should_publish_item_type(item_type: ItemType) -> bool:
         """Check if an item type should be published based on scope and repository content."""
         return (
@@ -249,9 +219,10 @@ def publish_all_items(
         )
 
     # Publish items in the defined order
-    for item_type, header in item_type_headers.items():
+    total_item_types = len(constants.SERIAL_EXECUTION_ITEM_ORDER)
+    for order_num, item_type in constants.SERIAL_EXECUTION_ITEM_ORDER.items():
         if _should_publish_item_type(item_type):
-            print_header(header)
+            print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
             items.ItemPublisher.create(item_type, fabric_workspace_obj).publish_all()
 
     # Check Environment Publish
