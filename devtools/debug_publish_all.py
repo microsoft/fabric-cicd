@@ -19,20 +19,32 @@ def main():
 
     artifacts_folder = root_directory / "sample" / "workspace"
     item_types_to_deploy = [
-        "Lakehouse",
-        "VariableLibrary",
+        "ApacheAirflowJob",
+        "CopyJob",
+        "DataAgent",
         "Dataflow",
         "DataPipeline",
-        "Notebook",
         "Environment",
-        "SemanticModel",
-        "Report",
         "Eventhouse",
+        "Eventstream",
+        "GraphQLApi",
+        "KQLDashboard",
         "KQLDatabase",
         "KQLQueryset",
+        "Lakehouse",
+        "MirroredDatabase",
+        "MLExperiment",
+        "MountedDataFactory",
+        "Notebook",
+        "OrgApp",
         "Reflex",
-        "Eventstream",
+        "Report",
+        "SemanticModel",
         "SparkJobDefinition",
+        "SQLDatabase",
+        "UserDataFunction",
+        "VariableLibrary",
+        "Warehouse",
     ]
     token_credential = DefaultAzureCredential()
     for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
