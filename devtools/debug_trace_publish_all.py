@@ -21,7 +21,7 @@ def main():
     """Capture HTTP trace while publishing all items to Fabric workspace."""
 
     os.environ["FABRIC_CICD_HTTP_TRACE_ENABLED"] = "1"
-    os.environ["FABRIC_CICD_HTTP_TRACE_FILE"] = str(root_directory / "http_trace.csv")
+    os.environ["FABRIC_CICD_HTTP_TRACE_FILE"] = str(root_directory / "http_trace.json")
 
     workspace_id = os.environ.get("FABRIC_WORKSPACE_ID")
     if not workspace_id:

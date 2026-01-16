@@ -125,6 +125,17 @@ class MockFabricAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body_bytes)
 
+        logger.debug(f"Mock server request for {route_key}: method={method}, path={self.path}")
+        logger.debug(
+            f"Mock server responding to {route_key}: status={response.status_code}, body_length={len(body_bytes)}"
+        )
+        try:
+            body_json = json.loads(body_bytes.decode("utf-8"))
+            formatted_body = json.dumps(body_json, indent=2)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            formatted_body = body_bytes.decode("utf-8", errors="replace")
+        logger.debug(f"Mock server response body for {route_key}:\n{formatted_body}")
+
     @classmethod
     def load_trace_data(cls, trace_file: Path):
         """

@@ -4,7 +4,7 @@
 
 This is a mock REST API Server that mimics `https://api.powerbi.com`.
 The idea is, to exercise the public facing `fabric_cicd` API E2E rapidly.
-The mock server loads an `http_trace.csv` file to dictate it's behavior.
+The mock server loads an `http_trace.json` file to dictate it's behavior.
 
 ### Capturing HTTP Trace for new resource types
 
@@ -17,7 +17,7 @@ export FABRIC_WORKSPACE_ID="8847d306-2a0c-4dc6-9fda-125b7d4fb966"
 uv run python devtools/debug_trace_publish_all.py
 ```
 
-New routes are automatically merged into `http_trace.csv`, skipping duplicates.
+New routes are automatically merged into `http_trace.json`, skipping duplicates.
 
 You can validate the integration test works with the mock server with:
 

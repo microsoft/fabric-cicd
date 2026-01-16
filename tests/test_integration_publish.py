@@ -23,18 +23,20 @@ def mock_fabric_api_server():
     Yields the server and sets environment variables for API URLs.
     """
     tests_dir = Path(__file__).parent
-    trace_file = tests_dir / "fixtures" / "http_trace.csv"
+    trace_file = tests_dir / "fixtures" / "http_trace.json"
 
     if not trace_file.exists():
-        pytest.skip("http_trace.csv not found - run debug_publish_all.py first to generate trace data")
+        pytest.skip("http_trace.json not found - run debug_publish_all.py first to generate trace data")
 
     server = MockFabricServer(trace_file, port=MOCK_SERVER_PORT)
 
     original_default_api = os.environ.get("DEFAULT_API_ROOT_URL")
     original_fabric_api = os.environ.get("FABRIC_API_ROOT_URL")
+    original_retry_delay = os.environ.get("FABRIC_CICD_RETRY_DELAY_OVERRIDE")
 
     os.environ["DEFAULT_API_ROOT_URL"] = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
     os.environ["FABRIC_API_ROOT_URL"] = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
+    os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE"] = "0"
 
     importlib.reload(fabric_cicd.constants)
 
@@ -53,6 +55,11 @@ def mock_fabric_api_server():
         os.environ["FABRIC_API_ROOT_URL"] = original_fabric_api
     else:
         os.environ.pop("FABRIC_API_ROOT_URL", None)
+
+    if original_retry_delay is not None:
+        os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE"] = original_retry_delay
+    else:
+        os.environ.pop("FABRIC_CICD_RETRY_DELAY_OVERRIDE", None)
 
     importlib.reload(fabric_cicd.constants)
 

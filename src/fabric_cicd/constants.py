@@ -88,6 +88,8 @@ class EnvVar(str, Enum):
     """Override the default Power BI API root URL. Defaults to 'https://api.powerbi.com'."""
     FABRIC_API_ROOT_URL = "FABRIC_API_ROOT_URL"
     """Override the Fabric API root URL. Defaults to 'https://api.fabric.microsoft.com'."""
+    RETRY_DELAY_OVERRIDE = "FABRIC_CICD_RETRY_DELAY_OVERRIDE"
+    """Override retry delay in seconds (e.g., '0' for instant retries - useful in tests)."""
 
 
 # General

@@ -7,6 +7,7 @@ import base64
 import datetime
 import json
 import logging
+import os
 import time
 from typing import Optional
 
@@ -359,9 +360,13 @@ def handle_retry(
         start_time: The start time of the request in seconds since epoch. Required if max_duration is set.
     """
     if max_duration is None or (start_time is not None and time.time() - start_time < max_duration):
-        retry_after = float(response_retry_after)
-        base_delay = float(base_delay)
-        delay = min(retry_after, base_delay * (2**attempt))
+        retry_delay_override = os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE.value)
+        if retry_delay_override is not None:
+            delay = float(retry_delay_override)
+        else:
+            retry_after = float(response_retry_after)
+            base_delay = float(base_delay)
+            delay = min(retry_after, base_delay * (2**attempt))
 
         # modify output for proper plurality and formatting
         delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"

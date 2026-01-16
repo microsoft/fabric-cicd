@@ -4,7 +4,6 @@
 """HTTP request/response tracer for debugging and mock server generation."""
 
 import base64
-import csv
 import hashlib
 import json
 import logging
@@ -158,7 +157,7 @@ class NoOpTracer:
 
 
 class FileTracer:
-    """Captures HTTP requests and responses to a CSV file."""
+    """Captures HTTP requests and responses to a JSON file."""
 
     def __init__(self, output_file: Optional[str] = None) -> None:
         """
@@ -170,11 +169,11 @@ class FileTracer:
         trace_file_from_env = os.environ.get(EnvVar.HTTP_TRACE_FILE.value)
 
         if output_file is None:
-            self.output_file = trace_file_from_env if trace_file_from_env else "http_trace.csv"
+            self.output_file = trace_file_from_env if trace_file_from_env else "http_trace.json"
         else:
             self.output_file = output_file
 
-        self.captures = []
+        self.captures: list[dict] = []
 
     def capture_request(self, method: str, url: str, headers: dict, body: str, files: Optional[dict]) -> None:  # noqa: ARG002
         """
@@ -189,7 +188,7 @@ class FileTracer:
         """
         request = HTTPRequest(
             method=method,
-            url=RouteNormalizer.normalize(url),
+            url=url,
             headers={k: v for k, v in headers.items() if k.lower() not in [AUTHORIZATION_HEADER]},
             body=body,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -225,24 +224,42 @@ class FileTracer:
         self.captures[-1]["response_b64"] = http_response.to_b64()
 
     def save(self) -> None:
-        """Save all HTTP captures to a CSV file."""
+        """Save all HTTP captures to a JSON file."""
         if not self.captures:
             return
 
         try:
             output_path = Path(self.output_file)
-            file_exists = output_path.exists()
+            existing_traces: list[dict] = []
+            if output_path.exists():
+                with output_path.open("r") as f:
+                    existing_data = json.load(f)
+                    existing_traces = existing_data.get("traces", [])
 
-            with output_path.open("a" if file_exists else "w", newline="") as f:
-                writer = csv.writer(f)
+            for capture in self.captures:
+                request_b64 = capture.get("request_b64", "")
+                response_b64 = capture.get("response_b64", "")
 
-                if not file_exists:
-                    writer.writerow(["request_b64", "response_b64"])
+                request_data = None
+                response_data = None
 
-                for capture in self.captures:
-                    request_b64 = capture.get("request_b64", "")
-                    response_b64 = capture.get("response_b64", "")
-                    writer.writerow([request_b64, response_b64])
+                if request_b64:
+                    request_data = json.loads(base64.b64decode(request_b64).decode())
+                if response_b64:
+                    response_data = json.loads(base64.b64decode(response_b64).decode())
+
+                existing_traces.append({"request": request_data, "response": response_data})
+
+            existing_traces.sort(key=lambda x: x["request"].get("timestamp", "") if x.get("request") else "")
+            output_data = {
+                "description": "HTTP trace data from Fabric API interactions",
+                "total_traces": len(existing_traces),
+                "traces": existing_traces,
+            }
+
+            with output_path.open("w") as f:
+                json.dump(output_data, f, indent=2)
+
         except Exception as e:
             logger.warning(f"Failed to save HTTP trace: {e}")
 
