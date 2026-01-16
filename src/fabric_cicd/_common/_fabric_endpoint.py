@@ -251,7 +251,7 @@ def _handle_response(
                 # No Location header means operation completed immediately
                 exit_loop = True
             else:
-                time.sleep(1)
+                time.sleep(float(os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE.value, 1)))
                 long_running = True
 
     # Handle successful responses
