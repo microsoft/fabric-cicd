@@ -15,24 +15,6 @@ sys.path.insert(0, str(root_directory / "src"))
 from azure.identity import DefaultAzureCredential
 
 import fabric_cicd
-from fabric_cicd._common._http_tracer import TraceFileDeduplicator
-
-
-def merge_trace_files():
-    """Merge new trace file into fixtures and deduplicate by unique signatures."""
-    new_trace_file = root_directory / "http_trace.csv"
-    fixture_trace_file = root_directory / "tests" / "fixtures" / "http_trace.csv"
-
-    if not new_trace_file.exists():
-        print("No new trace file generated")
-        return
-
-    result = TraceFileDeduplicator.merge_trace_files(
-        source_file=new_trace_file, target_file=fixture_trace_file, deduplicate=True
-    )
-
-    print(f"Merged {result['merged']} entries from new trace file")
-    print(f"Removed {result['duplicates_removed']} duplicate entries")
 
 
 def main():
@@ -78,7 +60,6 @@ def main():
     fabric_cicd.publish_all_items(target_workspace)
 
     print("Publish completed successfully")
-    merge_trace_files()
 
 
 if __name__ == "__main__":
