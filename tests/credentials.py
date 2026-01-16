@@ -36,7 +36,7 @@ def create_dummy_jwt(expiry_timestamp: int) -> str:
     return f"{header_b64}.{payload_b64}.{signature}"
 
 
-class StaticTokenCredential(TokenCredential):
+class DummyTokenCredential(TokenCredential):
     """A static token credential for testing."""
 
     def __init__(self, expiry_days: int = 365):

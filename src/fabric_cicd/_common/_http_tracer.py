@@ -5,6 +5,7 @@
 
 import base64
 import csv
+import hashlib
 import json
 import logging
 import os
@@ -12,6 +13,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Protocol
+from urllib.parse import urlparse
 
 import requests
 
@@ -42,6 +44,22 @@ class HTTPRequest:
         data = json.loads(json_str)
         return cls(**data)
 
+    def get_unique_signature(self) -> str:
+        """Generate unique signature from URL, method, and body using SHA256."""
+        body_str = json.dumps(self.body, sort_keys=True) if isinstance(self.body, dict) else str(self.body or "")
+        return hashlib.sha256(f"{self.url}{self.method}{body_str}".encode()).hexdigest()
+
+    def get_route_key(self) -> str:
+        """Extract route key (method + path + query) from the request."""
+        try:
+            parsed_url = urlparse(self.url)
+            route = parsed_url.path
+            if parsed_url.query:
+                route += f"?{parsed_url.query}"
+            return f"{self.method} {route}"
+        except Exception:
+            return ""
+
 
 @dataclass
 class HTTPResponse:
@@ -63,6 +81,11 @@ class HTTPResponse:
         json_str = base64.b64decode(b64_str).decode()
         data = json.loads(json_str)
         return cls(**data)
+
+    def get_unique_signature(self) -> str:
+        """Generate unique signature from status code and body using SHA256."""
+        body_str = json.dumps(self.body, sort_keys=True) if isinstance(self.body, dict) else str(self.body or "")
+        return hashlib.sha256(f"{self.status_code}{body_str}".encode()).hexdigest()
 
 
 class HTTPTracer(Protocol):
@@ -185,6 +208,103 @@ class FileTracer:
                     writer.writerow([request_b64, response_b64])
         except Exception as e:
             logger.warning(f"Failed to save HTTP trace: {e}")
+
+
+class TraceFileDeduplicator:
+    """
+    Deduplicating HTTP trace files based on unique signatures.
+    This allows us to keep the file size manageable.
+    """
+
+    @staticmethod
+    def deduplicate_trace_file(trace_file_path: Path) -> int:
+        """
+        Deduplicate a trace file by unique request and response signatures.
+
+        Keeps only unique combinations of (request signature, response signature).
+
+        Args:
+            trace_file_path: Path to the CSV trace file
+
+        Returns:
+            Number of duplicate entries removed
+        """
+        if not trace_file_path.exists():
+            return 0
+
+        seen_signatures = set()
+        unique_rows = []
+        total_rows = 0
+
+        with trace_file_path.open("r") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+
+            for row in reader:
+                total_rows += 1
+                try:
+                    request = HTTPRequest.from_b64(row["request_b64"])
+                    response = HTTPResponse.from_b64(row["response_b64"]) if row.get("response_b64") else None
+
+                    request_sig = request.get_unique_signature()
+                    response_sig = response.get_unique_signature() if response else ""
+                    combined_sig = f"{request_sig}:{response_sig}"
+
+                    if combined_sig not in seen_signatures:
+                        seen_signatures.add(combined_sig)
+                        unique_rows.append(row)
+                except Exception:
+                    unique_rows.append(row)
+
+        duplicates_removed = total_rows - len(unique_rows)
+        with trace_file_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in unique_rows:
+                writer.writerow(row)
+
+        return duplicates_removed
+
+    @staticmethod
+    def merge_trace_files(source_file: Path, target_file: Path, deduplicate: bool = True) -> dict[str, int]:
+        """
+        Merge source trace file into target trace file.
+
+        Args:
+            source_file: Source CSV trace file to merge from
+            target_file: Target CSV trace file to merge into
+            deduplicate: Whether to deduplicate after merging
+
+        Returns:
+            Dictionary with 'merged' and 'duplicates_removed' counts
+        """
+        if not source_file.exists():
+            return {"merged": 0, "duplicates_removed": 0}
+
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        if not target_file.exists():
+            with source_file.open("r") as src, target_file.open("w") as dst:
+                dst.write(src.read())
+            merged_count = sum(1 for _ in csv.DictReader(source_file.open("r")))
+            duplicates_removed = TraceFileDeduplicator.deduplicate_trace_file(target_file) if deduplicate else 0
+            return {"merged": merged_count, "duplicates_removed": duplicates_removed}
+
+        merged_count = 0
+        with source_file.open("r") as src:
+            reader = csv.DictReader(src)
+            rows_to_add = list(reader)
+            merged_count = len(rows_to_add)
+
+            if rows_to_add:
+                with target_file.open("a", newline="") as dst:
+                    writer = csv.DictWriter(dst, fieldnames=reader.fieldnames)
+                    for row in rows_to_add:
+                        writer.writerow(row)
+
+        duplicates_removed = TraceFileDeduplicator.deduplicate_trace_file(target_file) if deduplicate else 0
+
+        return {"merged": merged_count, "duplicates_removed": duplicates_removed}
 
 
 class HTTPTracerFactory:

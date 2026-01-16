@@ -9,7 +9,8 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "FABRIC_WORKSPACE_ID": "b4e2b127-32f1-49e7-a3aa-a87dba44990c"
             },
             "cwd": "${workspaceFolder}"
         }

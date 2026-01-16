@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 import pytest
-from credentials import StaticTokenCredential
+from credentials import DummyTokenCredential
 from fixtures.mock_fabric_server import MOCK_SERVER_PORT, MockFabricServer
 
 import fabric_cicd
@@ -81,7 +81,7 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
         "VariableLibrary",
     ]
 
-    token_credential = StaticTokenCredential()
+    token_credential = DummyTokenCredential()
 
     for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
         fabric_cicd.append_feature_flag(flag)
