@@ -59,7 +59,7 @@ def mock_fabric_api_server():
 
 def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
     """Test full publish_all_items workflow using mocked API responses."""
-    workspace_id = "b4e2b127-32f1-49e7-a3aa-a87dba44990c"
+    workspace_id = "00000000-0000-0000-0000-000000000000"
     environment_key = "PPE"
 
     root_directory = Path(__file__).resolve().parent.parent

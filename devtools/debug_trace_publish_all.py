@@ -42,11 +42,12 @@ def main():
 
     os.environ["FABRIC_CICD_HTTP_TRACE_ENABLED"] = "1"
     os.environ["FABRIC_CICD_HTTP_TRACE_FILE"] = str(root_directory / "http_trace.csv")
-    
+
     workspace_id = os.environ.get("FABRIC_WORKSPACE_ID")
     if not workspace_id:
-        raise ValueError("FABRIC_WORKSPACE_ID environment variable must be set")
-    
+        msg = "FABRIC_WORKSPACE_ID environment variable must be set"
+        raise ValueError(msg)
+
     environment_key = "PPE"
 
     artifacts_folder = root_directory / "sample" / "workspace"

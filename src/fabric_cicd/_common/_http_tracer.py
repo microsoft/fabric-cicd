@@ -9,10 +9,11 @@ import hashlib
 import json
 import logging
 import os
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Protocol
+from typing import Any, ClassVar, Optional, Protocol
 from urllib.parse import urlparse
 
 import requests
@@ -20,6 +21,42 @@ import requests
 from fabric_cicd.constants import AUTHORIZATION_HEADER, EnvVar
 
 logger = logging.getLogger(__name__)
+
+
+class RouteNormalizer:
+    """Normalizes workspace IDs in URLs for consistent mocking across different workspaces.
+
+    Attributes:
+        NORMALIZATION_RULES: List of (pattern, replacement) tuples for URL normalization.
+            Each pattern should have two capture groups:
+            1. The prefix (e.g., '/workspaces/')
+            2. The GUID to replace
+            The replacement value will be substituted for the GUID while preserving the prefix.
+    """
+
+    NORMALIZATION_RULES: ClassVar[list[tuple[re.Pattern, str]]] = [
+        (
+            re.compile(r"(/workspaces/)([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})"),
+            "00000000-0000-0000-0000-000000000000",
+        ),
+    ]
+
+    @classmethod
+    def normalize(cls, url: str) -> str:
+        """
+        Normalize workspace IDs in URLs to a constant value.
+
+        Args:
+            url: URL that may contain workspace GUIDs
+
+        Returns:
+            URL with workspace GUIDs replaced by normalized ID
+        """
+        normalized_url = url
+        for pattern, replacement in cls.NORMALIZATION_RULES:
+            normalized_url = pattern.sub(lambda match, repl=replacement: match.group(1) + repl, normalized_url)
+
+        return normalized_url
 
 
 @dataclass
@@ -152,7 +189,7 @@ class FileTracer:
         """
         request = HTTPRequest(
             method=method,
-            url=url,
+            url=RouteNormalizer.normalize(url),
             headers={k: v for k, v in headers.items() if k.lower() not in [AUTHORIZATION_HEADER]},
             body=body,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -244,6 +281,7 @@ class TraceFileDeduplicator:
                 total_rows += 1
                 try:
                     request = HTTPRequest.from_b64(row["request_b64"])
+                    request.url = RouteNormalizer.normalize(request.url)
                     response = HTTPResponse.from_b64(row["response_b64"]) if row.get("response_b64") else None
 
                     request_sig = request.get_unique_signature()
@@ -252,6 +290,7 @@ class TraceFileDeduplicator:
 
                     if combined_sig not in seen_signatures:
                         seen_signatures.add(combined_sig)
+                        row["request_b64"] = request.to_b64()
                         unique_rows.append(row)
                 except Exception:
                     unique_rows.append(row)
