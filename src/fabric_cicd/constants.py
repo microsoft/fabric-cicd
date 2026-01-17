@@ -154,7 +154,8 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Serial execution order for publishing items (determines dependency order)
-SERIAL_EXECUTION_ITEM_ORDER: dict[int, ItemType] = {
+# Unpublish order is the reverse of this
+SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     1: ItemType.VARIABLE_LIBRARY,
     2: ItemType.WAREHOUSE,
     3: ItemType.MIRRORED_DATABASE,

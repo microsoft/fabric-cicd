@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Captures route traces from a real Fabric workspace deployment into a CSV file."""
+"""Captures route traces from a live Fabric workspace deployment into a JSON trace file."""
 
 import csv
 import os

@@ -219,8 +219,8 @@ def publish_all_items(
         )
 
     # Publish items in the defined order
-    total_item_types = len(constants.SERIAL_EXECUTION_ITEM_ORDER)
-    for order_num, item_type in constants.SERIAL_EXECUTION_ITEM_ORDER.items():
+    total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
+    for order_num, item_type in constants.SERIAL_ITEM_PUBLISH_ORDER.items():
         if _should_publish_item_type(item_type):
             print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
             items.ItemPublisher.create(item_type, fabric_workspace_obj).publish_all()
@@ -321,45 +321,22 @@ def unpublish_all_orphan_items(
         ItemType.KQL_DATABASE.value: FeatureFlag.ENABLE_KQLDATABASE_UNPUBLISH.value,
     }
 
-    # Define order to unpublish items
+    # Build unpublish order based on reversed publish order, scope, and feature flags
     unpublish_order = []
-    for item_type in [
-        ItemType.ML_EXPERIMENT.value,
-        ItemType.DATA_AGENT.value,
-        ItemType.ORG_APP.value,
-        ItemType.MOUNTED_DATA_FACTORY.value,
-        ItemType.APACHE_AIRFLOW_JOB.value,
-        ItemType.GRAPHQL_API.value,
-        ItemType.DATA_PIPELINE.value,
-        ItemType.DATAFLOW.value,
-        ItemType.KQL_DASHBOARD.value,
-        ItemType.EVENTSTREAM.value,
-        ItemType.REFLEX.value,
-        ItemType.KQL_QUERYSET.value,
-        ItemType.KQL_DATABASE.value,
-        ItemType.COPY_JOB.value,
-        ItemType.REPORT.value,
-        ItemType.SEMANTIC_MODEL.value,
-        ItemType.NOTEBOOK.value,
-        ItemType.SPARK_JOB_DEFINITION.value,
-        ItemType.EVENTHOUSE.value,
-        ItemType.USER_DATA_FUNCTION.value,
-        ItemType.ENVIRONMENT.value,
-        ItemType.SQL_DATABASE.value,
-        ItemType.LAKEHOUSE.value,
-        ItemType.MIRRORED_DATABASE.value,
-        ItemType.WAREHOUSE.value,
-        ItemType.VARIABLE_LIBRARY.value,
-    ]:
-        if item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.deployed_items:
-            unpublish_flag = unpublish_flag_mapping.get(item_type)
+    reversed_publish_order = reversed(list(constants.SERIAL_ITEM_PUBLISH_ORDER.values()))
+    for item_type in reversed_publish_order:
+        if (
+            item_type.value in fabric_workspace_obj.item_type_in_scope
+            and item_type.value in fabric_workspace_obj.deployed_items
+        ):
+            unpublish_flag = unpublish_flag_mapping.get(item_type.value)
             # Append item_type if no feature flag is required or the corresponding flag is enabled
             if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
-                unpublish_order.append(item_type)
+                unpublish_order.append(item_type.value)
             elif unpublish_flag and unpublish_flag not in constants.FEATURE_FLAG:
                 # Log warning when unpublish is skipped due to missing feature flag
                 logger.warning(
-                    f"Skipping unpublish for {item_type} items because the '{unpublish_flag}' feature flag is not enabled."
+                    f"Skipping unpublish for {item_type.value} items because the '{unpublish_flag}' feature flag is not enabled."
                 )
 
     for item_type in unpublish_order:
