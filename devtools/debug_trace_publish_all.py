@@ -2,12 +2,9 @@
 
 """Captures route traces from a live Fabric workspace deployment into a JSON trace file."""
 
-import csv
 import os
 import sys
 from pathlib import Path
-
-csv.field_size_limit(sys.maxsize)
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
