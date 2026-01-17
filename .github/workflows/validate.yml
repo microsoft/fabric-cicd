@@ -25,14 +25,12 @@ jobs:
               with:
                   python-version: "3.x"
 
-            - name: Install dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install ruff
+            - name: Install uv
+              uses: astral-sh/setup-uv@v5
 
             - name: Run ruff format
               run: |
-                  if ruff format; then
+                  if uv run ruff format --check; then
                     echo "✅ ruff format passed."
                   else
                     echo "❌ ruff format failed."
@@ -50,14 +48,12 @@ jobs:
               with:
                   python-version: "3.x"
 
-            - name: Install dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install ruff
+            - name: Install uv
+              uses: astral-sh/setup-uv@v5
 
             - name: Run ruff lint
               run: |
-                  if ruff check; then
+                  if uv run ruff check; then
                     echo "✅ ruff lint passed."
                   else
                     echo "❌ ruff lint failed."
