@@ -108,12 +108,10 @@ RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.
 RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
+VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
-
-# HTTP Tracing
-VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 
 # Item Type
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
