@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from fabric_cicd._common._item import Item
-from fabric_cicd._items._lakehouse import process_shortcuts
+from fabric_cicd._items._lakehouse import ShortcutPublisher
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 
@@ -109,8 +109,9 @@ def test_process_shortcuts_with_exclude_regex_filters_shortcuts(mock_fabric_work
     # Set exclude regex to filter out shortcuts starting with "temp_"
     mock_fabric_workspace.shortcut_exclude_regex = "^temp_.*"
 
-    # Call process_shortcuts
-    process_shortcuts(mock_fabric_workspace, mock_item)
+    # Call ShortcutPublisher.publish_all
+    shortcut_publisher = ShortcutPublisher(mock_fabric_workspace, mock_item)
+    shortcut_publisher.publish_all()
 
     # Verify that only the production_shortcut was published
     post_calls = [
@@ -167,8 +168,9 @@ def test_process_shortcuts_without_exclude_regex_publishes_all(mock_fabric_works
     # No exclude regex set (None)
     mock_fabric_workspace.shortcut_exclude_regex = None
 
-    # Call process_shortcuts
-    process_shortcuts(mock_fabric_workspace, mock_item)
+    # Call ShortcutPublisher.publish_all
+    shortcut_publisher = ShortcutPublisher(mock_fabric_workspace, mock_item)
+    shortcut_publisher.publish_all()
 
     # Verify that both shortcuts were published
     post_calls = [
@@ -221,8 +223,9 @@ def test_process_shortcuts_exclude_regex_excludes_all_matching(mock_fabric_works
     # Set exclude regex that matches all shortcuts
     mock_fabric_workspace.shortcut_exclude_regex = "^temp_.*"
 
-    # Call process_shortcuts
-    process_shortcuts(mock_fabric_workspace, mock_item)
+    # Call ShortcutPublisher.publish_all
+    shortcut_publisher = ShortcutPublisher(mock_fabric_workspace, mock_item)
+    shortcut_publisher.publish_all()
 
     # Verify that no shortcuts were published
     post_calls = [
@@ -288,8 +291,9 @@ def test_process_shortcuts_with_complex_regex_pattern(mock_fabric_workspace, moc
     # Set exclude regex to filter shortcuts containing "_temp"
     mock_fabric_workspace.shortcut_exclude_regex = ".*_temp.*"
 
-    # Call process_shortcuts
-    process_shortcuts(mock_fabric_workspace, mock_item)
+    # Call ShortcutPublisher.publish_all
+    shortcut_publisher = ShortcutPublisher(mock_fabric_workspace, mock_item)
+    shortcut_publisher.publish_all()
 
     # Verify that only prod_shortcut was published
     post_calls = [

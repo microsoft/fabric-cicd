@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: Trace Publish All Items",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/devtools/debug_trace_publish_all.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "FABRIC_WORKSPACE_ID": "b4e2b127-32f1-49e7-a3aa-a87dba44990c"
+            },
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

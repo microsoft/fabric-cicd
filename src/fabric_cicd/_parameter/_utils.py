@@ -22,6 +22,7 @@ from jsonpath_ng.ext import parse
 import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import InputError, ParsingError
+from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +322,7 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
         if get_dataflow_name:
             if (
                 item_type in workspace_obj.repository_items
-                and item_type == "Dataflow"
+                and item_type == ItemType.DATAFLOW.value
                 and item_name in workspace_obj.repository_items[item_type]
                 and attribute == "id"
             ):
@@ -435,7 +436,7 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
     Args:
     raw_file: The parameter.yml file content as a string.
     """
-    if "enable_environment_variable_replacement" in constants.FEATURE_FLAG:
+    if FeatureFlag.ENABLE_ENVIRONMENT_VARIABLE_REPLACEMENT.value in constants.FEATURE_FLAG:
         # filter os.environ dict to only allow variables that begin with $ENV:
         env_vars = {k[len("$ENV:") :]: v for k, v in os.environ.items() if k.startswith("$ENV:")}
         # block of code to support both variants of the parameters.yml file

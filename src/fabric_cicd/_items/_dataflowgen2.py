@@ -10,32 +10,16 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher, ParallelConfig
 from fabric_cicd._parameter._utils import (
     check_replacement,
     extract_find_value,
     extract_parameter_filters,
     extract_replace_value,
 )
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_dataflows(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all dataflow items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "Dataflow"
-
-    # Set the publish order based on dependencies (when dataflow references another dataflow)
-    publish_order = set_dataflow_publish_order(fabric_workspace_obj, item_type)
-
-    for item_name in publish_order:
-        fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=item_type, func_process_file=func_process_file
-        )
 
 
 def set_dataflow_publish_order(workspace_obj: FabricWorkspace, item_type: str) -> list[str]:
@@ -184,7 +168,9 @@ def get_source_dataflow_name(
     for param in workspace_obj.environment_parameter.get("find_replace", []):
         # Extract values from the parameter
         input_type, input_name, input_path = extract_parameter_filters(workspace_obj, param)
-        filter_match = check_replacement(input_type, input_name, input_path, "Dataflow", item_name, file_path)
+        filter_match = check_replacement(
+            input_type, input_name, input_path, ItemType.DATAFLOW.value, item_name, file_path
+        )
         find_info = extract_find_value(param, file_content, filter_match)
 
         # Skip if this parameter doesn't match the dataflow ID
@@ -241,7 +227,9 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
             source_dataflow_id = source_dataflow_info["source_id"]
 
             # Get the logical ID of the source dataflow from repository items
-            logical_id = workspace_obj.repository_items.get("Dataflow", {}).get(source_dataflow_name, {}).logical_id
+            logical_id = (
+                workspace_obj.repository_items.get(ItemType.DATAFLOW.value, {}).get(source_dataflow_name, {}).logical_id
+            )
 
             # Replace the dataflow ID with its logical ID and the workspace ID with the default workspace ID
             if logical_id:
@@ -254,3 +242,23 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
                 )
 
     return file_obj.contents
+
+
+def _get_dataflow_publish_order(publisher: "DataflowPublisher") -> list[str]:
+    """Get the ordered list of dataflow names based on dependencies."""
+    return set_dataflow_publish_order(publisher.fabric_workspace_obj, publisher.item_type)
+
+
+class DataflowPublisher(ItemPublisher):
+    """Publisher for Dataflow items."""
+
+    item_type = ItemType.DATAFLOW.value
+
+    parallel_config = ParallelConfig(enabled=False, ordered_items_func=_get_dataflow_publish_order)
+    """Dataflows must be published in dependency order (sequential)"""
+
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single Dataflow item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
+        )

@@ -3,49 +3,129 @@
 
 """Constants for the fabric-cicd package."""
 
+import os
+from enum import Enum
+
+
+class ItemType(str, Enum):
+    """Enumeration of supported Microsoft Fabric item types."""
+
+    APACHE_AIRFLOW_JOB = "ApacheAirflowJob"
+    COPY_JOB = "CopyJob"
+    DATA_AGENT = "DataAgent"
+    DATA_PIPELINE = "DataPipeline"
+    DATAFLOW = "Dataflow"
+    ENVIRONMENT = "Environment"
+    EVENTHOUSE = "Eventhouse"
+    EVENTSTREAM = "Eventstream"
+    GRAPHQL_API = "GraphQLApi"
+    KQL_DASHBOARD = "KQLDashboard"
+    KQL_DATABASE = "KQLDatabase"
+    KQL_QUERYSET = "KQLQueryset"
+    LAKEHOUSE = "Lakehouse"
+    MIRRORED_DATABASE = "MirroredDatabase"
+    ML_EXPERIMENT = "MLExperiment"
+    MOUNTED_DATA_FACTORY = "MountedDataFactory"
+    NOTEBOOK = "Notebook"
+    ORG_APP = "OrgApp"
+    REFLEX = "Reflex"
+    REPORT = "Report"
+    SEMANTIC_MODEL = "SemanticModel"
+    SPARK_JOB_DEFINITION = "SparkJobDefinition"
+    SQL_DATABASE = "SQLDatabase"
+    USER_DATA_FUNCTION = "UserDataFunction"
+    VARIABLE_LIBRARY = "VariableLibrary"
+    WAREHOUSE = "Warehouse"
+
+
+class FeatureFlag(str, Enum):
+    """Enumeration of supported feature flags for fabric-cicd."""
+
+    ENABLE_LAKEHOUSE_UNPUBLISH = "enable_lakehouse_unpublish"
+    """Set to enable the deletion of Lakehouses."""
+    ENABLE_WAREHOUSE_UNPUBLISH = "enable_warehouse_unpublish"
+    """Set to enable the deletion of Warehouses."""
+    ENABLE_SQLDATABASE_UNPUBLISH = "enable_sqldatabase_unpublish"
+    """Set to enable the deletion of SQL Databases."""
+    ENABLE_EVENTHOUSE_UNPUBLISH = "enable_eventhouse_unpublish"
+    """Set to enable the deletion of Eventhouses."""
+    ENABLE_KQLDATABASE_UNPUBLISH = "enable_kqldatabase_unpublish"
+    """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
+    ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
+    """Set to enable deploying shortcuts with the lakehouse."""
+    DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
+    """Set to disable deploying workspace sub folders."""
+    CONTINUE_ON_SHORTCUT_FAILURE = "continue_on_shortcut_failure"
+    """Set to allow deployment to continue even when shortcuts fail to publish."""
+    ENABLE_ENVIRONMENT_VARIABLE_REPLACEMENT = "enable_environment_variable_replacement"
+    """Set to enable the use of pipeline variables."""
+    ENABLE_EXPERIMENTAL_FEATURES = "enable_experimental_features"
+    """Set to enable experimental features, such as selective deployments."""
+    ENABLE_ITEMS_TO_INCLUDE = "enable_items_to_include"
+    """Set to enable selective publishing/unpublishing of items."""
+    ENABLE_EXCLUDE_FOLDER = "enable_exclude_folder"
+    """Set to enable folder-based exclusion during publish operations."""
+    ENABLE_SHORTCUT_EXCLUDE = "enable_shortcut_exclude"
+    """Set to enable selective publishing of shortcuts in a Lakehouse."""
+    ENABLE_CONFIG_DEPLOY = "enable_config_deploy"
+    """Set to enable config file-based deployment."""
+    ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
+    """Set to enable collection of API responses during publish operations."""
+    DISABLE_PRINT_IDENTITY = "disable_print_identity"
+    """Set to disable printing the executing identity name."""
+    ENABLE_DEBUG_MODE = "enable_debug_mode"
+    """Set to enable debug mode for detailed logging."""
+
+
+class EnvVar(str, Enum):
+    """Enumeration of environment variables used by fabric-cicd."""
+
+    HTTP_TRACE_ENABLED = "FABRIC_CICD_HTTP_TRACE_ENABLED"
+    """Set to '1', 'true', or 'yes' to enable HTTP request/response tracing."""
+    HTTP_TRACE_FILE = "FABRIC_CICD_HTTP_TRACE_FILE"
+    """Path to save HTTP trace output. If set, HTTP tracing is enabled."""
+    DEFAULT_API_ROOT_URL = "DEFAULT_API_ROOT_URL"
+    """Override the default Power BI API root URL. Defaults to 'https://api.powerbi.com'."""
+    FABRIC_API_ROOT_URL = "FABRIC_API_ROOT_URL"
+    """Override the Fabric API root URL. Defaults to 'https://api.fabric.microsoft.com'."""
+    RETRY_DELAY_OVERRIDE_SECONDS = "FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS"
+    """Override retry delay in seconds (e.g., '0' for instant retries - useful in tests)."""
+    RETRY_AFTER_SECONDS = "FABRIC_CICD_RETRY_AFTER_SECONDS"
+    """Override retry-after delay for item name conflicts (HTTP 400). Defaults to 300 seconds."""
+    RETRY_BASE_DELAY_SECONDS = "FABRIC_CICD_RETRY_BASE_DELAY_SECONDS"
+    """Override base delay for item name conflict retries. Defaults to 30 seconds."""
+    RETRY_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_MAX_DURATION_SECONDS"
+    """Override max duration for item name conflict retries. Defaults to 300 seconds."""
+
+
 # General
 VERSION = "0.1.33"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
-DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
-FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
+DEFAULT_API_ROOT_URL = os.environ.get(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
+FABRIC_API_ROOT_URL = os.environ.get(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
+RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))
+RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.value, 30))
+RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
+VALID_ENABLE_FLAGS = ["1", "true", "yes"]
+
+# HTTP Headers
+AUTHORIZATION_HEADER = "authorization"
 
 # Item Type
-ACCEPTED_ITEM_TYPES = (
-    "DataPipeline",
-    "Environment",
-    "Notebook",
-    "Report",
-    "SemanticModel",
-    "Lakehouse",
-    "MirroredDatabase",
-    "VariableLibrary",
-    "CopyJob",
-    "Eventhouse",
-    "KQLDatabase",
-    "KQLQueryset",
-    "Reflex",
-    "Eventstream",
-    "Warehouse",
-    "SQLDatabase",
-    "KQLDashboard",
-    "Dataflow",
-    "GraphQLApi",
-    "ApacheAirflowJob",
-    "MountedDataFactory",
-    "DataAgent",
-    "UserDataFunction",
-    "OrgApp",
-    "MLExperiment",
-    "SparkJobDefinition",
-)
+ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
 
 # Publish
-SHELL_ONLY_PUBLISH = ["Lakehouse", "Warehouse", "SQLDatabase", "MLExperiment"]
+SHELL_ONLY_PUBLISH = [
+    ItemType.LAKEHOUSE.value,
+    ItemType.WAREHOUSE.value,
+    ItemType.SQL_DATABASE.value,
+    ItemType.ML_EXPERIMENT.value,
+]
 
 # Items that do not require assigned capacity
-NO_ASSIGNED_CAPACITY_REQUIRED = ["SemanticModel", "Report"]
+NO_ASSIGNED_CAPACITY_REQUIRED = [ItemType.SEMANTIC_MODEL.value, ItemType.REPORT.value]
 
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
@@ -57,18 +137,18 @@ INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
 
 # Item Type to File Mapping (to check for item dependencies)
-ITEM_TYPE_TO_FILE = {"DataPipeline": "pipeline-content.json"}
+ITEM_TYPE_TO_FILE = {ItemType.DATA_PIPELINE.value: "pipeline-content.json"}
 
 # Property path to get SQL Endpoint or Eventhouse URI
 PROPERTY_PATH_ATTR_MAPPING = {
-    "Lakehouse": {
+    ItemType.LAKEHOUSE.value: {
         "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
         "sqlendpointid": "body/properties/sqlEndpointProperties/id",
     },
-    "Warehouse": {
+    ItemType.WAREHOUSE.value: {
         "sqlendpoint": "body/properties/connectionString",
     },
-    "Eventhouse": {
+    ItemType.EVENTHOUSE.value: {
         "queryserviceuri": "body/properties/queryServiceUri",
     },
 }
@@ -79,6 +159,37 @@ PARAMETER_FILE_NAME = "parameter.yml"
 PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
 
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
+
+# Serial execution order for publishing items (determines dependency order)
+# Unpublish order is the reverse of this
+SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
+    1: ItemType.VARIABLE_LIBRARY,
+    2: ItemType.WAREHOUSE,
+    3: ItemType.MIRRORED_DATABASE,
+    4: ItemType.LAKEHOUSE,
+    5: ItemType.SQL_DATABASE,
+    6: ItemType.ENVIRONMENT,
+    7: ItemType.USER_DATA_FUNCTION,
+    8: ItemType.EVENTHOUSE,
+    9: ItemType.SPARK_JOB_DEFINITION,
+    10: ItemType.NOTEBOOK,
+    11: ItemType.SEMANTIC_MODEL,
+    12: ItemType.REPORT,
+    13: ItemType.COPY_JOB,
+    14: ItemType.KQL_DATABASE,
+    15: ItemType.KQL_QUERYSET,
+    16: ItemType.REFLEX,
+    17: ItemType.EVENTSTREAM,
+    18: ItemType.KQL_DASHBOARD,
+    19: ItemType.DATAFLOW,
+    20: ItemType.DATA_PIPELINE,
+    21: ItemType.GRAPHQL_API,
+    22: ItemType.APACHE_AIRFLOW_JOB,
+    23: ItemType.MOUNTED_DATA_FACTORY,
+    24: ItemType.ORG_APP,
+    25: ItemType.DATA_AGENT,
+    26: ItemType.ML_EXPERIMENT,
+}
 
 # Parameter file validation messages
 INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
