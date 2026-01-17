@@ -3,14 +3,43 @@
 
 """Base interface for all item publishers."""
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from fabric_cicd._common._item import Item
 from fabric_cicd.constants import ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 
-class ItemPublisher(ABC):
+class Publisher(ABC):
+    """Base interface for all publishers."""
+
+    def __init__(self, fabric_workspace_obj: "FabricWorkspace") -> None:
+        """
+        Initialize the publisher with a FabricWorkspace object.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object containing items to be published.
+        """
+        self.fabric_workspace_obj = fabric_workspace_obj
+
+    @abstractmethod
+    def publish_one(self, name: str, obj: object) -> None:
+        """
+        Publish a single object.
+
+        Args:
+            name: The name of the object to publish.
+            obj: The object to publish.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def publish_all(self) -> None:
+        """Publish all objects."""
+        raise NotImplementedError
+
+
+class ItemPublisher(Publisher):
     """Base interface for all item type publishers."""
 
     """
@@ -25,7 +54,7 @@ class ItemPublisher(ABC):
         Args:
             fabric_workspace_obj: The FabricWorkspace object containing items to be published.
         """
-        self.fabric_workspace_obj = fabric_workspace_obj
+        super().__init__(fabric_workspace_obj)
 
     @staticmethod
     def create(item_type: ItemType, fabric_workspace_obj: "FabricWorkspace") -> "ItemPublisher":
