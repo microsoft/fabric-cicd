@@ -10,7 +10,7 @@ import dpath
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
-from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd._items._base_publisher import ItemPublisher, ParallelConfig
 from fabric_cicd._items._manage_dependencies import set_publish_order
 from fabric_cicd.constants import ItemType
 
@@ -47,21 +47,23 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
     return reference_list
 
 
+def _get_datapipeline_publish_order(publisher: "DataPipelinePublisher") -> list[str]:
+    """Get the ordered list of data pipeline names based on dependencies."""
+    return set_publish_order(publisher.fabric_workspace_obj, publisher.item_type, find_referenced_datapipelines)
+
+
 class DataPipelinePublisher(ItemPublisher):
     """Publisher for Data Pipeline items."""
 
     item_type = ItemType.DATA_PIPELINE.value
 
+    parallel_config = ParallelConfig(enabled=False, ordered_items_func=_get_datapipeline_publish_order)
+    """Pipelines must be published in dependency order (sequential)"""
+
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Data Pipeline item."""
         self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
 
-    def publish_all(self) -> None:
-        """Publish all Data Pipeline items."""
-        publish_order = set_publish_order(self.fabric_workspace_obj, self.item_type, find_referenced_datapipelines)
-
+    def pre_publish_all(self) -> None:
+        """Refresh deployed items before publishing to resolve references."""
         self.fabric_workspace_obj._refresh_deployed_items()
-        items_dict = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
-        for item_name in publish_order:
-            item = items_dict[item_name]
-            self.publish_one(item_name, item)

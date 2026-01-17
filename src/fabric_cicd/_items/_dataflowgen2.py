@@ -10,7 +10,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
-from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd._items._base_publisher import ItemPublisher, ParallelConfig
 from fabric_cicd._parameter._utils import (
     check_replacement,
     extract_find_value,
@@ -244,22 +244,21 @@ def replace_source_dataflow_ids(workspace_obj: FabricWorkspace, item_obj: Item, 
     return file_obj.contents
 
 
+def _get_dataflow_publish_order(publisher: "DataflowPublisher") -> list[str]:
+    """Get the ordered list of dataflow names based on dependencies."""
+    return set_dataflow_publish_order(publisher.fabric_workspace_obj, publisher.item_type)
+
+
 class DataflowPublisher(ItemPublisher):
     """Publisher for Dataflow items."""
 
     item_type = ItemType.DATAFLOW.value
+
+    parallel_config = ParallelConfig(enabled=False, ordered_items_func=_get_dataflow_publish_order)
+    """Dataflows must be published in dependency order (sequential)"""
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Dataflow item."""
         self.fabric_workspace_obj._publish_item(
             item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
         )
-
-    def publish_all(self) -> None:
-        """Publish all Dataflow items."""
-        publish_order = set_dataflow_publish_order(self.fabric_workspace_obj, self.item_type)
-        items_dict = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
-
-        for item_name in publish_order:
-            item = items_dict[item_name]
-            self.publish_one(item_name, item)

@@ -127,12 +127,8 @@ class LakehousePublisher(ItemPublisher):
 
         logger.info(f"{constants.INDENT}Published")
 
-    def publish_all(self) -> None:
-        """Publish all Lakehouse items."""
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)
-
-        # Need all lakehouses published first to protect interrelationships
+    def post_publish_all(self) -> None:
+        """Publish shortcuts after all lakehouses are published to protect interrelationships."""
         if FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value in constants.FEATURE_FLAG:
             for item_obj in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 # Check if the item is published to avoid any post publish actions

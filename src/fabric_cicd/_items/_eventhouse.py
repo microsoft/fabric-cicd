@@ -23,8 +23,3 @@ class EventhousePublisher(ItemPublisher):
         self.fabric_workspace_obj._publish_item(
             item_name=item_name, item_type=self.item_type, exclude_path=exclude_path
         )
-
-    def publish_all(self) -> None:
-        """Publish all Eventhouse items."""
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)

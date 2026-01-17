@@ -73,8 +73,3 @@ class ReportPublisher(ItemPublisher):
             exclude_path=exclude_path,
             func_process_file=func_process_file,
         )
-
-    def publish_all(self) -> None:
-        """Publish all Report items."""
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)

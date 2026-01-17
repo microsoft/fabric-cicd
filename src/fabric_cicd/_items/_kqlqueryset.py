@@ -99,9 +99,6 @@ class KQLQuerysetPublisher(ItemPublisher):
             item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
         )
 
-    def publish_all(self) -> None:
-        """Publish all KQL Queryset items."""
+    def pre_publish_all(self) -> None:
+        """Refresh deployed items to get KQL Database cluster URIs."""
         self.fabric_workspace_obj._refresh_deployed_items()
-
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)

@@ -3,11 +3,52 @@
 
 """Base interface for all item publishers."""
 
+import logging
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from typing import Callable, Optional
 
 from fabric_cicd._common._item import Item
 from fabric_cicd.constants import ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ParallelConfig:
+    """Configuration for parallel execution behavior of a publisher.
+
+    This dataclass controls how the base ItemPublisher.publish_all() method
+    executes publish_one() calls - either in parallel or sequentially.
+
+    Attributes:
+        enabled: If True, publish_one calls run in parallel using ThreadPoolExecutor.
+                 If False, items are published sequentially. Default is True.
+        max_workers: Maximum number of concurrent threads. None means use ThreadPoolExecutor default.
+        ordered_items_func: Optional callable that returns an ordered list of item names.
+                           When provided, items are published sequentially in this order.
+                           This takes precedence over `enabled=True`.
+    """
+
+    enabled: bool = True
+    max_workers: Optional[int] = None
+    ordered_items_func: Optional[Callable[["ItemPublisher"], list[str]]] = None
+
+
+class PublishError(Exception):
+    """Exception raised when one or more publish operations fail.
+
+    Attributes:
+        errors: List of (item_name, exception) tuples for all failed items.
+    """
+
+    def __init__(self, errors: list[tuple[str, Exception]]) -> None:
+        """Initialize with a list of (item_name, exception) tuples."""
+        self.errors = errors
+        failed_names = [name for name, _ in errors]
+        super().__init__(f"Failed to publish {len(errors)} item(s): {failed_names}")
 
 
 class Publisher(ABC):
@@ -40,12 +81,27 @@ class Publisher(ABC):
 
 
 class ItemPublisher(Publisher):
-    """Base interface for all item type publishers."""
+    """
+    Base interface for all item type publishers.
 
+    Provides a default parallel publish_all() implementation that:
+    - Executes publish_one() calls in parallel using ThreadPoolExecutor
+    - Aggregates errors from all failed items into a single PublishError
+    - Supports pre/post hooks via pre_publish_all() and post_publish_all()
+    - Can be configured via the parallel_config class attribute
+
+    Subclasses can customize behavior by:
+    - Setting parallel_config to control parallelization
+    - Overriding pre_publish_all() for setup before publishing
+    - Overriding post_publish_all() for cleanup after publishing
+    - Overriding get_items_to_publish() to filter or order items
     """
-    Mandatory property to be set by each publisher.
-    """
+
     item_type: str
+    """Mandatory property to be set by each publisher subclass"""
+
+    parallel_config: ParallelConfig = ParallelConfig()
+    """Configuration for parallel execution - subclasses can override with their own ParallelConfig"""
 
     def __init__(self, fabric_workspace_obj: "FabricWorkspace") -> None:
         """
@@ -147,12 +203,142 @@ class ItemPublisher(Publisher):
         """
         self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
 
+    def get_items_to_publish(self) -> dict[str, "Item"]:
+        """
+        Get the items to publish for this item type.
+
+        Returns:
+            Dictionary mapping item names to Item objects.
+
+        Subclasses can override to filter or transform the items.
+        """
+        return self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+
+    def pre_publish_all(self) -> None:
+        """
+        Hook called before publishing any items.
+
+        Subclasses can override to perform setup, validation, or refresh operations.
+        Default implementation does nothing.
+        """
+        pass
+
+    def post_publish_all(self) -> None:
+        """
+        Hook called after all items have been published successfully.
+
+        Subclasses can override to perform cleanup, binding, or finalization.
+        Default implementation does nothing.
+        """
+        pass
+
+    def _publish_items_parallel(self, items: dict[str, "Item"]) -> list[tuple[str, Exception]]:
+        """
+        Publish items in parallel using ThreadPoolExecutor.
+
+        Args:
+            items: Dictionary mapping item names to Item objects.
+
+        Returns:
+            List of (item_name, exception) tuples for failed items.
+        """
+        errors: list[tuple[str, Exception]] = []
+        config = getattr(self.__class__, "parallel_config", ParallelConfig())
+
+        with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
+            futures = {
+                executor.submit(self.publish_one, item_name, item): item_name for item_name, item in items.items()
+            }
+
+            for future in as_completed(futures):
+                item_name = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Failed to publish item '{item_name}': {e}")
+                    errors.append((item_name, e))
+
+        return errors
+
+    def _publish_items_sequential(self, items: dict[str, "Item"]) -> list[tuple[str, Exception]]:
+        """
+        Publish items sequentially.
+
+        Args:
+            items: Dictionary mapping item names to Item objects.
+
+        Returns:
+            List of (item_name, exception) tuples for failed items.
+        """
+        errors: list[tuple[str, Exception]] = []
+
+        for item_name, item in items.items():
+            try:
+                self.publish_one(item_name, item)
+            except Exception as e:
+                logger.error(f"Failed to publish item '{item_name}': {e}")
+                errors.append((item_name, e))
+
+        return errors
+
+    def _publish_items_ordered(self, items: dict[str, "Item"], order: list[str]) -> list[tuple[str, Exception]]:
+        """
+        Publish items in a specific order sequentially.
+
+        Args:
+            items: Dictionary mapping item names to Item objects.
+            order: List of item names in the order they should be published.
+
+        Returns:
+            List of (item_name, exception) tuples for failed items.
+        """
+        errors: list[tuple[str, Exception]] = []
+
+        for item_name in order:
+            if item_name in items:
+                try:
+                    self.publish_one(item_name, items[item_name])
+                except Exception as e:
+                    logger.error(f"Failed to publish item '{item_name}': {e}")
+                    errors.append((item_name, e))
+
+        return errors
+
     def publish_all(self) -> None:
         """
         Execute the publish operation for this item type.
 
-        Default implementation iterates over all items of this type and calls publish_one.
-        Subclasses can override this method for custom batch publishing logic.
+        1. Calls pre_publish_all() for any setup operations
+        2. Gets items via get_items_to_publish()
+        3. Publishes items (parallel or sequential based on parallel_config)
+        4. Calls post_publish_all() for any finalization
+        5. Raises PublishError if any items failed
+
+        The parallel_config class attribute controls execution:
+        - If ordered_items_func is set: publishes in that order sequentially
+        - If enabled=True: publishes in parallel
+        - If enabled=False: publishes sequentially
+
+        Raises:
+            PublishError: If one or more items failed to publish.
         """
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)
+        self.pre_publish_all()
+        items = self.get_items_to_publish()
+        if not items:
+            self.post_publish_all()
+            return
+
+        config = getattr(self.__class__, "parallel_config", ParallelConfig())
+
+        if config.ordered_items_func is not None:
+            order = config.ordered_items_func(self)
+            errors = self._publish_items_ordered(items, order)
+        elif config.enabled:
+            errors = self._publish_items_parallel(items)
+        else:
+            errors = self._publish_items_sequential(items)
+
+        self.post_publish_all()
+
+        if errors:
+            raise PublishError(errors)

@@ -31,8 +31,3 @@ class SQLDatabasePublisher(ItemPublisher):
             return
 
         logger.info(f"{constants.INDENT}Published")
-
-    def publish_all(self) -> None:
-        """Publish all SQL Database items."""
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)

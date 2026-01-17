@@ -269,14 +269,10 @@ class EnvironmentPublisher(ItemPublisher):
             return
         _publish_environment_metadata(self.fabric_workspace_obj, item_name)
 
-    def publish_all(self) -> None:
-        """Publish all Environment items."""
+    def pre_publish_all(self) -> None:
+        """Check environment publish state before publishing."""
         logger.warning("The underlying legacy Microsoft Fabric Environment APIs will be deprecated by March 1, 2026.")
         logger.warning(
             "Please upgrade to the latest fabric-cicd version before March 1, 2026 to prevent broken Environment item deployments."
         )
-
         check_environment_publish_state(self.fabric_workspace_obj, True)
-
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)

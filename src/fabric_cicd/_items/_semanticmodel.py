@@ -154,11 +154,8 @@ class SemanticModelPublisher(ItemPublisher):
             item_name=item_name, item_type=self.item_type, exclude_path=exclude_path
         )
 
-    def publish_all(self) -> None:
-        """Publish all Semantic Model items."""
-        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
-            self.publish_one(item_name, item)
-
+    def post_publish_all(self) -> None:
+        """Bind semantic models to connections after all models are published."""
         model_with_binding_dict = self.fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
 
         if not model_with_binding_dict:
