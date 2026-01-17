@@ -2,6 +2,8 @@
 
 ## `mock_fabric_server`: A mock Fabric REST API
 
+![Test Harness](.imgs/test-harness.png)
+
 This is a mock REST API Server that mimics `https://api.powerbi.com`.
 The idea is, to exercise the public facing `fabric_cicd` API E2E rapidly.
 The mock server loads an `http_trace.json` file to dictate it's behavior.
