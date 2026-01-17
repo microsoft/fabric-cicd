@@ -5,7 +5,6 @@
 
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import dpath
@@ -279,9 +278,5 @@ class EnvironmentPublisher(ItemPublisher):
 
         check_environment_publish_state(self.fabric_workspace_obj, True)
 
-        def _publish(args: tuple) -> None:
-            item_name, item = args
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
             self.publish_one(item_name, item)
-
-        with ThreadPoolExecutor() as executor:
-            list(executor.map(_publish, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items()))

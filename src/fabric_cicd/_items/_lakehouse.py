@@ -5,7 +5,6 @@
 
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
 import dpath
 
@@ -135,8 +134,8 @@ def publish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, sho
             msg = f"Failed to publish '{shortcut['name']}' for lakehouse {item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger) from e
 
-    with ThreadPoolExecutor() as executor:
-        list(executor.map(_publish_one, shortcut_dict.values()))
+    for shortcut in shortcut_dict.values():
+        _publish_one(shortcut)
 
 
 def unpublish_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item, shortcut_paths: list) -> None:
@@ -228,23 +227,12 @@ class LakehousePublisher(ItemPublisher):
 
     def publish_all(self) -> None:
         """Publish all Lakehouse items."""
-
-        def _publish(args: tuple) -> None:
-            item_name, item = args
+        for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
             self.publish_one(item_name, item)
-
-        with ThreadPoolExecutor() as executor:
-            list(executor.map(_publish, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items()))
 
         # Need all lakehouses published first to protect interrelationships
         if FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value in constants.FEATURE_FLAG:
-
-            def _process(item_obj: Item) -> None:
+            for item_obj in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 # Check if the item is published to avoid any post publish actions
                 if not item_obj.skip_publish:
                     process_shortcuts(self.fabric_workspace_obj, item_obj)
-
-            with ThreadPoolExecutor() as executor:
-                list(
-                    executor.map(_process, self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values())
-                )
