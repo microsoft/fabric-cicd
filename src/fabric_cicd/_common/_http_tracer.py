@@ -8,11 +8,10 @@ import hashlib
 import json
 import logging
 import os
-import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, ClassVar, Optional, Protocol
+from typing import Any, Optional, Protocol
 from urllib.parse import urlparse
 
 import requests
@@ -20,42 +19,6 @@ import requests
 from fabric_cicd.constants import AUTHORIZATION_HEADER, EnvVar
 
 logger = logging.getLogger(__name__)
-
-
-class RouteNormalizer:
-    """Normalizes workspace IDs in URLs for consistent mocking across different workspaces.
-
-    Attributes:
-        NORMALIZATION_RULES: List of (pattern, replacement) tuples for URL normalization.
-            Each pattern should have two capture groups:
-            1. The prefix (e.g., '/workspaces/')
-            2. The GUID to replace
-            The replacement value will be substituted for the GUID while preserving the prefix.
-    """
-
-    NORMALIZATION_RULES: ClassVar[list[tuple[re.Pattern, str]]] = [
-        (
-            re.compile(r"(/workspaces/)([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})"),
-            "00000000-0000-0000-0000-000000000000",
-        ),
-    ]
-
-    @classmethod
-    def normalize(cls, url: str) -> str:
-        """
-        Normalize workspace IDs in URLs to a constant value.
-
-        Args:
-            url: URL that may contain workspace GUIDs
-
-        Returns:
-            URL with workspace GUIDs replaced by normalized ID
-        """
-        normalized_url = url
-        for pattern, replacement in cls.NORMALIZATION_RULES:
-            normalized_url = pattern.sub(lambda match, repl=replacement: match.group(1) + repl, normalized_url)
-
-        return normalized_url
 
 
 @dataclass
