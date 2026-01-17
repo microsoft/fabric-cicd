@@ -251,7 +251,7 @@ def _handle_response(
                 # No Location header means operation completed immediately
                 exit_loop = True
             else:
-                time.sleep(float(os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE.value, 1)))
+                time.sleep(float(os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE_SECONDS.value, 1)))
                 long_running = True
 
     # Handle successful responses
@@ -297,10 +297,10 @@ def _handle_response(
     ):
         handle_retry(
             attempt=iteration_count,
-            base_delay=30,
-            max_duration=max_duration,
+            base_delay=constants.RETRY_BASE_DELAY_SECONDS,
+            max_duration=constants.RETRY_MAX_DURATION_SECONDS,
             start_time=start_time,
-            response_retry_after=300,
+            response_retry_after=constants.RETRY_AFTER_SECONDS,
             prepend_message="Item name is reserved.",
         )
 
@@ -360,7 +360,7 @@ def handle_retry(
         start_time: The start time of the request in seconds since epoch. Required if max_duration is set.
     """
     if max_duration is None or (start_time is not None and time.time() - start_time < max_duration):
-        retry_delay_override = os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE.value)
+        retry_delay_override = os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE_SECONDS.value)
         if retry_delay_override is not None:
             delay = float(retry_delay_override)
         else:

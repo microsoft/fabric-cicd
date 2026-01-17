@@ -88,8 +88,14 @@ class EnvVar(str, Enum):
     """Override the default Power BI API root URL. Defaults to 'https://api.powerbi.com'."""
     FABRIC_API_ROOT_URL = "FABRIC_API_ROOT_URL"
     """Override the Fabric API root URL. Defaults to 'https://api.fabric.microsoft.com'."""
-    RETRY_DELAY_OVERRIDE = "FABRIC_CICD_RETRY_DELAY_OVERRIDE"
+    RETRY_DELAY_OVERRIDE_SECONDS = "FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS"
     """Override retry delay in seconds (e.g., '0' for instant retries - useful in tests)."""
+    RETRY_AFTER_SECONDS = "FABRIC_CICD_RETRY_AFTER_SECONDS"
+    """Override retry-after delay for item name conflicts (HTTP 400). Defaults to 300 seconds."""
+    RETRY_BASE_DELAY_SECONDS = "FABRIC_CICD_RETRY_BASE_DELAY_SECONDS"
+    """Override base delay for item name conflict retries. Defaults to 30 seconds."""
+    RETRY_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_MAX_DURATION_SECONDS"
+    """Override max duration for item name conflict retries. Defaults to 300 seconds."""
 
 
 # General
@@ -97,6 +103,9 @@ VERSION = "0.1.33"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = os.environ.get(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
 FABRIC_API_ROOT_URL = os.environ.get(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
+RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))
+RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.value, 30))
+RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 

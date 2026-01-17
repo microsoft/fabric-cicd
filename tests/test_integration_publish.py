@@ -32,11 +32,11 @@ def mock_fabric_api_server():
 
     original_default_api = os.environ.get("DEFAULT_API_ROOT_URL")
     original_fabric_api = os.environ.get("FABRIC_API_ROOT_URL")
-    original_retry_delay = os.environ.get("FABRIC_CICD_RETRY_DELAY_OVERRIDE")
+    original_retry_delay = os.environ.get("FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS")
 
     os.environ["DEFAULT_API_ROOT_URL"] = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
     os.environ["FABRIC_API_ROOT_URL"] = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
-    os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE"] = "0"
+    os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS"] = "0"
 
     importlib.reload(fabric_cicd.constants)
 
@@ -57,9 +57,9 @@ def mock_fabric_api_server():
         os.environ.pop("FABRIC_API_ROOT_URL", None)
 
     if original_retry_delay is not None:
-        os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE"] = original_retry_delay
+        os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS"] = original_retry_delay
     else:
-        os.environ.pop("FABRIC_CICD_RETRY_DELAY_OVERRIDE", None)
+        os.environ.pop("FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS", None)
 
     importlib.reload(fabric_cicd.constants)
 
