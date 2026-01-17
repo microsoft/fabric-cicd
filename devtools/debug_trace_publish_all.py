@@ -40,12 +40,16 @@ def main():
         "KQLDatabase",
         "KQLQueryset",
         "Lakehouse",
+        "MirroredDatabase",
+        "MLExperiment",
         "Notebook",
         "Reflex",
         "Report",
         "SemanticModel",
         "SparkJobDefinition",
+        "SQLDatabase",
         "VariableLibrary",
+        "Warehouse",
     ]
     token_credential = DefaultAzureCredential()
     for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:

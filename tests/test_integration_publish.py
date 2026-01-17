@@ -75,17 +75,22 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
     item_types_to_deploy = [
         "Dataflow",
         "DataPipeline",
+        "Environment",
         "Eventhouse",
         "Eventstream",
         "KQLDatabase",
         "KQLQueryset",
         "Lakehouse",
+        "MirroredDatabase",
+        "MLExperiment",
         "Notebook",
         "Reflex",
         "Report",
         "SemanticModel",
         "SparkJobDefinition",
+        "SQLDatabase",
         "VariableLibrary",
+        "Warehouse",
     ]
 
     token_credential = DummyTokenCredential()
