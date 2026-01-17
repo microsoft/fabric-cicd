@@ -24,3 +24,8 @@ You can validate the integration test works with the mock server with:
 ```bash
 uv run pytest -v -s --log-cli-level=INFO tests/test_integration_publish.py::test_publish_all_items_integration
 ```
+
+Notes:
+
+* The `http_trace.json` must be generated in one shot, i.e. the Mock Server is not guaranteed to incrementally process new lines added to `http_trace.json`.
+  What that means is - you should capture as many items as possible in `debug_trace_publish_all.py`, and use that payload in the tests.
