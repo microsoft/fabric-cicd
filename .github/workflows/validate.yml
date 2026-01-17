@@ -5,8 +5,6 @@ on:
     pull_request:
         branches: ["main"]
         types: [opened, edited, synchronize, ready_for_review]
-    push:
-        branches: ["dev/mdrrahman/parallelize-intro"]
 
 permissions:
     contents: read
@@ -27,12 +25,14 @@ jobs:
               with:
                   python-version: "3.x"
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v5
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install ruff
 
             - name: Run ruff format
               run: |
-                  if uv run ruff format --check; then
+                  if ruff format; then
                     echo "✅ ruff format passed."
                   else
                     echo "❌ ruff format failed."
@@ -50,12 +50,14 @@ jobs:
               with:
                   python-version: "3.x"
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v5
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install ruff
 
             - name: Run ruff lint
               run: |
-                  if uv run ruff check; then
+                  if ruff check; then
                     echo "✅ ruff lint passed."
                   else
                     echo "❌ ruff lint failed."
