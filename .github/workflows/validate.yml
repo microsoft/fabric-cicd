@@ -5,6 +5,8 @@ on:
     pull_request:
         branches: ["main"]
         types: [opened, edited, synchronize, ready_for_review]
+    push:
+        branches: ["dev/mdrrahman/parallelize-intro"]
 
 permissions:
     contents: read
