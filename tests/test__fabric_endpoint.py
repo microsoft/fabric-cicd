@@ -52,8 +52,7 @@ def setup_mocks(monkeypatch, mocker):
 def generate_mock_jwt(authtype=""):
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
     payload = (
-        base64
-        .urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
+        base64.urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
         .decode()
         .strip("=")
     )
