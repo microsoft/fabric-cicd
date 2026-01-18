@@ -106,6 +106,14 @@ class TestParameterUtilities:
                     "queryserviceuri": "eventhouse-query-uri",
                 },
             },
+            "SQLDatabase": {
+                "TestSQLDatabase": {
+                    "id": "sqldatabase-id",
+                    "sqlendpoint": "test-sql-server.database.fabric.microsoft.com,1433",
+                    "sqlendpointid": "",
+                    "queryserviceuri": "",
+                },
+            },
         }
         mock_ws.repository_items = {
             "Dataflow": {
@@ -261,6 +269,12 @@ class TestParameterUtilities:
         assert result == "warehouse-id"
         result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.$id", False)
         assert result == "warehouse-id"
+
+        # Test with valid SQLDatabase item
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.sqlendpoint", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com,1433"
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.$sqlendpoint", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com,1433"
 
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
