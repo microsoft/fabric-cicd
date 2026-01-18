@@ -10,7 +10,7 @@ The mock server loads an `http_trace.json` file to dictate the behavior.
 
 1. Add new workloads into the codebase
 2. Capture REST calls from Fabric using `debug_trace_publish_all.py`
-3. Move `http_trace.json` into fixture
+3. Move `http_trace.json.gz` into fixture
 4. Enjoy rapid test coverage
 
 ### Capturing HTTP Trace for new resource types
