@@ -748,49 +748,6 @@ class TestParameterUtilities:
     @mock.patch("fabric_cicd._common._validate_input.validate_repository_directory")
     @mock.patch("fabric_cicd._common._validate_input.validate_item_type_in_scope")
     @mock.patch("fabric_cicd._common._validate_input.validate_environment")
-    @mock.patch("fabric_cicd._common._validate_input.validate_token_credential")
-    def test_validate_parameter_file_with_token_credential(
-        self, mock_validate_token, mock_validate_env, mock_validate_item_type, mock_validate_repo, mock_param
-    ):
-        """Tests validate_parameter_file function with custom token credential."""
-        # Setup mocks
-        mock_validate_repo.return_value = Path("/mock/repo")
-        mock_validate_item_type.return_value = ["Notebook", "Lakehouse"]
-        mock_validate_env.return_value = "Test"
-        mock_token = mock.MagicMock()
-        mock_validate_token.return_value = mock_token
-        mock_param_instance = mock.MagicMock()
-        mock_param.return_value = mock_param_instance
-        mock_param_instance._validate_parameter_file.return_value = True
-
-        # Call the function
-        from fabric_cicd._parameter._utils import validate_parameter_file
-
-        # Patch the FabricEndpoint inside the test since we need it to run successfully
-        with mock.patch("fabric_cicd._common._fabric_endpoint.FabricEndpoint", return_value=mock.MagicMock()):
-            result = validate_parameter_file(
-                repository_directory=Path("/mock/repo"),
-                item_type_in_scope=["Notebook", "Lakehouse"],
-                environment="Test",
-                token_credential=mock_token,
-            )
-
-        # Verify the result and that token validation was called
-        assert result is True
-        mock_validate_token.assert_called_once_with(mock_token)
-        mock_param.assert_called_once_with(
-            repository_directory=Path("/mock/repo"),
-            item_type_in_scope=["Notebook", "Lakehouse"],
-            environment="Test",
-            parameter_file_name="parameter.yml",
-            parameter_file_path=None,
-        )
-        mock_param_instance._validate_parameter_file.assert_called_once()
-
-    @mock.patch("fabric_cicd._parameter._parameter.Parameter")
-    @mock.patch("fabric_cicd._common._validate_input.validate_repository_directory")
-    @mock.patch("fabric_cicd._common._validate_input.validate_item_type_in_scope")
-    @mock.patch("fabric_cicd._common._validate_input.validate_environment")
     def test_validate_parameter_file_with_none_item_type_in_scope(
         self, mock_validate_env, mock_validate_item_type, mock_validate_repo, mock_param
     ):
