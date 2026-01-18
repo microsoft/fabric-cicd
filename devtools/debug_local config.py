@@ -20,10 +20,16 @@ from fabric_cicd import append_feature_flag, change_log_level, deploy_with_confi
 append_feature_flag("enable_experimental_features")
 append_feature_flag("enable_config_deploy")
 
-# config_override_dict = {"core": {"item_types_in_scope": ["Notebook"]}, "publish": {"skip": {"dev": False}}}
-
 # In this example, the config file sits within the root/sample/workspace directory
 config_file = str(root_directory / "sample" / "workspace" / "config.yml")
+
+# Uncomment to use SPN auth
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# tenant_id = "your-tenant-id"
+# token_credential = ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
+
+# config_override_dict = {"core": {"item_types_in_scope": ["Notebook"]}, "publish": {"skip": {"dev": False}}}
 
 deploy_with_config(
     config_file_path=config_file,
