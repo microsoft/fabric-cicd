@@ -52,8 +52,7 @@ def setup_mocks(monkeypatch, mocker):
 def generate_mock_jwt(authtype=""):
     header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
     payload = (
-        base64
-        .urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
+        base64.urlsafe_b64encode(json.dumps({authtype: f"{authtype}Example", "exp": 9999999999}).encode())
         .decode()
         .strip("=")
     )
@@ -368,6 +367,8 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
         "response_header",
         "return_value",
         "exception_match",
+        "max_duration",
+        "start_time",
     ),
     [
         (
@@ -377,6 +378,8 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
             {"x-ms-public-api-error-code": "Unauthorized"},
             {},
             "The executing identity is not authorized to call GET on 'http://example.com'.",
+            None,
+            None,
         ),
         (
             400,
@@ -385,6 +388,8 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
             {"x-ms-public-api-error-code": "PrincipalTypeNotSupported"},
             {},
             "The executing principal type is not supported to call GET on 'http://example.com'.",
+            None,
+            None,
         ),
         (
             400,
@@ -393,27 +398,38 @@ def test_handle_response_longrunning_exception(exception_match, response_json):
             {"x-ms-public-api-error-code": "PrincipalTypeNotSupported"},
             {"message": "Test Libabry is not present in the environment."},
             "Deployment attempted to remove a library that is not present in the environment. ",
+            None,
+            None,
         ),
         (
             500,
-            1,
+            5,
             False,
             {"Content-Type": "application/json"},
             {"message": "Internal Server Error"},
-            "Unhandled error occurred calling GET on 'http://example.com'. Message: Internal Server Error",
+            r"Maximum execution duration \(0 seconds\) exceeded",
+            0,
+            0.0,
         ),
-        (429, 5, True, {"Retry-After": "10"}, {}, r"Maximum retry attempts \(5\) exceeded."),
+        (429, 5, True, {"Retry-After": "10"}, {}, r"Maximum execution duration \(0 seconds\) exceeded", 0, 0.0),
     ],
     ids=[
         "unauthorized",
         "principal_type_not_supported",
         "failed_library_removal",
-        "unexpected_error",
-        "retry",
+        "retry_500",
+        "retry_429",
     ],
 )
 def test_handle_response_exceptions(
-    status_code, input_iteration_count, input_long_running, response_header, return_value, exception_match
+    status_code,
+    input_iteration_count,
+    input_long_running,
+    response_header,
+    return_value,
+    exception_match,
+    max_duration,
+    start_time,
 ):
     """Test _handle_response raises appropriate exceptions based on response error codes."""
     response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=return_value))
@@ -425,6 +441,8 @@ def test_handle_response_exceptions(
             body="{}",
             long_running=input_long_running,
             iteration_count=input_iteration_count,
+            max_duration=max_duration,
+            start_time=start_time,
         )
 
 
@@ -442,11 +460,18 @@ def test_handle_response_feature_not_available():
         )
 
 
-def test_handle_response_item_display_name_already_in_use(setup_mocks):
-    """Test _handle_response logs a retry message when item display name is already in use."""
+def test_handle_response_item_display_name_already_in_use(setup_mocks, monkeypatch):
+    """
+    Test _handle_response logs a retry message when item display name is already in use.
+
+    Mocks time.sleep to avoid actual test execution delays.
+    """
+    import time
+
     dl, _mock_requests = setup_mocks
+    monkeypatch.setattr("time.sleep", lambda _: None)
     response = Mock(status_code=400, headers={"x-ms-public-api-error-code": "ItemDisplayNameNotAvailableYet"})
-    _handle_response(response, "GET", "http://example.com", "{}", False, 1)
+    _handle_response(response, "GET", "http://example.com", "{}", False, 1, max_duration=300, start_time=time.time())
     expected = f"{constants.INDENT}Item name is reserved. Checking again in 60 seconds (Attempt 1)..."
     assert dl.messages == [expected]
 

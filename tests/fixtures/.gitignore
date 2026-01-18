@@ -1,0 +1,3 @@
+# Only the gzipped http trace should be committed to git
+# Snapshots are not human reviewable in a PR, it's too large.
+http_trace.json
