@@ -10,7 +10,7 @@
             "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src",
-                "FABRIC_WORKSPACE_ID": "8bc22460-f51f-488d-bc12-950a5c217558"
+                "FABRIC_WORKSPACE_ID": "your-fabric-workspace-guid"
             },
             "cwd": "${workspaceFolder}"
         }

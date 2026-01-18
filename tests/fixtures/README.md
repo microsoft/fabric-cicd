@@ -24,7 +24,7 @@ Update `item_types_to_deploy` in the script with the item you want to capture HT
 > Note: items such as `Warehouse` can throw on an F2.
 
 ```bash
-export FABRIC_WORKSPACE_ID="8bc22460-f51f-488d-bc12-950a5c217558"
+export FABRIC_WORKSPACE_ID="your-fabric-workspace-guid"
 uv run python devtools/debug_trace_publish_all.py
 cp -f http_trace.json.gz tests/fixtures/http_trace.json.gz
 ```
