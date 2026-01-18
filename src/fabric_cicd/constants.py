@@ -20,7 +20,7 @@ class EnvVar(str, Enum):
     HTTP_TRACE_ENABLED = "FABRIC_CICD_HTTP_TRACE_ENABLED"
     """Set to '1', 'true', or 'yes' to enable HTTP request/response tracing."""
     HTTP_TRACE_FILE = "FABRIC_CICD_HTTP_TRACE_FILE"
-    """Path to save HTTP trace output. If set, HTTP tracing is enabled."""
+    """Path to save HTTP trace output. Only used if HTTP tracing is enabled."""
     DEFAULT_API_ROOT_URL = "DEFAULT_API_ROOT_URL"
     """Override the default Power BI API root URL. Defaults to 'https://api.powerbi.com'."""
     FABRIC_API_ROOT_URL = "FABRIC_API_ROOT_URL"
