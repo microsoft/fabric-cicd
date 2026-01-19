@@ -104,6 +104,9 @@ PROPERTY_PATH_ATTR_MAPPING = {
     "Warehouse": {
         "sqlendpoint": "body/properties/connectionString",
     },
+    "SQLDatabase": {
+        "sqlendpoint": "body/properties/serverFqdn",
+    },
     "Eventhouse": {
         "queryserviceuri": "body/properties/queryServiceUri",
     },
