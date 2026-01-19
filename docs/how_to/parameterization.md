@@ -212,6 +212,7 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
         | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
         | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                        | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+        
         - Attributes should be **lowercase**.
         - Item type and name are **case-sensitive**.
         - Item type must be valid and in scope.
