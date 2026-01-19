@@ -157,18 +157,18 @@ semantic_model_binding:
 
 In the `find_replace` parameter, the `find_value` can be set to a regex pattern instead of a literal string to find a value in the files to replace. When a match is found, the `find_value` is assigned to the matched string and can be used to replace all occurrences of that value in the file.
 
--   **How to** use this feature:
-    -   Set the `find_value` to a **valid regex pattern** wrapped in quotes.
-    -   Include the optional field `is_regex` and set it to the value `"true"`, see [more details](#regex-pattern-match).
--   **Important:**
-    -   The user is solely **responsible for providing a valid and correctly matching regex pattern**. If the pattern is invalid (i.e., it cannot be compiled) or fails to match any content in the target files, deployment will fail.
-    -   A valid regex pattern requires the following:
-        -   Ensure that all special characters in the regex pattern are properly **escaped**.
-        -   The exact value intended to be replaced must be enclosed in parentheses `( )`.
-        -   The parentheses creates a **capture group 1**, which must always be used as the replacement target. Capture group 1 should isolate values like a GUID, SQL connection string, etc.
-        -   Include the **surrounding context** in the pattern, such as property/field names, quotes, etc. to ensure it matches the correct value and not a value with a similar format elsewhere in the file.
--   **Example:**
-    -   Use a regex `find_value` to match a lakehouse ID inside a Notebook file. **Note:** avoid using a pattern that ONLY matches the GUID format as doing so would risk replacing any matching GUID in the file, not just the intended one. Include the surrounding context in your pattern—such as `# META "default_lakehouse": "123456"`—and capture only the `123456` GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
+- **How to** use this feature:
+    - Set the `find_value` to a **valid regex pattern** wrapped in quotes.
+    - Include the optional field `is_regex` and set it to the value `"true"`, see [more details](#regex-pattern-match).
+- **Important:**
+    - The user is solely **responsible for providing a valid and correctly matching regex pattern**. If the pattern is invalid (i.e., it cannot be compiled) or fails to match any content in the target files, deployment will fail.
+    - A valid regex pattern requires the following:
+        - Ensure that all special characters in the regex pattern are properly **escaped**.
+        - The exact value intended to be replaced must be enclosed in parentheses `( )`.
+        - The parentheses creates a **capture group 1**, which must always be used as the replacement target. Capture group 1 should isolate values like a GUID, SQL connection string, etc.
+        - Include the **surrounding context** in the pattern, such as property/field names, quotes, etc. to ensure it matches the correct value and not a value with a similar format elsewhere in the file.
+- **Example:**
+    - Use a regex `find_value` to match a lakehouse ID inside a Notebook file. **Note:** avoid using a pattern that ONLY matches the GUID format as doing so would risk replacing any matching GUID in the file, not just the intended one. Include the surrounding context in your pattern—such as `# META "default_lakehouse": "123456"`—and capture only the `123456` GUID in group 1. This ensures that only the correct, context-specific GUID is replaced.
 
 ```yaml
 find_replace:
@@ -187,12 +187,11 @@ find_replace:
 
 The `replace_value` field in the `find_replace` and `key_value_replace` parameters supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
 
--   **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
--   Dynamic replacement works in tandem with `find_value` (for `find_replace`) as either a regex or a literal string, or with `find_key` (for `key_value_replace`) as a JSONPath expression.
--   The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
--   **Supported variables:**
-
-    -   **Workspace variable:**
+- **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
+- Dynamic replacement works in tandem with `find_value` (for `find_replace`) as either a regex or a literal string, or with `find_key` (for `key_value_replace`) as a JSONPath expression.
+- The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
+- **Supported variables:**
+    - **Workspace variable:**
 
         | Workspace Variable                                              | Description                                                                               | Example                                                    |
         | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
@@ -202,11 +201,10 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
 
         **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
 
-    -   **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
-
-        -   `$items.<item_type>.<item_name>.<attribute>` (legacy format)
-        -   **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
-        -   **Supported attributes:**
+    - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
+        - `$items.<item_type>.<item_name>.<attribute>` (legacy format)
+        - **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
+        - **Supported attributes:**
 
         | Attribute Variable                                | Supported Items      | Example                                           | Sample Replace Value                                           |
         | ------------------------------------------------- | -------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
@@ -214,20 +212,18 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
         | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse            | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
         | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse           | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+        - Attributes should be **lowercase**.
+        - Item type and name are **case-sensitive**.
+        - Item type must be valid and in scope.
+        - Item name must be an **exact match** (include spaces, if present).
+        - **Example:** set `$items.Notebook.Hello World.$id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
+        - **Important**: Deployment will fail in the following cases:
+            - Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.$id` instead of `$items.Notebook.Hello World.$id`.
+            - The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
+            - An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
+            - The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
 
-        -   Attributes should be **lowercase**.
-        -   Item type and name are **case-sensitive**.
-        -   Item type must be valid and in scope.
-        -   Item name must be an **exact match** (include spaces, if present).
-        -   **Example:** set `$items.Notebook.Hello World.$id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
-        -   **Important**: Deployment will fail in the following cases:
-
-            -   Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.$id` instead of `$items.Notebook.Hello World.$id`.
-            -   The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
-            -   An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
-            -   The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
-
-        -   For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
+        - For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
 
 ### Environment Variable Replacement
 
@@ -246,15 +242,15 @@ find_replace:
 
 File filtering is supported in all parameters. This feature is optional and can be used to specify the files where replacement is intended to occur.
 
--   **Supported filters:** `item_type`, `item_name`, and `file_path`, see [more details](#supported-file-filters).
-    -   **Note:** only `item_name` filter is supported in `spark_pool` parameter.
--   **Expected behavior:**
-    -   If at least one filter value does not match, the replacement will be skipped for that file.
-    -   If none of the optional filter fields or values are provided, the value found in _any_ repository file is subject to replacement.
--   **Filter input:**
-    -   Input values are **case sensitive**.
-    -   Input values must be **string** or **array** (enables one or many values to filter on).
-        -   YAML supports array inputs using bracket ( **[ ]** ) or dash ( **-** ) notation.
+- **Supported filters:** `item_type`, `item_name`, and `file_path`, see [more details](#supported-file-filters).
+    - **Note:** only `item_name` filter is supported in `spark_pool` parameter.
+- **Expected behavior:**
+    - If at least one filter value does not match, the replacement will be skipped for that file.
+    - If none of the optional filter fields or values are provided, the value found in _any_ repository file is subject to replacement.
+- **Filter input:**
+    - Input values are **case sensitive**.
+    - Input values must be **string** or **array** (enables one or many values to filter on).
+        - YAML supports array inputs using bracket ( **[ ]** ) or dash ( **-** ) notation.
 
 <span class="md-h4-nonanchor">find_replace/key_value_replace</span>
 
@@ -310,40 +306,40 @@ When optional fields are omitted or left empty, only basic parameterization func
 
 **Important:**
 
--   String input values should be wrapped in quotes. Remember to escape special characters, such as **\\** in `file_path` inputs.
--   `is_regex` and filter fields can be used in the same parameter configuration.
+- String input values should be wrapped in quotes. Remember to escape special characters, such as **\\** in `file_path` inputs.
+- `is_regex` and filter fields can be used in the same parameter configuration.
 
 ### Regex Pattern Match
 
 #### `is_regex`
 
--   Only applicable to the `find_replace` parameter.
--   Include `is_regex` field when setting the `find_value` to a **valid regex pattern.**
--   When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
--   When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
+- Only applicable to the `find_replace` parameter.
+- Include `is_regex` field when setting the `find_value` to a **valid regex pattern.**
+- When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
+- When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
 
 ### Supported File Filters
 
 #### `item_type`
 
--   Item types must be valid and within scope of deployment.
--   See valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype).
+- Item types must be valid and within scope of deployment.
+- See valid [types](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item?tabs=HTTP#itemtype).
 
 #### `item_name`
 
--   Item names must match the exact names of items in the `repository_directory`.
+- Item names must match the exact names of items in the `repository_directory`.
 
 #### `file_path`
 
--   `file_path` accepts three types of paths within the _repository directory_ boundary:
-    -   **Absolute paths:** Full path starting from the drive root.
-    -   **Relative paths:** Paths relative to the _repository directory_.
-    -   **Wildcard paths:** Paths containing glob patterns.
--   When using _wildcard paths_:
-    -   Common patterns include `*` (matches any characters in a filename), `**` (matches any directory depth).
-    -   All matched files must exist within the _repository directory_.
-    -   When using wildcard patterns, verify your syntax carefully to avoid unexpected matching behavior.
-    -   **Examples:** `**/notebook-content.py` matches all notebook files in the repository directory, `Sample Pipelines/*.json` matches json files in the Sample Pipelines folder in the repository directory.
+- `file_path` accepts three types of paths within the _repository directory_ boundary:
+    - **Absolute paths:** Full path starting from the drive root.
+    - **Relative paths:** Paths relative to the _repository directory_.
+    - **Wildcard paths:** Paths containing glob patterns.
+- When using _wildcard paths_:
+    - Common patterns include `*` (matches any characters in a filename), `**` (matches any directory depth).
+    - All matched files must exist within the _repository directory_.
+    - When using wildcard patterns, verify your syntax carefully to avoid unexpected matching behavior.
+    - **Examples:** `**/notebook-content.py` matches all notebook files in the repository directory, `Sample Pipelines/*.json` matches json files in the Sample Pipelines folder in the repository directory.
 
 ## Parameter File Validation
 
@@ -921,7 +917,6 @@ Connections must be parameterized in addition to item references.
 <span class="md-h4-nonanchor">Scenarios When Deploying a Dataflow that contains a source Dataflow reference:</span>
 
 1. Source Dataflow exists in the **same workspace** as the dependent Dataflow:
-
     - The source Dataflow must be deployed BEFORE the dependent Dataflow (especially during first time deployment).
     - To handle this dependency correctly and prevent deployment errors, set up the `find_replace` parameter with the following requirements (incorrect setup may introduce failure during Dataflow deployment):
         - Set `find_value` to match the `dataflowId` GUID referenced in the `mashup.pq` file (literal string or [regex](#find_value-regex)).
@@ -945,7 +940,6 @@ Connections must be parameterized in addition to item references.
     ```
 
 2. Source Dataflow exists in a **different workspace** from the dependent Dataflow:
-
     - When the source Dataflow exists in a different workspace, deployment order doesn't matter.
     - To re-point the source Dataflow from one workspace to another workspace, you can parameterize using the `find_replace` parameter. The Dataflow ID AND Workspace ID of the source Dataflow both need to be parameterized.
     - **Note:** dynamic replacement for item ID and workspace ID will NOT work here since the source Dataflow does not exist in the _repository directory_.
@@ -953,7 +947,6 @@ Connections must be parameterized in addition to item references.
 <span class="md-h4-nonanchor">Scenarios When Deploying a Dataflow that contains other Fabric items (e.g., Lakehouse, Warehouse, etc.) references:</span>
 
 1. Source and/or destination item exists in the **same workspace** as the dependent Dataflow:
-
     - Use the `find_replace` parameter to update references so they point to the corresponding items in the target workspace.
     - You need to parameterize both the item ID and workspace ID found in the `mashup.pq` file.
     - Best practices for Dataflow parameterization:
@@ -962,7 +955,6 @@ Connections must be parameterized in addition to item references.
     - Adding file filters to target specific Dataflow files provides more precise control.
 
 2. Source/destination item exists in a **different workspace** from the dependent Dataflow:
-
     - Use the `find_replace` parameter to update references so they point to items in the different workspace.
     - Parameterize both the item ID and workspace ID found in the `mashup.pq` file.
     - Use a regex pattern for the `find_value` to avoid hardcoding GUIDs and simplify maintenance.
@@ -973,8 +965,8 @@ Connections must be parameterized in addition to item references.
 
 **Case:** A Dataflow points to a destination Lakehouse. The Lakehouse exists in the same workspace as the Dataflow. In the `mashup.pq` file, the following GUIDs need to be replaced:
 
--   The workspaceId `e6a8c59f-4b27-48d1-ae03-7f92b1c6458d` with the target workspace Id.
--   The lakehouseId `3d72f90e-61b5-42a8-9c7e-b085d4e31fa2` with the corresponding Id of the Lakehouse in the target environment (PPE/PROD/etc).
+- The workspaceId `e6a8c59f-4b27-48d1-ae03-7f92b1c6458d` with the target workspace Id.
+- The lakehouseId `3d72f90e-61b5-42a8-9c7e-b085d4e31fa2` with the corresponding Id of the Lakehouse in the target environment (PPE/PROD/etc).
 
 **Solution:** These replacements are managed using a regex pattern as input for the `find_value` in the `parameter.yml` file, which finds the matching value in the _specified_ repository files and replaces it with the dynamically retrieved workspace or item Id of the target environment.
 
@@ -1071,25 +1063,27 @@ in
 
 ### Reports
 
-Reports can reference Semantic Models in two ways: `byPath` (relative path to a model in the same repository) or `byConnection` (connection string to a model in Power BI service). 
+Reports can reference Semantic Models in two ways: `byPath` (relative path to a model in the same repository) or `byConnection` (connection string to a model in Power BI service).
 
-#### `byPath` Parameterization
+#### Parameterization Overview
 
-When a Report uses `byPath` to reference a Semantic Model in the same repository, the library automatically converts it to a `byConnection` format during deployment. The Semantic Model must exist in the repository for this to work.
+**`byPath` - No Parameterization Needed**
 
-**No parameterization is needed** for `byPath` references when the Semantic Model is deployed in the same workspace - the library handles this automatically.
+When a Report uses `byPath` to reference a Semantic Model in the same repository, the library automatically converts it to `byConnection` format during deployment. The Semantic Model must exist in the repository for this to work.
 
-#### `byConnection` Parameterization
+**`byConnection` - Requires Parameterization**
 
 When Reports and Semantic Models are deployed separately (e.g., models first, then reports), or when Reports need to connect to models in Power BI Online service, use `byConnection` with parameterization to rebind reports to different semantic models across environments. This approach supports both same-workspace and cross-workspace binding scenarios.
 
-**Case:** A Report uses `byConnection` to reference a Semantic Model that is deployed to Power BI Online. The connection string contains environment-specific workspace IDs, semantic model names, and semantic model IDs that need to be updated when deploying to different environments (PPE/PROD/etc). The semantic model can be in the same workspace as the report or in a different workspace.
+**Case:** A Report uses `byConnection` to reference a Semantic Model deployed to Power BI Online. The connection string contains environment-specific values (workspace ID, semantic model name, and semantic model ID) that must be updated for each target environment (PPE, PROD, etc.). The semantic model can be in the same workspace as the report or in a different workspace.
+
+**Note:** This case does not apply to the `semantic_model_binding` parameter.
 
 **Solution:** Use `find_replace` or `key_value_replace` in the `parameter.yml` file to parameterize the connection string components.
 
-<span class="md-h4-nonanchor">Option 1: Using `find_replace` for individual components</span>
+#### `find_replace` Parameterization Case
 
-This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This is useful when you want to replace specific parts while keeping the rest of the connection string unchanged.
+This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This enables granular control over each component in the connection string and allows the option to apply dynamic variables where needed.
 
 **Note:** The examples below use placeholder values (e.g., `MyReport`, `YourSemanticModelName`). Replace these with your actual report and semantic model names. For a working example, see `sample/workspace/parameter.yml` which references the `ByConnection.Report` and `ABC.SemanticModel` items.
 
@@ -1100,11 +1094,11 @@ find_replace:
     # Replace workspace ID in connection string
     - find_value: "dev-workspace-id"
       replace_value:
-          PPE: "ppe-workspace-guid"
-          PROD: "prod-workspace-guid"
+          PPE: "$workspace.$id" # PPE workspace ID
+          PROD: "$workspace.$id" # PROD workspace ID
       item_type: "Report"
       file_path: "/MyReport.Report/definition.pbir"
-    
+
     # Replace semantic model name in connection string
     - find_value: "dev-semantic-model"
       replace_value:
@@ -1112,9 +1106,8 @@ find_replace:
           PROD: "prod-semantic-model-name"
       item_type: "Report"
       file_path: "/MyReport.Report/definition.pbir"
-    
+
     # Replace semantic model ID in connection string with dynamic replacement
-    # Note: Replace 'YourSemanticModelName' with the actual semantic model name from your repository
     - find_value: "00000000-0000-0000-0000-000000000000"
       replace_value:
           PPE: "$items.SemanticModel.YourSemanticModelName.$id"
@@ -1123,25 +1116,23 @@ find_replace:
       file_path: "/MyReport.Report/definition.pbir"
 ```
 
-<span class="md-h4-nonanchor">definition.pbir file (source control)</span>
+<span class="md-h4-nonanchor">definition.pbir</span>
 
 ```json
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
-  "version": "4.0",
-  "datasetReference": {
-    "byConnection": {
-      "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev-workspace-id;initial catalog=dev-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=00000000-0000-0000-0000-000000000000"
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
+    "version": "4.0",
+    "datasetReference": {
+        "byConnection": {
+            "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev-workspace-id;initial catalog=dev-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=00000000-0000-0000-0000-000000000000"
+        }
     }
-  }
 }
 ```
 
-**Note:** Using dynamic replacement (`$items.SemanticModel.MyModel.$id`) requires the Semantic Model to exist in the repository and be deployed to the target workspace before the Report is deployed.
+#### `key_value_replace` Parameterization Case
 
-<span class="md-h4-nonanchor">Option 2: Using `key_value_replace` for entire connection string</span>
-
-This approach replaces the entire connection string with environment-specific values. This is useful when the entire connection string format differs between environments.
+This approach replaces the entire connection string with environment-specific values. This simplifies the parameter input and is useful when the entire connection string format differs between environments.
 
 **Note:** This example uses placeholder values. For a working example, see `sample/workspace/parameter.yml`.
 
@@ -1157,24 +1148,16 @@ key_value_replace:
       item_name: "MyReport"
 ```
 
-<span class="md-h4-nonanchor">definition.pbir file (source control)</span>
+<span class="md-h4-nonanchor">definition.pbir</span>
 
 ```json
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
-  "version": "4.0",
-  "datasetReference": {
-    "byConnection": {
-      "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev-workspace-id;initial catalog=dev-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=00000000-0000-0000-0000-000000000000"
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
+    "version": "4.0",
+    "datasetReference": {
+        "byConnection": {
+            "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/dev-workspace-id;initial catalog=dev-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=00000000-0000-0000-0000-000000000000"
+        }
     }
-  }
 }
 ```
-
-**Important Considerations:**
-
--   Reports with `byConnection` references are deployed as-is to the target workspace with the parameterized connection string.
--   **Cross-workspace binding is supported:** A report deployed to Workspace A can connect to a semantic model in Workspace B by specifying the target workspace ID in the connection string (the `myorg/{workspace-id}` portion).
--   The connection string format shown above is the standard Power BI connection string format for connecting to semantic models.
--   When using `find_replace`, be specific with your find values to avoid unintended replacements (e.g., use unique placeholder values like "dev-workspace-id" rather than just "dev").
--   When using `key_value_replace`, the JSONPath expression `$.datasetReference.byConnection.connectionString` targets the connectionString field within the byConnection object.

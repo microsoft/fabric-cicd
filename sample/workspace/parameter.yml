@@ -47,16 +47,16 @@ find_replace:
     # Report byConnection - workspace id in connection string
     - find_value: "dev-workspace-id"
       replace_value:
-        PPE: "ppe-workspace-guid"
-        PROD: "prod-workspace-guid"
+        PPE: "$workspace.$id"
+        PROD: "$workspace.$id"
       # Optional fields:
       item_type: "Report"
       file_path: "/ByConnection.Report/definition.pbir"
     # Report byConnection - semantic model name in connection string
     - find_value: "dev-semantic-model"
       replace_value:
-        PPE: "ppe-semantic-model-name"
-        PROD: "prod-semantic-model-name"
+        PPE: "ABC"
+        PROD: "ABC"
       # Optional fields:
       item_type: "Report"
       file_path: "/ByConnection.Report/definition.pbir"
