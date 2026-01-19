@@ -1132,9 +1132,7 @@ find_replace:
 
 #### `key_value_replace` Parameterization Case
 
-This approach replaces the entire connection string with environment-specific values. This simplifies the parameter input and is useful when the entire connection string format differs between environments.
-
-**Note:** This example uses placeholder values. For a working example, see `sample/workspace/parameter.yml`.
+This approach replaces the entire connection string with environment-specific values. This simplifies the parameter configuration, however, dynamic variables are not supported in this example as they cannot be embedded within a larger string value.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 

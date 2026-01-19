@@ -50,25 +50,21 @@ find_replace:
         PPE: "$workspace.$id"
         PROD: "$workspace.$id"
       # Optional fields:
-      item_type: "Report"
       file_path: "/ByConnection.Report/definition.pbir"
-    # Report byConnection - semantic model name in connection string
+     # Report byConnection - semantic model name in connection string
     - find_value: "dev-semantic-model"
       replace_value:
         PPE: "ABC"
         PROD: "ABC"
       # Optional fields:
-      item_type: "Report"
       file_path: "/ByConnection.Report/definition.pbir"
     # Report byConnection - semantic model id in connection string using dynamic replacement
-    # This example references ABC.SemanticModel from the sample workspace
     - find_value: "00000000-0000-0000-0000-000000000000"
       replace_value:
       # Variable: $items.type.name.attribute (Note: item type and name values are CASE SENSITIVE; id attribute returns the deployed item's id/guid)
         PPE: "$items.SemanticModel.ABC.$id"
         PROD: "$items.SemanticModel.ABC.$id"
       # Optional fields:
-      item_type: "Report"
       file_path: "/ByConnection.Report/definition.pbir"
 
 key_value_replace:
@@ -105,14 +101,6 @@ key_value_replace:
         PPE: false
         PROD: true
       file_path: "**/.schedules"
-    # Report byConnection - Replace entire connection string using JSONPath
-    - find_key: $.datasetReference.byConnection.connectionString
-      replace_value:
-        PPE: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/ppe-workspace-guid;initial catalog=ppe-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=ppe-model-guid"
-        PROD: "Data Source=powerbi://api.powerbi.com/v1.0/myorg/prod-workspace-guid;initial catalog=prod-semantic-model;access mode=readonly;integrated security=ClaimsToken;semanticmodelid=prod-model-guid"
-      # Optional fields:
-      item_type: "Report"
-      item_name: "ByConnection"
 
 spark_pool:
     # CapacityPool_Large
