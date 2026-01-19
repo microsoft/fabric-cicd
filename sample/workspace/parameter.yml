@@ -51,7 +51,7 @@ find_replace:
         PROD: "$workspace.$id"
       # Optional fields:
       file_path: "/ByConnection.Report/definition.pbir"
-     # Report byConnection - semantic model name in connection string
+    # Report byConnection - semantic model name in connection string
     - find_value: "dev-semantic-model"
       replace_value:
         PPE: "ABC"
