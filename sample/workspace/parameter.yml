@@ -104,31 +104,24 @@ spark_pool:
       # Optional field:
       item_name:
       
+# Deprecation notice: 'gateway_binding' will not be supported in future releases.
 gateway_binding:
     - gateway_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
       dataset_name: "gateway_sm2"
-          
+
+# Legacy format (backwards compatibility)
 semantic_model_binding:
-    # New format (recommended): Supports default connections and per-item overrides
+    - connection_id: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+      semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
+
+# New format (recommended): Supports default connections and per-item overrides
+semantic_model_binding:
     default:
         connections:
-            PPE: "default-connection-id-ppe"
-            PROD: "default-connection-id-prod"
+            PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
+            PROD: "c4f8e2b1-3d2a-4f5b-9c6e-7a8b9c0d1e2f"
     models:
         - semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
           connections:
-              PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
-              PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
-        - semantic_model_name: "MySemanticModel_SingleConnection"
-          connections:
-              PPE: "12345678-1234-1234-1234-123456789abc"
-              PROD: "98765432-4321-4321-4321-ba0987654321"
-    
-    # Legacy format (backward compatible): Direct connection_id mapping
-    # Uncomment to use legacy format instead of new format above
-    # - connection_id:
-    #     PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
-    #     PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
-    #   semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
-    # - connection_id: "12345678-1234-1234-1234-123456789abc"
-    #   semantic_model_name: "MySemanticModel_SingleConnection"
+            PPE: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
+            PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
