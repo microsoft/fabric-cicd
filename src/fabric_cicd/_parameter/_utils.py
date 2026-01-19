@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import yaml
-from azure.core.credentials import TokenCredential
 from jsonpath_ng.ext import parse
 
 import fabric_cicd.constants as constants
@@ -460,7 +459,6 @@ def validate_parameter_file(
     environment: str = "N/A",
     parameter_file_name: str = "parameter.yml",
     parameter_file_path: Optional[str] = None,
-    token_credential: TokenCredential = None,
 ) -> bool:
     """
     A wrapper function that validates a parameter.yml file, using
@@ -472,26 +470,15 @@ def validate_parameter_file(
         environment: The target environment.
         parameter_file_name: The name of the parameter file, default is "parameter.yml".
         parameter_file_path: The path to the parameter file, if different from the default.
-        token_credential: The token credential to use for authentication, use for SPN auth.
     """
-    from azure.identity import DefaultAzureCredential
-
     from fabric_cicd._common._validate_input import (
         validate_environment,
         validate_item_type_in_scope,
         validate_repository_directory,
-        validate_token_credential,
     )
 
     # Import the Parameter class here to avoid circular imports
     from fabric_cicd._parameter._parameter import Parameter
-
-    # Set up authentication credential - use DefaultAzureCredential if none provided, otherwise validate provided credential
-    if token_credential is None:
-        # CodeQL [SM05139] Public library needing to have a default auth when user doesn't provide token. Not internal Azure product.
-        _credential = DefaultAzureCredential()
-    else:
-        validate_token_credential(token_credential)
 
     # Initialize the Parameter object with the validated inputs
     parameter_obj = Parameter(
