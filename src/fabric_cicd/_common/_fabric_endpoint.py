@@ -251,6 +251,9 @@ def _handle_response(
                 # No Location header means operation completed immediately
                 exit_loop = True
             else:
+                # We check for system level config for retry delay override, e.g. in unit
+                # tests where we want to rip through thousands of API calls quickly. If not
+                # set, e.g. at runtime, we use normal polling delay of default 1 second.
                 time.sleep(float(os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE_SECONDS.value, 1)))
                 long_running = True
 
