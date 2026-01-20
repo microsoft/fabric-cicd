@@ -13,9 +13,9 @@ The mock server loads an `http_trace.json` file to dictate the behavior.
 3. Move `http_trace.json.gz` into fixture
 4. Enjoy rapid test coverage
 
-### Capturing HTTP Trace for new resource types
+### Capturing HTTP Trace for new fabric item types
 
-Suppose you need to add payloads for a new resource type.
+Suppose you need to add payloads for a new fabric item type.
 
 The following script creates an HTTP snapshot that is stored in `http_trace.json.gz`, which is moved into `fabric-cicd/tests/fixtures`
 
