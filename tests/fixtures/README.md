@@ -21,8 +21,6 @@ The following script creates an HTTP snapshot that is stored in `http_trace.json
 
 Update `item_types_to_deploy` in the script with the item you want to capture HTTP traffic for, then run:
 
-> Note: items such as `Warehouse` can throw on an F2.
-
 ```bash
 export FABRIC_WORKSPACE_ID="your-fabric-workspace-guid"
 uv run python devtools/debug_trace_publish_all.py
