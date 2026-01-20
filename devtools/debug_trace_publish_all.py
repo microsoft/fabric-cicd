@@ -51,7 +51,6 @@ def main():
         "VariableLibrary",
         "Warehouse",
     ]
-    token_credential = DefaultAzureCredential()
     for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
         fabric_cicd.append_feature_flag(flag)
     target_workspace = fabric_cicd.FabricWorkspace(
@@ -59,7 +58,6 @@ def main():
         environment=environment,
         repository_directory=str(repository_directory),
         item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
     )
     fabric_cicd.publish_all_items(target_workspace)
 
