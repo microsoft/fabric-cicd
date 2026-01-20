@@ -8,12 +8,12 @@ The following contains all major, minor, and patch version release notes.
 
 ## Version 0.1.34
 
-<span class="md-h2-subheader">Release Date: 2026-1-20</span>
+<span class="md-h2-subheader">Release Date: 2026-01-20</span>
 
 - ✨ Enable dynamic replacement of SQL endpoint values from SQL Database items ([#720](https://github.com/microsoft/fabric-cicd/issues/720))
 - ✨ Support Fabric Notebook Authentication ([#707](https://github.com/microsoft/fabric-cicd/issues/707))
 - ✨ Onboard Spark Job Definition item type ([#115](https://github.com/microsoft/fabric-cicd/issues/115))
-- 📝 Add CONTRIBUTING.md file to repository ([#723](https://github.com/microsoft/fabric-cicd/issues/723))
+- 📝 Add `CONTRIBUTING.md` file to repository ([#723](https://github.com/microsoft/fabric-cicd/issues/723))
 - 📝 Add comprehensive troubleshooting guide to documentation ([#705](https://github.com/microsoft/fabric-cicd/issues/705))
 - 📝 Add parameterization documentation for Report items using ByConnection binding to Semantic Models ([#637](https://github.com/microsoft/fabric-cicd/issues/637))
 - ⚡ Add debug file for local Fabric REST API testing ([#714](https://github.com/microsoft/fabric-cicd/issues/714))
