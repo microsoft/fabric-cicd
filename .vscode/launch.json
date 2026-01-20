@@ -5,7 +5,7 @@
             "name": "Debug: Trace Publish All Items",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/devtools/debug_trace_publish_all.py",
+            "program": "${workspaceFolder}/devtools/debug_trace_deployment.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {

@@ -29,7 +29,7 @@ def mock_fabric_api_server():
     trace_file = trace_file_gz.with_suffix("")
 
     if not trace_file_gz.exists():
-        pytest.skip("http_trace.json.gz not found - run devtools/debug_trace_publish_all.py first to generate trace data")
+        pytest.skip("http_trace.json.gz not found - run devtools/debug_trace_deployment.py first to generate trace data")
 
     if trace_file.exists():
         trace_file.unlink()

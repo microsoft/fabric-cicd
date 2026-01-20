@@ -11,7 +11,7 @@ The mock server loads an `http_trace.json` file to dictate the behavior.
 The 4 steps outlined in the image below are as follows:
 
 1. Add new workloads into the codebase
-2. Capture REST calls from Fabric using `debug_trace_publish_all.py`
+2. Capture REST calls from Fabric using `debug_trace_deployment.py`
 3. Move `http_trace.json.gz` into fixture
 4. Enjoy rapid test coverage!
 
@@ -28,7 +28,7 @@ Update `item_types_to_deploy` in the script with the item you want to capture HT
 
 ```bash
 export FABRIC_WORKSPACE_ID="your-fabric-workspace-guid"
-uv run python devtools/debug_trace_publish_all.py
+uv run python devtools/debug_trace_deployment.py
 cp -f http_trace.json.gz tests/fixtures/http_trace.json.gz
 ```
 
@@ -41,4 +41,4 @@ uv run pytest -v -s --log-cli-level=INFO tests/test_integration_publish.py::test
 ### Important Notes
 
 * The `http_trace.json` must be generated in one shot, i.e. the Mock Server is not guaranteed to incrementally process new lines added to `http_trace.json`.
-  What that means is - you should capture as many items as possible in `debug_trace_publish_all.py`, and use that payload in the tests.
+  What that means is - you should capture as many items as possible in `debug_trace_deployment.py`, and use that payload in the tests.

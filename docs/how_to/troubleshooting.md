@@ -298,7 +298,7 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 3. Uncomment `change_log_level()` to view API request/response details
 4. Run: `uv run python devtools/debug_api.py`
 
-#### debug_trace_publish_all.py
+#### debug_trace_deployment.py
 
 **Purpose**: Debug the public API `publish_all_items()` workflow with breakpoints using VS Code's debugger.
 
@@ -314,7 +314,7 @@ az login
 
 **Quick Start**:
 
-1. Open `devtools/debug_trace_publish_all.py`
+1. Open `devtools/debug_trace_deployment.py`
 2. Set breakpoint(s) in the code
 3. Update `.vscode/launch.json` with your workspace ID in `FABRIC_WORKSPACE_ID`
 4. Press **F5** → Select "Debug: Publish All Items"
