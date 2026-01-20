@@ -2,6 +2,23 @@
 
 ## `mock_fabric_server`: A mock Fabric REST API
 
+
+### Use Cases
+
+Basically, this fixture allows Integration Testing without the costs associated with E2E tests..
+
+If you peek inside `http_trace.json`, each full deployment of `fabric-cicd` project makes thousands of API calls.
+As the project grows in scope, so does the amount of tests that need to be written to exercise coverage. This becomes
+unruly via PyTest mocks or [monkey patching](https://docs.pytest.org/en/stable/how-to/monkeypatch.html).
+
+In an ideal scenario, whenver a PR is opened, we'd test it against a real Fabric Workspace, but - stateful tests are 
+difficult, any outages in Fabric API can cause PRs to fail - etc; this means testing against a real workspace is not
+realistic.
+
+But what if we could _mimic_ the Fabric API locally?
+
+That's what this fixture provides.
+
 This is a mock REST API Server that mimics `https://api.powerbi.com`.
 The idea is, to exercise the public facing `fabric_cicd` API E2E rapidly.
 The mock server loads an `http_trace.json` file to dictate the behavior.
@@ -15,12 +32,11 @@ The 4 steps outlined in the image below are as follows:
 3. Move `http_trace.json.gz` into fixture
 4. Enjoy rapid test coverage!
 
-
 ![Test Harness](.imgs/test-harness.png)
 
-### Capturing HTTP Trace for new fabric item types
+### Capturing HTTP Trace for new Fabric API calls
 
-Suppose you need to add payloads for a new fabric item type.
+Suppose you need to add payloads for a new fabric item type or an API call.
 
 The following script creates an HTTP snapshot that is stored in `http_trace.json.gz`, which is moved into `fabric-cicd/tests/fixtures`
 
@@ -42,3 +58,10 @@ uv run pytest -v -s --log-cli-level=INFO tests/test_integration_publish.py::test
 
 * The `http_trace.json` must be generated in one shot, i.e. the Mock Server is not guaranteed to incrementally process new lines added to `http_trace.json`.
   What that means is - you should capture as many items as possible in `debug_trace_deployment.py`, and use that payload in the tests.
+
+### Troubleshooting
+
+* If a Unit Test fails on your branch but it wasn't failing on a previous branch, that means your branch contains new changes that have not
+  been snapshotted. If you rever your branch to `main`, the tests should run green.
+  
+  Therefore, due to the logic/API call additions in your PR, you must regenerate the snapshot using the steps outlined above.
