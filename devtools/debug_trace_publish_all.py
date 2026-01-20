@@ -28,10 +28,10 @@ def main():
         msg = "FABRIC_WORKSPACE_ID environment variable must be set"
         raise ValueError(msg)
 
-    environment_key = "PPE"
+    environment = "PPE"
 
-    artifacts_folder = root_directory / "sample" / "workspace"
-    item_types_to_deploy = [
+    repository_directory = root_directory / "sample" / "workspace"
+    item_type_in_scope = [
         "Dataflow",
         "DataPipeline",
         "Environment",
@@ -56,9 +56,9 @@ def main():
         fabric_cicd.append_feature_flag(flag)
     target_workspace = fabric_cicd.FabricWorkspace(
         workspace_id=workspace_id,
-        environment=environment_key,
-        repository_directory=str(artifacts_folder),
-        item_type_in_scope=item_types_to_deploy,
+        environment=environment,
+        repository_directory=str(repository_directory),
+        item_type_in_scope=item_type_in_scope,
         token_credential=token_credential,
     )
     fabric_cicd.publish_all_items(target_workspace)
