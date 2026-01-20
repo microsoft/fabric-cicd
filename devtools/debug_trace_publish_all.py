@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 
-"""Captures route traces from a live Fabric workspace deployment into a JSON GZIP trace file."""
+# Captures route traces from a live Fabric workspace deployment into a JSON GZIP trace file.
 
 import gzip
 import os
