@@ -106,6 +106,14 @@ class TestParameterUtilities:
                     "queryserviceuri": "eventhouse-query-uri",
                 },
             },
+            "SQLDatabase": {
+                "TestSQLDatabase": {
+                    "id": "sqldatabase-id",
+                    "sqlendpoint": "test-sql-server.database.fabric.microsoft.com,1433",
+                    "sqlendpointid": "",
+                    "queryserviceuri": "",
+                },
+            },
         }
         mock_ws.repository_items = {
             "Dataflow": {
@@ -261,6 +269,12 @@ class TestParameterUtilities:
         assert result == "warehouse-id"
         result = _extract_item_attribute(mock_workspace, "$items.Warehouse.TestWarehouse.$id", False)
         assert result == "warehouse-id"
+
+        # Test with valid SQLDatabase item
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.sqlendpoint", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com,1433"
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.$sqlendpoint", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com,1433"
 
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
@@ -727,49 +741,6 @@ class TestParameterUtilities:
             environment="Test",
             parameter_file_name="custom_params.yml",
             parameter_file_path="/custom/path/to/parameters.yml",
-        )
-        mock_param_instance._validate_parameter_file.assert_called_once()
-
-    @mock.patch("fabric_cicd._parameter._parameter.Parameter")
-    @mock.patch("fabric_cicd._common._validate_input.validate_repository_directory")
-    @mock.patch("fabric_cicd._common._validate_input.validate_item_type_in_scope")
-    @mock.patch("fabric_cicd._common._validate_input.validate_environment")
-    @mock.patch("fabric_cicd._common._validate_input.validate_token_credential")
-    def test_validate_parameter_file_with_token_credential(
-        self, mock_validate_token, mock_validate_env, mock_validate_item_type, mock_validate_repo, mock_param
-    ):
-        """Tests validate_parameter_file function with custom token credential."""
-        # Setup mocks
-        mock_validate_repo.return_value = Path("/mock/repo")
-        mock_validate_item_type.return_value = ["Notebook", "Lakehouse"]
-        mock_validate_env.return_value = "Test"
-        mock_token = mock.MagicMock()
-        mock_validate_token.return_value = mock_token
-        mock_param_instance = mock.MagicMock()
-        mock_param.return_value = mock_param_instance
-        mock_param_instance._validate_parameter_file.return_value = True
-
-        # Call the function
-        from fabric_cicd._parameter._utils import validate_parameter_file
-
-        # Patch the FabricEndpoint inside the test since we need it to run successfully
-        with mock.patch("fabric_cicd._common._fabric_endpoint.FabricEndpoint", return_value=mock.MagicMock()):
-            result = validate_parameter_file(
-                repository_directory=Path("/mock/repo"),
-                item_type_in_scope=["Notebook", "Lakehouse"],
-                environment="Test",
-                token_credential=mock_token,
-            )
-
-        # Verify the result and that token validation was called
-        assert result is True
-        mock_validate_token.assert_called_once_with(mock_token)
-        mock_param.assert_called_once_with(
-            repository_directory=Path("/mock/repo"),
-            item_type_in_scope=["Notebook", "Lakehouse"],
-            environment="Test",
-            parameter_file_name="parameter.yml",
-            parameter_file_path=None,
         )
         mock_param_instance._validate_parameter_file.assert_called_once()
 

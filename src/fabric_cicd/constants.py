@@ -4,7 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 # General
-VERSION = "0.1.33"
+VERSION = "0.1.34"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_API_ROOT_URL = "https://api.powerbi.com"
 FABRIC_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -67,6 +67,9 @@ PROPERTY_PATH_ATTR_MAPPING = {
     },
     "Warehouse": {
         "sqlendpoint": "body/properties/connectionString",
+    },
+    "SQLDatabase": {
+        "sqlendpoint": "body/properties/serverFqdn",
     },
     "Eventhouse": {
         "queryserviceuri": "body/properties/queryServiceUri",
