@@ -63,6 +63,10 @@ def main():
 
     print("Publish completed successfully")
 
+    # The raw JSON trace file is very large; GZIP compress it generate a compact version
+    # that can be used by tests. The raw trace file is still left in place for 
+    # debugging purposes.
+    #
     trace_file = root_directory / "http_trace.json"
     compressed_file = root_directory / "http_trace.json.gz"
     with trace_file.open("rb") as f_in, gzip.open(compressed_file, "wb") as f_out:
