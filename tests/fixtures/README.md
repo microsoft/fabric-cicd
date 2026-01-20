@@ -19,7 +19,8 @@ But what if we could _mimic_ the Fabric API locally?
 
 That's what this fixture provides.
 
-This is a mock REST API Server that mimics `https://api.powerbi.com`.
+This is a mock REST API Server that mimics `https://api.powerbi.com` and `https://api.fabric.microsoft.com`. We can any number of further mocks in the future as well - as long as the API calls are traced and snapshotted.
+
 The idea is, to exercise the public facing `fabric_cicd` API E2E rapidly.
 The mock server loads an `http_trace.json` file to dictate the behavior.
 
