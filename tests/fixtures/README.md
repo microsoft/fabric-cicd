@@ -2,7 +2,6 @@
 
 ## `mock_fabric_server`: A mock Fabric REST API
 
-
 ### Use Cases
 
 Basically, this fixture allows Integration Testing without the costs associated with E2E tests..
@@ -23,6 +22,20 @@ This is a mock REST API Server that mimics `https://api.powerbi.com` and `https:
 
 The idea is, to exercise the public facing `fabric_cicd` API E2E rapidly.
 The mock server loads an `http_trace.json` file to dictate the behavior.
+
+### Why not VCR
+
+This is very similar to [VCR Cassettes](https://github.com/vcr/vcr). The downside of VCR is, the actual HTTP interactions are
+abstracted away via the SDK, and as a result, the test code does not truly make calls to a real REST API that we have full control over.
+
+For example, in our mock REST API, we can add logic to override exceptions at a route level, which is not possible in VCR (without opening a PR).
+
+> In both VCR and this fixture, the one thing is common, generating snapshots takes time, since you have to interact
+> with the real control plane (in this case Fabric), which is costly.
+>
+> The way to think about the situation is, we're able to enjoy near 100% test coverage for _all_ of our customer facing calls
+> without using a real control plane, this allows us to _significantly_ increase code velocity as all code paths are tested by
+> nature of a full deployment.
 
 ### What is this?
 
@@ -66,3 +79,7 @@ uv run pytest -v -s --log-cli-level=INFO tests/test_integration_publish.py::test
   been snapshotted. If you rever your branch to `main`, the tests should run green.
   
   Therefore, due to the logic/API call additions in your PR, you must regenerate the snapshot using the steps outlined above.
+
+* Copilot generated PRs that change API signatures will probably need human intervention to generate snapshots, as Copilot cannot make
+  REST API calls to a real Fabric instance to regenerate the snapshot. In this situation, pull the Copilot generated PR locally and rerun
+  the snapshot generation.
