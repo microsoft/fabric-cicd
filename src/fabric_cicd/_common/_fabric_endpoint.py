@@ -352,7 +352,8 @@ def handle_retry(
     start_time: float | None = None,
 ) -> None:
     """
-    Handles retry logic with exponential backoff based on the response.
+    Handles retry logic with exponential backoff based on the response, retrying
+    until the maximum duration is reached.
 
     Args:
         attempt: The current attempt number.
