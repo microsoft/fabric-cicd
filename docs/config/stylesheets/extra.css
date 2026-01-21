@@ -137,7 +137,6 @@ p:has(.md-h2-subheader) {
 
 .item-types-grid li {
     break-inside: avoid;
-    page-break-inside: avoid;
 }
 
 /* Responsive: 2 columns on tablets */
