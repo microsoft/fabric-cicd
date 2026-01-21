@@ -13,7 +13,12 @@ def on_page_markdown(markdown, **kwargs):
         end_index = markdown.index("<!--END-SUPPORTED-ITEM-TYPES-->\n")
 
         supported_item_types = constants.ACCEPTED_ITEM_TYPES
-        markdown_content = "\n".join([f"-   {item}" for item in supported_item_types])
+        
+        # Generate multi-column layout with HTML
+        markdown_content = '<div class="item-types-grid" markdown="1">\n\n'
+        for item in supported_item_types:
+            markdown_content += f"-   {item}\n"
+        markdown_content += "\n</div>\n"
 
         new_markdown = markdown[:start_index] + markdown_content + markdown[end_index:]
         return new_markdown
