@@ -10,8 +10,8 @@ fabric-cicd includes a debug logging feature that provides detailed visibility i
 
 **Default Behavior:**
 
--   Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings and errors
--   Detailed logs can be accessed from the `fabric_cicd.error.log` file
+- Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings and errors
+- The `fabric_cicd.error.log` file will contain the same lines printed to the console along with stack traces for any errors
 
 **Enabling Debug Logging:**
 
@@ -24,27 +24,24 @@ from fabric_cicd import change_log_level
 change_log_level()
 ```
 
-When debug logging is enabled:
+When debug logging is enabled, all API calls are logged with detailed request/response information, and additional context about internal operations is displayed. Both the console and the `fabric_cicd.error.log` file will contain the detailed information.
 
--   All API calls are logged to the console with detailed request/response information
--   Additional context about internal operations is displayed
-
-**Important:** Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration.
+**Important:** Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration. See [Understanding Error Logs](#understanding-error-logs) for details on interpreting log output.
 
 ### Testing Deployments Locally
 
 Before running deployments via CI/CD pipelines, users can test the deployment workflow locally by running the provided debug scripts. This helps with:
 
--   Validating configuration changes without affecting production
--   Testing parameter file configurations
--   Debugging deployment issues
--   Verifying authentication and permissions
+- Validating configuration changes without affecting production
+- Testing parameter file configurations
+- Debugging deployment issues
+- Verifying authentication and permissions
 
 fabric-cicd includes several debug scripts in the `devtools/` directory that allow users to run deployments against real workspaces in a controlled environment. See [Debug Scripts](#debug-scripts) for detailed information on:
 
--   `debug_local.py` or `debug_local config.py` - Test full deployment workflows
--   `debug_parameterization.py` - Validate parameter files without deploying
--   `debug_api.py` - Test Fabric REST API calls directly
+- `debug_local.py` or `debug_local config.py` - Test full deployment workflows
+- `debug_parameterization.py` - Validate parameter files without deploying
+- `debug_api.py` - Test Fabric REST API calls directly
 
 **Tip:** Using these scripts locally can catch configuration errors early, saving time in your CI/CD pipeline.
 
@@ -68,8 +65,8 @@ sample/workspace/
 
 Each item folder follows the naming convention `ItemName.ItemType/` and contains:
 
--   `.platform` file which contains the item metadata
--   Item definition files (e.g., `pipeline-content.json`, `notebook-content.py`)
+- `.platform` file which contains the item metadata
+- Item definition files (e.g., `pipeline-content.json`, `notebook-content.py`)
 
 **Using the Sample:**
 
@@ -77,11 +74,9 @@ Use this sample structure as a template for organizing your Fabric items. To tes
 
 ### Understanding Error Logs
 
-fabric-cicd automatically creates a `fabric_cicd.error.log` file in your working directory. This file contains:
+When running a deployment, fabric-cicd automatically creates a `fabric_cicd.error.log` file in your working directory. The level of detail captured depends on whether [debug logging is enabled](#enable-debug-logging).
 
--   **Full stack traces** for all errors encountered
--   **API request/response details** including URLs, headers, and payloads
--   **Complete diagnostic information** not always shown in console output
+**Tip:** Always enable debug logging when troubleshooting deployment issues to capture full API traces in the log file.
 
 #### Accessing API Traces
 
@@ -99,13 +94,14 @@ Open the `fabric_cicd.error.log` file to view:
 2. **Response Details**: Status code, response headers, and complete response body
 3. **Timing Information**: When the call was made
 4. **Stack Trace**: The complete call stack leading to the error
+5. **Additional Logs**: Information on internal operations that occurred during deployment
 
 This information is critical for determining if issues are caused by:
 
--   API failures or service issues
--   Authentication/authorization problems
--   Invalid request payloads
--   Network connectivity issues
+- API failures or service issues
+- Authentication/authorization problems
+- Invalid request payloads
+- Network connectivity issues
 
 #### Example Error Log Entry
 
@@ -239,7 +235,7 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 
 | Configuration      | Description                                                                         | Required |
 | ------------------ | ----------------------------------------------------------------------------------- | -------- |
-| `config_file`      | Path to your config.yml file                                                        | Yes      |
+| `config_file`      | Path to your `config.yml` file                                                      | Yes      |
 | `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
 | `token_credential` | Service Principal credentials (defaults to DefaultAzureCredential)                  | No       |
 | `config_override`  | Dictionary to override configuration values within `config.yml`                     | No       |
@@ -247,7 +243,7 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 **Quick Start**:
 
 1. Open `devtools/debug_local config.py`
-2. Set `config_file` path and `environment`
+2. Set `config_file` path and `environment` (can use the sample `config.yml` file found in `sample/workspace`)
 3. Uncomment `change_log_level()` to enable debug logging
 4. Ensure required feature flags are enabled (already set in script)
 5. Run: `uv run python "devtools/debug_local config.py"`
@@ -271,7 +267,7 @@ See [configuration deployment](config_deployment.md) for details on creating `co
 **Quick Start**:
 
 1. Open `devtools/debug_parameterization.py`
-2. Set `repository_directory` and `environment`
+2. Set `repository_directory` and `environment` (the `parameter.yml` file is located in the repository directory in this case)
 3. Uncomment `change_log_level()` to view all the validation steps
 4. Run: `uv run python devtools/debug_parameterization.py`
 
@@ -331,7 +327,7 @@ If you're still experiencing issues after following this guide:
 
 ## Additional Resources
 
--   [Contribution Guide](https://github.com/microsoft/fabric-cicd/blob/main/CONTRIBUTING.md) - Setup instructions and PR requirements
--   [Feature Flags](optional_feature.md#feature-flags) - Available feature flags for advanced scenarios
--   [Getting Started](getting_started.md) - Basic installation and authentication
--   [Microsoft Fabric API Documentation](https://learn.microsoft.com/en-us/rest/api/fabric/) - Official API reference
+- [Contribution Guide](https://github.com/microsoft/fabric-cicd/blob/main/CONTRIBUTING.md) - Setup instructions and PR requirements
+- [Feature Flags](optional_feature.md#feature-flags) - Available feature flags for advanced scenarios
+- [Getting Started](getting_started.md) - Basic installation and authentication
+- [Microsoft Fabric API Documentation](https://learn.microsoft.com/en-us/rest/api/fabric/) - Official API reference

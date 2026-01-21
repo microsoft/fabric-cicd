@@ -1111,3 +1111,244 @@ def test_kqldatabase_folder_regex_no_match_edge_case():
     ]
     for p in bad_paths:
         assert pattern.match(p) is None, f"Regex should not match path: {p}"
+
+
+def test_get_item_attribute_caching_basic(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that _get_item_attribute caches results and returns expected values."""
+    mock_endpoint = MagicMock()
+
+    # Mock response for Lakehouse sqlendpoint attribute
+    mock_response = {"body": {"properties": {"sqlEndpointProperties": {"connectionString": "test-connection-string"}}}}
+    mock_endpoint.invoke.return_value = mock_response
+
+    # Create workspace with mocked endpoint
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        # Test fetching an attribute
+        result = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="Lakehouse",
+            item_guid="test-item-guid",
+            item_name="Test Lakehouse",
+            attribute_name="sqlendpoint",
+        )
+
+        # Verify the result is as expected
+        assert result == "test-connection-string"
+
+        # Verify API was called once
+        assert mock_endpoint.invoke.call_count == 1
+        mock_endpoint.invoke.assert_called_with(
+            method="GET",
+            url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/test-workspace-id/lakehouses/test-item-guid",
+        )
+
+
+def test_get_item_attribute_caching_prevents_api_call(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that fetching the same attribute again uses cache and doesn't make API call."""
+    mock_endpoint = MagicMock()
+
+    # Mock response for Lakehouse sqlendpoint attribute
+    mock_response = {"body": {"properties": {"sqlEndpointProperties": {"connectionString": "test-connection-string"}}}}
+    mock_endpoint.invoke.return_value = mock_response
+
+    # Create workspace with mocked endpoint
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        # First call - should make API call
+        result1 = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="Lakehouse",
+            item_guid="test-item-guid",
+            item_name="Test Lakehouse",
+            attribute_name="sqlendpoint",
+        )
+
+        # Second call with same parameters - should use cache
+        result2 = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="Lakehouse",
+            item_guid="test-item-guid",
+            item_name="Test Lakehouse",
+            attribute_name="sqlendpoint",
+        )
+
+        # Verify results are the same
+        assert result1 == result2 == "test-connection-string"
+
+        # Verify API was called only once (cached on second call)
+        assert mock_endpoint.invoke.call_count == 1
+
+
+def test_get_item_attribute_different_cache_keys(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that different cache keys don't collide and each makes separate API calls."""
+    mock_endpoint = MagicMock()
+
+    # Mock response for different item types
+    def mock_invoke_side_effect(*args, **kwargs):
+        url = kwargs.get("url", args[1] if len(args) > 1 else "")
+        if "lakehouses" in url:
+            return {
+                "body": {
+                    "properties": {
+                        "sqlEndpointProperties": {
+                            "id": "endpoint-id-123",
+                            "connectionString": "lakehouse-connection-string",
+                        }
+                    }
+                }
+            }
+        if "warehouses" in url:
+            return {"body": {"properties": {"connectionString": "warehouse-connection-string"}}}
+        if "eventhouses" in url:
+            return {"body": {"properties": {"queryServiceUri": "eventhouse-query-uri"}}}
+        return {"body": {}}
+
+    mock_endpoint.invoke.side_effect = mock_invoke_side_effect
+
+    # Create workspace with mocked endpoint
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        # Test different combinations to ensure no cache collisions
+
+        # Different item types
+        lakehouse_result = workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "sqlendpoint")
+        warehouse_result = workspace._get_item_attribute("ws1", "Warehouse", "guid1", "name1", "sqlendpoint")
+        eventhouse_result = workspace._get_item_attribute("ws1", "Eventhouse", "guid1", "name1", "queryserviceuri")
+
+        # Different workspace IDs
+        lakehouse_ws2_result = workspace._get_item_attribute("ws2", "Lakehouse", "guid1", "name1", "sqlendpoint")
+
+        # Different item GUIDs
+        lakehouse_guid2_result = workspace._get_item_attribute("ws1", "Lakehouse", "guid2", "name1", "sqlendpoint")
+
+        # Different item names
+        lakehouse_name2_result = workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name2", "sqlendpoint")
+
+        # Different attributes
+        lakehouse_sqlendpointid_result = workspace._get_item_attribute(
+            "ws1", "Lakehouse", "guid1", "name1", "sqlendpointid"
+        )
+
+        # Verify all results are different and correct
+        assert lakehouse_result == "lakehouse-connection-string"
+        assert warehouse_result == "warehouse-connection-string"
+        assert eventhouse_result == "eventhouse-query-uri"
+        assert lakehouse_ws2_result == "lakehouse-connection-string"  # Same API response
+        assert lakehouse_guid2_result == "lakehouse-connection-string"  # Same API response
+        assert lakehouse_name2_result == "lakehouse-connection-string"  # Same API response
+
+        # Mock the API to return different values for sqlendpointid
+        def mock_invoke_side_effect_extended(*args, **kwargs):
+            url = kwargs.get("url", args[1] if len(args) > 1 else "")
+            if "lakehouses" in url:
+                if "guid1" in url:
+                    return {
+                        "body": {
+                            "properties": {
+                                "sqlEndpointProperties": {
+                                    "id": "endpoint-id-123",
+                                    "connectionString": "lakehouse-connection-string",
+                                }
+                            }
+                        }
+                    }
+                # guid2
+                return {
+                    "body": {
+                        "properties": {
+                            "sqlEndpointProperties": {
+                                "id": "endpoint-id-456",
+                                "connectionString": "lakehouse-connection-string-2",
+                            }
+                        }
+                    }
+                }
+            return {"body": {}}
+
+        mock_endpoint.invoke.side_effect = mock_invoke_side_effect_extended
+
+        # Fetch sqlendpointid for guid1
+        lakehouse_sqlendpointid_result = workspace._get_item_attribute(
+            "ws1", "Lakehouse", "guid1", "name1", "sqlendpointid"
+        )
+        assert lakehouse_sqlendpointid_result == "endpoint-id-123"
+
+        # Verify API was called for each unique cache key
+        # We expect 7 calls: 3 initial + 1 for ws2 + 1 for guid2 + 1 for name2 + 1 for sqlendpointid
+        assert mock_endpoint.invoke.call_count == 7
+
+
+def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test edge cases for _get_item_attribute to ensure cache doesn't introduce regressions."""
+    mock_endpoint = MagicMock()
+    mock_endpoint.invoke.return_value = {"body": {}}
+
+    # Create workspace with mocked endpoint
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        # Test empty item_guid - should return empty string without API call
+        result = workspace._get_item_attribute("ws1", "Lakehouse", "", "name1", "sqlendpoint")
+        assert result == ""
+        assert mock_endpoint.invoke.call_count == 0  # No API call made
+
+        # Test None item_guid - should return empty string without API call
+        result = workspace._get_item_attribute("ws1", "Lakehouse", None, "name1", "sqlendpoint")
+        assert result == ""
+        assert mock_endpoint.invoke.call_count == 0  # No API call made
+
+        # Test unsupported item type - should return empty string without API call
+        result = workspace._get_item_attribute("ws1", "UnsupportedType", "guid1", "name1", "someattr")
+        assert result == ""
+        assert mock_endpoint.invoke.call_count == 0  # No API call made
+
+        # Test unsupported attribute for supported item type - should return empty string without API call
+        result = workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "unsupportedattr")
+        assert result == ""
+        assert mock_endpoint.invoke.call_count == 0  # No API call made
+
+        # Test valid call that results in empty attribute value - should raise InputError
+        mock_endpoint.invoke.return_value = {
+            "body": {
+                "properties": {
+                    "sqlEndpointProperties": {
+                        "connectionString": ""  # Empty value
+                    }
+                }
+            }
+        }
+
+        from fabric_cicd._common._exceptions import InputError
+
+        with pytest.raises(InputError) as exc_info:
+            workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "sqlendpoint")
+
+        assert "Attribute value not found" in str(exc_info.value)
+        assert "Lakehouse" in str(exc_info.value)
+        assert "name1" in str(exc_info.value)
+
+        # Verify the error case was not cached
+        with pytest.raises(InputError):
+            workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "sqlendpoint")
+        # Should still be only 1 API call (cached error)
+        assert mock_endpoint.invoke.call_count == 2
