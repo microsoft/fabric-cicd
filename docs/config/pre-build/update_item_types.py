@@ -14,9 +14,47 @@ def on_page_markdown(markdown, **kwargs):
 
         supported_item_types = constants.ACCEPTED_ITEM_TYPES
         
-        # Generate multi-column layout with HTML
-        items_list = "\n".join([f"-   {item}" for item in supported_item_types])
-        markdown_content = f'<div class="item-types-grid" markdown="1">\n\n{items_list}\n\n</div>\n'
+        # Categorize item types
+        data_engineering = [
+            "DataPipeline", "Lakehouse", "Notebook", "Warehouse", "SQLDatabase", 
+            "SparkJobDefinition", "Environment", "Dataflow", "CopyJob", "ApacheAirflowJob"
+        ]
+        data_science = [
+            "MLExperiment", "Notebook", "Environment"
+        ]
+        real_time_intelligence = [
+            "Eventhouse", "KQLDatabase", "KQLQueryset", "KQLDashboard", 
+            "Eventstream", "Reflex"
+        ]
+        data_integration = [
+            "MirroredDatabase", "MountedDataFactory", "DataAgent"
+        ]
+        business_intelligence = [
+            "Report", "SemanticModel"
+        ]
+        other = [
+            "GraphQLApi", "UserDataFunction", "VariableLibrary", "OrgApp"
+        ]
+        
+        # Build categorized table
+        markdown_content = "| Category | Item Types |\n"
+        markdown_content += "|----------|------------|\n"
+        
+        categories = [
+            ("Data Engineering", data_engineering),
+            ("Real-Time Intelligence", real_time_intelligence),
+            ("Data Science", data_science),
+            ("Data Integration", data_integration),
+            ("Business Intelligence", business_intelligence),
+            ("Other", other)
+        ]
+        
+        for category_name, items in categories:
+            # Only include items that are in ACCEPTED_ITEM_TYPES
+            category_items = [item for item in items if item in supported_item_types]
+            if category_items:
+                items_str = ", ".join(category_items)
+                markdown_content += f"| {category_name} | {items_str} |\n"
 
         new_markdown = markdown[:start_index] + markdown_content + markdown[end_index:]
         return new_markdown

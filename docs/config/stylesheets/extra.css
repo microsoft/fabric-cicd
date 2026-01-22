@@ -123,32 +123,3 @@ p:has(.md-h2-subheader) {
     width: 100%;
     height: auto; /* Maintain aspect ratio */
 }
-
-/* Multi-column layout for supported item types */
-.item-types-grid {
-    column-count: 3;
-    column-gap: 2rem;
-}
-
-.item-types-grid ul {
-    margin: 0;
-    padding-left: 1.2rem;
-}
-
-.item-types-grid li {
-    break-inside: avoid;
-}
-
-/* Responsive: 2 columns on tablets */
-@media screen and (max-width: 76.1875em) {
-    .item-types-grid {
-        column-count: 2;
-    }
-}
-
-/* Responsive: 1 column on mobile */
-@media screen and (max-width: 44.9375em) {
-    .item-types-grid {
-        column-count: 1;
-    }
-}
