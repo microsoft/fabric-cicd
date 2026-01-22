@@ -1,11 +1,11 @@
-name: Feature Request
+name: "🚀 Feature Request"
 description: Request a feature
-title: "Feature Request"
+title: "[FEATURE]"
 labels: ["enhancement"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for suggesting a feature!
+          value: Thanks for suggesting a new feature! Please provide as much detail as possible to help us understand and evaluate your request.
 
     - type: textarea
       id: problem-description

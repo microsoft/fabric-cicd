@@ -1,6 +1,6 @@
-name: Documentation Feedback
+name: "📝 Documentation Feedback"
 description: Provide documentation feedback
-title: "Documentation Feedback"
+title: "[DOC]"
 labels: ["documentation"]
 body:
     - type: markdown
