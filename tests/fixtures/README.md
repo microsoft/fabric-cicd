@@ -4,7 +4,7 @@
 
 ### Use Cases
 
-Basically, this fixture allows Integration Testing without the costs associated with E2E tests..
+Basically, this fixture allows Integration Testing without the costs associated with E2E tests.
 
 If you peek inside `http_trace.json`, each full deployment of `fabric-cicd` project makes thousands of API calls.
 As the project grows in scope, so does the amount of tests that need to be written to exercise coverage. This becomes
@@ -18,7 +18,8 @@ But what if we could _mimic_ the Fabric API locally?
 
 That's what this fixture provides.
 
-This is a mock REST API Server that mimics `https://api.powerbi.com` and `https://api.fabric.microsoft.com`. We can any number of further mocks in the future as well - as long as the API calls are traced and snapshotted.
+This is a mock REST API Server that can mimic any REST API, including `https://api.powerbi.com` and `https://api.fabric.microsoft.com`. 
+We can add any number of further mocks in the future as well - as long as the API calls are traced and snapshotted.
 
 The idea is, to exercise the public facing `fabric_cicd` API E2E rapidly.
 The mock server loads an `http_trace.json` file to dictate the behavior.
