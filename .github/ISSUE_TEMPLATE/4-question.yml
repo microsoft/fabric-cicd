@@ -20,23 +20,24 @@ body:
       attributes:
           label: Context
           description: |
-              Add context here, include:
+              Add context and include:
               - Your use case or scenario
               - What you've already tried
               - Specifics on what was involved (code snippets, configurations, etc.)
       validations:
-          required: false
+          required: true
 
     - type: input
       id: library-version
       attributes:
-          label: Library Version (if relevant)
+          label: Library Version
+          description: What is the library version? (if relevant)
 
     - type: dropdown
       id: operating-system
       attributes:
-          label: Operating System (if relevant)
-          description: What operating system are you using?
+          label: Operating System
+          description: What operating system are you using? (if relevant)
           options:
               - Not applicable
               - Windows
