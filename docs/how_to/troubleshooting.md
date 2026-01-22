@@ -299,16 +299,6 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 
 **Purpose**: Debug the public API `publish_all_items()` workflow with breakpoints using VS Code's debugger.
 
-**Setup**:
-
-```bash
-# Install dependencies
-uv sync --dev
-
-# Authenticate
-az login
-```
-
 **Quick Start**:
 
 1. Open `devtools/debug_trace_deployment.py`
