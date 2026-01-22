@@ -38,22 +38,23 @@ def on_page_markdown(markdown, **kwargs):
             ]
         }
         
-        # Validation: Ensure all item types are categorized
+        # Validation: Ensure all item types are categorized and vice versa
         all_categorized = set(item for items in categories.values() for item in items)
         uncategorized = set(supported_item_types) - all_categorized
+        extra_categorized = all_categorized - set(supported_item_types)
+        
         if uncategorized:
             raise ValueError(f"Uncategorized item types found: {uncategorized}. Please add them to a category.")
+        if extra_categorized:
+            raise ValueError(f"Invalid item types in categories: {extra_categorized}. These are not in ACCEPTED_ITEM_TYPES.")
         
         # Build categorized table
         markdown_content = "| Category | Item Types |\n"
         markdown_content += "|----------|------------|\n"
         
         for category_name, items in categories.items():
-            # Only include items that are in ACCEPTED_ITEM_TYPES
-            category_items = [item for item in items if item in supported_item_types]
-            if category_items:
-                items_str = ", ".join(category_items)
-                markdown_content += f"| {category_name} | {items_str} |\n"
+            items_str = ", ".join(items)
+            markdown_content += f"| {category_name} | {items_str} |\n"
 
         new_markdown = markdown[:start_index] + markdown_content + markdown[end_index:]
         return new_markdown
