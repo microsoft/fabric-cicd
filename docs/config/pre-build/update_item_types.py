@@ -20,7 +20,7 @@ def on_page_markdown(markdown, **kwargs):
             "SparkJobDefinition", "Environment", "Dataflow", "CopyJob", "ApacheAirflowJob"
         ]
         data_science = [
-            "MLExperiment", "Notebook", "Environment"
+            "MLExperiment"
         ]
         real_time_intelligence = [
             "Eventhouse", "KQLDatabase", "KQLQueryset", "KQLDashboard", 
