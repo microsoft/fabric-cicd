@@ -55,7 +55,7 @@ Suppose you need to add payloads for a new fabric item type or an API call.
 
 The following script creates an HTTP snapshot that is stored in `http_trace.json.gz`, which is moved into `fabric-cicd/tests/fixtures`
 
-Update `item_types_to_deploy` in the script with the item you want to capture HTTP traffic for, then run:
+Update `item_type_in_scope` in the script with the item type you want to capture HTTP traffic for, then run:
 
 ```bash
 export FABRIC_WORKSPACE_ID="your-fabric-workspace-guid"
