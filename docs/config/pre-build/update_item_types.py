@@ -14,31 +14,32 @@ def on_page_markdown(markdown, **kwargs):
 
         supported_item_types = constants.ACCEPTED_ITEM_TYPES
         
-        # Categorize item types
-        data_engineering = [
-            "DataPipeline", "Lakehouse", "Notebook", "Warehouse", "SQLDatabase", 
-            "SparkJobDefinition", "Environment", "Dataflow", "CopyJob", "ApacheAirflowJob"
-        ]
-        data_science = [
-            "MLExperiment"
-        ]
-        real_time_intelligence = [
-            "Eventhouse", "KQLDatabase", "KQLQueryset", "KQLDashboard", 
-            "Eventstream", "Reflex"
-        ]
-        data_integration = [
-            "MirroredDatabase", "MountedDataFactory", "DataAgent"
-        ]
-        business_intelligence = [
-            "Report", "SemanticModel"
-        ]
-        other = [
-            "GraphQLApi", "UserDataFunction", "VariableLibrary", "OrgApp"
-        ]
+        # Define categories with their item types
+        categories = {
+            "Data Engineering": [
+                "DataPipeline", "Lakehouse", "Notebook", "Warehouse", "SQLDatabase", 
+                "SparkJobDefinition", "Environment", "Dataflow", "CopyJob", "ApacheAirflowJob"
+            ],
+            "Real-Time Intelligence": [
+                "Eventhouse", "KQLDatabase", "KQLQueryset", "KQLDashboard", 
+                "Eventstream", "Reflex"
+            ],
+            "Data Science": [
+                "MLExperiment"
+            ],
+            "Data Integration": [
+                "MirroredDatabase", "MountedDataFactory", "DataAgent"
+            ],
+            "Business Intelligence": [
+                "Report", "SemanticModel"
+            ],
+            "Other": [
+                "GraphQLApi", "UserDataFunction", "VariableLibrary", "OrgApp"
+            ]
+        }
         
         # Validation: Ensure all item types are categorized
-        all_categorized = set(data_engineering + data_science + real_time_intelligence + 
-                              data_integration + business_intelligence + other)
+        all_categorized = set(item for items in categories.values() for item in items)
         uncategorized = set(supported_item_types) - all_categorized
         if uncategorized:
             raise ValueError(f"Uncategorized item types found: {uncategorized}. Please add them to a category.")
@@ -47,16 +48,7 @@ def on_page_markdown(markdown, **kwargs):
         markdown_content = "| Category | Item Types |\n"
         markdown_content += "|----------|------------|\n"
         
-        categories = [
-            ("Data Engineering", data_engineering),
-            ("Real-Time Intelligence", real_time_intelligence),
-            ("Data Science", data_science),
-            ("Data Integration", data_integration),
-            ("Business Intelligence", business_intelligence),
-            ("Other", other)
-        ]
-        
-        for category_name, items in categories:
+        for category_name, items in categories.items():
             # Only include items that are in ACCEPTED_ITEM_TYPES
             category_items = [item for item in items if item in supported_item_types]
             if category_items:
