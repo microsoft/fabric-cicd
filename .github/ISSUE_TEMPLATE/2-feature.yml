@@ -71,7 +71,8 @@ body:
       attributes:
           label: Implementation Notes
           description: |
-              If you have technical suggestions for implementation:
-              - Supported or not yet supported item types
-              - Parameterization
-              - publish_all_items / unpublish_all_orphan_items / deploy_with_config behavior
+              If you have technical suggestions for implementation, consider:
+              - Which item types are affected? (Notebook, DataPipeline, Environment, etc.)
+              - Does this require changes to core classes/functions? Which ones?
+              - Does this require changes to the parameterization framework?
+              - Which Fabric REST APIs would be involved?
