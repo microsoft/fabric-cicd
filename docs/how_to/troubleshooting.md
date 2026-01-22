@@ -297,7 +297,7 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 
 #### debug_trace_deployment.py
 
-**Purpose**: Debug the public API `publish_all_items()` workflow with breakpoints using VS Code's debugger.
+**Purpose**: Debug the public APIs called in `publish_all_items()` workflow with breakpoints using VS Code's debugger.
 
 **Quick Start**:
 
