@@ -67,12 +67,12 @@ body:
 
     - type: markdown
       attributes:
-      value: |
-          ## Alternative Support Channels
+          value: |
+              ## Alternative Support Channels
 
-          For different types of questions, you might also consider:
+              For different types of questions, you might also consider:
 
-          - **General Fabric questions**: [Developer Community Forum](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
-          - **Feature suggestions**: [Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
-          - **Enterprise support**: [Fabric Support Team](https://support.fabric.microsoft.com/)
-          - **Community discussions**: [r/MicrosoftFabric on Reddit](https://www.reddit.com/r/MicrosoftFabric/)
+              - **General Fabric questions**: [Developer Community Forum](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
+              - **Feature suggestions**: [Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
+              - **Enterprise support**: [Fabric Support Team](https://support.fabric.microsoft.com/)
+              - **Community discussions**: [r/MicrosoftFabric on Reddit](https://www.reddit.com/r/MicrosoftFabric/)
