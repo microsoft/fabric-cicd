@@ -1,0 +1,201 @@
+id: issue-triage
+name: GitOps.PullRequestIssueManagement
+description: Issue triage workflow
+owner:
+resource: repository
+disabled: false
+
+where:
+configuration:
+  resourceManagementConfiguration:
+
+    eventResponderTasks:
+
+      - description: Label new issues for triage
+        if:
+          - payloadType: Issues
+          - isAction:
+              action: Opened
+        then:
+          - addLabel:
+              label: needs triage
+          - addReply:
+              reply: >
+                Thank you for submitting this issue, ${issueAuthor}.
+                
+                A member of the Fabric CICD team will review your submission and provide feedback shortly.
+
+      - description: Maintainer command to request more info
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '^/needinfo'
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - addLabel:
+              label: needs author feedback
+          - addReply:
+              reply: >
+                ${issueAuthor}, we require additional information to properly evaluate this issue.
+                
+                Please provide the requested details so we can continue with the review process.
+          - removeLabel:
+              label: needs triage
+
+      - description: Author replied; clear "needs author feedback" and stale label
+        if:
+          - payloadType: Issue_Comment
+          - isAction:
+              action: Created
+          - isActivitySender:
+              issueAuthor: true
+          - or:
+              - hasLabel:
+                  label: needs author feedback
+              - hasLabel:
+                  label: no recent activity
+        then:
+          - removeLabel:
+              label: needs author feedback
+          - removeLabel:
+              label: no recent activity
+          - addLabel:
+              label: needs triage
+          - addReply:
+              reply: >
+                Thank you for replying with additional information, ${issueAuthor}.
+                
+                A member of the Fabric CICD team will continue reviewing this issue.
+
+      - description: Maintainer marks triage complete (/triaged)
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '^/triaged'
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - removeLabel:
+              label: needs triage
+          - addReply:
+              reply: >
+                **Triage has been completed** for this issue.
+
+      - description: Accept as help wanted
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '^/help-wanted'
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - removeLabel:
+              label: needs triage
+          - addLabel:
+              label: help wanted
+          - addReply:
+              reply: >
+                This issue has been marked as **help wanted**. 
+                
+                Community contributions are welcome and appreciated.
+
+      - description: Accept as good first issue
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '^/good-first-issue'
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - addLabel:
+              label: good first issue
+          - addLabel:
+              label: help wanted
+          - removeLabel:
+              label: needs triage
+          - addReply:
+              reply: >
+                This issue has been marked as a **good first issue**.
+                
+                This represents an excellent opportunity for new contributors to get involved with the project.
+
+      - description: Mark wontfix and close
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '^/wontfix'
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - addLabel:
+              label: wontfix
+          - removeLabel:
+              label: needs triage
+          - addReply:
+              reply: >
+                This issue is being closed as **wontfix**.
+                
+                We appreciate your feedback and the time you took to report this issue.
+          - closeIssue
+
+      - description: Duplicate command → label, reply, and close
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '\/dup(licate|e)?(\s+of)?\s+\#[\d]+' # /dup of #123, /duplicate of #123
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - addLabel:
+              label: duplicate
+          - addReply:
+              reply: >
+                This issue appears to be a **duplicate** of the referenced issue and will be closed.
+                
+                Please continue discussion in the original issue to consolidate tracking and avoid fragmentation.
+          - closeIssue
+
+      - description: Maintainer command to mark as bug
+        if:
+          - payloadType: Issue_Comment
+          - commentContains:
+              pattern: '^/bug'
+              isRegex: true
+          - or:
+              - activitySenderHasPermission:
+                  permission: Admin
+              - activitySenderHasPermission:
+                  permission: Write
+        then:
+          - removeLabel:
+              label: needs triage
+          - addLabel:
+              label: bug
+          - addReply:
+              reply: >
+                This issue has been triaged and identified as a **bug**. Our team will review and prioritize it accordingly.
