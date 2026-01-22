@@ -1,6 +1,6 @@
 name: "❓ Question"
 description: Ask a question about fabric-cicd
-title: "[QUESTION]"
+title: "[QUESTION] "
 labels: ["question"]
 body:
     - type: markdown

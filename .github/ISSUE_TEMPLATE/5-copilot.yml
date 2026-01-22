@@ -1,6 +1,6 @@
-name: GitHub Copilot Assignment
+name: "🤖 GitHub Copilot Assignment"
 description: Issue template for tasks assigned to GitHub Copilot Agent
-title: "Copilot"
+title: "[COPILOT] "
 labels: ["copilot"]
 body:
     - type: markdown
