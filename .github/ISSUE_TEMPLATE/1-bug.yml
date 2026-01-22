@@ -7,14 +7,6 @@ body:
       attributes:
           value: Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
 
-    - type: textarea
-      id: problem-description
-      attributes:
-          label: What is the problem?
-          description: Describe the bug you encountered and what the gap is.
-      validations:
-          required: true
-
     - type: input
       id: library-version
       attributes:
@@ -55,6 +47,14 @@ body:
               - Service principal (federated credential)
               - Managed identity
               - Other
+      validations:
+          required: true
+
+    - type: textarea
+      id: problem-description
+      attributes:
+          label: What is the problem?
+          description: Describe the bug you encountered and what the gap is.
       validations:
           required: true
 
