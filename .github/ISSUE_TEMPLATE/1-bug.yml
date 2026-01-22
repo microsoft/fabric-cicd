@@ -5,7 +5,7 @@ labels: ["bug"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for reporting a bug!
+          value: Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
 
     - type: input
       id: library-version
@@ -15,21 +15,78 @@ body:
       validations:
           required: true
 
-    - type: textarea
-      id: problem-description
+    - type: input
+      id: python-version
       attributes:
-          label: What is the problem?
-          description: Describe what the gap is and how to reproduce it.
+          label: Python Version
+          description: Run `python --version` to get your version
+          placeholder: e.g., Python 3.11.5
+      validations:
+          required: true
+
+    - type: dropdown
+      id: operating-system
+      attributes:
+          label: Operating System
+          description: What operating system are you using?
+          options:
+              - Windows
+              - macOS
+              - Linux
+      validations:
+          required: true
+
+    - type: dropdown
+      id: auth-method
+      attributes:
+          label: Authentication Method
+          description: How are you authenticating?
+          options:
+              - Azure CLI (az login)
+              - Service principal (secret)
+              - Service principal (certificate)
+              - Service principal (federated credential)
+              - Managed identity
+              - Other
       validations:
           required: true
 
     - type: textarea
-      id: solution-description
+      id: problem-description
       attributes:
-          label: Is there an ideal solution?
-          description: Describe the ideal solution if there is one.
+          label: What is the problem?
+          description: Describe what the gap is.
+          placeholder: Describe the bug you encountered...
       validations:
-          required: false
+          required: true
+
+    - type: textarea
+      id: reproduction-steps
+      attributes:
+          label: Steps to Reproduce
+          description: Please provide step-by-step instructions to reproduce the bug
+          placeholder: |
+              1. Create Fabric item in a certain way '...'
+              2. Run deployment using auth type and x,y,z setup'...'
+              3. See error
+      validations:
+          required: true
+
+    - type: textarea
+      id: expected-behavior
+      attributes:
+          label: Expected Behavior
+          description: What did you expect to happen?
+      validations:
+          required: true
+
+    - type: textarea
+      id: actual-behavior
+      attributes:
+          label: Actual Behavior
+          description: What actually happened? Include error messages if applicable.
+      validations:
+          required: true
 
     - type: textarea
       id: additional-context
