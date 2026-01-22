@@ -302,7 +302,7 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 **Quick Start**:
 
 1. Open `devtools/debug_trace_deployment.py`
-2. Set breakpoint(s) in the code
+2. Set breakpoint(s) in the code - e.g. prior to `publish_all_items`
 3. Update `.vscode/launch.json` with your workspace ID in `FABRIC_WORKSPACE_ID`
 4. Press **F5** → Select "Debug: Publish All Items"
 
