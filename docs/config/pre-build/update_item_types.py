@@ -36,6 +36,13 @@ def on_page_markdown(markdown, **kwargs):
             "GraphQLApi", "UserDataFunction", "VariableLibrary", "OrgApp"
         ]
         
+        # Validation: Ensure all item types are categorized
+        all_categorized = set(data_engineering + data_science + real_time_intelligence + 
+                              data_integration + business_intelligence + other)
+        uncategorized = set(supported_item_types) - all_categorized
+        if uncategorized:
+            raise ValueError(f"Uncategorized item types found: {uncategorized}. Please add them to a category.")
+        
         # Build categorized table
         markdown_content = "| Category | Item Types |\n"
         markdown_content += "|----------|------------|\n"
