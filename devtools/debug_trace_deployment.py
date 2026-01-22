@@ -12,8 +12,6 @@ from pathlib import Path
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
 
-from azure.identity import DefaultAzureCredential
-
 import fabric_cicd
 
 
