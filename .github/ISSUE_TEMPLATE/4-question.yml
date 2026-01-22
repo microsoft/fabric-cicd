@@ -8,7 +8,7 @@ body:
           value: Thanks for your question! Please provide as much detail as possible to help us assist you effectively.
 
     - type: textarea
-      id: trying-to-achieve
+      id: question
       attributes:
           label: What is the question?
           description: A clear and concise description of what you'd like to know or need help with.
@@ -21,9 +21,9 @@ body:
           label: Context
           description: |
               Add context here, include:
-               - Your use case or scenario
-               - What you've already tried
-               - Specifics on what was involved (code snippets, configurations, etc.)
+              - Your use case or scenario
+              - What you've already tried
+              - Specifics on what was involved (code snippets, configurations, etc.)
       validations:
           required: false
 
@@ -31,8 +31,6 @@ body:
       id: library-version
       attributes:
           label: Library Version (if relevant)
-      validations:
-          required: false
 
     - type: dropdown
       id: operating-system
@@ -44,8 +42,7 @@ body:
               - Windows
               - macOS
               - Linux
-      validations:
-          required: false
+          default: 0
 
     - type: checkboxes
       id: documentation-check
@@ -57,8 +54,6 @@ body:
                 required: true
               - label: I have reviewed the fabric-cicd documentation
                 required: true
-      validations:
-          required: false
 
     - type: textarea
       id: additional-information
@@ -69,8 +64,6 @@ body:
               - Code snippets
               - Screenshots (if applicable)
               - Error messages (if any)
-      validations:
-          required: false
 
     - type: markdown
       attributes:
