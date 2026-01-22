@@ -42,6 +42,7 @@ fabric-cicd includes several debug scripts in the `devtools/` directory that all
 - `debug_local.py` or `debug_local config.py` - Test full deployment workflows
 - `debug_parameterization.py` - Validate parameter files without deploying
 - `debug_api.py` - Test Fabric REST API calls directly
+- `debug_trace_deployment.py` - Perform and end-to-end deployment against a Fabric Workspace and capture HTTP Traces to be used for Integration Tests
 
 **Tip:** Using these scripts locally can catch configuration errors early, saving time in your CI/CD pipeline.
 
