@@ -14,13 +14,9 @@ body:
           label: Use Case / Problem
           description: |
               Describe the problem or use case that this feature would solve. Include:
-              - What you're trying to accomplish
+              - What problem are you trying to solve?
               - Current limitations or pain points
               - How this fits into your workflow
-          placeholder: |
-              What problem are you trying to solve?
-              What are the current limitations?
-              How does this fit into your workflow?
       validations:
           required: true
 
@@ -33,7 +29,6 @@ body:
               - Specific functionality
               - Expected behavior and output
               - Integration with existing fabric-cicd features
-          placeholder: Describe your proposed solution...
       validations:
           required: true
 
@@ -46,10 +41,6 @@ body:
               - Workarounds you're currently using
               - Other tools or approaches that could solve this
               - Why those alternatives are insufficient
-          placeholder: |
-              What workarounds are you currently using?
-              What other approaches have you considered?
-              Why are those alternatives insufficient?
 
     - type: checkboxes
       id: impact-assessment
@@ -81,8 +72,6 @@ body:
           label: Implementation Notes
           description: |
               If you have technical suggestions for implementation:
-              - Relevant Fabric REST APIs (https://learn.microsoft.com/en-us/rest/api/fabric/)
-              - Item types affected (Notebook, DataPipeline, Environment, etc.)
-              - Parameter file (parameter.yml) changes needed
-              - publish_all_items / unpublish_all_orphan_items behavior changes
-          placeholder: Technical implementation suggestions...
+              - Supported or not yet supported item types
+              - Parameterization
+              - publish_all_items / unpublish_all_orphan_items / deploy_with_config behavior
