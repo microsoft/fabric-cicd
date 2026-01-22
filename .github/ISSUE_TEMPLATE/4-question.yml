@@ -52,11 +52,11 @@ body:
       attributes:
           label: Have you checked the documentation?
           description: Please confirm you've reviewed the available resources
-      options:
-          - label: I have searched existing GitHub issues
-            required: true
-          - label: I have reviewed the fabric-cicd documentation
-            required: true
+          options:
+              - label: I have searched existing GitHub issues
+                required: true
+              - label: I have reviewed the fabric-cicd documentation
+                required: true
       validations:
           required: false
 
