@@ -94,6 +94,6 @@ body:
       id: additional-context
       attributes:
           label: Additional context, screenshots, logs, error output, etc
-          description: Add any other relevant details like specific workspace/item types involved, related issues or documentation, API request IDs. If it is long, please paste to https://gist.github.com/ and insert the link here.  Ensure to strip any non public information.
+          description: Add any other relevant details like specific workspace/item types involved, related issues or documentation, API request IDs. If it is long, please paste to https://gist.github.com/ and insert the link here. Ensure to strip any non public information.
       validations:
           required: false

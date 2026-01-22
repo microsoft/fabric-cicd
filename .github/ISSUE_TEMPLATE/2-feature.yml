@@ -61,7 +61,7 @@ body:
           options:
               - label: I understand this feature should maintain backward compatibility
                 required: true
-              - label: I confirm this feature request does not introduce performance regressions for existing workflows
+              - label: I understand this feature should not introduce performance regressions for existing workflows
                 required: true
               - label: I acknowledge that new features must follow fabric-cicd's established patterns and conventions
                 required: true
