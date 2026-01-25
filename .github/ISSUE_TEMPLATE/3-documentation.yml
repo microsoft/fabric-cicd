@@ -5,28 +5,79 @@ labels: ["documentation"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for providing documentation feedback!
+          value: |
+              Thanks for taking the time to provide documentation feedback! 
+              Please include as much detail as possible to help us improve our documentation.
 
     - type: input
       id: documentation-location
       attributes:
           label: URL to documentation
           description: Provide a URL to the documentation location.
+          placeholder: "https://microsoft.github.io/fabric-cicd/..."
       validations:
           required: true
+
+    - type: dropdown
+      id: feedback-type
+      attributes:
+          label: Type of feedback
+          description: What kind of documentation issue is this?
+          options:
+              - Unclear or confusing content
+              - Missing information
+              - Incorrect or outdated information
+              - Typo or grammatical error
+              - Code example issue
+              - Broken link
+              - Suggestion for improvement
+              - Other
+      validations:
+          required: true
+
+    - type: textarea
+      id: current-content
+      attributes:
+          label: Current content (if applicable)
+          description: Copy the relevant section of documentation that needs improvement.
+          placeholder: "Paste the current text or describe what exists..."
+      validations:
+          required: false
 
     - type: textarea
       id: feedback
       attributes:
           label: Feedback
-          description: What is the feedback?
+          description: What is the issue or what improvement would you suggest?
+          placeholder: "Describe what's wrong or what could be better..."
       validations:
           required: true
+
+    - type: textarea
+      id: suggested-change
+      attributes:
+          label: Suggested change
+          description: If you have a specific suggestion, please provide it here.
+          placeholder: "Provide your suggested text, code, or improvement..."
+      validations:
+          required: false
+
+    - type: dropdown
+      id: user-experience
+      attributes:
+          label: Experience with fabric-cicd
+          description: This helps us understand our audience better.
+          options:
+              - New to fabric-cicd
+              - Some experience with fabric-cicd
+              - Experienced user
+      validations:
+          required: false
 
     - type: textarea
       id: additional-context
       attributes:
           label: Additional context
-          description: Add any other context or screenshots here.
+          description: Add any other context, screenshots, or related links here.
       validations:
           required: false
