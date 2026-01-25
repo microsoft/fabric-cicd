@@ -39,7 +39,10 @@ body:
       attributes:
           label: Affected Files/Components
           description: List specific files, modules, or components involved.
-          placeholder: src/fabric_cicd/fabric_workspace.py, tests/test_fabric_workspace.py...
+          placeholder: |
+              - src/fabric_cicd/fabric_workspace.py
+              - tests/test_fabric_workspace.py
+              - ...
       validations:
           required: false
 
@@ -70,13 +73,15 @@ body:
       id: success-criteria
       attributes:
           label: Success Criteria
-          description: Define completion requirements.
-          placeholder: |
-              - [ ] All existing tests pass
-              - [ ] New tests added for feature
+          description: Define completion requirements. Remove items that don't apply.
+          value: |
+              - [ ] All existing tests pass (`uv run pytest -v`)
+              - [ ] New tests added for changes
               - [ ] `uv run ruff format` passes
               - [ ] `uv run ruff check` passes
+              - [ ] Import test passes (`uv run python -c "from fabric_cicd import FabricWorkspace"`)
               - [ ] Documentation updated (if applicable)
+              - [ ] PR title follows format: "Fixes #XXX - Description"
       validations:
           required: false
 

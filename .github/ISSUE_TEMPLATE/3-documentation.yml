@@ -36,8 +36,8 @@ body:
     - type: textarea
       id: current-content
       attributes:
-          label: Current content (if applicable)
-          description: Copy the relevant section of documentation that needs improvement.
+          label: Current content
+          description: Copy the relevant section of documentation that needs improvement (if applicable).
           placeholder: "Paste the current text or describe what exists..."
       validations:
           required: false
