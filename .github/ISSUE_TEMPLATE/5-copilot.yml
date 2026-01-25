@@ -39,7 +39,7 @@ body:
       attributes:
           label: Affected Files/Components
           description: List specific files, modules, or components involved.
-          placeholder: |-
+          placeholder: |
               src/fabric_cicd/fabric_workspace.py
               tests/test_fabric_workspace.py
       validations:
