@@ -5,9 +5,7 @@ labels: ["documentation"]
 body:
     - type: markdown
       attributes:
-          value: |
-              Thanks for taking the time to provide documentation feedback! 
-              Please include as much detail as possible to help us improve our documentation.
+          value: Thanks for taking the time to provide documentation feedback! Please include as much detail as possible to help us improve our documentation.
 
     - type: input
       id: documentation-location

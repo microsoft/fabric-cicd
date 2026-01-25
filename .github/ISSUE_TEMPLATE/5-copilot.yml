@@ -5,9 +5,7 @@ labels: ["copilot"]
 body:
     - type: markdown
       attributes:
-          value: |
-              Used internally to raise issues specifically for GitHub Copilot agent assistance.
-              Provide as much context as possible to help the agent work efficiently.
+          value: Used internally to raise issues specifically for GitHub Copilot agent assistance. Provide as much context as possible to help the agent work efficiently.
 
     - type: dropdown
       id: task-type
@@ -20,19 +18,19 @@ body:
               - Refactoring
               - Documentation
               - Tests
-              - CI/CD pipeline
+              - Other
       validations:
           required: true
 
     - type: textarea
-      id: problem-description
+      id: task-description
       attributes:
-          label: Problem Description
-          description: Describe the issue, error messages, and likely cause.
+          label: Task Description
+          description: Describe what needs to be done and any relevant context.
           placeholder: |
-              What's happening:
-              Error message (if any):
-              Likely cause:
+              What needs to be done:
+              Context/Background:
+              Error message (if applicable):
       validations:
           required: true
 
@@ -41,17 +39,15 @@ body:
       attributes:
           label: Affected Files/Components
           description: List specific files, modules, or components involved.
-          placeholder: |
-              - src/fabric_cicd/fabric_workspace.py
-              - tests/test_workspace.py
+          placeholder: src/fabric_cicd/fabric_workspace.py, tests/test_fabric_workspace.py...
       validations:
           required: false
 
     - type: textarea
       id: reproduction-steps
       attributes:
-          label: Reproduction Steps (for bugs)
-          description: Steps to reproduce the issue.
+          label: Reproduction Steps
+          description: Steps to reproduce the issue (for bugs).
           placeholder: |
               1. Run `uv run pytest tests/test_example.py`
               2. Observe error...
