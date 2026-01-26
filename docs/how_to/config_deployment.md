@@ -22,7 +22,7 @@ from fabric_cicd import deploy_with_config
 
 # Deploy using a config file
 deploy_with_config(
-    config_file_path="C:/dev/workspace/config.yml",
+    config_file_path="C:/dev/workspace/config.yml", # required
     environment="dev"
 )
 ```
@@ -96,22 +96,22 @@ core:
 
 <span class="md-h4-nonanchor">Required Fields:</span>
 
--   Workspace Identifier:
-    -   Workspace ID takes precedence over workspace name when both are provided.
-    -   `workspace_id` must be a valid string GUID.
--   Repository Directory Path:
-    -   Supports relative or absolute path.
-    -   Relative path must be relative to the `config.yml` file location.
+- Workspace Identifier:
+    - Workspace ID takes precedence over workspace name when both are provided.
+    - `workspace_id` must be a valid string GUID.
+- Repository Directory Path:
+    - Supports relative or absolute path.
+    - Relative path must be relative to the `config.yml` file location.
 
 <span class="md-h4-nonanchor">Optional Fields:</span>
 
--   Item Types in Scope:
-    -   If `item_types_in_scope` is not specified, all item types will be included by default.
-    -   Item types must be provided as a list, use `-` or `[]` notation.
-    -   Only accepts supported item types.
--   Parameter Path:
-    -   Supports relative or absolute path.
-    -   Relative path must be relative to the `config.yml` file location.
+- Item Types in Scope:
+    - If `item_types_in_scope` is not specified, all item types will be included by default.
+    - Item types must be provided as a list, use `-` or `[]` notation.
+    - Only accepts supported item types.
+- Parameter Path:
+    - Supports relative or absolute path.
+    - Relative path must be relative to the `config.yml` file location.
 
 ### Publish Settings
 
@@ -253,7 +253,7 @@ core:
 
 ### Required vs Optional Fields
 
-Fields are categorized as **required** or **optional**, which affects how missing environment values are handled:
+Fields are categorized as **required** or **optional**, which affects how missing environment values are handled when environment is passed into `deploy_with_config()`:
 
 | Field                                   | Required | Environment Missing Behavior    |
 | --------------------------------------- | -------- | ------------------------------- |
@@ -298,16 +298,16 @@ publish:
 
 In this example:
 
--   Deploying to `dev`: `folder_exclude_regex` = `"^test_.*"`, `skip` = `true`
--   Deploying to `test`: No folder exclusion applied, `skip` = `false`
--   Deploying to `prod`: No folder exclusion applied, `skip` = `false`
+- Deploying to `dev`: `folder_exclude_regex` = `"^test_.*"`, `skip` = `true`
+- Deploying to `test`: No folder exclusion applied, `skip` = `false`
+- Deploying to `prod`: No folder exclusion applied, `skip` = `false`
 
 ### Logging Behavior
 
 When an optional field uses environment mapping and does not include the target environment:
 
--   **Important optional fields** (`item_types_in_scope`, `parameter`): A **warning** is logged to alert users that the setting is being skipped.
--   **Other optional fields**: A **debug** message is logged, visible only when debug logging is enabled.
+- **Important optional fields** (`item_types_in_scope`, `parameter`): A **warning** is logged to alert users that the setting is being skipped.
+- **Other optional fields**: A **debug** message is logged, visible only when debug logging is enabled.
 
 Example log output when deploying to `prod` with the config above:
 
@@ -441,12 +441,12 @@ deploy_with_config(
 
 **Important Considerations:**
 
--   **Caution:** Exercise caution when overriding configuration values for _production_ environments.
--   **Support:** Configuration overrides are supported for all sections and settings in the configuration file.
--   **Rules:**
-    -   Existing values can be overridden for any field in the configuration.
-    -   New values can only be added for optional fields that aren't present in the original configuration.
-    -   Required fields must exist in the original configuration in order to override.
+- **Caution:** Exercise caution when overriding configuration values for _production_ environments.
+- **Support:** Configuration overrides are supported for all sections and settings in the configuration file.
+- **Rules:**
+    - Existing values can be overridden for any field in the configuration.
+    - New values can only be added for optional fields that aren't present in the original configuration.
+    - Required fields must exist in the original configuration in order to override.
 
 ## Troubleshooting Guide
 
