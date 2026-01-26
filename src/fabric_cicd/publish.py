@@ -213,7 +213,6 @@ def publish_all_items(
     # Publish items in the defined order synchronously
     total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
     publishers_with_async_check: list[items.ItemPublisher] = []
-
     for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
         print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
         publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
