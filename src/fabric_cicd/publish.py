@@ -11,7 +11,6 @@ from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
 from fabric_cicd import constants
-from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._config_utils import (
     apply_config_overrides,
     extract_publish_settings,
@@ -211,24 +210,16 @@ def publish_all_items(
         )
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-    def _should_publish_item_type(item_type: ItemType) -> bool:
-        """Check if an item type should be published based on scope and repository content."""
-        return (
-            item_type.value in fabric_workspace_obj.item_type_in_scope
-            and item_type.value in fabric_workspace_obj.repository_items
-        )
-
     # Publish items in the defined order synchronously
     total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
     publishers_with_async_check: list[items.ItemPublisher] = []
 
-    for order_num, item_type in constants.SERIAL_ITEM_PUBLISH_ORDER.items():
-        if _should_publish_item_type(item_type):
-            print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
-            publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
-            publisher.publish_all()
-            if publisher.has_async_publish_check:
-                publishers_with_async_check.append(publisher)
+    for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
+        print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
+        publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
+        publisher.publish_all()
+        if publisher.has_async_publish_check:
+            publishers_with_async_check.append(publisher)
 
     # Check asynchronous publish status for relevant item types
     for publisher in publishers_with_async_check:
@@ -297,9 +288,6 @@ def unpublish_all_orphan_items(
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    is_items_to_include_list = False
-    regex_pattern = check_regex(item_name_exclude_regex)
-
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
     print_header("Unpublishing Orphaned Items")
@@ -315,36 +303,18 @@ def unpublish_all_orphan_items(
         logger.warning(
             "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
         )
-        is_items_to_include_list = True
 
     # Build unpublish order based on reversed publish order, scope, and feature flags
-    unpublish_order = []
-    for item_type in reversed(list(constants.SERIAL_ITEM_PUBLISH_ORDER.values())):
-        if (
-            item_type.value in fabric_workspace_obj.item_type_in_scope
-            and item_type.value in fabric_workspace_obj.deployed_items
-        ):
-            unpublish_flag = constants.UNPUBLISH_FLAG_MAPPING.get(item_type.value)
-            # Append item_type if no feature flag is required or the corresponding flag is enabled
-            if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
-                unpublish_order.append(item_type.value)
-            elif unpublish_flag and unpublish_flag not in constants.FEATURE_FLAG:
-                # Log warning when unpublish is skipped due to missing feature flag
-                logger.warning(
-                    f"Skipping unpublish for {item_type.value} items because the '{unpublish_flag}' feature flag is not enabled."
-                )
+    for item_type in items.ItemPublisher.get_item_types_to_unpublish(fabric_workspace_obj):
+        to_delete_list = items.ItemPublisher.get_orphaned_items(
+            fabric_workspace_obj,
+            item_type,
+            item_name_exclude_regex=item_name_exclude_regex if not items_to_include else None,
+            items_to_include=items_to_include,
+        )
 
-    for item_type in unpublish_order:
-        deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
-        repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
-
-        to_delete_set = deployed_names - repository_names
-
-        if is_items_to_include_list:
-            to_delete_list = [name for name in to_delete_set if f"{name}.{item_type}" in items_to_include]
+        if items_to_include and to_delete_list:
             logger.debug(f"Items to include for unpublishing ({item_type}): {to_delete_list}")
-        else:
-            to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
         publisher = items.ItemPublisher.create(ItemType(item_type), fabric_workspace_obj)
         if to_delete_list and publisher.has_dependency_tracking:

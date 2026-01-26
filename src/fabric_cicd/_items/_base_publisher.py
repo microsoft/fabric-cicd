@@ -214,6 +214,101 @@ class ItemPublisher(Publisher):
 
         return publisher_class(fabric_workspace_obj)
 
+    @staticmethod
+    def get_item_types_to_publish(fabric_workspace_obj: "FabricWorkspace") -> list[tuple[int, ItemType]]:
+        """
+        Get the ordered list of item types that should be published.
+
+        Returns item types that are both in scope and have items in the repository,
+        ordered according to SERIAL_ITEM_PUBLISH_ORDER.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object containing scope and repository info.
+
+        Returns:
+            List of (order_num, ItemType) tuples for item types that should be published.
+        """
+        from fabric_cicd import constants
+
+        result = []
+        for order_num, item_type in constants.SERIAL_ITEM_PUBLISH_ORDER.items():
+            if (
+                item_type.value in fabric_workspace_obj.item_type_in_scope
+                and item_type.value in fabric_workspace_obj.repository_items
+            ):
+                result.append((order_num, item_type))
+        return result
+
+    @staticmethod
+    def get_item_types_to_unpublish(fabric_workspace_obj: "FabricWorkspace") -> list[str]:
+        """
+        Get the ordered list of item types that should be unpublished.
+
+        Returns item types in reverse publish order that are in scope, have deployed items,
+        and meet feature flag requirements. Logs warnings for skipped item types.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object containing scope and deployed items info.
+
+        Returns:
+            List of item type strings in the order they should be unpublished.
+        """
+        from fabric_cicd import constants
+
+        unpublish_order = []
+        for item_type in reversed(list(constants.SERIAL_ITEM_PUBLISH_ORDER.values())):
+            if (
+                item_type.value in fabric_workspace_obj.item_type_in_scope
+                and item_type.value in fabric_workspace_obj.deployed_items
+            ):
+                unpublish_flag = constants.UNPUBLISH_FLAG_MAPPING.get(item_type.value)
+                # Append item_type if no feature flag is required or the corresponding flag is enabled
+                if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
+                    unpublish_order.append(item_type.value)
+                elif unpublish_flag and unpublish_flag not in constants.FEATURE_FLAG:
+                    # Log warning when unpublish is skipped due to missing feature flag
+                    logger.warning(
+                        f"Skipping unpublish for {item_type.value} items because the '{unpublish_flag}' feature flag is not enabled."
+                    )
+        return unpublish_order
+
+    @staticmethod
+    def get_orphaned_items(
+        fabric_workspace_obj: "FabricWorkspace",
+        item_type: str,
+        item_name_exclude_regex: Optional[str] = None,
+        items_to_include: Optional[list[str]] = None,
+    ) -> list[str]:
+        """
+        Get the list of orphaned items that should be unpublished for a given item type.
+
+        Orphaned items are those deployed but not present in the repository,
+        filtered by exclusion regex or items_to_include list.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object containing deployed and repository items.
+            item_type: The item type string to check for orphans.
+            item_name_exclude_regex: Optional regex pattern to exclude items from unpublishing.
+            items_to_include: Optional list of items in "name.type" format to include for unpublishing.
+
+        Returns:
+            List of item names that should be unpublished.
+        """
+        import re
+
+        deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
+        repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
+        to_delete_set = deployed_names - repository_names
+
+        if items_to_include is not None:
+            # Filter to only items in the include list
+            return [name for name in to_delete_set if f"{name}.{item_type}" in items_to_include]
+        if item_name_exclude_regex:
+            # Filter out items matching the exclude regex
+            regex_pattern = re.compile(item_name_exclude_regex)
+            return [name for name in to_delete_set if not regex_pattern.match(name)]
+        return list(to_delete_set)
+
     # endregion
 
     # region Public Methods
