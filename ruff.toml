@@ -29,6 +29,7 @@ ignore = [
     "D401",   # First line should be in imperative mood
     "D415",   # First line should end with a period, question mark, or exclamation point
     "ANN003", # Missing type annotation for kwargs
+    "RUF100", # Unused noqa directive (version-dependent on ruff and not deterministic)
 ]
 
 pydocstyle.convention = "google"

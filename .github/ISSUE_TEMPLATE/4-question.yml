@@ -1,24 +1,79 @@
-name: Question
-description: Ask a question
-title: "Question"
+name: "❓ Question"
+description: Ask a question about fabric-cicd
+title: "[QUESTION] "
 labels: ["question"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for asking a question!
+          value: Thanks for your question! Please provide as much detail as possible to help us assist you effectively.
 
     - type: textarea
-      id: trying-to-achieve
+      id: question
       attributes:
           label: What is the question?
-          description: Clearly state the question.
+          description: A clear and concise description of what you'd like to know or need help with.
       validations:
           required: true
 
     - type: textarea
-      id: additional-context
+      id: context
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Context
+          description: |
+              Add context and include:
+              - Your use case or scenario
+              - What you've already tried
+              - Specifics on what was involved (code snippets, configurations, etc.)
       validations:
-          required: false
+          required: true
+
+    - type: input
+      id: library-version
+      attributes:
+          label: Library Version
+          description: What is the library version? (if relevant)
+
+    - type: dropdown
+      id: operating-system
+      attributes:
+          label: Operating System
+          description: What operating system are you using? (if relevant)
+          options:
+              - Not applicable
+              - Windows
+              - macOS
+              - Linux
+          default: 0
+
+    - type: checkboxes
+      id: documentation-check
+      attributes:
+          label: Have you checked the documentation?
+          description: Please confirm you've reviewed the available resources
+          options:
+              - label: I have searched existing GitHub issues
+                required: true
+              - label: I have reviewed the fabric-cicd documentation
+                required: true
+
+    - type: textarea
+      id: additional-information
+      attributes:
+          label: Additional Information
+          description: |
+              Any additional details that might help us answer your question:
+              - Code snippets
+              - Screenshots (if applicable)
+              - Error messages (if any)
+
+    - type: markdown
+      attributes:
+          value: |
+              ## Alternative Support Channels
+
+              For different types of questions, you might also consider:
+
+              - **General Fabric questions**: [Developer Community Forum](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
+              - **Feature suggestions**: [Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
+              - **Enterprise support**: [Fabric Support Team](https://support.fabric.microsoft.com/)
+              - **Community discussions**: [r/MicrosoftFabric on Reddit](https://www.reddit.com/r/MicrosoftFabric/)

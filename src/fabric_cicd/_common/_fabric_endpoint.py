@@ -7,6 +7,7 @@ import base64
 import datetime
 import json
 import logging
+import os
 import time
 from typing import Optional
 
@@ -18,6 +19,7 @@ from azure.core.exceptions import (
 
 import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
+from fabric_cicd._common._http_tracer import HTTPTracer, HTTPTracerFactory
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +27,26 @@ logger = logging.getLogger(__name__)
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
 
-    def __init__(self, token_credential: TokenCredential, requests_module: requests = requests) -> None:
+    def __init__(
+        self,
+        token_credential: TokenCredential,
+        requests_module: requests = requests,
+        http_tracer: Optional[HTTPTracer] = None,
+    ) -> None:
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
 
         Args:
             token_credential: The token credential.
             requests_module: The requests module.
+            http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
         """
         self.aad_token = None
         self.aad_token_expiration = None
         self.token_credential = token_credential
         self.requests = requests_module
+        self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
+
         self._refresh_token()
 
     def invoke(
@@ -46,6 +56,7 @@ class FabricEndpoint:
         body: str = "{}",
         files: Optional[dict] = None,
         poll_long_running: bool = True,
+        max_duration: int = 300,
         **kwargs,
     ) -> dict:
         """
@@ -57,6 +68,7 @@ class FabricEndpoint:
             body: The JSON body to include in the request. Defaults to an empty JSON object.
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
+            max_duration: Maximum execution duration in seconds. Defaults to 300 (5 minutes).
             **kwargs: Additional keyword arguments to pass to the method.
         """
         exit_loop = False
@@ -73,7 +85,10 @@ class FabricEndpoint:
                 }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
+
+                self.http_tracer.capture_request(method, url, headers, body, files)
                 response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
+                self.http_tracer.capture_response(response)
 
                 iteration_count += 1
 
@@ -95,6 +110,8 @@ class FabricEndpoint:
                         body,
                         long_running,
                         iteration_count,
+                        max_duration,
+                        start_time,
                         **kwargs,
                     )
 
@@ -108,6 +125,9 @@ class FabricEndpoint:
 
         end_time = time.time()
         logger.debug(f"Request completed in {end_time - start_time} seconds")
+
+        if exit_loop:
+            self.http_tracer.save()
 
         return {
             "header": dict(response.headers),
@@ -173,6 +193,8 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
+    max_duration: int | None = None,
+    start_time: float | None = None,
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -186,6 +208,8 @@ def _handle_response(
         body: The JSON body used in the request.
         long_running: A boolean indicating if the operation is long-running.
         iteration_count: The current iteration count of the loop.
+        max_duration: Maximum execution duration in seconds. Defaults to None.
+        start_time: The start time of the request in seconds since epoch. Defaults to None.
     """
     exit_loop = False
     retry_after = response.headers.get("Retry-After", 60)
@@ -227,7 +251,10 @@ def _handle_response(
                 # No Location header means operation completed immediately
                 exit_loop = True
             else:
-                time.sleep(1)
+                # We check for system level config for retry delay override, e.g. in unit
+                # tests where we want to rip through thousands of API calls quickly. If not
+                # set, e.g. at runtime, we use normal polling delay of default 1 second.
+                time.sleep(float(os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE_SECONDS.value, 1)))
                 long_running = True
 
     # Handle successful responses
@@ -243,9 +270,22 @@ def _handle_response(
         handle_retry(
             attempt=iteration_count,
             base_delay=10,
-            max_retries=5,
+            max_duration=max_duration,
+            start_time=start_time,
             response_retry_after=retry_after,
             prepend_message="API is throttled.",
+        )
+
+    # Handle internal server errors via retry,
+    # rather than failing the deployment run
+    elif response.status_code == 500:
+        handle_retry(
+            attempt=iteration_count,
+            base_delay=10,
+            max_duration=max_duration,
+            start_time=start_time,
+            response_retry_after=retry_after,
+            prepend_message="Server error encountered.",
         )
 
     # Handle unauthorized access
@@ -260,9 +300,10 @@ def _handle_response(
     ):
         handle_retry(
             attempt=iteration_count,
-            base_delay=30,
-            max_retries=5,
-            response_retry_after=300,
+            base_delay=constants.RETRY_BASE_DELAY_SECONDS,
+            max_duration=constants.RETRY_MAX_DURATION_SECONDS,
+            start_time=start_time,
+            response_retry_after=constants.RETRY_AFTER_SECONDS,
             prepend_message="Item name is reserved.",
         )
 
@@ -307,22 +348,29 @@ def handle_retry(
     base_delay: float,
     response_retry_after: float = 60,
     prepend_message: str = "",
-    max_retries: int | None = None,
+    max_duration: int | None = None,
+    start_time: float | None = None,
 ) -> None:
     """
-    Handles retry logic with exponential backoff based on the response.
+    Handles retry logic with exponential backoff based on the response, retrying
+    until the maximum duration is reached.
 
     Args:
         attempt: The current attempt number.
         base_delay: Base delay in seconds for backoff.
         response_retry_after: The value of the Retry-After header from the response.
         prepend_message: Message to prepend to the retry log.
-        max_retries: Maximum number of retry attempts. If None, retries indefinitely.
+        max_duration: Maximum execution duration in seconds. If None, retries indefinitely.
+        start_time: The start time of the request in seconds since epoch. Required if max_duration is set.
     """
-    if max_retries is None or attempt < max_retries:
-        retry_after = float(response_retry_after)
-        base_delay = float(base_delay)
-        delay = min(retry_after, base_delay * (2**attempt))
+    if max_duration is None or (start_time is not None and time.time() - start_time < max_duration):
+        retry_delay_override = os.environ.get(constants.EnvVar.RETRY_DELAY_OVERRIDE_SECONDS.value)
+        if retry_delay_override is not None:
+            delay = float(retry_delay_override)
+        else:
+            retry_after = float(response_retry_after)
+            base_delay = float(base_delay)
+            delay = min(retry_after, base_delay * (2**attempt))
 
         # modify output for proper plurality and formatting
         delay_str = f"{delay:.0f}" if delay.is_integer() else f"{delay:.2f}"
@@ -334,7 +382,8 @@ def handle_retry(
         )
         time.sleep(delay)
     else:
-        msg = f"Maximum retry attempts ({max_retries}) exceeded."
+        elapsed = time.time() - start_time if start_time is not None else 0
+        msg = f"Maximum execution duration ({max_duration} seconds) exceeded after {elapsed:.1f} seconds."
         raise Exception(msg)
 
 
