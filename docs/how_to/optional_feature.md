@@ -24,6 +24,7 @@ For scenarios that aren't supported by default, fabric-cicd offers `feature-flag
 | `enable_config_deploy`                    | Set to enable config file-based deployment                              | ☑️           |
 | `enable_response_collection`              | Set to enable collection of API responses during publish operations     |              |
 | `continue_on_shortcut_failure`            | Set to allow deployment to continue even when shortcuts fail to publish |              |
+| `enable_debug_mode`                       | Set to enable debug mode for detailed logging                           |              |
 
 <span class="md-h3-nonanchor">Example</span>
 
