@@ -95,13 +95,37 @@ class ItemPublisher(Publisher):
     - Overriding pre_publish_all() for setup before publishing
     - Overriding post_publish_all() for cleanup after publishing
     - Overriding get_items_to_publish() to filter or order items
+    - Overriding get_unpublish_order() for dependency-aware unpublishing
+    - Overriding post_publish_all_check() for async publish state verification
+
+    Publish Lifecycle:
+        1. pre_publish_all()
+        2. get_items_to_publish()
+        3. publish_one() - called for each item
+        4. post_publish_all()
+        5. post_publish_all_check() - if has_async_publish_check
+
+    Unpublish Hook:
+        - get_unpublish_order() - if has_dependency_tracking
     """
+
+    # region Class Attributes
 
     item_type: str
     """Mandatory property to be set by each publisher subclass"""
 
     parallel_config: ParallelConfig = ParallelConfig()
     """Configuration for parallel execution - subclasses can override with their own ParallelConfig"""
+
+    has_async_publish_check: bool = False
+    """Set to True if this publisher implements post_publish_all_check() for async state verification"""
+
+    has_dependency_tracking: bool = False
+    """Set to True if this publisher implements get_unpublish_order() for dependency ordering"""
+
+    # endregion
+
+    # region Initialization & Factory
 
     def __init__(self, fabric_workspace_obj: "FabricWorkspace") -> None:
         """
@@ -190,6 +214,49 @@ class ItemPublisher(Publisher):
 
         return publisher_class(fabric_workspace_obj)
 
+    # endregion
+
+    # region Public Methods
+
+    def publish_all(self) -> None:
+        """
+        Execute the publish operation for this item type.
+
+        1. Calls pre_publish_all() for any setup operations
+        2. Gets items via get_items_to_publish()
+        3. Publishes items (parallel or sequential based on parallel_config)
+        4. Calls post_publish_all() for any finalization
+        5. Raises PublishError if any items failed
+
+        The parallel_config class attribute controls execution:
+        - If ordered_items_func is set: publishes in that order sequentially
+        - If enabled=True: publishes in parallel
+        - If enabled=False: publishes sequentially
+
+        Raises:
+            PublishError: If one or more items failed to publish.
+        """
+        self.pre_publish_all()
+        items = self.get_items_to_publish()
+        if not items:
+            self.post_publish_all()
+            return
+
+        config = getattr(self.__class__, "parallel_config", ParallelConfig())
+
+        if config.ordered_items_func is not None:
+            order = config.ordered_items_func(self)
+            errors = self._publish_items_ordered(items, order)
+        elif config.enabled:
+            errors = self._publish_items_parallel(items)
+        else:
+            errors = self._publish_items_sequential(items)
+
+        self.post_publish_all()
+
+        if errors:
+            raise PublishError(errors)
+
     def publish_one(self, item_name: str, _item: "Item") -> None:
         """
         Publish a single item.
@@ -214,6 +281,21 @@ class ItemPublisher(Publisher):
         """
         return self.fabric_workspace_obj.repository_items.get(self.item_type, {})
 
+    def get_unpublish_order(self, items_to_unpublish: list[str]) -> list[str]:
+        """
+        Get the ordered list of item names based on dependencies for unpublishing.
+
+        Args:
+            items_to_unpublish: List of item names to be unpublished.
+
+        Returns:
+            List of item names in the order they should be unpublished (reverse dependency order).
+
+        Default implementation returns items in their original order.
+        Subclasses with dependency tracking should override for proper ordering.
+        """
+        return items_to_unpublish
+
     def pre_publish_all(self) -> None:
         """
         Hook called before publishing any items.
@@ -231,6 +313,23 @@ class ItemPublisher(Publisher):
         Default implementation does nothing.
         """
         pass
+
+    def post_publish_all_check(self) -> None:
+        """
+        Hook called after publish_all completes to verify async publish state.
+
+        Subclasses can override this to check the state of asynchronous publish
+        operations (e.g., Environment items that have async publish workflows).
+        Default implementation does nothing.
+
+        This method is called separately from publish_all() and should be invoked
+        by the orchestration layer after all items of this type have been published.
+        """
+        pass
+
+    # endregion
+
+    # region Publishing
 
     def _publish_items_parallel(self, items: dict[str, "Item"]) -> list[tuple[str, Exception]]:
         """
@@ -304,41 +403,4 @@ class ItemPublisher(Publisher):
 
         return errors
 
-    def publish_all(self) -> None:
-        """
-        Execute the publish operation for this item type.
-
-        1. Calls pre_publish_all() for any setup operations
-        2. Gets items via get_items_to_publish()
-        3. Publishes items (parallel or sequential based on parallel_config)
-        4. Calls post_publish_all() for any finalization
-        5. Raises PublishError if any items failed
-
-        The parallel_config class attribute controls execution:
-        - If ordered_items_func is set: publishes in that order sequentially
-        - If enabled=True: publishes in parallel
-        - If enabled=False: publishes sequentially
-
-        Raises:
-            PublishError: If one or more items failed to publish.
-        """
-        self.pre_publish_all()
-        items = self.get_items_to_publish()
-        if not items:
-            self.post_publish_all()
-            return
-
-        config = getattr(self.__class__, "parallel_config", ParallelConfig())
-
-        if config.ordered_items_func is not None:
-            order = config.ordered_items_func(self)
-            errors = self._publish_items_ordered(items, order)
-        elif config.enabled:
-            errors = self._publish_items_parallel(items)
-        else:
-            errors = self._publish_items_sequential(items)
-
-        self.post_publish_all()
-
-        if errors:
-            raise PublishError(errors)
+    # endregion

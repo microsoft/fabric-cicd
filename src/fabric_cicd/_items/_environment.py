@@ -60,9 +60,9 @@ def set_environment_deployment_type(item: Item) -> bool:
     return shell_only
 
 
-def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
+def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
     """
-    Checks the publish state of environments after deployment
+    Checks the publish state of environments after deployment.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
@@ -251,6 +251,7 @@ class EnvironmentPublisher(ItemPublisher):
     """Publisher for Environment items."""
 
     item_type = ItemType.ENVIRONMENT.value
+    has_async_publish_check = True
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Environment item."""
@@ -270,4 +271,8 @@ class EnvironmentPublisher(ItemPublisher):
 
     def pre_publish_all(self) -> None:
         """Check environment publish state before publishing."""
-        check_environment_publish_state(self.fabric_workspace_obj, True)
+        _check_environment_publish_state(self.fabric_workspace_obj, True)
+
+    def post_publish_all_check(self) -> None:
+        """Check environment publish state after all environments have been published."""
+        _check_environment_publish_state(self.fabric_workspace_obj, False)

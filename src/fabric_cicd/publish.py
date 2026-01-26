@@ -220,15 +220,20 @@ def publish_all_items(
 
     # Publish items in the defined order synchronously
     total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
+    publishers_with_async_check: list[items.ItemPublisher] = []
+
     for order_num, item_type in constants.SERIAL_ITEM_PUBLISH_ORDER.items():
         if _should_publish_item_type(item_type):
             print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
-            items.ItemPublisher.create(item_type, fabric_workspace_obj).publish_all()
+            publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
+            publisher.publish_all()
+            if publisher.has_async_publish_check:
+                publishers_with_async_check.append(publisher)
 
     # Check asynchronous publish status for relevant item types
-    if _should_publish_item_type(ItemType.ENVIRONMENT):
-        print_header("Checking Environment Publish State")
-        items.check_environment_publish_state(fabric_workspace_obj)
+    for publisher in publishers_with_async_check:
+        print_header(f"Checking {publisher.item_type} Publish State")
+        publisher.post_publish_all_check()
 
     # Return response data if feature flag is enabled and responses were collected
     return (
@@ -341,13 +346,9 @@ def unpublish_all_orphan_items(
         else:
             to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type == ItemType.DATA_PIPELINE.value:
-            find_referenced_items_func = items.find_referenced_datapipelines
-
-            # Determine order to delete w/o dependencies
-            to_delete_list = items.set_unpublish_order(
-                fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
-            )
+        publisher = items.ItemPublisher.create(ItemType(item_type), fabric_workspace_obj)
+        if to_delete_list and publisher.has_dependency_tracking:
+            to_delete_list = publisher.get_unpublish_order(to_delete_list)
 
         for item_name in to_delete_list:
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)

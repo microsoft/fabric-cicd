@@ -11,7 +11,7 @@ import dpath
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher, ParallelConfig
-from fabric_cicd._items._manage_dependencies import set_publish_order
+from fabric_cicd._items._manage_dependencies import set_publish_order, set_unpublish_order
 from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
@@ -56,9 +56,24 @@ class DataPipelinePublisher(ItemPublisher):
     """Publisher for Data Pipeline items."""
 
     item_type = ItemType.DATA_PIPELINE.value
+    has_dependency_tracking = True
 
     parallel_config = ParallelConfig(enabled=False, ordered_items_func=_get_datapipeline_publish_order)
     """Pipelines must be published in dependency order (sequential)"""
+
+    def get_unpublish_order(self, items_to_unpublish: list[str]) -> list[str]:
+        """
+        Get the ordered list of item names based on dependencies for unpublishing.
+
+        Args:
+            items_to_unpublish: List of item names to be unpublished.
+
+        Returns:
+            List of item names in the order they should be unpublished (reverse dependency order).
+        """
+        return set_unpublish_order(
+            self.fabric_workspace_obj, self.item_type, items_to_unpublish, find_referenced_datapipelines
+        )
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Data Pipeline item."""
