@@ -113,7 +113,7 @@ def test_publish_environments_passes_shell_flag(tmp_path):
             self.repository_items[item_type][item_name].skip_publish = True
 
     ws = FakeWorkspace()
-    env_module.publish_environments(ws)
+    env_module.EnvironmentPublisher(ws).publish_all()
     assert "shell_only_publish" in captured["called_with"]
     assert captured["called_with"]["shell_only_publish"] is True
 
@@ -197,7 +197,7 @@ def test_end_to_end_environment_setting_only(tmp_path):
             return file_obj.contents
 
     ws = FakeWorkspace()
-    env_module.publish_environments(ws)
+    env_module.EnvironmentPublisher(ws).publish_all()
 
     # Verify the sequence of important calls occurred in order
     urls = [c[1] for c in calls]
@@ -271,7 +271,7 @@ def test_end_to_end_environment_with_libraries(tmp_path):
             return file_obj.contents
 
     ws = FakeWorkspace()
-    env_module.publish_environments(ws)
+    env_module.EnvironmentPublisher(ws).publish_all()
 
     urls = [c[1] for c in calls]
     assert any("/items" in u and u.endswith("/items") for u in urls), "Create item call missing"

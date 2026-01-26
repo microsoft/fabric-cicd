@@ -14,45 +14,10 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import MissingFileError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_environments(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all environment items from the repository.
-
-    Environments are deployed using the updateDefinition API, and then compute settings and libraries are published separately.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    logger.warning("The underlying legacy Microsoft Fabric Environment APIs will be deprecated by March 1, 2026.")
-    logger.warning(
-        "Please upgrade to the latest fabric-cicd version before March 1, 2026 to prevent broken Environment item deployments."
-    )
-
-    # Check for ongoing publish
-    check_environment_publish_state(fabric_workspace_obj, True)
-
-    item_type = "Environment"
-    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
-        # Only deploy the environment shell when it just contains spark compute settings
-        is_shell_only = set_environment_deployment_type(item)
-        logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
-
-        # Exclude Sparkcompute.yml from environment definition deployment (requires special handling)
-        exclude_path = r"\Setting"
-        fabric_workspace_obj._publish_item(
-            item_name=item_name,
-            item_type=item_type,
-            exclude_path=exclude_path,
-            skip_publish_logging=True,
-            shell_only_publish=is_shell_only,
-        )
-        if item.skip_publish:
-            continue
-        _publish_environment_metadata(fabric_workspace_obj, item_name)
 
 
 def set_environment_deployment_type(item: Item) -> bool:
@@ -106,7 +71,7 @@ def check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initi
     ongoing_publish = True
     iteration = 1
 
-    environments = fabric_workspace_obj.repository_items.get("Environment", {})
+    environments = fabric_workspace_obj.repository_items.get(ItemType.ENVIRONMENT.value, {})
     filtered_environments = [
         k
         for k in environments
@@ -179,7 +144,7 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
         item_name: Name of the environment item whose compute settings are to be published.
         is_excluded: Flag indicating if Sparkcompute.yml was excluded from definition deployment.
     """
-    item_type = "Environment"
+    item_type = ItemType.ENVIRONMENT.value
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
 
     # Update compute settings
@@ -208,7 +173,7 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: s
 
     # Get Setting/Sparkcompute.yml content from repository
     yaml_contents = None
-    item = fabric_workspace_obj.repository_items["Environment"][item_name]
+    item = fabric_workspace_obj.repository_items[ItemType.ENVIRONMENT.value][item_name]
     item_files = item.item_files
     for file in item_files:
         if file.file_path.name == "Sparkcompute.yml" and file.file_path.parent.name == "Setting":
@@ -280,3 +245,30 @@ def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace,
         new_input_dict[new_key] = value
 
     return new_input_dict
+
+
+class EnvironmentPublisher(ItemPublisher):
+    """Publisher for Environment items."""
+
+    item_type = ItemType.ENVIRONMENT.value
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Environment item."""
+        is_shell_only = set_environment_deployment_type(item)
+        logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
+
+        exclude_path = r"\Setting"
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name,
+            item_type=self.item_type,
+            exclude_path=exclude_path,
+            skip_publish_logging=True,
+            shell_only_publish=is_shell_only,
+        )
+        if item.skip_publish:
+            return
+        _publish_environment_metadata(self.fabric_workspace_obj, item_name)
+
+    def pre_publish_all(self) -> None:
+        """Check environment publish state before publishing."""
+        check_environment_publish_state(self.fabric_workspace_obj, True)
