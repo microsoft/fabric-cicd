@@ -16,6 +16,7 @@ from azure.core.credentials import TokenCredential
 
 import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InputError
+from fabric_cicd.constants import OperationType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -156,3 +157,32 @@ def validate_token_credential(input_value: TokenCredential) -> TokenCredential:
     validate_data_type("TokenCredential", "credential", input_value)
 
     return input_value
+
+
+def validate_items_to_include(items_to_include: Optional[list[str]], operation: "OperationType") -> None:
+    """
+    Validate items_to_include parameter and check required feature flags.
+
+    Args:
+        items_to_include: List of items in "item_name.item_type" format, or None.
+        operation: The type of operation being performed (publish or unpublish).
+
+    Raises:
+        InputError: If required feature flags are not enabled.
+    """
+    from fabric_cicd.constants import FeatureFlag
+
+    if items_to_include is None:
+        return
+
+    if (
+        FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+        or FeatureFlag.ENABLE_ITEMS_TO_INCLUDE.value not in constants.FEATURE_FLAG
+    ):
+        msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
+        raise InputError(msg, logger)
+
+    logger.warning(f"Selective {operation.value} is enabled.")
+    logger.warning(
+        f"Using items_to_include is risky as it can prevent needed dependencies from being {operation.value}.  Use at your own risk."
+    )

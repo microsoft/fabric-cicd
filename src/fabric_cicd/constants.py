@@ -137,6 +137,15 @@ class FeatureFlag(str, Enum):
     """Set to enable debug mode for detailed logging."""
 
 
+class OperationType(str, Enum):
+    """Enumeration of operation types for publish/unpublish workflows."""
+
+    PUBLISH = "deployment"
+    """Publishing items to the workspace."""
+    UNPUBLISH = "unpublish"
+    """Unpublishing/removing items from the workspace."""
+
+
 # The following resources can be unpublished only if their feature flags are set
 UNPUBLISH_FLAG_MAPPING = {
     ItemType.LAKEHOUSE.value: FeatureFlag.ENABLE_LAKEHOUSE_UNPUBLISH.value,

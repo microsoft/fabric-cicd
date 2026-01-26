@@ -23,6 +23,7 @@ from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
+    validate_items_to_include,
 )
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -185,16 +186,7 @@ def publish_all_items(
         fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
     if items_to_include:
-        if (
-            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
-            or FeatureFlag.ENABLE_ITEMS_TO_INCLUDE.value not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Selective deployment is enabled.")
-        logger.warning(
-            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
+        validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
         fabric_workspace_obj.items_to_include = items_to_include
 
     if shortcut_exclude_regex:
@@ -286,22 +278,11 @@ def unpublish_all_orphan_items(
         >>> unpublish_orphaned_items(workspace, items_to_include=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+    validate_items_to_include(items_to_include, operation=constants.OperationType.UNPUBLISH)
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
     print_header("Unpublishing Orphaned Items")
-
-    if items_to_include:
-        if (
-            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
-            or FeatureFlag.ENABLE_ITEMS_TO_INCLUDE.value not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Selective unpublish is enabled.")
-        logger.warning(
-            "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
-        )
 
     # Build unpublish order based on reversed publish order, scope, and feature flags
     for item_type in items.ItemPublisher.get_item_types_to_unpublish(fabric_workspace_obj):
