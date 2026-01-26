@@ -181,6 +181,11 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.ENVIRONMENT.value: r"\Setting",
 }
 
+# API Format Mapping for item types that require specific API formats
+API_FORMAT_MAPPING = {
+    ItemType.SPARK_JOB_DEFINITION.value: "SparkJobDefinitionV2",
+}
+
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
