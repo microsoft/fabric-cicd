@@ -11,7 +11,7 @@ from fabric_cicd._common._exceptions import ItemDependencyError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +66,9 @@ class ReportPublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Report item."""
-        exclude_path = r".*\.pbi[/\\].*"
         self.fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=self.item_type,
-            exclude_path=exclude_path,
+            exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
             func_process_file=func_process_file,
         )

@@ -172,6 +172,15 @@ SHELL_ONLY_PUBLISH = [
 # Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = [ItemType.SEMANTIC_MODEL.value, ItemType.REPORT.value]
 
+# Exclude Path Regex Patterns for filtering files during publish
+EXCLUDE_PATH_REGEX_MAPPING = {
+    ItemType.DATA_AGENT.value: r".*\.pbi[/\\].*",
+    ItemType.REPORT.value: r".*\.pbi[/\\].*",
+    ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
+    ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
+    ItemType.ENVIRONMENT.value: r"\Setting",
+}
+
 # REGEX Constants
 VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""

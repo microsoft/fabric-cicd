@@ -15,7 +15,7 @@ from fabric_cicd._common._exceptions import MissingFileError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -257,11 +257,10 @@ class EnvironmentPublisher(ItemPublisher):
         is_shell_only = set_environment_deployment_type(item)
         logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
 
-        exclude_path = r"\Setting"
         self.fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=self.item_type,
-            exclude_path=exclude_path,
+            exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
             skip_publish_logging=True,
             shell_only_publish=is_shell_only,
         )
