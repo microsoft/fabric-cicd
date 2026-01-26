@@ -143,7 +143,7 @@ def publish_all_items(
     if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG:
         fabric_workspace_obj.responses = {}
 
-    # check if workspace has assigned capacity, if not, exit
+    # Check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
 
     response_state = fabric_workspace_obj.endpoint.invoke(
