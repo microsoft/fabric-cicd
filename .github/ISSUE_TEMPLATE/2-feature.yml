@@ -1,24 +1,78 @@
-name: Feature Request
-description: Request a feature
-title: "Feature Request"
+name: "🚀 Feature Request"
+description: Suggest an idea or enhancement for fabric-cicd
+title: "[FEATURE] "
 labels: ["enhancement"]
 body:
     - type: markdown
       attributes:
-          value: Thanks for suggesting a feature!
+          value: |
+              Thanks for suggesting a new feature! Please provide as much detail as possible to help us understand and evaluate your request.
 
     - type: textarea
-      id: problem-description
+      id: use-case-problem
       attributes:
-          label: What is the feature?
-          description: Describe what the gap is and the ideal solution.
+          label: Use Case / Problem
+          description: |
+              Describe the problem or use case that this feature would solve. Include:
+              - What problem are you trying to solve?
+              - Current limitations or pain points
+              - How this fits into your workflow
       validations:
           required: true
 
     - type: textarea
-      id: additional-context
+      id: proposed-solution
       attributes:
-          label: Additional context
-          description: Add any other context or screenshots here.
+          label: Proposed Solution
+          description: |
+              Describe the solution you'd like to see implemented:
+              - Specific functionality
+              - Expected behavior and output
+              - Integration with existing fabric-cicd features
       validations:
-          required: false
+          required: true
+
+    - type: textarea
+      id: alternatives-considered
+      attributes:
+          label: Alternatives Considered
+          description: |
+              Describe any alternative solutions or features you've considered:
+              - Workarounds you're currently using
+              - Other tools or approaches that could solve this
+              - Why those alternatives are insufficient
+
+    - type: checkboxes
+      id: impact-assessment
+      attributes:
+          label: Impact Assessment
+          description: Help us understand the impact of this feature
+          options:
+              - label: This would help me personally
+              - label: This would help my team/organization
+              - label: This would help the broader fabric-cicd community
+              - label: This aligns with Microsoft Fabric roadmap items
+
+    - type: checkboxes
+      id: implementation-attestation
+      attributes:
+          label: Implementation Attestation
+          description: Please confirm your understanding of implementation considerations (required)
+          options:
+              - label: I understand this feature should maintain backward compatibility (if applicable)
+                required: true
+              - label: I understand this feature should not introduce performance regressions for existing workflows
+                required: true
+              - label: I acknowledge that new features must follow fabric-cicd's established patterns and conventions
+                required: true
+
+    - type: textarea
+      id: implementation-notes
+      attributes:
+          label: Implementation Notes
+          description: |
+              If you have technical suggestions for implementation, consider:
+              - Which item types are affected? (Notebook, DataPipeline, Environment, etc.)
+              - Does this require changes to core classes/functions? Which ones?
+              - Does this require changes to the parameterization framework?
+              - Which Fabric REST APIs would be involved (if any)?

@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -138,6 +139,10 @@ class FabricWorkspace:
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
+        # Initialize cache for _get_item_attribute method
+        self._item_attribute_cache = {}
+        self._item_attribute_cache_lock = threading.Lock()
+
         # Get parameter_file_path from kwargs
         self.parameter_file_path = kwargs.get("parameter_file_path")
 
@@ -191,6 +196,14 @@ class FabricWorkspace:
         if not item_guid:
             return ""
 
+        # Create a cache key for this request
+        cache_key = (workspace_id, item_type, item_guid, item_name, attribute_name)
+
+        # Check if result is already cached
+        with self._item_attribute_cache_lock:
+            if cache_key in self._item_attribute_cache:
+                return self._item_attribute_cache[cache_key]
+
         # Check if this item type has property mappings
         if item_type not in constants.PROPERTY_PATH_ATTR_MAPPING:
             logger.debug(f"No property path mappings defined for {item_type}")
@@ -219,6 +232,9 @@ class FabricWorkspace:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
             raise InputError(msg, logger)
 
+        # Cache the result before returning
+        with self._item_attribute_cache_lock:
+            self._item_attribute_cache[cache_key] = attribute_value
         return attribute_value
 
     def _refresh_parameter_file(self) -> None:
@@ -365,7 +381,7 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties
-            if item_type in ["Lakehouse", "Warehouse"]:
+            if item_type in ["Lakehouse", "Warehouse", "SQLDatabase"]:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                 )
