@@ -26,7 +26,7 @@ def parse_changelog() -> dict[str, list[str]]:
 
     try:
         response = requests.get(
-            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/src/fabric_cicd/changelog.md"
+            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/docs/changelog.md"
         )
         if response.status_code == 200:
             content = response.text

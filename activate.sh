@@ -16,6 +16,7 @@ if [ -n "$PACKAGES" ]; then
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $PACKAGES > /dev/null 2>&1
 fi
 command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+command -v changie &> /dev/null || curl -sSL https://changie.dev/install.sh | sh
 command -v code &> /dev/null && code --install-extension ms-python.python --force > /dev/null 2>&1 || true
 
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$PATH:$HOME/.local/bin"

@@ -120,7 +120,7 @@ jobs:
 
                   # 2. If title is version format, only constants.py and changelog.md should be changed
                   if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
-                    EXPECTED_FILES="src/fabric_cicd/constants.py src/fabric_cicd/changelog.md"
+                    EXPECTED_FILES="src/fabric_cicd/constants.py docs/changelog.md"
                     SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
                     SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
                     if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then

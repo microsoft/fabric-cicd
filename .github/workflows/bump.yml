@@ -178,7 +178,7 @@ jobs:
                         // Extract changelog content for new release
                         const versionNumber = '${{ steps.version-check.outputs.version_number }}';
                         const fs = require('fs');
-                        const path = 'src/fabric_cicd/changelog.md';
+                        const path = 'docs/changelog.md';
                         
                         let changelogContent = `Release ${tagName}`;
                         

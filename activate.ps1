@@ -37,7 +37,7 @@ function Test-Dependancy {
 }
 
 # Function to install required packages if not already installed
-function Test-And-Install-Package {
+function Test-And-Install-Python-Package {
     param (
         [string]$packageName
     )
@@ -59,6 +59,25 @@ function Test-And-Install-Package {
     }
 }
 
+# Function to install changie if not already installed
+function Test-And-Install-Changie {
+    if (-not (Get-Command changie -ErrorAction SilentlyContinue)) {
+        Write-Host "changie not found, installing..."
+        try {
+            Invoke-Expression (Invoke-WebRequest -Uri "https://changie.dev/install.ps1" -UseBasicParsing).Content
+            Write-Host "changie installed successfully."
+            Test-Dependancy -commandName "changie"
+        }
+        catch {
+            Write-Host "Failed to install changie. Please check your connection and scripts."
+            exit 1
+        }
+    }
+    else {
+        Write-Host "changie is already installed."
+    }
+}
+
 # Function to add a directory to PATH
 function Add-DirectoryToPath {
     param (
@@ -74,10 +93,11 @@ function Add-DirectoryToPath {
 # Check if dependencies are installed and add directory to PATH
 Test-Dependancy -commandName "python"
 Test-Dependancy -commandName "pip"
-
 # Check and install required packages
-Test-And-Install-Package -packageName "uv"
-Test-And-Install-Package -packageName "ruff"
+Test-And-Install-Python-Package -packageName "uv"
+Test-And-Install-Python-Package -packageName "ruff"
+Test-And-Install-Changie
+
 
 # uv fallback to default path if unavailable in python directory
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
