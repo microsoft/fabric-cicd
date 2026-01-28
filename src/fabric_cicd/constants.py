@@ -55,7 +55,6 @@ class ItemType(str, Enum):
     ML_EXPERIMENT = "MLExperiment"
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
     NOTEBOOK = "Notebook"
-    ORG_APP = "OrgApp"
     REFLEX = "Reflex"
     REPORT = "Report"
     SEMANTIC_MODEL = "SemanticModel"
@@ -92,9 +91,8 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     21: ItemType.GRAPHQL_API,
     22: ItemType.APACHE_AIRFLOW_JOB,
     23: ItemType.MOUNTED_DATA_FACTORY,
-    24: ItemType.ORG_APP,
-    25: ItemType.DATA_AGENT,
-    26: ItemType.ML_EXPERIMENT,
+    24: ItemType.DATA_AGENT,
+    25: ItemType.ML_EXPERIMENT,
 }
 
 

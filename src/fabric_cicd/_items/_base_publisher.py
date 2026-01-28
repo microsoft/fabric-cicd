@@ -170,7 +170,6 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._mlexperiment import MLExperimentPublisher
         from fabric_cicd._items._mounteddatafactory import MountedDataFactoryPublisher
         from fabric_cicd._items._notebook import NotebookPublisher
-        from fabric_cicd._items._orgapp import OrgAppPublisher
         from fabric_cicd._items._report import ReportPublisher
         from fabric_cicd._items._semanticmodel import SemanticModelPublisher
         from fabric_cicd._items._sparkjobdefinition import SparkJobDefinitionPublisher
@@ -203,7 +202,6 @@ class ItemPublisher(Publisher):
             ItemType.GRAPHQL_API: GraphQLApiPublisher,
             ItemType.APACHE_AIRFLOW_JOB: ApacheAirflowJobPublisher,
             ItemType.MOUNTED_DATA_FACTORY: MountedDataFactoryPublisher,
-            ItemType.ORG_APP: OrgAppPublisher,
             ItemType.DATA_AGENT: DataAgentPublisher,
             ItemType.ML_EXPERIMENT: MLExperimentPublisher,
         }
