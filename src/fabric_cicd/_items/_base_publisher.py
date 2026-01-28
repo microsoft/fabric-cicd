@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import get_item_logger
 from fabric_cicd.constants import ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -441,15 +442,17 @@ class ItemPublisher(Publisher):
 
         with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
             futures = {
-                executor.submit(self.publish_one, item_name, item): item_name for item_name, item in items.items()
+                executor.submit(self.publish_one, item_name, item): (item_name, item)
+                for item_name, item in items.items()
             }
 
             for future in as_completed(futures):
-                item_name = futures[future]
+                item_name, item = futures[future]
                 try:
                     future.result()
                 except Exception as e:
-                    logger.error(f"Failed to publish item '{item_name}': {e}")
+                    item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
+                    item_logger.error(f"Failed to publish: {e}")
                     errors.append((item_name, e))
 
         return errors
@@ -470,7 +473,8 @@ class ItemPublisher(Publisher):
             try:
                 self.publish_one(item_name, item)
             except Exception as e:
-                logger.error(f"Failed to publish item '{item_name}': {e}")
+                item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
+                item_logger.error(f"Failed to publish: {e}")
                 errors.append((item_name, e))
 
         return errors
@@ -490,10 +494,12 @@ class ItemPublisher(Publisher):
 
         for item_name in order:
             if item_name in items:
+                item = items[item_name]
                 try:
-                    self.publish_one(item_name, items[item_name])
+                    self.publish_one(item_name, item)
                 except Exception as e:
-                    logger.error(f"Failed to publish item '{item_name}': {e}")
+                    item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
+                    item_logger.error(f"Failed to publish: {e}")
                     errors.append((item_name, e))
 
         return errors

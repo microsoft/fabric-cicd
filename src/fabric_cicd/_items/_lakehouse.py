@@ -12,6 +12,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import get_item_logger
 from fabric_cicd._items._base_publisher import ItemPublisher, Publisher
 from fabric_cicd.constants import FeatureFlag, ItemType
 
@@ -103,6 +104,7 @@ class LakehousePublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Lakehouse item."""
+        item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
         creation_payload = next(
             (
                 {"enableSchemas": True}
@@ -125,7 +127,7 @@ class LakehousePublisher(ItemPublisher):
 
         check_sqlendpoint_provision_status(self.fabric_workspace_obj, item)
 
-        logger.info(f"{constants.INDENT}Published")
+        item_logger.info(f"{constants.INDENT}Published")
 
     def post_publish_all(self) -> None:
         """Publish shortcuts after all lakehouses are published to protect interrelationships."""
@@ -173,6 +175,7 @@ class ShortcutPublisher(Publisher):
             _shortcut_name: The name/path of the shortcut to publish.
             shortcut: The shortcut definition to publish.
         """
+        item_logger = get_item_logger(__name__, item_type="Shortcut", item_name=shortcut["name"])
         shortcut = replace_default_lakehouse_id(shortcut, self.item_obj)
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/create-shortcut
         try:
@@ -181,13 +184,13 @@ class ShortcutPublisher(Publisher):
                 url=f"{self.fabric_workspace_obj.base_api_url}/items/{self.item_obj.guid}/shortcuts?shortcutConflictPolicy=CreateOrOverwrite",
                 body=shortcut,
             )
-            logger.info(f"{constants.INDENT}{shortcut['name']} Shortcut Published")
+            item_logger.info(f"{constants.INDENT}Shortcut Published")
         except Exception as e:
             if FeatureFlag.CONTINUE_ON_SHORTCUT_FAILURE.value in constants.FEATURE_FLAG:
-                logger.warning(
-                    f"Failed to publish '{shortcut['name']}'. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
+                item_logger.warning(
+                    "Failed to publish. This usually happens when the lakehouse containing the source for this shortcut is published as a shell and has no data yet."
                 )
-                logger.info("The publish process will continue with the other items.")
+                item_logger.info("The publish process will continue with the other items.")
                 return
             msg = f"Failed to publish '{shortcut['name']}' for lakehouse {self.item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger) from e
