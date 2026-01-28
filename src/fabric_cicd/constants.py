@@ -60,7 +60,6 @@ ACCEPTED_ITEM_TYPES = (
     "MountedDataFactory",
     "DataAgent",
     "UserDataFunction",
-    "OrgApp",
     "MLExperiment",
     "SparkJobDefinition",
 )
