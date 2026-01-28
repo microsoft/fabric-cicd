@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Cross-platform file locking utility."""
+"""Cross-platform file locking."""
 
 import sys
 from pathlib import Path
@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 
 class FileLock:
-    """Cross-platform file lock context manager."""
+    """File lock context manager."""
 
     def __init__(self, lock_file: str) -> None:
         self.lock_path = Path(f"{lock_file}.lock")
