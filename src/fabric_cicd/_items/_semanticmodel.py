@@ -6,6 +6,7 @@
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._parameter._utils import process_environment_key
 
 logger = logging.getLogger(__name__)
 
@@ -23,30 +24,125 @@ def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
         exclude_path = r".*\.pbi[/\\].*"
         fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
 
-    model_with_binding_dict = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
+    # Bind semantic models to connections after deploying (post-deployment step)
+    semantic_model_binding = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", {})
+    if semantic_model_binding:
+        environment = fabric_workspace_obj.environment
 
-    if not model_with_binding_dict:
-        return
+        # Check if legacy format (list) or new format (dict)
+        if isinstance(semantic_model_binding, list):
+            binding_mapping = build_binding_mapping_legacy(fabric_workspace_obj, semantic_model_binding)
+        else:
+            binding_mapping = build_binding_mapping(fabric_workspace_obj, semantic_model_binding, environment)
 
-    # Build connection mapping from semantic_model_binding parameter
+        if binding_mapping:
+            connections = get_connections(fabric_workspace_obj)
+            bind_semanticmodel_to_connection(
+                fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
+            )
+
+
+def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic_model_binding: list) -> dict:
+    """
+    Build the connection mapping from legacy list-based semantic_model_binding parameter.
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object
+        semantic_model_binding: The semantic_model_binding parameter as a list
+
+    Returns:
+        Dictionary mapping semantic model names to connection IDs
+    """
+    logger.warning(
+        "The legacy 'semantic_model_binding' parameter format will be deprecated in a future release. "
+        "Please migrate to the new dictionary format with 'default' and 'models' keys."
+    )
+    item_type = "SemanticModel"
     binding_mapping = {}
+    repository_models = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
-    for model in model_with_binding_dict:
-        model_name = model.get("semantic_model_name", [])
-        connection_id = model.get("connection_id")
+    for entry in semantic_model_binding:
+        connection_id = entry.get("connection_id")
+        model_names = entry.get("semantic_model_name", [])
 
-        if isinstance(model_name, str):
-            model_name = [model_name]
+        if not connection_id:
+            logger.debug("No connection_id found in semantic_model_binding entry, skipping")
+            continue
 
-        for name in model_name:
+        if isinstance(model_names, str):
+            model_names = [model_names]
+
+        for name in model_names:
+            if name not in repository_models:
+                logger.warning(f"Semantic model '{name}' specified in parameter.yml not found in repository")
+                continue
             binding_mapping[name] = connection_id
 
-    connections = get_connections(fabric_workspace_obj)
+    return binding_mapping
 
-    if binding_mapping:
-        bind_semanticmodel_to_connection(
-            fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
-        )
+
+def build_binding_mapping(
+    fabric_workspace_obj: FabricWorkspace, semantic_model_binding: dict, environment: str
+) -> dict:
+    """
+    Build the connection mapping from semantic_model_binding parameter.
+    Supports:
+    - default.connections: Applied to all models in the repository with connections that are not explicitly listed
+    - models: List of explicit model-to-connection mappings
+
+    Args:
+        fabric_workspace_obj: The FabricWorkspace object
+        semantic_model_binding: The semantic_model_binding parameter dictionary
+        environment: The target environment name (_ALL_ key can be used)
+
+    Returns:
+        Dictionary mapping semantic model names to connection IDs
+    """
+    item_type = "SemanticModel"
+    binding_mapping = {}
+    repository_models = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
+
+    # Get default connection for this environment
+    default_connections = semantic_model_binding.get("default", {}).get("connections", {})
+    default_connections = process_environment_key(fabric_workspace_obj, default_connections)
+    default_connection_id = default_connections.get(environment)
+    if not default_connection_id:
+        logger.debug(f"Environment '{environment}' not found in default connections")
+
+    # Process explicit model bindings
+    explicit_models = set()
+    models_config = semantic_model_binding.get("models", [])
+
+    for model in models_config:
+        model_names = model.get("semantic_model_name", [])
+        connections = model.get("connections", {})
+
+        if isinstance(model_names, str):
+            model_names = [model_names]
+
+        connections = process_environment_key(fabric_workspace_obj, connections)
+        connection_id = connections.get(environment)
+        if not connection_id:
+            logger.debug(f"Environment '{environment}' not found in connections for semantic model(s): {model_names}")
+            continue
+
+        # Only track as explicit if environment connection is defined
+        explicit_models.update(model_names)
+
+        for name in model_names:
+            if name not in repository_models:
+                logger.warning(f"Semantic model '{name}' specified in parameter.yml not found in repository")
+                continue
+            binding_mapping[name] = connection_id
+
+    # Apply default connection to non-explicit models using set difference
+    if default_connection_id:
+        default_models = repository_models - explicit_models
+        for model_name in default_models:
+            binding_mapping[model_name] = default_connection_id
+            logger.debug(f"Applying default connection to semantic model '{model_name}'")
+
+    return binding_mapping
 
 
 def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
@@ -59,6 +155,7 @@ def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
     Returns:
         Dictionary with connection ID as key and connection details as value
     """
+    # https://learn.microsoft.com/en-us/rest/api/fabric/core/connections/list-connections
     connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/connections"
 
     try:
@@ -90,36 +187,31 @@ def bind_semanticmodel_to_connection(
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
         connections: Dictionary of connection objects with connection ID as key.
-        connection_details: Dictionary mapping dataset names to connection IDs from parameter.yml.
+        connection_details: Dictionary mapping semantic model names to connection IDs from parameter.yml.
     """
     item_type = "SemanticModel"
 
-    # Loop through each semantic model in the semantic_model_binding section
-    for dataset_name, connection_id in connection_details.items():
+    for model_name, connection_id in connection_details.items():
         # Check if the connection ID exists in the connections dict
         if connection_id not in connections:
-            logger.warning(f"Connection ID '{connection_id}' not found for semantic model '{dataset_name}'")
+            logger.warning(f"Connection ID '{connection_id}' not found for semantic model '{model_name}'")
             continue
 
-        # Check if this semantic model exists in the repository
-        if dataset_name not in fabric_workspace_obj.repository_items.get(item_type, {}):
-            logger.warning(f"Semantic model '{dataset_name}' not found in repository")
-            continue
-
-        # Get the semantic model object
-        item_obj = fabric_workspace_obj.repository_items[item_type][dataset_name]
+        # Get the semantic model object (validated during binding mapping creation)
+        item_obj = fabric_workspace_obj.repository_items[item_type][model_name]
         model_id = item_obj.guid
 
-        logger.info(f"Binding semantic model '{dataset_name}' (ID: {model_id}) to connection '{connection_id}'")
+        logger.info(f"Binding semantic model '{model_name}' (ID: {model_id}) to connection '{connection_id}'")
 
         try:
             # Get the connection details for this semantic model from Fabric API
+            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/list-item-connections
             item_connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/items/{model_id}/connections"
             connections_response = fabric_workspace_obj.endpoint.invoke(method="GET", url=item_connections_url)
             connections_data = connections_response.get("body", {}).get("value", [])
 
             if not connections_data:
-                logger.warning(f"No connections found for semantic model '{dataset_name}'")
+                logger.debug(f"No existing connections found for semantic model '{model_name}', skipping binding")
                 continue
 
             # Use the first connection as the template
@@ -134,22 +226,23 @@ def bind_semanticmodel_to_connection(
             request_body = build_request_body({"connectionBinding": connection_binding})
 
             # Make the bind connection API call
-            powerbi_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/semanticModels/{model_id}/bindConnection"
+            # https://learn.microsoft.com/en-us/rest/api/fabric/semanticmodel/items/bind-semantic-model-connection
+            binding_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/semanticModels/{model_id}/bindConnection"
             bind_response = fabric_workspace_obj.endpoint.invoke(
                 method="POST",
-                url=powerbi_url,
+                url=binding_url,
                 body=request_body,
             )
 
             status_code = bind_response.get("status_code")
 
             if status_code == 200:
-                logger.info(f"Successfully bound semantic model '{dataset_name}' to connection '{connection_id}'")
+                logger.info(f"Successfully bound semantic model '{model_name}' to connection '{connection_id}'")
             else:
-                logger.warning(f"Failed to bind semantic model '{dataset_name}'. Status code: {status_code}")
+                logger.warning(f"Failed to bind semantic model '{model_name}'. Status code: {status_code}")
 
         except Exception as e:
-            logger.error(f"Failed to bind semantic model '{dataset_name}' to connection: {e!s}")
+            logger.error(f"Failed to bind semantic model '{model_name}' to connection: {e!s}")
             continue
 
 
