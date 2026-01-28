@@ -74,6 +74,24 @@ Before you begin, ensure you have the following installed:
     ruff check
     ```
 
+### Changelog Management
+
+- This project uses [changie](https://changie.dev) to manage the changelog.
+- Every Pull Request (PR) must include a changie entry file.
+- The `Changie` tool is automatically installed when running `activate.ps1` or `activate.sh`.
+- To create a new changelog entry:
+    1. Run the following command in your terminal:
+        ```sh
+        changie new
+        ```
+    2. Follow the interactive prompts to:
+        - Select the type of change (e.g., `Breaking Change`, `New Items Support`, `New Functionality`, `Additional Optimizations`, etc.).
+        - Enter a description of your change.
+        - Enter your GitHub's username
+    3. This will generate a YAML file in the `.changes/` directory.
+- `Changie` will check your PR to ensure this file exists.
+- The entry is then automatically consolidated into the main `docs/CHANGELOG.md` during the release process.
+
 ### Pull Request Requirements
 
 - **All pull requests must be linked to an issue.** This ensures proper tracking and context for changes.
@@ -92,3 +110,49 @@ Before you begin, ensure you have the following installed:
     - [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
     - [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
     - [Technical Debt](https://github.com/microsoft/fabric-cicd/issues/new?template=5-tech-debt.yml)
+
+### Documenting Changes with Changie
+
+All pull requests must include proper change documentation using [changie](https://changie.dev), which is automatically installed when running `activate.ps1` or `activate.sh`. This ensures that release notes are automatically generated and changes are properly tracked.
+
+#### Requirements
+
+**Every PR must include at least one change entry** created using `changie new`. You may add multiple entries if your PR introduces multiple distinct changes.
+
+#### How to Add Change Entries
+
+1. **From the Terminal, run `changie new` command**:
+
+    ```bash
+    changie new
+    ```
+
+2. **Select the appropriate change type** from the available options:
+    - **⚠️ Breaking Change** - For changes that break backward compatibility
+    - **🆕 New Items Support** - For adding support for new Fabric item types
+    - **✨ New Functionality** - For new features, commands, or capabilities
+    - **🔧 Bug Fix** - For fixing existing issues or incorrect behavior
+    - **⚡ Additional Optimizations** - For performance improvements or optimizations
+    - **📝 Documentation Update** - For documentation improvements or updates
+
+3. **Provide a clear description** of your change:
+    - Write in present tense (e.g., "Add support for..." not "Added support for...")
+    - Be specific and user-focused
+    - Include the affected command or feature if applicable
+    - Keep it concise but informative
+
+#### Examples of Good Change Descriptions
+
+- `Add new 'fab describe capacity' command for viewing capacity details`
+- `Fix authentication timeout issue in interactive mode`
+- `Update workspace examples with new folder hierarchy patterns`
+- `Optimize API response caching to reduce network calls`
+
+#### Guidelines
+
+- **One logical change per entry**: If your PR fixes a bug and adds a feature, create two separate entries
+- **User-facing perspective**: Describe what users will experience, not internal implementation details
+- **Clear and actionable**: Users should understand what changed and how it affects them
+- **Consistent formatting**: Follow the examples and existing patterns in the changelog
+
+The change entries will be automatically included in the release notes when a new version is published. This process ensures that all improvements, fixes, and new features are properly communicated to users.

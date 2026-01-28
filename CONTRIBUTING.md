@@ -171,6 +171,52 @@ Verify that:
 - PRs will be labeled as "need author feedback" when there are comments to resolve
 - Approved PRs will be merged by the fabric-cicd team
 
+### Documenting Changes with Changie
+
+All pull requests must include proper change documentation using [changie](https://changie.dev), which is pre-installed in the development container. This ensures that release notes are automatically generated and changes are properly tracked.
+
+#### Requirements
+
+**Every PR must include at least one change entry** created using `changie new`. You may add multiple entries if your PR introduces multiple distinct changes.
+
+#### How to Add Change Entries
+
+1. **From the Terminal, run `changie new` command**:
+
+    ```bash
+    changie new
+    ```
+
+2. **Select the appropriate change type** from the available options:
+    - **⚠️ Breaking Change** - For changes that break backward compatibility
+    - **🆕 New Items Support** - For adding support for new Fabric item types
+    - **✨ New Functionality** - For new features, commands, or capabilities
+    - **🔧 Bug Fix** - For fixing existing issues or incorrect behavior
+    - **⚡ Additional Optimizations** - For performance improvements or optimizations
+    - **📝 Documentation Update** - For documentation improvements or updates
+
+3. **Provide a clear description** of your change:
+    - Write in present tense (e.g., "Add support for..." not "Added support for...")
+    - Be specific and user-focused
+    - Include the affected command or feature if applicable
+    - Keep it concise but informative
+
+#### Examples of Good Change Descriptions
+
+- `Add new 'fab describe capacity' command for viewing capacity details`
+- `Fix authentication timeout issue in interactive mode`
+- `Update workspace examples with new folder hierarchy patterns`
+- `Optimize API response caching to reduce network calls`
+
+#### Guidelines
+
+- **One logical change per entry**: If your PR fixes a bug and adds a feature, create two separate entries
+- **User-facing perspective**: Describe what users will experience, not internal implementation details
+- **Clear and actionable**: Users should understand what changed and how it affects them
+- **Consistent formatting**: Follow the examples and existing patterns in the changelog
+
+The change entries will be automatically included in the release notes when a new version is published. This process ensures that all improvements, fixes, and new features are properly communicated to users.
+
 ## Resources to help you get started
 
 Here are some resources to help you get started:
