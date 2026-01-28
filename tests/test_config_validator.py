@@ -765,6 +765,28 @@ class TestConfigValidator:
         # PROD should remain unchanged since it wasn't the target environment
         assert self.validator.config["test_section"]["test_field"]["PROD"] == "prod_dir"
 
+    def test_resolve_path_field_environment_not_in_mapping(self, tmp_path):
+        """Test _resolve_path_field skips gracefully when environment is not in mapping."""
+        self.validator.environment = "prod"  # Target environment
+
+        # Create directory only for 'dev' environment
+        dev_dir = tmp_path / "dev_dir"
+        dev_dir.mkdir()
+
+        # Parameter mapping only has 'dev', not 'prod'
+        field_value = {"dev": "dev_dir"}
+
+        self.validator.config = {"test_section": {"test_field": field_value}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        # Should NOT raise KeyError - should skip gracefully
+        self.validator._resolve_path_field(field_value, "test_field", "test_section", "directory")
+
+        # No errors should be added (optional field behavior)
+        assert self.validator.errors == []
+        # Config should remain unchanged since resolution was skipped
+        assert self.validator.config["test_section"]["test_field"] == {"dev": "dev_dir"}
+
     def test_resolve_path_field_nonexistent_path(self, tmp_path):
         """Test _resolve_path_field with nonexistent path."""
         self.validator.config = {"test_section": {"test_field": "nonexistent_dir"}}
@@ -1351,7 +1373,13 @@ class TestConfigValidatorUtilityFunctions:
                 "item_types_in_scope": ["Notebook"],
                 "parameter": "param.yml",
             },
-            "publish": {"exclude_regex": ".*_test", "items_to_include": ["item1"], "skip": False},
+            "publish": {
+                "exclude_regex": ".*_test",
+                "folder_exclude_regex": "^temp/",
+                "shortcut_exclude_regex": "^shortcut_temp/",
+                "items_to_include": ["item1"],
+                "skip": False,
+            },
             "unpublish": {"exclude_regex": ".*_old", "items_to_include": ["item2"], "skip": True},
             "features": ["feature1"],
             "constants": {"KEY": "value"},
@@ -1360,15 +1388,27 @@ class TestConfigValidatorUtilityFunctions:
         fields = _get_config_fields(config)
 
         # Should return all fields from all sections
-        assert len(fields) == 13
+        assert len(fields) == 15  # Updated count with folder_exclude_regex and shortcut_exclude_regex
 
         # Check some specific fields
         field_names = [field[1] for field in fields]
         assert "workspace_id" in field_names
         assert "repository_directory" in field_names
         assert "parameter" in field_names
+        assert "folder_exclude_regex" in field_names
+        assert "shortcut_exclude_regex" in field_names
         assert "features" in field_names
         assert "constants" in field_names
+
+        # Check required vs optional flags
+        for _section, field_name, _display_name, is_required, warn_if_missing in fields:
+            if field_name in ["workspace_id", "workspace", "repository_directory"]:
+                assert is_required is True, f"{field_name} should be required"
+            else:
+                assert is_required is False, f"{field_name} should be optional"
+
+            if field_name in ["item_types_in_scope", "parameter"]:
+                assert warn_if_missing is True, f"{field_name} should warn if missing"
 
     def test_is_regular_constants_dict_regular(self):
         """Test _is_regular_constants_dict with regular constants dictionary."""
@@ -1865,10 +1905,12 @@ class TestEnvironmentMismatchValidation:
 
         self.validator._validate_environment_exists()
 
-        # Should get multiple errors for each field that has environment mapping
-        assert len(self.validator.errors) >= 3  # At least workspace_id, repository_directory, and item_types
+        # Only required fields (workspace_id, repository_directory) cause errors
+        # Optional fields (item_types_in_scope, skip) only log warnings/debug
+        assert len(self.validator.errors) == 2
         error_text = " ".join(self.validator.errors)
-        assert "Environment 'test' not found" in error_text
+        assert "workspace_id" in error_text
+        assert "repository_directory" in error_text
 
     def test_environment_mapping_vs_basic_values_mixed(self):
         """Test configuration with both environment mappings and basic values."""
@@ -1902,17 +1944,67 @@ class TestEnvironmentMismatchValidation:
             },
             "publish": {
                 "exclude_regex": "^TEST.*",  # Basic value - should be ignored
-                "skip": {"dev": True},  # Environment mapping - missing 'prod'
+                "skip": {"dev": True},  # Environment mapping - missing 'prod' (optional, no error)
             },
         }
         self.validator.environment = "prod"
 
         self.validator._validate_environment_exists()
 
-        # Should get errors only for fields with environment mappings
+        # Should get error only for required field with environment mapping
+        # Optional fields (skip) only log debug, not errors
+        assert len(self.validator.errors) == 1
+        error_text = " ".join(self.validator.errors)
+        assert "workspace_id" in error_text
+        assert "skip" not in error_text  # Optional field should not cause error
+
+    def test_environment_mismatch_optional_fields_log_only(self):
+        """Test that optional fields only log warnings/debug when environment is missing."""
+        import logging
+
+        self.validator.config = {
+            "core": {
+                "workspace_id": "simple-id",  # Not a mapping, won't trigger error
+                "repository_directory": "/path",
+                "item_types_in_scope": {"dev": ["Notebook"]},  # Optional, warn_if_missing=True
+                "parameter": {"dev": "param.yml"},  # Optional, warn_if_missing=True
+            },
+            "publish": {
+                "exclude_regex": {"dev": "^TEST.*"},  # Optional, warn_if_missing=False
+                "skip": {"dev": True},  # Optional, warn_if_missing=False
+            },
+        }
+        self.validator.environment = "prod"
+
+        with (
+            patch.object(logging.getLogger("fabric_cicd._common._config_validator"), "warning") as mock_warning,
+            patch.object(logging.getLogger("fabric_cicd._common._config_validator"), "debug") as mock_debug,
+        ):
+            self.validator._validate_environment_exists()
+
+        # No errors for optional fields
+        assert self.validator.errors == []
+
+        # Warnings should be logged for item_types_in_scope and parameter
+        assert mock_warning.call_count == 2
+
+        # Debug should be logged for exclude_regex and skip
+        assert mock_debug.call_count == 2
+
+    def test_environment_mismatch_required_fields_error(self):
+        """Test that required fields cause errors when environment is missing."""
+        self.validator.config = {
+            "core": {
+                "workspace_id": {"dev": "dev-id"},  # Required
+                "repository_directory": {"dev": "/dev/path"},  # Required
+            },
+        }
+        self.validator.environment = "prod"
+
+        self.validator._validate_environment_exists()
+
+        # Should get errors for both required fields
         assert len(self.validator.errors) == 2
         error_text = " ".join(self.validator.errors)
         assert "workspace_id" in error_text
-        assert "skip" in error_text
-        assert "repository_directory" not in error_text  # Basic value should not cause error
-        assert "exclude_regex" not in error_text  # Basic value should not cause error
+        assert "repository_directory" in error_text
