@@ -187,6 +187,16 @@ class FileTracer:
 
         self.captures[-1]["response_b64"] = http_response.to_b64()
 
+    def save(self) -> None:
+        """Save all HTTP captures to a JSON file."""
+        if not self.captures:
+            return
+
+        try:
+            FileLock.run_with_lock(self.output_file, self._flush_traces_to_file)
+        except Exception as e:
+            logger.warning(f"Failed to save HTTP trace: {e}")
+
     def _flush_traces_to_file(self) -> None:
         """Flush captured traces to the output file (called within lock)."""
         output_path = Path(self.output_file)
@@ -219,16 +229,6 @@ class FileTracer:
 
         with output_path.open("w") as f:
             json.dump(output_data, f, indent=2)
-
-    def save(self) -> None:
-        """Save all HTTP captures to a JSON file."""
-        if not self.captures:
-            return
-
-        try:
-            FileLock.run_with_lock(self.output_file, self._flush_traces_to_file)
-        except Exception as e:
-            logger.warning(f"Failed to save HTTP trace: {e}")
 
 
 class HTTPTracerFactory:
