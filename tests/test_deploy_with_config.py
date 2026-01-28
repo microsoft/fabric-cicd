@@ -375,14 +375,17 @@ class TestConfigOverrides:
     @patch("fabric_cicd.constants.FEATURE_FLAG", set())
     def test_apply_feature_flags(self):
         """Test applying feature flags from config."""
-        config = {"features": ["enable_shortcut_publish", "enable_debug_mode"]}
+        foo = "enable_foo_feature"
+        bar = "enable_bar_feature"
+
+        config = {"features": [foo, bar]}
 
         apply_config_overrides(config, "N/A")
 
         from fabric_cicd import constants
 
-        assert "enable_shortcut_publish" in constants.FEATURE_FLAG
-        assert "enable_debug_mode" in constants.FEATURE_FLAG
+        assert foo in constants.FEATURE_FLAG
+        assert bar in constants.FEATURE_FLAG
 
     def test_apply_constants_overrides(self):
         """Test applying constants overrides from config."""
