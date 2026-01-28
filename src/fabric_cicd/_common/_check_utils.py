@@ -26,7 +26,7 @@ def parse_changelog() -> dict[str, list[str]]:
 
     try:
         response = requests.get(
-            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/src/fabric_cicd/changelog.md"
+            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/docs/changelog.md"
         )
         if response.status_code == 200:
             content = response.text
@@ -37,7 +37,7 @@ def parse_changelog() -> dict[str, list[str]]:
         logger.debug(f"Error fetching online changelog: {e}")
         return {}
 
-    version_pattern = r"## Version (\d+\.\d+\.\d+).*?(?=## Version|\Z)"
+    version_pattern = r"## \[v(\d+\.\d+\.\d+)\].*?(?=## \[v|\Z)"
     changelog_dict = {}
 
     for match in re.finditer(version_pattern, content, re.DOTALL):

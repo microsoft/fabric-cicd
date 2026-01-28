@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+---
+name: 🔄 Changelog
+
+on:
+    pull_request:
+        branches:
+            - main
+        types:
+            - opened
+            - reopened
+            - labeled
+            - unlabeled
+            - synchronize
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ format('{0}-{1}-{2}-{3}-{4}', github.workflow, github.event_name, github.ref, github.base_ref || null, github.head_ref || null) }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    changelog-existence:
+        name: 🔄 Check Changelog
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip changelog') && github.actor != 'dependabot[bot]' }}
+        runs-on: ubuntu-latest
+        env:
+            BASE_SHA: ${{ github.event.pull_request.base.sha }}
+            HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        steps:
+            - name: ⤵️ Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Required to access full commit history
+
+            - name: ✔️ Check for changelog changes
+              id: changelog_check
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      const { execSync } = require('child_process');
+                      const base = process.env.BASE_SHA;
+                      const head = process.env.HEAD_SHA;
+                      console.log(`Comparing changes from ${base} to ${head}`)
+                      const output = execSync(`git diff --name-only --no-renames --diff-filter=AM ${base} ${head}`).toString();
+                      const files = output.split('\n').filter(Boolean);
+                      const changelogExists = files.some(file => file.startsWith('.changes/unreleased/') && file.endsWith('.yaml'));
+                      core.setOutput('exists', changelogExists);
+
+            - name: 🚧 Setup Node
+              if: steps.changelog_check.outputs.exists == 'true'
+              uses: actions/setup-node@v6
+              with:
+                  node-version: "20"
+
+            - name: 🚧 Install Changie
+              if: steps.changelog_check.outputs.exists == 'true'
+              run: npm i -g changie
+
+            - name: 🔄 Prepare comment (changelog)
+              if: steps.changelog_check.outputs.exists == 'true'
+              run: |
+                  echo -e "# Changelog Preview\n" > changie.md
+                  changie batch patch --dry-run --prerelease 'dev' >> changie.md
+                  cat changie.md >> $GITHUB_STEP_SUMMARY
+
+            - name: 🔄 Prepare comment (missing)
+              if: steps.changelog_check.outputs.exists == 'false'
+              run: |
+                  echo -e "# 🛑 Changelog entry required to merge\n" > changie.md
+                  echo "Run \`changie new\` to add a new changelog entry" >> changie.md
+                  cat changie.md >> $GITHUB_STEP_SUMMARY
+
+            - name: ✅ Pass if changelog entry exists
+              if: steps.changelog_check.outputs.exists == 'true'
+              run: |
+                  echo "✅ Changelog entry exists."
+                  exit 0
+
+            - name: 🛑 Fail if changelog entry is missing and required
+              if: steps.changelog_check.outputs.exists == 'false'
+              run: |
+                  echo "🛑 Changelog entry required to merge."
+                  echo "🛑 Please run 'changie new' to add a new changelog entry."
+                  exit 1
+
+    changelog-skip:
+        name: ⏭️ Skip Changelog
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'skip changelog') || github.actor == 'dependabot[bot]' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: ✅ Pass (skip)
+              run: |
+                  echo "⏭️ Changelog check skipped." >> $GITHUB_STEP_SUMMARY
+                  exit 0
