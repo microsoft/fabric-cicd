@@ -23,7 +23,9 @@ from fabric_cicd._common._logging import print_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
+    validate_folder_path_exclude_regex,
     validate_items_to_include,
+    validate_shortcut_exclude_regex,
 )
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -173,16 +175,7 @@ def publish_all_items(
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     if folder_path_exclude_regex:
-        if (
-            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
-            or FeatureFlag.ENABLE_EXCLUDE_FOLDER.value not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_exclude_folder' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Folder path exclusion is enabled.")
-        logger.warning(
-            "Using folder_path_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
+        validate_folder_path_exclude_regex(folder_path_exclude_regex)
         fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
     if items_to_include:
@@ -190,16 +183,7 @@ def publish_all_items(
         fabric_workspace_obj.items_to_include = items_to_include
 
     if shortcut_exclude_regex:
-        if (
-            FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
-            or FeatureFlag.ENABLE_SHORTCUT_EXCLUDE.value not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_shortcut_exclude' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Shortcut exclusion is enabled.")
-        logger.warning(
-            "Using shortcut_exclude_regex will selectively exclude shortcuts from being deployed to lakehouses. Use with caution."
-        )
+        validate_shortcut_exclude_regex(shortcut_exclude_regex)
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
     # Publish items in the defined order synchronously
