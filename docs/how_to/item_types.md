@@ -126,12 +126,6 @@
     - Notebooks attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
 - **Resources** are not source controlled and will not be deployed.
 
-## Org App
-
-- **Parameterization:**
-    - The `find_replace` section in the `parameter.yml` file is not applied.
-- SPN is currently not a supported authentication method for deploying Org App items.
-
 ## Real-Time Dashboard
 
 - **Parameterization:**
