@@ -10,17 +10,14 @@ any user input throughout the package
 import logging
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InputError
-from fabric_cicd.constants import OperationType
+from fabric_cicd.constants import FeatureFlag, OperationType
 from fabric_cicd.fabric_workspace import FabricWorkspace
-
-if TYPE_CHECKING:
-    from fabric_cicd.constants import FeatureFlag
 
 logger = logging.getLogger(__name__)
 
