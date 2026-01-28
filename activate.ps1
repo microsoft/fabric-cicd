@@ -66,8 +66,7 @@ function Test-And-Install-Changie {
     if (-not (Get-Command changie -ErrorAction SilentlyContinue)) {
         Write-Host "changie not found, installing globally via npm..."
         try {
-            npm install -g changie
-            Write-Host "changie installed successfully."
+            npm install -g changie --registry https://registry.npmjs.org/
             
             # Add npm global bin to PATH if needed
             $npmGlobalPath = npm config get prefix
