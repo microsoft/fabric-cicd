@@ -38,7 +38,6 @@ class CustomFormatter(logging.Formatter):
 
         level_name = f"{level_color}[{level_name}]"
         timestamp = f"{self.formatTime(record, self.datefmt)}"
-        location = f"[{record.funcName}:{record.lineno}]"
         item_context = ""
         item_type = getattr(record, "item_type", None)
         item_name = getattr(record, "item_name", None)
@@ -52,7 +51,7 @@ class CustomFormatter(logging.Formatter):
         # indent if the message contains "->"
         if constants.INDENT in message:
             message = message.replace(constants.INDENT, "")
-            full_message = f"{' ' * 8} {timestamp} - {location} - {item_context}{message}"
+            full_message = f"{' ' * 8} {timestamp} - {item_context}{message}"
         else:
             # Calculate visual length by removing ANSI escape codes
 
@@ -63,7 +62,7 @@ class CustomFormatter(logging.Formatter):
             # Pad to 16 visual characters
             padding = " " * max(0, 8 - visual_level_length)
 
-            full_message = f"{level_name}{padding} {timestamp} - {location} - {item_context}{message}"
+            full_message = f"{level_name}{padding} {timestamp} - {item_context}{message}"
         return full_message
 
 
