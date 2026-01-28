@@ -285,9 +285,6 @@ def publish_all_items(
     if _should_publish_item_type("MountedDataFactory"):
         print_header("Publishing Mounted Data Factories")
         items.publish_mounteddatafactories(fabric_workspace_obj)
-    if _should_publish_item_type("OrgApp"):
-        print_header("Publishing Org Apps")
-        items.publish_orgapps(fabric_workspace_obj)
     if _should_publish_item_type("DataAgent"):
         print_header("Publishing Data Agents")
         items.publish_dataagents(fabric_workspace_obj)
@@ -396,7 +393,6 @@ def unpublish_all_orphan_items(
     for item_type in [
         "MLExperiment",
         "DataAgent",
-        "OrgApp",
         "MountedDataFactory",
         "ApacheAirflowJob",
         "GraphQLApi",
