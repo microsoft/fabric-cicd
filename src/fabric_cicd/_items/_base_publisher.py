@@ -447,7 +447,7 @@ class ItemPublisher(Publisher):
             }
 
             for future in as_completed(futures):
-                item_name, item = futures[future]
+                item_name, _ = futures[future]
                 try:
                     future.result()
                 except Exception as e:
