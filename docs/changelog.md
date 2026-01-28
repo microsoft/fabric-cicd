@@ -1,9 +1,3 @@
----
-markdown_extensions:
-    - toc:
-          toc_depth: 1
----
-
 # Changelog
 
 ## [v0.1.34](https://pypi.org/project/fabric-cicd/0.1.34) - January 20, 2026
