@@ -4,3 +4,5 @@ time: 2026-01-28T10:28:44.435609802Z
 custom:
     Author: shirasassoon
     AuthorLink: https://github.com/shirasassoon
+    Issue: "758"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/758
