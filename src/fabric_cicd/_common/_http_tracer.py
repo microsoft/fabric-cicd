@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from fabric_cicd._common._file_lock import FileLock
 from fabric_cicd.constants import AUTHORIZATION_HEADER, EnvVar
 
 logger = logging.getLogger(__name__)
@@ -192,39 +193,42 @@ class FileTracer:
             return
 
         try:
-            output_path = Path(self.output_file)
-            existing_traces: list[dict] = []
-            if output_path.exists():
-                with output_path.open("r") as f:
-                    existing_data = json.load(f)
-                    existing_traces = existing_data.get("traces", [])
-
-            for capture in self.captures:
-                request_b64 = capture.get("request_b64", "")
-                response_b64 = capture.get("response_b64", "")
-
-                request_data = None
-                response_data = None
-
-                if request_b64:
-                    request_data = json.loads(base64.b64decode(request_b64).decode())
-                if response_b64:
-                    response_data = json.loads(base64.b64decode(response_b64).decode())
-
-                existing_traces.append({"request": request_data, "response": response_data})
-
-            existing_traces.sort(key=lambda x: x["request"].get("timestamp", "") if x.get("request") else "")
-            output_data = {
-                "description": "HTTP trace data from Fabric API interactions",
-                "total_traces": len(existing_traces),
-                "traces": existing_traces,
-            }
-
-            with output_path.open("w") as f:
-                json.dump(output_data, f, indent=2)
-
+            FileLock.run_with_lock(self.output_file, self._flush_traces_to_file)
         except Exception as e:
             logger.warning(f"Failed to save HTTP trace: {e}")
+
+    def _flush_traces_to_file(self) -> None:
+        """Flush captured traces to the output file (called within lock)."""
+        output_path = Path(self.output_file)
+        existing_traces: list[dict] = []
+        if output_path.exists() and output_path.stat().st_size > 0:
+            with output_path.open("r") as f:
+                existing_data = json.load(f)
+                existing_traces = existing_data.get("traces", [])
+
+        for capture in self.captures:
+            request_b64 = capture.get("request_b64", "")
+            response_b64 = capture.get("response_b64", "")
+
+            request_data = None
+            response_data = None
+
+            if request_b64:
+                request_data = json.loads(base64.b64decode(request_b64).decode())
+            if response_b64:
+                response_data = json.loads(base64.b64decode(response_b64).decode())
+
+            existing_traces.append({"request": request_data, "response": response_data})
+
+        existing_traces.sort(key=lambda x: x["request"].get("timestamp", "") if x.get("request") else "")
+        output_data = {
+            "description": "HTTP trace data from Fabric API interactions",
+            "total_traces": len(existing_traces),
+            "traces": existing_traces,
+        }
+
+        with output_path.open("w") as f:
+            json.dump(output_data, f, indent=2)
 
 
 class HTTPTracerFactory:

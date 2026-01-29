@@ -3,31 +3,29 @@
 
 """Functions to process and deploy SQL Database item."""
 
-import logging
+from fabric_cicd import constants
+from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import get_item_logger
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
-from fabric_cicd import FabricWorkspace, constants
 
-logger = logging.getLogger(__name__)
+class SQLDatabasePublisher(ItemPublisher):
+    """Publisher for SQL Database items."""
 
+    item_type = ItemType.SQL_DATABASE.value
 
-def publish_sqldatabases(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all SQL Database items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-    """
-    item_type = "SQLDatabase"
-
-    for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
-        fabric_workspace_obj._publish_item(
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single SQL Database item."""
+        item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
+        self.fabric_workspace_obj._publish_item(
             item_name=item_name,
-            item_type=item_type,
+            item_type=self.item_type,
             skip_publish_logging=True,
         )
 
         # Check if the item is published to avoid any post publish actions
         if item.skip_publish:
-            continue
+            return
 
-        logger.info(f"{constants.INDENT}Published")
+        item_logger.info(f"{constants.INDENT}Published")

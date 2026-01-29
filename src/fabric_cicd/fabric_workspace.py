@@ -19,7 +19,8 @@ from fabric_cicd._common._check_utils import check_regex, check_valid_json_conte
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _generate_fabric_credential, _is_fabric_runtime
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._logging import get_item_logger, print_header
+from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -314,14 +315,14 @@ class FabricWorkspace:
                 # .Eventhouse/.children/ directory structure, requires extracting the
                 # parent folder path before the Eventhouse container, not just
                 # the immediate parent directory
-                if item_type == "KQLDatabase":
+                if item_type == ItemType.KQL_DATABASE.value:
                     pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
                     match = pattern.match(relative_path)
                     relative_parent_path = match.group(1) if match else None
                 else:
                     relative_parent_path = "/".join(relative_path.split("/")[:-1])
 
-                if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+                if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
                     item_folder_id = self.repository_folders.get(relative_parent_path, "")
                 else:
                     item_folder_id = ""
@@ -381,14 +382,14 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties
-            if item_type in ["Lakehouse", "Warehouse", "SQLDatabase"]:
+            if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                 )
                 sql_endpoint_id = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
                 )
-            if item_type in ["Eventhouse"]:
+            if item_type in [ItemType.EVENTHOUSE.value]:
                 query_service_uri = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
                 )
@@ -578,6 +579,7 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
+        item_logger = get_item_logger(__name__, item_type=item_type, item_name=item_name)
 
         # Initialize response collection for this item if responses are being tracked
         api_response = None
@@ -587,7 +589,7 @@ class FabricWorkspace:
             regex_pattern = check_regex(self.publish_item_name_exclude_regex)
             if regex_pattern.match(item_name):
                 item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                item_logger.info("Skipping publishing due to exclusion regex.")
                 return
 
         # Skip publishing if the item's folder path is excluded by the regex
@@ -597,7 +599,7 @@ class FabricWorkspace:
             relative_path_str = relative_path.as_posix()
             if regex_pattern.search(relative_path_str):
                 item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
+                item_logger.info("Skipping publishing due to folder path exclusion regex.")
                 return
 
         # Skip publishing if the item is not in the include list
@@ -611,7 +613,7 @@ class FabricWorkspace:
             match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
             if not match_found:
                 item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
+                item_logger.info("Skipping publishing as it is not in the include list.")
                 return
 
         item_guid = item.guid
@@ -646,7 +648,7 @@ class FabricWorkspace:
                 definition_body = {"definition": {"parts": item_payload}}
             combined_body = {**metadata_body, **definition_body}
 
-        logger.info(f"Publishing {item_type} '{item_name}'")
+        item_logger.info("Publishing")
 
         is_deployed = bool(item_guid)
 
@@ -684,7 +686,7 @@ class FabricWorkspace:
             )
             api_response = metadata_update_response
 
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+        if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
             deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
             # Check if the folder has changed
             if deployed_item is not None and deployed_item.folder_id != item.folder_id:
@@ -703,8 +705,8 @@ class FabricWorkspace:
                     else:
                         # If move is the only operation, use the move response
                         api_response = move_response
-                logger.debug(
-                    f"Moved {item_guid} from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
+                item_logger.debug(
+                    f"Moved from folder_id {self.deployed_items[item_type][item_name].folder_id} to folder_id {item.folder_id}"
                 )
 
         # Store response if responses are being tracked
@@ -716,7 +718,7 @@ class FabricWorkspace:
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
-            logger.info(f"{constants.INDENT}Published")
+            item_logger.info(f"{constants.INDENT}Published")
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
@@ -728,16 +730,16 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
         """
         item_guid = self.deployed_items[item_type][item_name].guid
-
-        logger.info(f"Unpublishing {item_type} '{item_name}'")
+        item_logger = get_item_logger(__name__, item_type=item_type, item_name=item_name)
+        item_logger.info("Unpublishing")
 
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
-            logger.info(f"{constants.INDENT}Unpublished")
+            item_logger.info(f"{constants.INDENT}Unpublished")
         except Exception as e:
-            logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+            item_logger.warning(f"Failed to unpublish. Raw exception: {e}")
 
     def _refresh_deployed_folders(self) -> None:
         """

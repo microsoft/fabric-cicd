@@ -6,47 +6,11 @@
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all semantic model items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "SemanticModel"
-
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        exclude_path = r".*\.pbi[/\\].*"
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
-
-    model_with_binding_dict = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
-
-    if not model_with_binding_dict:
-        return
-
-    # Build connection mapping from semantic_model_binding parameter
-    binding_mapping = {}
-
-    for model in model_with_binding_dict:
-        model_name = model.get("semantic_model_name", [])
-        connection_id = model.get("connection_id")
-
-        if isinstance(model_name, str):
-            model_name = [model_name]
-
-        for name in model_name:
-            binding_mapping[name] = connection_id
-
-    connections = get_connections(fabric_workspace_obj)
-
-    if binding_mapping:
-        bind_semanticmodel_to_connection(
-            fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
-        )
 
 
 def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
@@ -92,7 +56,7 @@ def bind_semanticmodel_to_connection(
         connections: Dictionary of connection objects with connection ID as key.
         connection_details: Dictionary mapping dataset names to connection IDs from parameter.yml.
     """
-    item_type = "SemanticModel"
+    item_type = ItemType.SEMANTIC_MODEL.value
 
     # Loop through each semantic model in the semantic_model_binding section
     for dataset_name, connection_id in connection_details.items():
@@ -176,3 +140,44 @@ def build_request_body(body: dict) -> dict:
             },
         }
     }
+
+
+class SemanticModelPublisher(ItemPublisher):
+    """Publisher for Semantic Model items."""
+
+    item_type = ItemType.SEMANTIC_MODEL.value
+
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single Semantic Model item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type)
+        )
+
+    def post_publish_all(self) -> None:
+        """Bind semantic models to connections after all models are published."""
+        model_with_binding_dict = self.fabric_workspace_obj.environment_parameter.get("semantic_model_binding", [])
+
+        if not model_with_binding_dict:
+            return
+
+        # Build connection mapping from semantic_model_binding parameter
+        binding_mapping = {}
+
+        for model in model_with_binding_dict:
+            model_name = model.get("semantic_model_name", [])
+            connection_id = model.get("connection_id")
+
+            if isinstance(model_name, str):
+                model_name = [model_name]
+
+            for name in model_name:
+                binding_mapping[name] = connection_id
+
+        connections = get_connections(self.fabric_workspace_obj)
+
+        if binding_mapping:
+            bind_semanticmodel_to_connection(
+                fabric_workspace_obj=self.fabric_workspace_obj,
+                connections=connections,
+                connection_details=binding_mapping,
+            )

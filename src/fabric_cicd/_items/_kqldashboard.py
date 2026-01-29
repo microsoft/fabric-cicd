@@ -10,25 +10,10 @@ from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_kqldashboard(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all Real-Time Dashboard items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "KQLDashboard"
-
-    fabric_workspace_obj._refresh_deployed_items()
-
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=item_type, func_process_file=func_process_file
-        )
 
 
 def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
@@ -41,7 +26,11 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
         file_obj: The file object.
     """
     # For KQL Dashboard, we do not need to process the file content
-    return replace_cluster_uri(workspace_obj, file_obj) if item_obj.type == "KQLDashboard" else file_obj.contents
+    return (
+        replace_cluster_uri(workspace_obj, file_obj)
+        if item_obj.type == ItemType.KQL_DASHBOARD.value
+        else file_obj.contents
+    )
 
 
 def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -> str:
@@ -59,7 +48,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
     data_sources = json_content_dict.get("dataSources")
 
     # Get the KQL Database items from the deployed items
-    database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase", {})
+    database_items = fabric_workspace_obj.deployed_items.get(ItemType.KQL_DATABASE.value, {})
 
     for data_source in data_sources:
         if not data_source:
@@ -88,3 +77,19 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
             data_source["clusterUri"] = kqldatabase_cluster_uri
 
     return json.dumps(json_content_dict, indent=2)
+
+
+class KQLDashboardPublisher(ItemPublisher):
+    """Publisher for KQL Dashboard items."""
+
+    item_type = ItemType.KQL_DASHBOARD.value
+
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single KQL Dashboard item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
+        )
+
+    def pre_publish_all(self) -> None:
+        """Refresh deployed items to get KQL Database cluster URIs."""
+        self.fabric_workspace_obj._refresh_deployed_items()

@@ -10,25 +10,10 @@ from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_kqlquerysets(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all KQL Queryset items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "KQLQueryset"
-
-    fabric_workspace_obj._refresh_deployed_items()
-
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=item_type, func_process_file=func_process_file
-        )
 
 
 def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
@@ -40,7 +25,11 @@ def func_process_file(workspace_obj: FabricWorkspace, item_obj: Item, file_obj: 
         item_obj: The item object.
         file_obj: The file object.
     """
-    return replace_cluster_uri(workspace_obj, file_obj) if item_obj.type == "KQLQueryset" else file_obj.contents
+    return (
+        replace_cluster_uri(workspace_obj, file_obj)
+        if item_obj.type == ItemType.KQL_QUERYSET.value
+        else file_obj.contents
+    )
 
 
 def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -> str:
@@ -62,7 +51,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
         return file_obj.contents
 
     # Get the KQL Database items from the deployed items
-    database_items = fabric_workspace_obj.deployed_items.get("KQLDatabase", {})
+    database_items = fabric_workspace_obj.deployed_items.get(ItemType.KQL_DATABASE.value, {})
 
     # If the cluster URI is empty, replace it with the cluster URI of the KQL database
     for data_source in data_sources:
@@ -97,3 +86,19 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
 
     logger.debug("Successfully updated all empty cluster URIs.")
     return json.dumps(json_content_dict, indent=2)
+
+
+class KQLQuerysetPublisher(ItemPublisher):
+    """Publisher for KQL Queryset items."""
+
+    item_type = ItemType.KQL_QUERYSET.value
+
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single KQL Queryset item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, func_process_file=func_process_file
+        )
+
+    def pre_publish_all(self) -> None:
+        """Refresh deployed items to get KQL Database cluster URIs."""
+        self.fabric_workspace_obj._refresh_deployed_items()

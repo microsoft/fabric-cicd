@@ -72,9 +72,11 @@ def test_publish_only_existing_item_types(mock_endpoint):
             patch.object(
                 FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
             ),
-            patch("fabric_cicd._items.publish_notebooks") as mock_publish_notebooks,
-            patch("fabric_cicd._items.publish_environments") as mock_publish_environments,
+            patch("fabric_cicd._items._notebook.NotebookPublisher") as mock_notebook_cls,
+            patch("fabric_cicd._items._environment.EnvironmentPublisher") as mock_env_cls,
         ):
+            mock_notebook_instance = mock_notebook_cls.return_value
+
             workspace = FabricWorkspace(
                 workspace_id="12345678-1234-5678-abcd-1234567890ab",
                 repository_directory=str(temp_path),
@@ -88,9 +90,10 @@ def test_publish_only_existing_item_types(mock_endpoint):
             assert "Notebook" in workspace.repository_items
             assert "Environment" not in workspace.repository_items
 
-            # Verify that only publish_notebooks was called
-            mock_publish_notebooks.assert_called_once_with(workspace)
-            mock_publish_environments.assert_not_called()
+            # Verify that only NotebookPublisher was instantiated
+            mock_notebook_cls.assert_called_once_with(workspace)
+            mock_notebook_instance.publish_all.assert_called_once()
+            mock_env_cls.assert_not_called()
 
 
 def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint):
@@ -365,10 +368,10 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint):
     # Track the order of function calls
     call_order = []
 
-    def mock_publish_lakehouses(_workspace):
+    def mock_publish_lakehouses():
         call_order.append("Lakehouse")
 
-    def mock_publish_mirroreddatabase(_workspace):
+    def mock_publish_mirroreddatabase():
         call_order.append("MirroredDatabase")
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -422,9 +425,14 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint):
             patch.object(
                 FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
             ),
-            patch("fabric_cicd._items.publish_lakehouses", side_effect=mock_publish_lakehouses),
-            patch("fabric_cicd._items.publish_mirroreddatabase", side_effect=mock_publish_mirroreddatabase),
+            patch("fabric_cicd._items._lakehouse.LakehousePublisher") as mock_lakehouse_cls,
+            patch("fabric_cicd._items._mirroreddatabase.MirroredDatabasePublisher") as mock_mirrored_cls,
         ):
+            mock_lakehouse_instance = mock_lakehouse_cls.return_value
+            mock_lakehouse_instance.publish_all.side_effect = mock_publish_lakehouses
+            mock_mirrored_instance = mock_mirrored_cls.return_value
+            mock_mirrored_instance.publish_all.side_effect = mock_publish_mirroreddatabase
+
             workspace = FabricWorkspace(
                 workspace_id="12345678-1234-5678-abcd-1234567890ab",
                 repository_directory=str(temp_path),
