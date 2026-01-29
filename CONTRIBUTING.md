@@ -109,7 +109,6 @@ When creating an issue please select the relevant template, e.g., bug, new featu
 - [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
 - [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
 - [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
-- [Copilot](https://github.com/microsoft/fabric-cicd/issues/new?template=5-copilot.yml)
 
 We aim to respond to new issues promptly, but response times may vary depending on workload and priority.
 
