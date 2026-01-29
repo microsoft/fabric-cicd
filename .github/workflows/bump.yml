@@ -178,7 +178,7 @@ jobs:
                         // Extract changelog content for new release
                         const versionNumber = '${{ steps.version-check.outputs.version_number }}';
                         const fs = require('fs');
-                        const path = 'src/fabric_cicd/changelog.md';
+                        const path = 'docs/changelog.md';
                         
                         let changelogContent = `Release ${tagName}`;
                         
@@ -190,9 +190,9 @@ jobs:
                             let content = [];
                             
                             for (const line of lines) {
-                              if (line.startsWith('## Version ')) {
+                              if (line.startsWith('## [v')) {
                                 if (found) break; // Hit next version, stop
-                                if (line.includes(`Version ${versionNumber}`)) {
+                                if (line.includes(`[v${versionNumber}]`)) {
                                   found = true;
                                   continue; // Skip the version header line
                                 }

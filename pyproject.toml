@@ -7,7 +7,6 @@ requires-python = ">=3.9,<3.13"
 license = "MIT"
 license-files = ["LICENSE"]
 dynamic = ["version"]
-urls.Repository = "https://github.com/microsoft/fabric-cicd.git"
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.9",
@@ -15,7 +14,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-
 dependencies = [
     "azure-identity>=1.19.0",
     "dpath>=2.2.0",
@@ -25,6 +23,10 @@ dependencies = [
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
 ]
+
+[project.urls]
+Repository = "https://github.com/microsoft/fabric-cicd.git"
+Changelog = "https://github.com/microsoft/fabric-cicd/blob/main/docs/changelog.md"
 
 [dependency-groups]
 dev = [
@@ -47,7 +49,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 dynamic.version = { attr = "fabric_cicd.constants.VERSION" }
 packages.find.where = ["src"]
-package-data = { "fabric_cicd" = ["changelog.md"] }
 
 [tool.uv]
 package = true
