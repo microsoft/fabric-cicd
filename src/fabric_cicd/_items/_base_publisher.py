@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._logging import get_item_logger
 from fabric_cicd.constants import ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -449,8 +448,7 @@ class ItemPublisher(Publisher):
                 try:
                     future.result()
                 except Exception as e:
-                    item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
-                    item_logger.error(f"Failed to publish: {e}")
+                    logger.error(f"Failed to publish {self.item_type} '{item_name}': {e}")
                     errors.append((item_name, e))
 
         return errors
@@ -471,8 +469,7 @@ class ItemPublisher(Publisher):
             try:
                 self.publish_one(item_name, item)
             except Exception as e:
-                item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
-                item_logger.error(f"Failed to publish: {e}")
+                logger.error(f"Failed to publish {self.item_type} '{item_name}': {e}")
                 errors.append((item_name, e))
 
         return errors
@@ -496,8 +493,7 @@ class ItemPublisher(Publisher):
                 try:
                     self.publish_one(item_name, item)
                 except Exception as e:
-                    item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
-                    item_logger.error(f"Failed to publish: {e}")
+                    logger.error(f"Failed to publish {self.item_type} '{item_name}': {e}")
                     errors.append((item_name, e))
 
         return errors

@@ -4,12 +4,14 @@
 """Functions to process and deploy Warehouse item."""
 
 import json
+import logging
 
 from fabric_cicd import constants
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._logging import get_item_logger
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import ItemType
+
+logger = logging.getLogger(__name__)
 
 
 class WarehousePublisher(ItemPublisher):
@@ -19,7 +21,6 @@ class WarehousePublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Warehouse item."""
-        item_logger = get_item_logger(__name__, item_type=self.item_type, item_name=item_name)
         creation_payload = next(
             (
                 json.loads(file.contents)["metadata"]["creationPayload"]
@@ -40,4 +41,4 @@ class WarehousePublisher(ItemPublisher):
         if item.skip_publish:
             return
 
-        item_logger.info(f"{constants.INDENT}Published")
+        logger.info(f"{constants.INDENT}Published Warehouse '{item_name}'")
