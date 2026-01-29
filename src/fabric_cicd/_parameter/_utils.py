@@ -495,7 +495,8 @@ def validate_parameter_file(
 def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bool:
     """
     Checks the parameter dictionary structure and determines if it
-    contains the valid structure (i.e. a list of values when indexed by the key).
+    contains the valid structure (i.e. a list of values when indexed by the key,
+    or the new dict format for semantic_model_binding).
 
     Args:
         param_dict: The parameter dictionary to check.
@@ -503,6 +504,10 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
     """
     # Check the structure of the specified parameter
     if param_name:
+        # Special case for semantic_model_binding - can be list (legacy) or dict (new)
+        if param_name == "semantic_model_binding":
+            is_valid, _ = _check_semantic_model_binding_structure(param_dict.get(param_name))
+            return is_valid
         return _check_parameter_structure(param_dict.get(param_name))
 
     # Get only parameters that exist in param_dict
@@ -512,16 +517,41 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
     if not existing_params:
         return False
 
-    # Check all existing parameters have the same structure and are valid
-    structures = [_check_parameter_structure(param_dict.get(name)) for name in existing_params]
+    # Check all existing parameters have valid structure
+    for name in existing_params:
+        # Special case for semantic_model_binding
+        if name == "semantic_model_binding":
+            is_valid, _ = _check_semantic_model_binding_structure(param_dict.get(name))
+            if not is_valid:
+                return False
+        elif not _check_parameter_structure(param_dict.get(name)):
+            return False
 
-    # All structures must be True and identical
-    return all(structures) and len(set(structures)) == 1
+    return True
 
 
 def _check_parameter_structure(param_value: any) -> bool:
     """Checks the structure of a parameter value"""
     return isinstance(param_value, list)
+
+
+def _check_semantic_model_binding_structure(param_value: any) -> tuple[bool, bool]:
+    """
+    Checks the structure of semantic_model_binding parameter value.
+    Supports both legacy (list) and new (dict with 'default' or 'models') formats.
+    """
+    # Legacy format: list
+    if isinstance(param_value, list):
+        return (True, False)
+
+    # New format: dict with at least 'default' or 'models'
+    if isinstance(param_value, dict):
+        has_default = "default" in param_value
+        has_models = "models" in param_value
+        is_valid = has_default or has_models
+        return (is_valid, True)
+
+    return (False, False)
 
 
 """Functions to process and validate file paths from the optional filter"""
