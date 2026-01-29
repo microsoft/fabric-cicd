@@ -11,7 +11,7 @@ changeFormat: "* {{.Body}} by [{{.Custom.Author}}]({{.Custom.AuthorLink}})"
 kinds:
     - label: "⚠️ Breaking Change"
       key: breaking
-      auto: minor
+      auto: major
     - label: "🆕 New Items Support"
       key: new-items
       auto: minor
