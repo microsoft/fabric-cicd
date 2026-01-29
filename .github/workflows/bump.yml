@@ -190,7 +190,7 @@ jobs:
                             let content = [];
                             
                             for (const line of lines) {
-                              if (line.startsWith('## [v ')) {
+                              if (line.startsWith('## [v')) {
                                 if (found) break; // Hit next version, stop
                                 if (line.includes(`[v${versionNumber}]`)) {
                                   found = true;
