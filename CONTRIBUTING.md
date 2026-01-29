@@ -17,38 +17,35 @@ or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any addi
 
 We welcome several types of contributions:
 
--   🔧 **Bug fixes** - Fix issues and improve reliability
--   ✨ **New features** - Add new commands or functionality
--   🆕 **New Items Support** - Onboard new Fabric item types
--   📝 **Documentation** - Improve guides, examples, and API docs
--   🧪 **Tests** - Add or improve test coverage
--   💬 **Help others** - Answer questions and provide support
--   💡 **Feature suggestions** - Propose new capabilities
+- 🔧 **Bug fixes** - Fix issues and improve reliability
+- ✨ **New features** - Add new commands or functionality
+- 🆕 **New Items Support** - Onboard new Fabric item types
+- 📝 **Documentation** - Improve guides, examples, and API docs
+- 🧪 **Tests** - Add or improve test coverage
+- 💬 **Help others** - Answer questions and provide support
+- 💡 **Feature suggestions** - Propose new capabilities
 
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
 
--   [Python](https://www.python.org/downloads/) (see [Installation](https://microsoft.github.io/fabric-cicd/#installation) for version requirements)
--   [PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
--   [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows) or [Az.Accounts PowerShell module](https://www.powershellgallery.com/packages/Az.Accounts/2.2.3)
--   [Visual Studio Code (VS Code)](https://code.visualstudio.com/)
+- [Python](https://www.python.org/downloads/) (see [Installation](https://microsoft.github.io/fabric-cicd/#installation) for version requirements)
+- [PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
+- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows) or [Az.Accounts PowerShell module](https://www.powershellgallery.com/packages/Az.Accounts/2.2.3)
+- [Visual Studio Code (VS Code)](https://code.visualstudio.com/)
 
 ## Initial Configuration
 
 1. **Fork the Repository on GitHub**:
-
     - Go to the repository [fabric-cicd](https://github.com/microsoft/fabric-cicd) on GitHub
     - In the top right corner, click on the **Fork** button
     - This will create a copy of the repository in your own GitHub account
 
 1. **Clone Your Forked Repository**:
-
     - Once the fork is complete, go to your GitHub account and open the forked repository
     - Click on the **Code** button, and clone to VS Code
 
 1. **Run activate.ps1**:
-
     - Open the Project in VS Code
     - Open PowerShell terminal
     - Run `activate.ps1` which will install `uv`, and `ruff` if not already found. And set up the default environment leveraging `uv sync`
@@ -59,12 +56,10 @@ Before you begin, ensure you have the following installed:
         _For Linux, run `activate.sh` instead_
 
 1. **Select Python Interpreter**:
-
     - Open the Command Palette (`Ctrl+Shift+P`) and select `Python: Select Interpreter`
     - Choose the interpreter from the `.venv` directory
 
 1. **Ensure All VS Code Extensions Are Installed**:
-
     - Open the Command Palette (`Ctrl+Shift+P`) and select `Extensions: Show Recommended Extensions`
     - Install all extensions recommended for the workspace
 
@@ -72,22 +67,22 @@ Before you begin, ensure you have the following installed:
 
 ### Managing Dependencies
 
--   All dependencies in this project are managed by `uv` which will resolve all dependencies and lock the versions to speed up virtual environment creation
--   For additions, run:
+- All dependencies in this project are managed by `uv` which will resolve all dependencies and lock the versions to speed up virtual environment creation
+- For additions, run:
     ```sh
     uv add <package-name>
     ```
--   For removals, run:
+- For removals, run:
     ```sh
     uv remove <package-name>
     ```
 
 ### Code Formatting & Linting
 
--   The python code within this project is maintained by `ruff`
--   If you install the recommended extensions, `ruff` will auto format on save of any file
--   Before being able to merge a PR, `ruff` is ran in a GitHub Action to ensure the files are properly formatted and maintained
--   To force linting, run the following
+- The python code within this project is maintained by `ruff`
+- If you install the recommended extensions, `ruff` will auto format on save of any file
+- Before being able to merge a PR, `ruff` is ran in a GitHub Action to ensure the files are properly formatted and maintained
+- To force linting, run the following
     ```sh
     uv run ruff format
     uv run ruff check
@@ -97,9 +92,9 @@ Before you begin, ensure you have the following installed:
 
 To avoid cases where submitted PRs are rejected, please follow the following steps:
 
--   To report a new issue, follow [Create an issue](#creating-an-issue)
--   To work on existing issue, follow [Find an issue to work on](#finding-an-issue-to-work-on)
--   To contribute code, follow [Pull request process](#pull-request-process)
+- To report a new issue, follow [Create an issue](#creating-an-issue)
+- To work on existing issue, follow [Find an issue to work on](#finding-an-issue-to-work-on)
+- To contribute code, follow [Pull request process](#pull-request-process)
 
 ### Creating an issue
 
@@ -109,11 +104,10 @@ All reported bugs or feature suggestions must start with creating an issue in th
 
 When creating an issue please select the relevant template, e.g., bug, new feature, general question, etc. and provide all required input:
 
--   [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
--   [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
--   [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
--   [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
--   [Copilot](https://github.com/microsoft/fabric-cicd/issues/new?template=5-copilot.yml)
+- [Bug Report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml)
+- [Feature Request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml)
+- [Documentation](https://github.com/microsoft/fabric-cicd/issues/new?template=3-documentation.yml)
+- [Question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml)
 
 We aim to respond to new issues promptly, but response times may vary depending on workload and priority.
 
@@ -123,9 +117,9 @@ We aim to respond to new issues promptly, but response times may vary depending 
 
 If you're new to contributing, look for issues with these labels:
 
--   **`good-first-issue`** - Beginner-friendly tasks that are well-scoped and documented
--   **`help wanted`** - Issues where community contributions are especially welcome
--   **`documentation`** - Improve docs, examples, or help text (great for first contributions)
+- **`good-first-issue`** - Beginner-friendly tasks that are well-scoped and documented
+- **`help wanted`** - Issues where community contributions are especially welcome
+- **`documentation`** - Improve docs, examples, or help text (great for first contributions)
 
 #### Getting Started Tips
 
@@ -155,32 +149,32 @@ Please review [engineering guidelines](https://github.com/microsoft/fabric-cicd/
 
 Your PR title MUST follow this exact format: `"Fixes #123 - Short Description"` where #123 is the issue number.
 
--   Use "Fixes" for bug fixes, "Closes" for features, "Resolves" for other changes
--   Example: "Fixes #520 - Add Python version requirements to documentation"
--   Version bump PRs are an exception: title must be "vX.X.X" format only
--   GitHub Actions will automatically check that your PR is linked to a valid issue and will fail if no valid reference is found
+- Use "Fixes" for bug fixes, "Closes" for features, "Resolves" for other changes
+- Example: "Fixes #520 - Add Python version requirements to documentation"
+- Version bump PRs are an exception: title must be "vX.X.X" format only
+- GitHub Actions will automatically check that your PR is linked to a valid issue and will fail if no valid reference is found
 
 #### Before Submitting PR
 
 Verify that:
 
--   The PR is focused on the related task
--   Tests coverage is kept and all tests pass
--   Your code is aligned with the code conventions of this project
+- The PR is focused on the related task
+- Tests coverage is kept and all tests pass
+- Your code is aligned with the code conventions of this project
 
 #### Review Process
 
--   Use a descriptive title and provide a clear summary of your changes
--   Address and resolve all review comments before merge
--   PRs will be labeled as "need author feedback" when there are comments to resolve
--   Approved PRs will be merged by the fabric-cicd team
+- Use a descriptive title and provide a clear summary of your changes
+- Address and resolve all review comments before merge
+- PRs will be labeled as "need author feedback" when there are comments to resolve
+- Approved PRs will be merged by the fabric-cicd team
 
 ## Resources to help you get started
 
 Here are some resources to help you get started:
 
--   A good place to start learning about fabric-cicd is the [fabric-cicd documentation](https://microsoft.github.io/fabric-cicd/)
--   If you want to contribute code, please check more details about coding guidelines, major code flows and code building block in [Engineering guidelines](https://github.com/microsoft/fabric-cicd/wiki)
+- A good place to start learning about fabric-cicd is the [fabric-cicd documentation](https://microsoft.github.io/fabric-cicd/)
+- If you want to contribute code, please check more details about coding guidelines, major code flows and code building block in [Engineering guidelines](https://github.com/microsoft/fabric-cicd/wiki)
 
 ## Engineering guidelines
 
@@ -194,21 +188,21 @@ Before contributing code, please review these guidelines to ensure your contribu
 
 Some areas require special consideration:
 
--   **Core infrastructure** - Major architectural changes require team discussion, including within `FabricEndpoint` and `FabricWorkspace` classes
--   **Parameterization framework** - Changes require team discussion due to complex validation and parameter replacement logic
+- **Core infrastructure** - Major architectural changes require team discussion, including within `FabricEndpoint` and `FabricWorkspace` classes
+- **Parameterization framework** - Changes require team discussion due to complex validation and parameter replacement logic
 
 ## Need Help?
 
 ### Getting Support
 
--   **[GitHub Issues](https://github.com/microsoft/fabric-cicd/issues)** - Report specific problems
--   **[Documentation](https://microsoft.github.io/fabric-cicd/)** - Check comprehensive guides
+- **[GitHub Issues](https://github.com/microsoft/fabric-cicd/issues)** - Report specific problems
+- **[Documentation](https://microsoft.github.io/fabric-cicd/)** - Check comprehensive guides
 
 ### Communication Guidelines
 
--   **Be patient** - Maintainers balance multiple responsibilities
--   **Be respectful** - Follow the code of conduct
--   **Be specific** - Provide clear, detailed information
--   **Be collaborative** - Work together to improve the project
+- **Be patient** - Maintainers balance multiple responsibilities
+- **Be respectful** - Follow the code of conduct
+- **Be specific** - Provide clear, detailed information
+- **Be collaborative** - Work together to improve the project
 
 Thank you for contributing to Microsoft fabric-cicd! Your contributions help make this tool better for the entire Fabric community.
