@@ -202,8 +202,7 @@ All pull requests must include proper change documentation using [changie](https
 
 #### Examples of Good Change Descriptions
 
-- `Add new 'fab describe capacity' command for viewing capacity details`
-- `Fix authentication timeout issue in interactive mode`
+- `Fix timeout issue in LRO polling`
 - `Update workspace examples with new folder hierarchy patterns`
 - `Optimize API response caching to reduce network calls`
 
