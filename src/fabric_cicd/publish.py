@@ -294,7 +294,7 @@ def publish_all_items(
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
-        log_header("Checking Environment Publish State")
+        log_header(logger, "Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 
     # Return response data if feature flag is enabled and responses were collected
@@ -364,7 +364,7 @@ def unpublish_all_orphan_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
-    log_header("Unpublishing Orphaned Items")
+    log_header(logger, "Unpublishing Orphaned Items")
 
     if items_to_include:
         if (
@@ -525,7 +525,7 @@ def deploy_with_config(
         msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
         raise InputError(msg, logger)
 
-    log_header("Config-Based Deployment")
+    log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
     # Validate environment
