@@ -20,7 +20,7 @@ from fabric_cicd._common._config_utils import (
     load_config_file,
 )
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
-from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
@@ -217,84 +217,84 @@ def publish_all_items(
         )
 
     if _should_publish_item_type("VariableLibrary"):
-        print_header("Publishing Variable Libraries")
+        log_header(logger, "Publishing Variable Libraries")
         items.publish_variablelibraries(fabric_workspace_obj)
     if _should_publish_item_type("Warehouse"):
-        print_header("Publishing Warehouses")
+        log_header(logger, "Publishing Warehouses")
         items.publish_warehouses(fabric_workspace_obj)
     if _should_publish_item_type("MirroredDatabase"):
-        print_header("Publishing Mirrored Databases")
+        log_header(logger, "Publishing Mirrored Databases")
         items.publish_mirroreddatabase(fabric_workspace_obj)
     if _should_publish_item_type("Lakehouse"):
-        print_header("Publishing Lakehouses")
+        log_header(logger, "Publishing Lakehouses")
         items.publish_lakehouses(fabric_workspace_obj)
     if _should_publish_item_type("SQLDatabase"):
-        print_header("Publishing SQL Databases")
+        log_header(logger, "Publishing SQL Databases")
         items.publish_sqldatabases(fabric_workspace_obj)
     if _should_publish_item_type("Environment"):
-        print_header("Publishing Environments")
+        log_header(logger, "Publishing Environments")
         items.publish_environments(fabric_workspace_obj)
     if _should_publish_item_type("UserDataFunction"):
-        print_header("Publishing User Data Functions")
+        log_header(logger, "Publishing User Data Functions")
         items.publish_userdatafunctions(fabric_workspace_obj)
     if _should_publish_item_type("Eventhouse"):
-        print_header("Publishing Eventhouses")
+        log_header(logger, "Publishing Eventhouses")
         items.publish_eventhouses(fabric_workspace_obj)
     if _should_publish_item_type("SparkJobDefinition"):
-        print_header("Publishing Spark Job Definitions")
+        log_header(logger, "Publishing Spark Job Definitions")
         items.publish_sparkjobdefinitions(fabric_workspace_obj)
     if _should_publish_item_type("Notebook"):
-        print_header("Publishing Notebooks")
+        log_header(logger, "Publishing Notebooks")
         items.publish_notebooks(fabric_workspace_obj)
     if _should_publish_item_type("SemanticModel"):
-        print_header("Publishing Semantic Models")
+        log_header(logger, "Publishing Semantic Models")
         items.publish_semanticmodels(fabric_workspace_obj)
     if _should_publish_item_type("Report"):
-        print_header("Publishing Reports")
+        log_header(logger, "Publishing Reports")
         items.publish_reports(fabric_workspace_obj)
     if _should_publish_item_type("CopyJob"):
-        print_header("Publishing Copy Jobs")
+        log_header(logger, "Publishing Copy Jobs")
         items.publish_copyjobs(fabric_workspace_obj)
     if _should_publish_item_type("KQLDatabase"):
-        print_header("Publishing KQL Databases")
+        log_header(logger, "Publishing KQL Databases")
         items.publish_kqldatabases(fabric_workspace_obj)
     if _should_publish_item_type("KQLQueryset"):
-        print_header("Publishing KQL Querysets")
+        log_header(logger, "Publishing KQL Querysets")
         items.publish_kqlquerysets(fabric_workspace_obj)
     if _should_publish_item_type("Reflex"):
-        print_header("Publishing Activators")
+        log_header(logger, "Publishing Activators")
         items.publish_activators(fabric_workspace_obj)
     if _should_publish_item_type("Eventstream"):
-        print_header("Publishing Eventstreams")
+        log_header(logger, "Publishing Eventstreams")
         items.publish_eventstreams(fabric_workspace_obj)
     if _should_publish_item_type("KQLDashboard"):
-        print_header("Publishing KQL Dashboards")
+        log_header(logger, "Publishing KQL Dashboards")
         items.publish_kqldashboard(fabric_workspace_obj)
     if _should_publish_item_type("Dataflow"):
-        print_header("Publishing Dataflows")
+        log_header(logger, "Publishing Dataflows")
         items.publish_dataflows(fabric_workspace_obj)
     if _should_publish_item_type("DataPipeline"):
-        print_header("Publishing Data Pipelines")
+        log_header(logger, "Publishing Data Pipelines")
         items.publish_datapipelines(fabric_workspace_obj)
     if _should_publish_item_type("GraphQLApi"):
-        print_header("Publishing GraphQL APIs")
+        log_header(logger, "Publishing GraphQL APIs")
         items.publish_graphqlapis(fabric_workspace_obj)
     if _should_publish_item_type("ApacheAirflowJob"):
-        print_header("Publishing Apache Airflow Jobs")
+        log_header(logger, "Publishing Apache Airflow Jobs")
         items.publish_apacheairflowjobs(fabric_workspace_obj)
     if _should_publish_item_type("MountedDataFactory"):
-        print_header("Publishing Mounted Data Factories")
+        log_header(logger, "Publishing Mounted Data Factories")
         items.publish_mounteddatafactories(fabric_workspace_obj)
     if _should_publish_item_type("DataAgent"):
-        print_header("Publishing Data Agents")
+        log_header(logger, "Publishing Data Agents")
         items.publish_dataagents(fabric_workspace_obj)
     if _should_publish_item_type("MLExperiment"):
-        print_header("Publishing ML Experiments")
+        log_header(logger, "Publishing ML Experiments")
         items.publish_mlexperiments(fabric_workspace_obj)
 
     # Check Environment Publish
     if _should_publish_item_type("Environment"):
-        print_header("Checking Environment Publish State")
+        log_header("Checking Environment Publish State")
         items.check_environment_publish_state(fabric_workspace_obj)
 
     # Return response data if feature flag is enabled and responses were collected
@@ -364,7 +364,7 @@ def unpublish_all_orphan_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
-    print_header("Unpublishing Orphaned Items")
+    log_header("Unpublishing Orphaned Items")
 
     if items_to_include:
         if (
@@ -525,7 +525,7 @@ def deploy_with_config(
         msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
         raise InputError(msg, logger)
 
-    print_header("Config-Based Deployment")
+    log_header("Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
     # Validate environment
