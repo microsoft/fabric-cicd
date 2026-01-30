@@ -136,19 +136,20 @@ def exception_handler(exception_type: type[BaseException], exception: BaseExcept
         sys.__excepthook__(exception_type, exception, traceback)
 
 
-def print_header(message: str) -> None:
+def log_header(logger: logging.Logger, message: str) -> None:
     """
-    Prints a header message with a decorative line above and below it.
+    Logs a header message with a decorative line above and below it.
 
     Args:
-        message: The header message to print.
+        logger: The logger to use for logging the header message.
+        message: The header message to log.
     """
     line_separator = "#" * 100
     formatted_message = f"########## {message}"
     formatted_message = f"{formatted_message} {line_separator[len(formatted_message) + 1 :]}"
 
-    print()  # Print a blank line before the header
-    print(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}{Style.BRIGHT}{formatted_message}{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
-    print()
+    logger.info("")  # Log a blank line before the header
+    logger.info(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
+    logger.info(f"{Fore.GREEN}{Style.BRIGHT}{formatted_message}{Style.RESET_ALL}")
+    logger.info(f"{Fore.GREEN}{Style.BRIGHT}{line_separator}{Style.RESET_ALL}")
+    logger.info("")
