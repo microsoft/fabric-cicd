@@ -52,6 +52,12 @@ spark_pool:
 semantic_model_binding:
     - connection_id: "connection_id"
       semantic_model_name: "semantic_model_name"
+
+semantic_model_parameters:
+    - semantic_model_name: "semantic_model_name"
+      parameters:
+          - name: "ParameterName"
+            new_value: "ParameterValue"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
@@ -151,6 +157,104 @@ semantic_model_binding:
       semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
 ```
 
+### `semantic_model_parameters`
+
+The `semantic_model_parameters` parameter enables automatic updates of Power BI dataset parameters during deployment. This is particularly useful for environment-specific values such as database connection strings, server names, API endpoints, or feature flags. Parameters are updated using the Power BI REST API immediately after the semantic model is deployed and connections are bound (if `semantic_model_binding` is configured).
+
+**Use Cases:**
+
+- Update database server names or connection strings for different environments (dev, test, prod)
+- Configure API endpoints specific to each environment
+- Set environment-specific feature flags
+- Update file paths or storage account names
+
+**How it works:** The semantic model is deployed first, then connections are bound (if configured), and finally parameters are updated via the Power BI API `/Default.UpdateParameters` endpoint.
+
+```yaml
+semantic_model_parameters:
+    # Single semantic model with multiple parameters
+    - semantic_model_name: <semantic_model_name>
+      parameters:
+          - name: <parameter_name>
+            new_value: <parameter_value>
+          - name: <another_parameter_name>
+            new_value: <another_parameter_value>
+
+    # Multiple semantic models sharing the same parameters
+    - semantic_model_name: [<model1>, <model2>, <model3>]
+      parameters:
+          - name: <parameter_name>
+            new_value: <shared_parameter_value>
+```
+
+**Example - SQL Server Configuration:**
+
+```yaml
+semantic_model_parameters:
+    # Configure SQL Server connection parameters
+    - semantic_model_name: "Sales Model"
+      parameters:
+          - name: "ServerName"
+            new_value: "prod-sqlserver.database.windows.net"
+          - name: "DatabaseName"
+            new_value: "SalesDB"
+          - name: "Port"
+            new_value: 1433
+```
+
+**Example - Multiple Models with Shared API Configuration:**
+
+```yaml
+semantic_model_parameters:
+    # Update API endpoint for multiple models
+    - semantic_model_name: ["Finance Model", "HR Model", "Marketing Model"]
+      parameters:
+          - name: "ApiEndpoint"
+            new_value: "https://api.production.com"
+          - name: "ApiVersion"
+            new_value: "v2"
+          - name: "TimeoutSeconds"
+            new_value: 300
+```
+
+**Example - Combined with Connection Binding:**
+
+```yaml
+# First bind the connection
+semantic_model_binding:
+    - connection_id: "prod-connection-id"
+      semantic_model_name: "Sales Model"
+
+# Then update parameters
+semantic_model_parameters:
+    - semantic_model_name: "Sales Model"
+      parameters:
+          - name: "DatabaseName"
+            new_value: "ProductionDB"
+          - name: "RefreshSchedule"
+            new_value: "Daily"
+```
+
+**Parameter Value Types:**
+
+All parameter values are converted to strings before being sent to the API. You can use:
+
+- **Strings**: `"prod-server.database.windows.net"`
+- **Numbers**: `1433` (automatically converted to `"1433"`)
+- **Booleans**: `true` (automatically converted to `"true"`)
+
+**Important Notes:**
+
+- Parameter names are **case-sensitive** and must exactly match the parameters defined in your semantic model
+- To find parameter names, open your `.pbix` file in Power BI Desktop and go to **Home** → **Transform data** → **Edit Parameters**
+- If a semantic model is not found in the repository, a warning is logged and deployment continues
+- If a parameter update fails, an error is logged but deployment of other models continues
+- The `semantic_model_name` field accepts either a single string or a list of strings
+
+**API Reference:** This feature uses the Power BI REST API endpoint: `POST /v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/Default.UpdateParameters`. For more information, see [Microsoft's API documentation](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/update-parameters-in-group).
+
+For additional examples, see the `examples/semantic_model_parameters_example.py` file in the repository.
+
 ## Advanced Find and Replace
 
 ### `find_value` Regex
@@ -212,7 +316,6 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
         | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
         | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                        | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
-        
         - Attributes should be **lowercase**.
         - Item type and name are **case-sensitive**.
         - Item type must be valid and in scope.
@@ -549,6 +652,25 @@ spark_pool:
               type: "Workspace" # target spark pool type, only supports Capacity or Workspace
               name: "WorkspacePool_Medium" # target spark pool name
       item_name: ["World_1", "World_2", "World_3"] # filter on environment files for environments with these names
+
+semantic_model_binding:
+    - connection_id: "prod-connection-guid" # connection ID for production
+      semantic_model_name: "Sales Model" # semantic model to bind
+
+semantic_model_parameters:
+    # Update SQL Server configuration for Sales Model
+    - semantic_model_name: "Sales Model"
+      parameters:
+          - name: "ServerName"
+            new_value: "prod-sqlserver.database.windows.net"
+          - name: "DatabaseName"
+            new_value: "SalesDB"
+
+    # Update API endpoint for multiple models
+    - semantic_model_name: ["Finance Model", "HR Model"]
+      parameters:
+          - name: "ApiEndpoint"
+            new_value: "https://api.production.com"
 ```
 
 ## Examples by Item Type

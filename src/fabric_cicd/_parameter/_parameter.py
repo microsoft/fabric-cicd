@@ -48,6 +48,10 @@ class Parameter:
             "minimum": {"connection_id", "semantic_model_name"},
             "maximum": {"connection_id", "semantic_model_name"},
         },
+        "semantic_model_parameters": {
+            "minimum": {"semantic_model_name", "parameters"},
+            "maximum": {"semantic_model_name", "parameters"},
+        },
         "extend": {"minimum": set(), "maximum": set()},
     }
 
@@ -380,6 +384,7 @@ class Parameter:
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
+            ("semantic_model_parameters parameter", lambda: self._validate_parameter("semantic_model_parameters")),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -397,6 +402,7 @@ class Parameter:
                         "key_value_replace parameter",
                         "spark_pool parameter",
                         "semantic_model_binding parameter",
+                        "semantic_model_parameters parameter",
                     )
                     and msg == "parameter not found"
                 ):
@@ -451,6 +457,8 @@ class Parameter:
             key_name = "instance_pool_id"
         elif param_name == "semantic_model_binding":
             key_name = "connection_id"
+        elif param_name == "semantic_model_parameters":
+            key_name = "semantic_model_name"
         else:
             key_name = "find_value"
 
@@ -458,15 +466,15 @@ class Parameter:
             param_num_str = str(param_num) if multiple_param else ""
             find_value = parameter_dict.get(key_name)
             for step, validation_func in validation_steps:
-                if param_name in ["semantic_model_binding"] and step == "replace_value":
+                if param_name in ["semantic_model_binding", "semantic_model_parameters"] and step == "replace_value":
                     continue
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-            # Special case to skip environment validation for semantic_model_binding
-            if param_name in ["semantic_model_binding"]:
+            # Special case to skip environment validation for semantic_model_binding and semantic_model_parameters
+            if param_name in ["semantic_model_binding", "semantic_model_parameters"]:
                 continue
             # Check if replacement will be skipped for a given find value
             is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
@@ -541,6 +549,19 @@ class Parameter:
                 expected_type = "dictionary"
             elif key in ["semantic_model_name"]:
                 expected_type = "string or list[string]"
+            elif key == "parameters":
+                # For semantic_model_parameters, parameters should be a list
+                if not isinstance(param_dict[key], list):
+                    return False, f"The 'parameters' field in {param_name} must be a list"
+                # Validate each parameter entry has 'name' and 'new_value'
+                for idx, param in enumerate(param_dict[key], start=1):
+                    if not isinstance(param, dict):
+                        return False, f"Parameter #{idx} in {param_name} must be a dictionary"
+                    if "name" not in param:
+                        return False, f"Parameter #{idx} in {param_name} is missing required 'name' field"
+                    if "new_value" not in param:
+                        return False, f"Parameter #{idx} in {param_name} is missing required 'new_value' field"
+                continue  # Skip the standard type validation for 'parameters'
             else:
                 expected_type = "string"
 
@@ -763,8 +784,9 @@ class Parameter:
         """Validate the data type of the input value."""
         type_validators = {
             "string": lambda x: isinstance(x, str),
-            "string or list[string]": lambda x: (isinstance(x, str))
-            or (isinstance(x, list) and all(isinstance(item, str) for item in x)),
+            "string or list[string]": lambda x: (
+                (isinstance(x, str)) or (isinstance(x, list) and all(isinstance(item, str) for item in x))
+            ),
             "dictionary": lambda x: isinstance(x, dict),
         }
         # Check if the expected type is valid and if the input matches the expected type
