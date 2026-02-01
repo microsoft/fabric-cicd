@@ -50,7 +50,12 @@ def get_config_value(config_section: dict, key: str, environment: str) -> str | 
 
 
 def update_setting(
-    settings: dict, config: dict, key: str, environment: str, default_value: str = None, output_key: str = None
+    settings: dict,
+    config: dict,
+    key: str,
+    environment: str,
+    default_value: Optional[str] = None,
+    output_key: Optional[str] = None,
 ) -> None:
     """
     Gets a config value using get_config_value and updates the settings dictionary
