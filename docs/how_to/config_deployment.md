@@ -285,10 +285,10 @@ core:
     repository_directory: "./workspace" # Same for all environments
 
 publish:
-    # Only exclude test folders in dev environment
+    # Only exclude legacy folders in prod environment
     folder_exclude_regex:
-        dev: "^test_.*"
-        # test and prod not specified - no folder exclusion applied
+        prod: "^legacy_.*"
+        # dev and test not specified - no folder exclusion applied
 
     # Skip publish in dev, run in test and prod
     skip:
@@ -298,9 +298,9 @@ publish:
 
 In this example:
 
-- Deploying to `dev`: `folder_exclude_regex` = `"^test_.*"`, `skip` = `true`
+- Deploying to `dev`: No folder exclusion applied, `skip` = `true`
 - Deploying to `test`: No folder exclusion applied, `skip` = `false`
-- Deploying to `prod`: No folder exclusion applied, `skip` = `false`
+- Deploying to `prod`: `folder_exclude_regex` = `"^legacy_.*"`, `skip` = `false`
 
 ### Logging Behavior
 

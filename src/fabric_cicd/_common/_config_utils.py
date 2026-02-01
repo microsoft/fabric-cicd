@@ -49,6 +49,29 @@ def get_config_value(config_section: dict, key: str, environment: str) -> str | 
     return value
 
 
+def update_setting(
+    settings: dict, config: dict, key: str, environment: str, default_value: str = None, output_key: str = None
+) -> None:
+    """
+    Gets a config value using get_config_value and updates the settings dictionary
+    if the value is not None.
+
+    Args:
+        settings: The settings dictionary to update
+        config: The configuration dictionary
+        key: The key to extract from the config
+        environment: Target environment
+        default_value: The default value to set if the config value is None
+        output_key: The key to use in the settings dictionary (defaults to `key` if None)
+    """
+    value = get_config_value(config, key, environment)
+    target_key = output_key or key
+    if value is not None:
+        settings[target_key] = value
+    elif default_value is not None:
+        settings[target_key] = default_value
+
+
 def extract_workspace_settings(config: dict, environment: str) -> dict:
     """Extract workspace-specific settings from config for the given environment."""
     environment = environment.strip()
@@ -57,34 +80,19 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
 
     # Workspace ID or name - required, validation ensures environment exists
     if "workspace_id" in core:
-        if isinstance(core["workspace_id"], dict):
-            settings["workspace_id"] = core["workspace_id"][environment]
-        else:
-            settings["workspace_id"] = core["workspace_id"]
+        settings["workspace_id"] = get_config_value(core, "workspace_id", environment)
         logger.info(f"Using workspace ID '{settings['workspace_id']}'")
-
     elif "workspace" in core:
-        if isinstance(core["workspace"], dict):
-            settings["workspace_name"] = core["workspace"][environment]
-        else:
-            settings["workspace_name"] = core["workspace"]
+        settings["workspace_name"] = get_config_value(core, "workspace", environment)
         logger.info(f"Using workspace '{settings['workspace_name']}'")
 
     # Repository directory - required, validation ensures environment exists
     if "repository_directory" in core:
-        if isinstance(core["repository_directory"], dict):
-            settings["repository_directory"] = core["repository_directory"][environment]
-        else:
-            settings["repository_directory"] = core["repository_directory"]
+        settings["repository_directory"] = get_config_value(core, "repository_directory", environment)
 
-    # Optional settings - validation logs warning if environment not found
-    item_types_in_scope = get_config_value(core, "item_types_in_scope", environment)
-    if item_types_in_scope is not None:
-        settings["item_types_in_scope"] = item_types_in_scope
-
-    parameter_file_path = get_config_value(core, "parameter", environment)
-    if parameter_file_path is not None:
-        settings["parameter_file_path"] = parameter_file_path
+    # Optional settings - validation logs warning if value not found for target environment
+    update_setting(settings, core, "item_types_in_scope", environment)
+    update_setting(settings, core, "parameter", environment, output_key="parameter_file_path")
 
     return settings
 
@@ -93,35 +101,21 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
     """Extract publish-specific settings from config for the given environment."""
     settings = {}
 
-    if "publish" not in config:
-        return settings
+    if "publish" in config:
+        publish_config = config["publish"]
 
-    publish_config = config["publish"]
+        # Optional settings - validation logs debug if value not found for target environment
+        settings_to_update = [
+            "exclude_regex",
+            "folder_exclude_regex",
+            "items_to_include",
+            "shortcut_exclude_regex",
+        ]
+        for key in settings_to_update:
+            update_setting(settings, publish_config, key, environment)
 
-    # Optional settings - validation logs debug if environment not found
-    exclude_regex = get_config_value(publish_config, "exclude_regex", environment)
-    if exclude_regex is not None:
-        settings["exclude_regex"] = exclude_regex
-
-    folder_exclude_regex = get_config_value(publish_config, "folder_exclude_regex", environment)
-    if folder_exclude_regex is not None:
-        settings["folder_exclude_regex"] = folder_exclude_regex
-
-    items_to_include = get_config_value(publish_config, "items_to_include", environment)
-    if items_to_include is not None:
-        settings["items_to_include"] = items_to_include
-
-    shortcut_exclude_regex = get_config_value(publish_config, "shortcut_exclude_regex", environment)
-    if shortcut_exclude_regex is not None:
-        settings["shortcut_exclude_regex"] = shortcut_exclude_regex
-
-    # Skip defaults to False if environment not found
-    if "skip" in publish_config:
-        skip_value = publish_config["skip"]
-        if isinstance(skip_value, dict):
-            settings["skip"] = skip_value.get(environment, False)
-        else:
-            settings["skip"] = skip_value
+        # Skip defaults to False if setting not found
+        update_setting(settings, publish_config, "skip", environment, default_value=False)
 
     return settings
 
@@ -130,27 +124,19 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
     """Extract unpublish-specific settings from config for the given environment."""
     settings = {}
 
-    if "unpublish" not in config:
-        return settings
+    if "unpublish" in config:
+        unpublish_config = config["unpublish"]
 
-    unpublish_config = config["unpublish"]
+        # Optional settings - validation logs debug if value not found for target environment
+        settings_to_update = [
+            "exclude_regex",
+            "items_to_include",
+        ]
+        for key in settings_to_update:
+            update_setting(settings, unpublish_config, key, environment)
 
-    # Optional settings - validation logs debug if environment not found
-    exclude_regex = get_config_value(unpublish_config, "exclude_regex", environment)
-    if exclude_regex is not None:
-        settings["exclude_regex"] = exclude_regex
-
-    items_to_include = get_config_value(unpublish_config, "items_to_include", environment)
-    if items_to_include is not None:
-        settings["items_to_include"] = items_to_include
-
-    # Skip defaults to False if environment not found
-    if "skip" in unpublish_config:
-        skip_value = unpublish_config["skip"]
-        if isinstance(skip_value, dict):
-            settings["skip"] = skip_value.get(environment, False)
-        else:
-            settings["skip"] = skip_value
+        # Skip defaults to False if setting not found
+        update_setting(settings, unpublish_config, "skip", environment, default_value=False)
 
     return settings
 
