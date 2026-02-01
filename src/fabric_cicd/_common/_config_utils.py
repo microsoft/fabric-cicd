@@ -78,7 +78,7 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
     core = config["core"]
     settings = {}
 
-    # Workspace ID or name - required, validation ensures environment exists
+    # Workspace ID or name - required, validation ensures value exists for target environment
     if "workspace_id" in core:
         settings["workspace_id"] = get_config_value(core, "workspace_id", environment)
         logger.info(f"Using workspace ID '{settings['workspace_id']}'")
@@ -86,7 +86,7 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
         settings["workspace_name"] = get_config_value(core, "workspace", environment)
         logger.info(f"Using workspace '{settings['workspace_name']}'")
 
-    # Repository directory - required, validation ensures environment exists
+    # Repository directory - required, validation ensures value exists for target environment
     if "repository_directory" in core:
         settings["repository_directory"] = get_config_value(core, "repository_directory", environment)
 
