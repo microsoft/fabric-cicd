@@ -144,6 +144,7 @@ PARAMETER_MSGS = {
     "missing key": "{} is missing keys",
     "invalid key": "{} contains invalid keys",
     "valid keys": "{} contains valid keys",
+    "mixed format": "Parameter '{}' contains mixed format keys (legacy and new format cannot be combined)",
     "missing required value": "Missing value for '{}' key in {}",
     "valid required values": "Required values in {} are valid",
     "missing replace value": "{} is missing a replace value for '{}' environment'",
