@@ -54,8 +54,9 @@ def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic
         Dictionary mapping semantic model names to connection IDs
     """
     logger.warning(
-        "The legacy 'semantic_model_binding' parameter format will be deprecated in a future release. "
-        "Please migrate to the new dictionary format with 'default' and 'models' keys."
+        "The legacy 'semantic_model_binding' list format is deprecated and will be removed in a future release. "
+        "Please migrate to the new dictionary format with 'default' and 'models' keys. "
+        "See: https://microsoft.github.io/fabric-cicd/how_to/parameterization/"
     )
     item_type = "SemanticModel"
     binding_mapping = {}
@@ -67,6 +68,14 @@ def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic
 
         if not connection_id:
             logger.debug("No connection_id found in semantic_model_binding entry, skipping")
+            continue
+
+        # Legacy format only supports string connection_id
+        if isinstance(connection_id, dict):
+            logger.warning(
+                "Environment-specific connection_id dictionaries are not supported in the legacy format. "
+                "Please migrate to the new dictionary format to use environment-specific values."
+            )
             continue
 
         if isinstance(model_names, str):
@@ -86,8 +95,11 @@ def build_binding_mapping(
 ) -> dict:
     """
     Build the connection mapping from semantic_model_binding parameter.
+
+    The new format requires environment-specific connection_id values (use '_ALL_' for all environments).
+
     Supports:
-    - default.connections: Applied to all models in the repository with connections that are not explicitly listed
+    - default.connection_id: Applied to all models in the repository that are not explicitly listed
     - models: List of explicit model-to-connection mappings
 
     Args:
@@ -102,12 +114,15 @@ def build_binding_mapping(
     binding_mapping = {}
     repository_models = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
 
-    # Get default connection for this environment
-    default_connections = semantic_model_binding.get("default", {}).get("connections", {})
-    default_connections = process_environment_key(fabric_workspace_obj, default_connections)
-    default_connection_id = default_connections.get(environment)
-    if not default_connection_id:
-        logger.debug(f"Environment '{environment}' not found in default connections")
+    # Get default connection_id for this environment
+    default_connection_id = None
+    default_config = semantic_model_binding.get("default", {})
+    if default_config:
+        connection_id_config = default_config.get("connection_id", {})
+        connection_id_config = process_environment_key(fabric_workspace_obj, connection_id_config)
+        default_connection_id = connection_id_config.get(environment)
+        if not default_connection_id:
+            logger.debug(f"Environment '{environment}' not found in default.connection_id")
 
     # Process explicit model bindings
     explicit_models = set()
@@ -115,15 +130,15 @@ def build_binding_mapping(
 
     for model in models_config:
         model_names = model.get("semantic_model_name", [])
-        connections = model.get("connections", {})
+        connection_id_config = model.get("connection_id", {})
 
         if isinstance(model_names, str):
             model_names = [model_names]
 
-        connections = process_environment_key(fabric_workspace_obj, connections)
-        connection_id = connections.get(environment)
+        connection_id_config = process_environment_key(fabric_workspace_obj, connection_id_config)
+        connection_id = connection_id_config.get(environment)
         if not connection_id:
-            logger.debug(f"Environment '{environment}' not found in connections for semantic model(s): {model_names}")
+            logger.debug(f"Environment '{environment}' not found in connection_id for semantic model(s): {model_names}")
             continue
 
         # Only track as explicit if environment connection is defined
@@ -135,7 +150,7 @@ def build_binding_mapping(
                 continue
             binding_mapping[name] = connection_id
 
-    # Apply default connection to non-explicit models using set difference
+    # Apply default connection to non-explicit models
     if default_connection_id:
         default_models = repository_models - explicit_models
         for model_name in default_models:

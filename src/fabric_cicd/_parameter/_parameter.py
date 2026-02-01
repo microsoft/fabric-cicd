@@ -46,7 +46,7 @@ class Parameter:
         },
         "semantic_model_binding": {
             "minimum": set(),
-            "maximum": {"connection_id", "semantic_model_name", "connections", "default", "models"},
+            "maximum": {"connection_id", "semantic_model_name", "default", "models"},
         },
         "extend": {"minimum": set(), "maximum": set()},
     }
@@ -525,7 +525,11 @@ class Parameter:
     def _validate_semantic_model_binding_parameter(
         self, param_name: str, multiple_param: bool = False
     ) -> tuple[bool, str]:
-        """Validate semantic_model_binding parameter, supporting both legacy and new formats."""
+        """Validate semantic_model_binding parameter, supporting both legacy and new formats.
+
+        Legacy format (list): Only string connection_id allowed (no environment mapping)
+        New format (dict): Only dict connection_id allowed (environment mapping required, use _ALL_ for all)
+        """
         param_value = self.environment_parameter.get(param_name)
         is_new_format = isinstance(param_value, dict)
         legacy_keys = {"connection_id", "semantic_model_name"}
@@ -553,12 +557,13 @@ class Parameter:
                 is_valid, msg = self._validate_data_type(default_value, "dictionary", "default", param_name)
                 if not is_valid:
                     return False, msg
-                if "connections" not in default_value:
+                if "connection_id" not in default_value:
                     return False, constants.PARAMETER_MSGS["missing key"].format(
-                        f"{param_name}.default (requires 'connections')"
+                        f"{param_name}.default (requires 'connection_id')"
                     )
+                # New format requires dict connection_id
                 is_valid, msg = self._validate_connection_id(
-                    default_value["connections"], f"{param_name}.default.connections"
+                    default_value["connection_id"], f"{param_name}.default.connection_id", require_dict=True
                 )
                 if not is_valid:
                     return False, msg
@@ -581,9 +586,9 @@ class Parameter:
                         return False, constants.PARAMETER_MSGS["missing key"].format(
                             f"{entry_name} (requires 'semantic_model_name')"
                         )
-                    if "connections" not in entry:
+                    if "connection_id" not in entry:
                         return False, constants.PARAMETER_MSGS["missing key"].format(
-                            f"{entry_name} (requires 'connections')"
+                            f"{entry_name} (requires 'connection_id')"
                         )
 
                     is_valid, msg = self._validate_data_type(
@@ -592,7 +597,10 @@ class Parameter:
                     if not is_valid:
                         return False, msg
 
-                    is_valid, msg = self._validate_connection_id(entry["connections"], f"{entry_name}.connections")
+                    # New format requires dict connection_id
+                    is_valid, msg = self._validate_connection_id(
+                        entry["connection_id"], f"{entry_name}.connection_id", require_dict=True
+                    )
                     if not is_valid:
                         return False, msg
 
@@ -626,7 +634,8 @@ class Parameter:
                 if not is_valid:
                     return False, msg
 
-                is_valid, msg = self._validate_connection_id(connection_id, context_name)
+                # Legacy format requires string connection_id (no environment mapping)
+                is_valid, msg = self._validate_connection_id(connection_id, context_name, require_string=True)
                 if not is_valid:
                     return False, msg
 
@@ -635,41 +644,49 @@ class Parameter:
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
-    def _validate_connection_id(self, connection_id: any, context_name: str) -> tuple[bool, str]:
-        """Validate a connection_id value (string GUID or dictionary of environment -> GUID)."""
-        # Validate type is string or dictionary
-        is_valid, msg = self._validate_data_type(connection_id, "string or dictionary", "connection_id", context_name)
-        if not is_valid:
-            return False, msg
-
-        # Handle string GUID
-        if isinstance(connection_id, str):
+    def _validate_connection_id(
+        self, connection_id: any, context_name: str, require_string: bool = False, require_dict: bool = False
+    ) -> tuple[bool, str]:
+        """Validate a connection_id value."""
+        # Legacy format: require string GUID only
+        if require_string:
+            if not isinstance(connection_id, str):
+                return False, (
+                    f"connection_id in {context_name} must be a string GUID. "
+                    "Environment-specific dictionaries are not supported in the legacy format. "
+                    "Please migrate to the new dictionary format with 'default' and 'models' keys."
+                )
             if not re.match(constants.VALID_GUID_REGEX, connection_id):
-                return False, f"connection_id is not a valid GUID: '{connection_id}'"
+                return False, f"connection_id '{connection_id}' is not a valid GUID in {context_name}"
             return True, f"Valid {context_name}"
 
-        # Handle dictionary of environment -> GUID
-        if not connection_id:
-            return False, f"{context_name} must be a non-empty dictionary"
+        # New format: require dict with environment keys
+        if require_dict:
+            if not isinstance(connection_id, dict):
+                return False, (
+                    f"{context_name} must be a dictionary with environment keys (e.g., DEV, PPE, PROD) or '_ALL_'. "
+                    "Use '_ALL_' to apply the same connection to all environments."
+                )
+            if not connection_id:
+                return False, f"{context_name} must be a non-empty dictionary"
 
-        for env_key, guid_value in connection_id.items():
-            # Validate each value is a string
-            is_valid, msg = self._validate_data_type(guid_value, "string", f"connection_id[{env_key}]", context_name)
-            if not is_valid:
-                return False, f"connection_id value for environment '{env_key}' must be a string (GUID)"
+            for env_key, guid_value in connection_id.items():
+                if not isinstance(guid_value, str):
+                    return False, f"connection_id value for environment '{env_key}' must be a string (GUID)"
+                if not re.match(constants.VALID_GUID_REGEX, guid_value):
+                    return False, f"connection_id for environment '{env_key}' is not a valid GUID: '{guid_value}'"
 
-            # Validate GUID format
-            if not re.match(constants.VALID_GUID_REGEX, guid_value):
-                return False, f"connection_id value for environment '{env_key}' is not a valid GUID: '{guid_value}'"
+            # Validate environment exists
+            is_valid_env, env_type = self._validate_environment(connection_id)
+            if self.environment != "N/A" and not is_valid_env:
+                if env_type.lower() == "_all_":
+                    return False, constants.PARAMETER_MSGS["other target env"].format(env_type, connection_id)
+                logger.warning(constants.PARAMETER_MSGS["no target env"].format(self.environment, context_name))
 
-        # Validate environment exists
-        is_valid_env, env_type = self._validate_environment(connection_id)
-        if self.environment != "N/A" and not is_valid_env:
-            if env_type.lower() == "_all_":
-                return False, constants.PARAMETER_MSGS["other target env"].format(env_type, connection_id)
-            logger.warning(constants.PARAMETER_MSGS["no target env"].format(self.environment, context_name))
+            return True, f"Valid {context_name}"
 
-        return True, f"Valid {context_name}"
+        # Should not reach here - caller must specify require_string or require_dict
+        return False, f"Invalid validation call for {context_name}: must specify require_string or require_dict"
 
     def _check_duplicate_semantic_model_names(self, param_value: any, is_new_format: bool) -> None:
         """Check for duplicate semantic model names and log a warning if found."""
@@ -924,7 +941,6 @@ class Parameter:
             "string or list[string]": lambda x: (isinstance(x, str))
             or (isinstance(x, list) and all(isinstance(item, str) for item in x)),
             "dictionary": lambda x: isinstance(x, dict),
-            "string or dictionary": lambda x: isinstance(x, (str, dict)),
         }
         # Check if the expected type is valid and if the input matches the expected type
         if expected_type not in type_validators or not type_validators[expected_type](input_value):

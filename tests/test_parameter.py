@@ -2191,6 +2191,7 @@ config:
 @pytest.mark.parametrize(
     ("param_value", "expected_ok", "expected_msg_contains"),
     [
+        # ===== Legacy format tests =====
         pytest.param(
             [{"connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99", "semantic_model_name": ["model1", "model2"]}],
             True,
@@ -2207,37 +2208,37 @@ config:
                     "semantic_model_name": ["model1", "model2"],
                 }
             ],
-            True,
-            "parameter is valid",
-            id="legacy_dict_connection_id",
+            False,
+            "must be a string guid",
+            id="legacy_dict_connection_id_not_supported",
         ),
         pytest.param(
             [
                 {
-                    "connection_id": {"PPE": "invalid-guid-format", "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab"},
+                    "connection_id": "invalid-guid-format",
                     "semantic_model_name": ["model1"],
                 }
             ],
             False,
-            "not a valid GUID",
+            "not a valid guid",
             id="legacy_invalid_guid",
         ),
         pytest.param(
             [
                 {
-                    "connection_id": {"PPE": 12345, "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab"},
+                    "connection_id": 12345,
                     "semantic_model_name": ["model1"],
                 }
             ],
             False,
-            "must be a string",
+            "must be a string guid",
             id="legacy_connection_id_not_string",
         ),
         pytest.param(
-            [{"connection_id": {}, "semantic_model_name": ["model1"]}],
+            [{"connection_id": "", "semantic_model_name": ["model1"]}],
             False,
             "missing value",
-            id="legacy_empty_connection_id_dict",
+            id="legacy_empty_connection_id",
         ),
         pytest.param(
             [
@@ -2251,25 +2252,30 @@ config:
             "mixed format",
             id="legacy_mixed_with_new_keys",
         ),
+        # ===== New format tests =====
         pytest.param(
-            {"default": {"connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}},
+            {"default": {"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}},
             True,
             "parameter is valid",
             id="new_default_only",
         ),
         pytest.param(
-            {"models": [{"semantic_model_name": "MyModel", "connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}]},
+            {
+                "models": [
+                    {"semantic_model_name": "MyModel", "connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}
+                ]
+            },
             True,
             "parameter is valid",
             id="new_models_only",
         ),
         pytest.param(
             {
-                "default": {"connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"},
+                "default": {"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}},
                 "models": [
                     {
                         "semantic_model_name": ["Model1", "Model2"],
-                        "connections": {
+                        "connection_id": {
                             "DEV": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
                             "PROD": "b2c3d4e5-6789-0abc-def1-234567890abc",
                         },
@@ -2287,16 +2293,10 @@ config:
             id="new_empty_dict",
         ),
         pytest.param(
-            {"default": {"connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}, "invalid_key": "x"},
+            {"default": {"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}, "invalid_key": "x"},
             False,
             "invalid key",
             id="new_invalid_key",
-        ),
-        pytest.param(
-            {"default": {"connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}, "connection_id": "x"},
-            False,
-            "mixed format",
-            id="new_mixed_keys",
         ),
         pytest.param(
             {"default": "not-a-dict"},
@@ -2307,8 +2307,8 @@ config:
         pytest.param(
             {"default": {"some_key": "value"}},
             False,
-            "connections",
-            id="new_default_missing_connections",
+            "connection_id",
+            id="new_default_missing_connection_id",
         ),
         pytest.param(
             {"models": []},
@@ -2329,7 +2329,7 @@ config:
             id="new_model_entry_not_dict",
         ),
         pytest.param(
-            {"models": [{"connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}]},
+            {"models": [{"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}]},
             False,
             "semantic_model_name",
             id="new_missing_semantic_model_name",
@@ -2337,20 +2337,36 @@ config:
         pytest.param(
             {"models": [{"semantic_model_name": "MyModel"}]},
             False,
-            "connections",
-            id="new_missing_connections",
+            "connection_id",
+            id="new_missing_connection_id",
         ),
         pytest.param(
-            {"models": [{"semantic_model_name": 12345, "connections": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}]},
+            {
+                "models": [
+                    {"semantic_model_name": 12345, "connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}
+                ]
+            },
             False,
             "string or list[string]",
             id="new_invalid_semantic_model_name_type",
         ),
         pytest.param(
-            {"models": [{"semantic_model_name": "MyModel", "connections": "invalid-guid"}]},
+            {"models": [{"semantic_model_name": "MyModel", "connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}]},
+            False,
+            "must be a dictionary",
+            id="new_string_connection_id_not_supported",
+        ),
+        pytest.param(
+            {"models": [{"semantic_model_name": "MyModel", "connection_id": {"DEV": "invalid-guid"}}]},
             False,
             "not a valid guid",
             id="new_invalid_connection_guid",
+        ),
+        pytest.param(
+            {"models": [{"semantic_model_name": "MyModel", "connection_id": {}}]},
+            False,
+            "non-empty dictionary",
+            id="new_empty_connection_id_dict",
         ),
     ],
 )
@@ -2363,39 +2379,78 @@ def test_semantic_model_binding_validation(empty_parameter, param_value, expecte
 
 
 @pytest.mark.parametrize(
-    ("connection_id", "expected_ok", "expected_msg_contains"),
+    ("connection_id", "require_string", "require_dict", "expected_ok", "expected_msg_contains"),
     [
+        pytest.param(
+            "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+            True,
+            False,
+            True,
+            "Valid",
+            id="legacy_valid_string_guid",
+        ),
+        pytest.param(
+            "invalid-guid",
+            True,
+            False,
+            False,
+            "not a valid GUID",
+            id="legacy_invalid_guid",
+        ),
+        pytest.param(
+            {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"},
+            True,
+            False,
+            False,
+            "must be a string GUID",
+            id="legacy_dict_not_supported",
+        ),
         pytest.param(
             {
                 "PPE": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
                 "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
-                "UAT": "12345678-1234-1234-1234-123456789abc",
             },
+            False,
+            True,
             True,
             "Valid",
-            id="valid_multi_env",
+            id="new_valid_multi_env",
         ),
         pytest.param(
             {"PPE": "not-a-guid", "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab"},
             False,
+            True,
+            False,
             "not a valid GUID",
-            id="invalid_guid_format",
+            id="new_invalid_guid_format",
+        ),
+        pytest.param(
+            "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+            False,
+            True,
+            False,
+            "must be a dictionary",
+            id="new_string_not_supported",
         ),
     ],
 )
-def test_validate_connection_id(empty_parameter, connection_id, expected_ok, expected_msg_contains):
+def test_validate_connection_id(
+    empty_parameter, connection_id, require_string, require_dict, expected_ok, expected_msg_contains
+):
     """Test _validate_connection_id with various inputs."""
-    ok, msg = empty_parameter._validate_connection_id(connection_id, "semantic_model_binding")
+    ok, msg = empty_parameter._validate_connection_id(
+        connection_id, "semantic_model_binding", require_string=require_string, require_dict=require_dict
+    )
     assert ok is expected_ok
     assert expected_msg_contains in msg
-    if not expected_ok and "PPE" in connection_id:
-        assert "PPE" in msg
 
 
 def test_semantic_model_binding_new_format_models_invalid_connection_guid(empty_parameter):
     """Test semantic_model_binding new format with invalid GUID in models connections."""
     empty_parameter.environment_parameter = {
-        "semantic_model_binding": {"models": [{"semantic_model_name": "MyModel", "connections": "not-a-valid-guid"}]}
+        "semantic_model_binding": {
+            "models": [{"semantic_model_name": "MyModel", "connection_id": {"DEV": "not-a-valid-guid"}}]
+        }
     }
     ok, msg = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
     assert ok is False

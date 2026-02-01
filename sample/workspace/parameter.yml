@@ -139,11 +139,11 @@ semantic_model_binding:
 # New format (recommended): Supports default connections and per-item overrides
 semantic_model_binding:
     default:
-        connections:
+        connection_id:
             PPE: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
             PROD: "c4f8e2b1-3d2a-4f5b-9c6e-7a8b9c0d1e2f"
     models:
         - semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
-          connections:
+          connection_id:
             PPE: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
             PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
