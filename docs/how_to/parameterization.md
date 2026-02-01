@@ -150,7 +150,7 @@ Semantic model binding connects semantic models to the appropriate data source c
 **Note:** The legacy format is on a deprecation path. Please migrate to the recommended format.
 
 ```yaml
-# The recommended format uses a dictionary with `default` and/or `models` sections:
+# Recommended format:
 semantic_model_binding:
     # Default connection for all models not explicitly listed
     default:
@@ -171,7 +171,7 @@ semantic_model_binding:
           connection_id:
               _ALL_: <connection_id_guid>
 
- # Legacy format:
+# Legacy format:
 semantic_model_binding:
     - connection_id: <connection_id_guid>
       # Required field: value must be a string or a list of strings
