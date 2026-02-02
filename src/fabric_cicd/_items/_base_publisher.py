@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from fabric_cicd._common._exceptions import PublishError
 from fabric_cicd._common._item import Item
 from fabric_cicd.constants import ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -35,20 +36,6 @@ class ParallelConfig:
     enabled: bool = True
     max_workers: Optional[int] = None
     ordered_items_func: Optional[Callable[["ItemPublisher"], list[str]]] = None
-
-
-class PublishError(Exception):
-    """Exception raised when one or more publish operations fail.
-
-    Attributes:
-        errors: List of (item_name, exception) tuples for all failed items.
-    """
-
-    def __init__(self, errors: list[tuple[str, Exception]]) -> None:
-        """Initialize with a list of (item_name, exception) tuples."""
-        self.errors = errors
-        failed_names = [name for name, _ in errors]
-        super().__init__(f"Failed to publish {len(errors)} item(s): {failed_names}")
 
 
 class Publisher(ABC):
@@ -348,7 +335,7 @@ class ItemPublisher(Publisher):
         self.post_publish_all()
 
         if errors:
-            raise PublishError(errors)
+            raise PublishError(errors, logger)
 
     def publish_one(self, item_name: str, _item: "Item") -> None:
         """
