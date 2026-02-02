@@ -147,43 +147,47 @@ spark_pool:
 
 Semantic model binding connects semantic models to the appropriate data source connection (e.g., cloud or on-premises) after deployment, ensuring your models can refresh data in the target environment.
 
-**Note:** The legacy format is on a deprecation path. Please migrate to the recommended format.
+**Important:** The legacy format is on a deprecation path. Please migrate to the recommended format.
+
+**Recommended format:**
 
 ```yaml
-# Recommended format:
 semantic_model_binding:
     # Default connection for all models not explicitly listed
     default:
         connection_id:
-            PPE: <PPE-connection_id_guid>
-            PROD: <PROD-connection_id_guid>
+            PPE: <PPE-connection_guid>
+            PROD: <PROD-connection_guid>
             # OR use _ALL_ for same connection across environments
-            # _ALL_: <connection_id_guid>
+            # _ALL_: <connection_guid>
 
     # Explicit bindings override default
     models:
-        - semantic_model_name: <model_name>
+        - semantic_model_name: "<semantic_model_name>"
           connection_id:
-              PPE: <PPE-connection_id_guid>
-              PROD: <PROD-connection_id_guid>
+              PPE: <PPE-connection_guid>
+              PROD: <PROD-connection_guid>
 
-        - semantic_model_name: [<model_name1>, <model_name2>]
+        - semantic_model_name: ["<semantic_model_name1>", "<semantic_model_name2>", ...]
           connection_id:
-              _ALL_: <connection_id_guid>
+              _ALL_: <connection_guid>
+```
 
+**Legacy format:**
+
+```yaml
 # Legacy format:
 semantic_model_binding:
-    - connection_id: <connection_id_guid>
+    - connection_id: <connection_guid>
       # Required field: value must be a string or a list of strings
-      semantic_model_name: <semantic_model_name>
+      semantic_model_name: "<semantic_model_name>"
       # OR
-      semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
+      semantic_model_name: ["<semantic_model_name1>","<semantic_model_name2>", ...]
 ```
 
 **Notes:**
 
-- The `_ALL_` environment key (case-insensitive) can be used in the connection_id dictionary to apply the same connection to any target environment.
-- When using environment-specific connection IDs, deployment will be skipped for semantic models if the target environment is not found in the connection_id dictionary.
+- The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
 - Connection ID values must be valid GUIDs.
 
 ## Advanced Find and Replace
@@ -247,6 +251,7 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
         | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
         | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                        | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+        
         - Attributes should be **lowercase**.
         - Item type and name are **case-sensitive**.
         - Item type must be valid and in scope.
