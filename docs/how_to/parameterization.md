@@ -145,7 +145,7 @@ spark_pool:
 
 ### `semantic_model_binding`
 
-Semantic model binding connects semantic models to the appropriate data source connection (e.g., cloud or on-premises) after deployment, ensuring your models can refresh data in the target environment.
+Semantic model binding automatically connects semantic models to the appropriate data source connection (e.g., cloud or on-premises) after deployment, ensuring your models can refresh data in the target environment.
 
 **Important:** The legacy format is on a deprecation path. Please migrate to the recommended format.
 
