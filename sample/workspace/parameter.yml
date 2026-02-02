@@ -133,3 +133,20 @@ gateway_binding:
 semantic_model_binding:
     - connection_id: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
       semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
+
+semantic_model_parameters:
+    # Update parameters for a single semantic model
+    - semantic_model_name: "Sales Model"
+      parameters:
+        - name: "ServerName"
+          new_value: "prod-sqlserver.database.windows.net"
+        - name: "DatabaseName"
+          new_value: "SalesDB"
+    
+    # Update multiple semantic models with the same parameters
+    - semantic_model_name: ["Finance Model", "HR Model"]
+      parameters:
+        - name: "ApiEndpoint"
+          new_value: "https://api.production.com"
+        - name: "TimeoutSeconds"
+          new_value: 300
