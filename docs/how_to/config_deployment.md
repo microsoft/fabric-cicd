@@ -22,7 +22,7 @@ from fabric_cicd import deploy_with_config
 
 # Deploy using a config file
 deploy_with_config(
-    config_file_path="C:/dev/workspace/config.yml",
+    config_file_path="C:/dev/workspace/config.yml", # required
     environment="dev"
 )
 ```
@@ -96,22 +96,22 @@ core:
 
 <span class="md-h4-nonanchor">Required Fields:</span>
 
--   Workspace Identifier:
-    -   Workspace ID takes precedence over workspace name when both are provided.
-    -   `workspace_id` must be a valid string GUID.
--   Repository Directory Path:
-    -   Supports relative or absolute path.
-    -   Relative path must be relative to the `config.yml` file location.
+- Workspace Identifier:
+    - Workspace ID takes precedence over workspace name when both are provided.
+    - `workspace_id` must be a valid string GUID.
+- Repository Directory Path:
+    - Supports relative or absolute path.
+    - Relative path must be relative to the `config.yml` file location.
 
 <span class="md-h4-nonanchor">Optional Fields:</span>
 
--   Item Types in Scope:
-    -   If `item_types_in_scope` is not specified, all item types will be included by default.
-    -   Item types must be provided as a list, use `-` or `[]` notation.
-    -   Only accepts supported item types.
--   Parameter Path:
-    -   Supports relative or absolute path.
-    -   Relative path must be relative to the `config.yml` file location.
+- Item Types in Scope:
+    - If `item_types_in_scope` is not specified, all item types will be included by default.
+    - Item types must be provided as a list, use `-` or `[]` notation.
+    - Only accepts supported item types.
+- Parameter Path:
+    - Supports relative or absolute path.
+    - Relative path must be relative to the `config.yml` file location.
 
 ### Publish Settings
 
@@ -239,7 +239,89 @@ constants:
         <env..>: <constant_value..>
 ```
 
-### Sample `config.yml` File
+## Environment-Specific Values
+
+All configuration fields support environment-specific values using a mapping format:
+
+```yaml
+core:
+    workspace_id:
+        dev: "dev-workspace-id"
+        test: "test-workspace-id"
+        prod: "prod-workspace-id"
+```
+
+### Required vs Optional Fields
+
+Fields are categorized as **required** or **optional**, which affects how missing environment values are handled when environment is passed into `deploy_with_config()`:
+
+| Field                                   | Required | Environment Missing Behavior    |
+| --------------------------------------- | -------- | ------------------------------- |
+| `core.workspace_id` or `core.workspace` | ✅       | Validation error                |
+| `core.repository_directory`             | ✅       | Validation error                |
+| `core.item_types_in_scope`              | ❌       | Warning logged, setting skipped |
+| `core.parameter`                        | ❌       | Warning logged, setting skipped |
+| `publish.exclude_regex`                 | ❌       | Debug logged, setting skipped   |
+| `publish.folder_exclude_regex`          | ❌       | Debug logged, setting skipped   |
+| `publish.shortcut_exclude_regex`        | ❌       | Debug logged, setting skipped   |
+| `publish.items_to_include`              | ❌       | Debug logged, setting skipped   |
+| `publish.skip`                          | ❌       | Defaults to `False`             |
+| `unpublish.exclude_regex`               | ❌       | Debug logged, setting skipped   |
+| `unpublish.items_to_include`            | ❌       | Debug logged, setting skipped   |
+| `unpublish.skip`                        | ❌       | Defaults to `False`             |
+| `features`                              | ❌       | Debug logged, setting skipped   |
+| `constants`                             | ❌       | Debug logged, setting skipped   |
+
+### Selective Environment Configuration
+
+Optional fields allow you to apply settings to specific environments without affecting others. This is useful when you want different behavior per environment:
+
+```yaml
+core:
+    workspace_id:
+        dev: "dev-workspace-id"
+        test: "test-workspace-id"
+        prod: "prod-workspace-id"
+    repository_directory: "./workspace" # Same for all environments
+
+publish:
+    # Only exclude legacy folders in prod environment
+    folder_exclude_regex:
+        prod: "^legacy_.*"
+        # dev and test not specified - no folder exclusion applied
+
+    # Skip publish in dev, run in test and prod
+    skip:
+        dev: true
+        # test and prod default to false
+```
+
+In this example:
+
+- Deploying to `dev`: No folder exclusion applied, `skip` = `true`
+- Deploying to `test`: No folder exclusion applied, `skip` = `false`
+- Deploying to `prod`: `folder_exclude_regex` = `"^legacy_.*"`, `skip` = `false`
+
+### Logging Behavior
+
+When an optional field uses environment mapping and does not include the target environment:
+
+- **Important optional fields** (`item_types_in_scope`, `parameter`): A **warning** is logged to alert users that the setting is being skipped.
+- **Other optional fields**: A **debug** message is logged, visible only when debug logging is enabled.
+
+Example log output when deploying to `prod` with the config above:
+
+```
+[Debug] - No value for 'folder_exclude_regex' in environment 'prod'. Available environments: ['dev']. This setting will be skipped.
+```
+
+To enable debug logging:
+
+```python
+change_log_level()
+```
+
+## Sample `config.yml` File
 
 ```yaml
 core:
@@ -359,12 +441,12 @@ deploy_with_config(
 
 **Important Considerations:**
 
--   **Caution:** Exercise caution when overriding configuration values for _production_ environments.
--   **Support:** Configuration overrides are supported for all sections and settings in the configuration file.
--   **Rules:**
-    -   Existing values can be overridden for any field in the configuration.
-    -   New values can only be added for optional fields that aren't present in the original configuration.
-    -   Required fields must exist in the original configuration in order to override.
+- **Caution:** Exercise caution when overriding configuration values for _production_ environments.
+- **Support:** Configuration overrides are supported for all sections and settings in the configuration file.
+- **Rules:**
+    - Existing values can be overridden for any field in the configuration.
+    - New values can only be added for optional fields that aren't present in the original configuration.
+    - Required fields must exist in the original configuration in order to override.
 
 ## Troubleshooting Guide
 
