@@ -249,6 +249,46 @@ SAMPLE_PLATFORM_FILE = """
 
 SAMPLE_NOTEBOOK_FILE = "print('Hello World and replace connection string: db52be81-c2b2-4261-84fa-840c67f4bbd0')"
 
+SAMPLE_PARAMETER_FILE_DUPLICATE_KEYS = """
+find_replace:
+    - find_value: "first-value"
+      replace_value:
+          PPE: "first-ppe"
+          PROD: "first-prod"
+
+find_replace:
+    - find_value: "second-value"
+      replace_value:
+          PPE: "second-ppe"
+          PROD: "second-prod"
+"""
+
+SAMPLE_PARAMETER_FILE_MULTIPLE_DUPLICATE_KEYS = """
+find_replace:
+    - find_value: "first-value"
+      replace_value:
+          PPE: "first-ppe"
+
+spark_pool:
+    - instance_pool_id: "pool-1"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool1"
+
+find_replace:
+    - find_value: "second-value"
+      replace_value:
+          PPE: "second-ppe"
+
+spark_pool:
+    - instance_pool_id: "pool-2"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool2"
+"""
+
 
 @pytest.fixture
 def item_type_in_scope():
@@ -297,6 +337,13 @@ def repository_directory(tmp_path):
 
     invalid_parameter_file_path8 = workspace_dir / "invalid_is_regex_parameter.yml"
     invalid_parameter_file_path8.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX)
+
+    # Create duplicate keys parameter files
+    duplicate_keys_file = workspace_dir / "duplicate_keys_parameter.yml"
+    duplicate_keys_file.write_text(SAMPLE_PARAMETER_FILE_DUPLICATE_KEYS)
+
+    multiple_duplicate_keys_file = workspace_dir / "multiple_duplicate_keys_parameter.yml"
+    multiple_duplicate_keys_file.write_text(SAMPLE_PARAMETER_FILE_MULTIPLE_DUPLICATE_KEYS)
 
     # Create the sample parameter file with ALL environment key
     all_env_parameter_file_path = workspace_dir / "all_env_parameter.yml"
@@ -2186,3 +2233,127 @@ config:
     data = yaml.safe_load(yaml_str)
     matches = parse(param["find_key"]).find(data)
     assert len(matches) == 0
+
+
+def test_check_duplicate_keys_single_duplicate(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of a single duplicate root-level key."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="duplicate_keys_parameter.yml",
+    )
+
+    # Read the file content directly to test _check_duplicate_keys
+    file_path = repository_directory / "duplicate_keys_parameter.yml"
+    content = file_path.read_text(encoding="utf-8")
+
+    msgs = constants.PARAMETER_MSGS["invalid content"]
+    errors = param_obj._check_duplicate_keys(content, msgs)
+
+    assert len(errors) == 1
+    assert "find_replace" in errors[0]
+
+    # Verify integration through _validate_yaml_content
+    yaml_errors = param_obj._validate_yaml_content(content)
+    assert len(yaml_errors) == 1
+    assert "find_replace" in yaml_errors[0]
+
+
+def test_check_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of multiple duplicate root-level keys."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="multiple_duplicate_keys_parameter.yml",
+    )
+
+    # Read the file content directly to test _check_duplicate_keys
+    file_path = repository_directory / "multiple_duplicate_keys_parameter.yml"
+    content = file_path.read_text(encoding="utf-8")
+
+    msgs = constants.PARAMETER_MSGS["invalid content"]
+    errors = param_obj._check_duplicate_keys(content, msgs)
+
+    assert len(errors) == 1
+    assert "find_replace" in errors[0]
+    assert "spark_pool" in errors[0]
+
+    # Verify integration through _validate_yaml_content
+    yaml_errors = param_obj._validate_yaml_content(content)
+    assert len(yaml_errors) == 1
+    assert "find_replace" in yaml_errors[0]
+    assert "spark_pool" in yaml_errors[0]
+
+
+def test_check_duplicate_keys_no_duplicates(parameter_object):
+    """Test that valid YAML with no duplicate keys passes."""
+    content = """
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+spark_pool:
+    - instance_pool_id: "pool-id"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool"
+"""
+    msgs = constants.PARAMETER_MSGS["invalid content"]
+    errors = parameter_object._check_duplicate_keys(content, msgs)
+
+    assert len(errors) == 0
+
+    # Verify integration through _validate_yaml_content
+    yaml_errors = parameter_object._validate_yaml_content(content)
+    assert len(yaml_errors) == 0
+
+
+def test_check_duplicate_keys_ignores_comments(parameter_object):
+    """Test that comment lines starting with # are ignored."""
+    content = """
+# This is a comment
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+# Another comment
+# find_replace: this should be ignored
+spark_pool:
+    - instance_pool_id: "pool-id"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool"
+"""
+    msgs = constants.PARAMETER_MSGS["invalid content"]
+    errors = parameter_object._check_duplicate_keys(content, msgs)
+
+    assert len(errors) == 0
+
+    # Verify integration through _validate_yaml_content
+    yaml_errors = parameter_object._validate_yaml_content(content)
+    assert len(yaml_errors) == 0
+
+
+def test_check_duplicate_keys_ignores_nested_keys(parameter_object):
+    """Test that nested keys (indented) are not flagged as duplicates."""
+    content = """
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+    - find_value: "value2"
+      replace_value:
+          PPE: "ppe-value2"
+"""
+    msgs = constants.PARAMETER_MSGS["invalid content"]
+    errors = parameter_object._check_duplicate_keys(content, msgs)
+
+    assert len(errors) == 0
+
+    # Verify integration through _validate_yaml_content
+    yaml_errors = parameter_object._validate_yaml_content(content)
+    assert len(yaml_errors) == 0

@@ -311,6 +311,11 @@ class Parameter:
             errors.append("YAML content is empty")
             return errors
 
+        # Check for duplicate keys at root level
+        duplicate_key_errors = self._check_duplicate_keys(content, msgs)
+        if duplicate_key_errors:
+            errors.extend(duplicate_key_errors)
+
         # Regex patterns to match all valid UTF-8 characters
         utf8_pattern = r"""
         (
@@ -334,6 +339,24 @@ class Parameter:
             errors.append(msgs["char"])
 
         return errors
+
+    def _check_duplicate_keys(self, content: str, msgs: dict[str, str]) -> list[str]:
+        """Check for duplicate root-level keys in YAML content."""
+        root_keys = []
+        dupes = []
+
+        for line in content.splitlines():
+            # Root-level keys start at column 0 and end with ':'
+            if line and not line[0].isspace() and ":" in line:
+                key = line.split(":")[0].strip()
+                # Skip comments and empty keys
+                if key and not key.startswith("#"):
+                    if key in root_keys:
+                        dupes.append(key)
+                    else:
+                        root_keys.append(key)
+
+        return [msgs["duplicate"].format(", ".join(dupes))] if dupes else []
 
     def _validate_parameter_load(self) -> tuple[bool, str]:
         """Validate the parameter file load."""

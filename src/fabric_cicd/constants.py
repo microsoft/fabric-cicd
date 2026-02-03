@@ -231,7 +231,11 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
-INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
+INVALID_YAML = {
+    "char": "Invalid characters found",
+    "quote": "Unclosed quote: {}",
+    "duplicate": "Duplicate key(s) found: {}",
+}
 INVALID_REPLACE_VALUE_SPARK_POOL = {
     "missing key": "The '{}' environment dict in spark_pool must contain a 'type' and a 'name' key",
     "missing value": "The '{}' environment in spark_pool is missing a value for '{}' key",
