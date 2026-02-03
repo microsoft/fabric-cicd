@@ -342,14 +342,14 @@ class ConfigValidator:
             # Handle no target environment case
             if any(
                 field_name in section and isinstance(section[field_name], dict)
-                for section, field_name, _ in _get_config_fields(self.config)
+                for section, field_name, _, _, _ in _get_config_fields(self.config)
                 if not (field_name == "constants" and _is_regular_constants_dict(section.get(field_name, {})))
             ):
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["no_env_with_mappings"])
             return
 
         # Check each field for target environment presence
-        for section, field_name, display_name in _get_config_fields(self.config):
+        for section, field_name, display_name, is_required, log_warning in _get_config_fields(self.config):
             if field_name in section:
                 field_value = section[field_name]
                 # Handle constants special case
@@ -359,11 +359,21 @@ class ConfigValidator:
                 # If it's a dict (environment mapping), check if target environment exists
                 if isinstance(field_value, dict) and self.environment not in field_value:
                     available_envs = list(field_value.keys())
-                    self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["environment"]["env_not_found"].format(
-                            self.environment, display_name, available_envs
-                        )
+                    msg = (
+                        f"Environment '{self.environment}' not found in '{display_name}'. "
+                        f"Available environments: {available_envs}. This setting will be skipped."
                     )
+
+                    if is_required:
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["environment"]["env_not_found"].format(
+                                self.environment, display_name, available_envs
+                            )
+                        )
+                    elif log_warning:
+                        logger.warning(msg)
+                    else:
+                        logger.debug(msg)
 
     def _validate_environment_mapping(self, field_value: dict, field_name: str, accepted_type: type) -> bool:
         """Validate field with environment mapping."""
@@ -572,6 +582,12 @@ class ConfigValidator:
 
         # If environment mapping is used and target environment is provided, only process that environment path
         if self.environment and self.environment != "N/A" and isinstance(field_value, dict):
+            if self.environment not in paths_to_resolve:
+                # Skip if environment not in mapping (for parameter field, which is optional)
+                logger.debug(
+                    f"Skipping path resolution for '{field_name}' - environment '{self.environment}' not in mapping"
+                )
+                return
             paths_to_resolve = {self.environment: paths_to_resolve[self.environment]}
 
         for env_key, path_str in paths_to_resolve.items():
@@ -954,26 +970,35 @@ class ConfigValidator:
                 )
 
 
-def _get_config_fields(config: dict) -> list[tuple[dict, str, str]]:
-    """Get list of all fields that support environment mappings."""
+def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
+    """Get list of all fields that support environment mappings.
+
+    Returns:
+        List of tuples: (section_dict, field_name, display_name, is_required, log_warning)
+        - is_required: If True, missing environment causes error.
+        - log_warning: logging type (e.g., warning (True), debug (False)).
+    """
     return [
-        # Core section fields
-        (config.get("core", {}), "workspace_id", "core.workspace_id"),
-        (config.get("core", {}), "workspace", "core.workspace"),
-        (config.get("core", {}), "repository_directory", "core.repository_directory"),
-        (config.get("core", {}), "item_types_in_scope", "core.item_types_in_scope"),
-        (config.get("core", {}), "parameter", "core.parameter"),
-        # Publish section fields
-        (config.get("publish", {}), "exclude_regex", "publish.exclude_regex"),
-        (config.get("publish", {}), "items_to_include", "publish.items_to_include"),
-        (config.get("publish", {}), "skip", "publish.skip"),
-        # Unpublish section fields
-        (config.get("unpublish", {}), "exclude_regex", "unpublish.exclude_regex"),
-        (config.get("unpublish", {}), "items_to_include", "unpublish.items_to_include"),
-        (config.get("unpublish", {}), "skip", "unpublish.skip"),
-        # Top-level sections
-        (config, "features", "features"),
-        (config, "constants", "constants"),
+        # Core section fields - required
+        (config.get("core", {}), "workspace_id", "core.workspace_id", True, False),
+        (config.get("core", {}), "workspace", "core.workspace", True, False),
+        (config.get("core", {}), "repository_directory", "core.repository_directory", True, False),
+        # Core section fields - optional but important (warn if missing)
+        (config.get("core", {}), "item_types_in_scope", "core.item_types_in_scope", False, True),
+        (config.get("core", {}), "parameter", "core.parameter", False, True),
+        # Publish section fields - optional (debug if missing)
+        (config.get("publish", {}), "exclude_regex", "publish.exclude_regex", False, False),
+        (config.get("publish", {}), "folder_exclude_regex", "publish.folder_exclude_regex", False, False),
+        (config.get("publish", {}), "shortcut_exclude_regex", "publish.shortcut_exclude_regex", False, False),
+        (config.get("publish", {}), "items_to_include", "publish.items_to_include", False, False),
+        (config.get("publish", {}), "skip", "publish.skip", False, False),
+        # Unpublish section fields - optional (debug if missing)
+        (config.get("unpublish", {}), "exclude_regex", "unpublish.exclude_regex", False, False),
+        (config.get("unpublish", {}), "items_to_include", "unpublish.items_to_include", False, False),
+        (config.get("unpublish", {}), "skip", "unpublish.skip", False, False),
+        # Top-level sections - optional (debug if missing)
+        (config, "features", "features", False, False),
+        (config, "constants", "constants", False, False),
     ]
 
 

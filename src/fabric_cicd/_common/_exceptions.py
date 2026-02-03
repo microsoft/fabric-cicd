@@ -56,3 +56,24 @@ class FailedPublishedItemStatusError(BaseCustomError):
 
 class MissingFileError(BaseCustomError):
     pass
+
+
+class PublishError(BaseCustomError):
+    """Exception raised when one or more publish operations fail.
+
+    Attributes:
+        errors: List of (item_name, exception) tuples for all failed items.
+    """
+
+    def __init__(self, errors: list[tuple[str, Exception]], logger: Logger) -> None:
+        """Initialize with a list of (item_name, exception) tuples."""
+        self.errors = errors
+        failed_names = [name for name, _ in errors]
+        message = f"Failed to publish {len(errors)} item(s): {failed_names}"
+
+        additional_info_parts = []
+        for item_name, exc in errors:
+            additional_info_parts.append(f"\n--- {item_name} ---\n{exc!s}")
+        additional_info = "\n".join(additional_info_parts) if additional_info_parts else None
+
+        super().__init__(message, logger, additional_info)

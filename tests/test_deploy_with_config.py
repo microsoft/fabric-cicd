@@ -375,14 +375,17 @@ class TestConfigOverrides:
     @patch("fabric_cicd.constants.FEATURE_FLAG", set())
     def test_apply_feature_flags(self):
         """Test applying feature flags from config."""
-        config = {"features": ["enable_shortcut_publish", "enable_debug_mode"]}
+        foo = "enable_foo_feature"
+        bar = "enable_bar_feature"
+
+        config = {"features": [foo, bar]}
 
         apply_config_overrides(config, "N/A")
 
         from fabric_cicd import constants
 
-        assert "enable_shortcut_publish" in constants.FEATURE_FLAG
-        assert "enable_debug_mode" in constants.FEATURE_FLAG
+        assert foo in constants.FEATURE_FLAG
+        assert bar in constants.FEATURE_FLAG
 
     def test_apply_constants_overrides(self):
         """Test applying constants overrides from config."""
@@ -762,3 +765,150 @@ class TestConfigUtilsExtractSettings:
 
         settings = extract_publish_settings(config, "prod")
         assert settings["folder_exclude_regex"] == "^PROD_FOLDER/"
+
+    def test_extract_publish_settings_missing_environment_skips_setting(self):
+        """Test that missing environment in optional publish settings skips the setting."""
+        config = {
+            "publish": {
+                "exclude_regex": {"dev": "^DEV.*"},  # Only dev defined
+                "folder_exclude_regex": {"dev": "^DEV_FOLDER/"},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined - settings should be skipped
+        settings = extract_publish_settings(config, "prod")
+        assert "exclude_regex" not in settings
+        assert "folder_exclude_regex" not in settings
+
+    def test_extract_unpublish_settings_missing_environment_skips_setting(self):
+        """Test that missing environment in optional unpublish settings skips the setting."""
+        config = {
+            "unpublish": {
+                "exclude_regex": {"dev": "^DEV.*"},  # Only dev defined
+                "items_to_include": {"dev": ["item1"]},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined - settings should be skipped
+        settings = extract_unpublish_settings(config, "prod")
+        assert "exclude_regex" not in settings
+        assert "items_to_include" not in settings
+
+    def test_extract_publish_settings_skip_defaults_false_when_env_missing(self):
+        """Test that skip defaults to False when environment is not in skip mapping."""
+        config = {
+            "publish": {
+                "skip": {"dev": True},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined - skip should default to False
+        settings = extract_publish_settings(config, "prod")
+        assert settings["skip"] is False
+
+    def test_extract_unpublish_settings_skip_defaults_false_when_env_missing(self):
+        """Test that skip defaults to False when environment is not in skip mapping."""
+        config = {
+            "unpublish": {
+                "skip": {"dev": True},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined - skip should default to False
+        settings = extract_unpublish_settings(config, "prod")
+        assert settings["skip"] is False
+
+    def test_extract_workspace_settings_optional_fields_missing_environment(self):
+        """Test that optional workspace fields are skipped when environment is missing."""
+        config = {
+            "core": {
+                "workspace_id": "12345678-1234-1234-1234-123456789abc",  # Simple value
+                "repository_directory": "/path/to/repo",
+                "item_types_in_scope": {"dev": ["Notebook"]},  # Only dev defined
+                "parameter": {"dev": "dev-param.yml"},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined for optional fields - they should be skipped
+        settings = extract_workspace_settings(config, "prod")
+        assert "item_types_in_scope" not in settings
+        assert "parameter_file_path" not in settings
+        # Required fields should still be present
+        assert settings["workspace_id"] == "12345678-1234-1234-1234-123456789abc"
+        assert settings["repository_directory"] == "/path/to/repo"
+
+    def test_extract_publish_settings_shortcut_exclude_regex_missing_environment(self):
+        """Test that shortcut_exclude_regex is skipped when environment is missing."""
+        config = {
+            "publish": {
+                "shortcut_exclude_regex": {"dev": "^dev_temp_.*"},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined - setting should be skipped
+        settings = extract_publish_settings(config, "prod")
+        assert "shortcut_exclude_regex" not in settings
+
+    def test_extract_publish_settings_items_to_include_missing_environment(self):
+        """Test that items_to_include is skipped when environment is missing."""
+        config = {
+            "publish": {
+                "items_to_include": {"dev": ["item1.Notebook", "item2.DataPipeline"]},  # Only dev defined
+            }
+        }
+
+        # prod environment not defined - setting should be skipped
+        settings = extract_publish_settings(config, "prod")
+        assert "items_to_include" not in settings
+
+
+class TestGetConfigValue:
+    """Test the get_config_value utility function."""
+
+    def test_get_config_value_key_not_present(self):
+        """Test get_config_value when key doesn't exist."""
+        from fabric_cicd._common._config_utils import get_config_value
+
+        config = {"other_key": "value"}
+        result = get_config_value(config, "missing_key", "dev")
+        assert result is None
+
+    def test_get_config_value_simple_value(self):
+        """Test get_config_value with simple (non-dict) value."""
+        from fabric_cicd._common._config_utils import get_config_value
+
+        config = {"key": "simple_value"}
+        result = get_config_value(config, "key", "dev")
+        assert result == "simple_value"
+
+    def test_get_config_value_dict_with_environment(self):
+        """Test get_config_value with dict containing target environment."""
+        from fabric_cicd._common._config_utils import get_config_value
+
+        config = {"key": {"dev": "dev_value", "prod": "prod_value"}}
+        result = get_config_value(config, "key", "dev")
+        assert result == "dev_value"
+
+    def test_get_config_value_dict_missing_environment(self):
+        """Test get_config_value with dict missing target environment."""
+        from fabric_cicd._common._config_utils import get_config_value
+
+        config = {"key": {"dev": "dev_value"}}
+        result = get_config_value(config, "key", "prod")
+        assert result is None
+
+    def test_get_config_value_list_value(self):
+        """Test get_config_value with list value."""
+        from fabric_cicd._common._config_utils import get_config_value
+
+        config = {"key": ["item1", "item2"]}
+        result = get_config_value(config, "key", "dev")
+        assert result == ["item1", "item2"]
+
+    def test_get_config_value_bool_value(self):
+        """Test get_config_value with boolean value."""
+        from fabric_cicd._common._config_utils import get_config_value
+
+        config = {"key": True}
+        result = get_config_value(config, "key", "dev")
+        assert result is True

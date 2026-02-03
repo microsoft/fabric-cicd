@@ -8,26 +8,10 @@ import logging
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_variablelibraries(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all variable library items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "VariableLibrary"
-
-    var_libraries = fabric_workspace_obj.repository_items.get(item_type, {})
-
-    for item_name in var_libraries:
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
-        if var_libraries[item_name].skip_publish:
-            continue
-        activate_value_set(fabric_workspace_obj, var_libraries[item_name])
 
 
 def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
@@ -60,3 +44,15 @@ def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) ->
 
     else:
         logger.warning(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")
+
+
+class VariableLibraryPublisher(ItemPublisher):
+    """Publisher for Variable Library items."""
+
+    item_type = ItemType.VARIABLE_LIBRARY.value
+
+    def publish_one(self, item_name: str, item: Item) -> None:
+        """Publish a single Variable Library item."""
+        self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
+        if not item.skip_publish:
+            activate_value_set(self.fabric_workspace_obj, item)

@@ -20,6 +20,7 @@ from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, Inpu
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _generate_fabric_credential, _is_fabric_runtime
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import print_header
+from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -314,14 +315,14 @@ class FabricWorkspace:
                 # .Eventhouse/.children/ directory structure, requires extracting the
                 # parent folder path before the Eventhouse container, not just
                 # the immediate parent directory
-                if item_type == "KQLDatabase":
+                if item_type == ItemType.KQL_DATABASE.value:
                     pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
                     match = pattern.match(relative_path)
                     relative_parent_path = match.group(1) if match else None
                 else:
                     relative_parent_path = "/".join(relative_path.split("/")[:-1])
 
-                if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+                if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
                     item_folder_id = self.repository_folders.get(relative_parent_path, "")
                 else:
                     item_folder_id = ""
@@ -381,14 +382,14 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Get additional properties
-            if item_type in ["Lakehouse", "Warehouse", "SQLDatabase"]:
+            if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
                 sql_endpoint = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                 )
                 sql_endpoint_id = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
                 )
-            if item_type in ["Eventhouse"]:
+            if item_type in [ItemType.EVENTHOUSE.value]:
                 query_service_uri = self._get_item_attribute(
                     self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
                 )
@@ -684,7 +685,7 @@ class FabricWorkspace:
             )
             api_response = metadata_update_response
 
-        if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+        if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
             deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
             # Check if the folder has changed
             if deployed_item is not None and deployed_item.folder_id != item.folder_id:
@@ -716,7 +717,7 @@ class FabricWorkspace:
 
         # skip_publish_logging provided in kwargs to suppress logging if further processing is to be done
         if not kwargs.get("skip_publish_logging", False):
-            logger.info(f"{constants.INDENT}Published")
+            logger.info(f"{constants.INDENT}Published {item_type} '{item_name}'")
         return
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
@@ -735,9 +736,9 @@ class FabricWorkspace:
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
             self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
-            logger.info(f"{constants.INDENT}Unpublished")
+            logger.info(f"{constants.INDENT}Unpublished {item_type} '{item_name}'")
         except Exception as e:
-            logger.warning(f"Failed to unpublish {item_type} '{item_name}'.  Raw exception: {e}")
+            logger.warning(f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}")
 
     def _refresh_deployed_folders(self) -> None:
         """
