@@ -13,9 +13,6 @@ permissions:
     statuses: write
 
 jobs:
-
-                      }
-
     format_ruff:
         name: Code Formatted
         runs-on: ubuntu-latest
