@@ -13,9 +13,55 @@ permissions:
     statuses: write
 
 jobs:
+    check-author-permissions:
+        name: Check Author Permissions
+        runs-on: ubuntu-latest
+        outputs:
+            skip_validation: ${{ steps.check_permissions.outputs.skip_validation }}
+        permissions:
+            pull-requests: read
+        steps:
+            - name: Check PR Author Permission Level
+              id: check_permissions
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const prAuthor = context.payload.pull_request.user.login;
+                      const repo = context.repo;
+
+                      console.log(`Checking permissions for PR author: ${prAuthor}`);
+
+                      try {
+                        const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                          owner: repo.owner,
+                          repo: repo.repo,
+                          username: prAuthor
+                        });
+                        
+                        const permissionLevel = permission.permission;
+                        console.log(`Permission level for ${prAuthor}: ${permissionLevel}`);
+                        
+                        // Skip validation for users with write, maintain, or admin access
+                        const skipValidation = ['write', 'maintain', 'admin'].includes(permissionLevel);
+                        
+                        core.setOutput('skip_validation', skipValidation.toString());
+                        
+                        if (skipValidation) {
+                          console.log(`✅ User ${prAuthor} has ${permissionLevel} access. Validation jobs will be skipped.`);
+                        } else {
+                          console.log(`ℹ️ User ${prAuthor} has ${permissionLevel} access. Validation jobs will run.`);
+                        }
+                      } catch (error) {
+                        console.log(`⚠️ Could not determine permission level for ${prAuthor}: ${error.message}`);
+                        console.log('Defaulting to running validation jobs.');
+                        core.setOutput('skip_validation', 'false');
+                      }
+
     format_ruff:
         name: Code Formatted
         runs-on: ubuntu-latest
+        needs: check-author-permissions
+        if: needs.check-author-permissions.outputs.skip_validation == 'false'
         steps:
             - name: Checkout code
               uses: actions/checkout@v2
@@ -41,6 +87,8 @@ jobs:
     lint_ruff:
         name: Code Linted
         runs-on: ubuntu-latest
+        needs: check-author-permissions
+        if: needs.check-author-permissions.outputs.skip_validation == 'false'
         steps:
             - name: Checkout code
               uses: actions/checkout@v2
@@ -67,6 +115,8 @@ jobs:
     validate-version-bump:
         name: Proper Version Bump
         runs-on: ubuntu-latest
+        needs: check-author-permissions
+        if: needs.check-author-permissions.outputs.skip_validation == 'false'
         outputs:
             is_version_bump: ${{ steps.version_bump_check.outputs.is_version_bump }}
         steps:
@@ -133,8 +183,8 @@ jobs:
     validate-linked-issue:
         name: Issue Linked
         runs-on: ubuntu-latest
-        needs: validate-version-bump
-        if: needs.validate-version-bump.outputs.is_version_bump == 'false'
+        needs: [check-author-permissions, validate-version-bump]
+        if: needs.check-author-permissions.outputs.skip_validation == 'false' && needs.validate-version-bump.outputs.is_version_bump == 'false'
         permissions:
             pull-requests: read
             issues: read
