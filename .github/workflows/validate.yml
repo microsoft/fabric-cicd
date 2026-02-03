@@ -164,13 +164,13 @@ jobs:
                         core.setOutput('skip_validation', skipValidation.toString());
                         
                         if (skipValidation) {
-                          console.log(`✅ User ${prAuthor} has ${roleName} role. Validation jobs will be skipped.`);
+                          console.log(`✅ User ${prAuthor} has ${roleName} role. Validation job for linked issue will be skipped.`);
                         } else {
-                          console.log(`ℹ️ User ${prAuthor} has ${roleName} role. Validation jobs will run.`);
+                          console.log(`ℹ️ User ${prAuthor} has ${roleName} role. Validation job for linked issue will run.`);
                         }
                       } catch (error) {
                         console.log(`⚠️ Could not determine collaborator role for ${prAuthor}: ${error.message}`);
-                        console.log('Defaulting to running validation jobs.');
+                        console.log('Defaulting to running validation job for linked issue.');
                         core.setOutput('skip_validation', 'false');
                       }
 
