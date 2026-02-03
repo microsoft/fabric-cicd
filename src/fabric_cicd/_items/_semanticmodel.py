@@ -66,9 +66,8 @@ def build_binding_mapping(
     fabric_workspace_obj: FabricWorkspace, semantic_model_binding: dict, environment: str
 ) -> dict:
     """
-    Build the connection mapping from semantic_model_binding parameter.
-
-    The new format requires environment-specific connection_id values (use '_ALL_' for all environments).
+    Build the connection mapping from semantic_model_binding parameter. The new format requires
+    environment-specific connection_id values (use '_ALL_' for all environments).
 
     Supports:
     - default.connection_id: Applied to all models in the repository that are not explicitly listed
@@ -113,7 +112,7 @@ def build_binding_mapping(
             logger.debug(f"Environment '{environment}' not found in connection_id for semantic model(s): {model_names}")
             continue
 
-        # Only track as explicit if environment connection is defined
+        # Track models with explicit bindings to exclude from default connection assignment
         explicit_models.update(model_names)
 
         for name in model_names:
@@ -276,12 +275,12 @@ class SemanticModelPublisher(ItemPublisher):
             return
 
         # Build connection mapping from semantic_model_binding parameter (support legacy or new formats)
-        environment = fabric_workspace_obj.environment
-        
+        environment = self.fabric_workspace_obj.environment
+
         if isinstance(semantic_model_binding, list):
-            binding_mapping = build_binding_mapping_legacy(fabric_workspace_obj, semantic_model_binding)
+            binding_mapping = build_binding_mapping_legacy(self.fabric_workspace_obj, semantic_model_binding)
         elif isinstance(semantic_model_binding, dict):
-            binding_mapping = build_binding_mapping(fabric_workspace_obj, semantic_model_binding, environment)
+            binding_mapping = build_binding_mapping(self.fabric_workspace_obj, semantic_model_binding, environment)
         else:
             logger.warning(
                 f"Invalid 'semantic_model_binding' type: {type(semantic_model_binding).__name__}. "
@@ -290,9 +289,9 @@ class SemanticModelPublisher(ItemPublisher):
             return
 
         if binding_mapping:
-            connections = get_connections(fabric_workspace_obj)
+            connections = get_connections(self.fabric_workspace_obj)
             bind_semanticmodel_to_connection(
-                fabric_workspace_obj=fabric_workspace_obj, 
-                connections=connections, 
+                fabric_workspace_obj=self.fabric_workspace_obj,
+                connections=connections,
                 connection_details=binding_mapping,
             )
