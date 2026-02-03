@@ -172,6 +172,7 @@ jobs:
                         console.log(`⚠️ Could not determine collaborator role for ${prAuthor}: ${error.message}`);
                         console.log('Defaulting to running validation jobs.');
                         core.setOutput('skip_validation', 'false');
+                      }
 
     validate-linked-issue:
         name: Issue Linked
