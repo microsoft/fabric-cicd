@@ -6,40 +6,12 @@
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._parameter._utils import process_environment_key
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_semanticmodels(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all semantic model items from the repository.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "SemanticModel"
-
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        exclude_path = r".*\.pbi[/\\].*"
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
-
-    # Bind semantic models to connections after deploying (post-deployment step)
-    semantic_model_binding = fabric_workspace_obj.environment_parameter.get("semantic_model_binding", {})
-    if semantic_model_binding:
-        environment = fabric_workspace_obj.environment
-
-        # Check if legacy format (list) or new format (dict)
-        if isinstance(semantic_model_binding, list):
-            binding_mapping = build_binding_mapping_legacy(fabric_workspace_obj, semantic_model_binding)
-        else:
-            binding_mapping = build_binding_mapping(fabric_workspace_obj, semantic_model_binding, environment)
-
-        if binding_mapping:
-            connections = get_connections(fabric_workspace_obj)
-            bind_semanticmodel_to_connection(
-                fabric_workspace_obj=fabric_workspace_obj, connections=connections, connection_details=binding_mapping
-            )
 
 
 def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic_model_binding: list) -> dict:
@@ -204,7 +176,7 @@ def bind_semanticmodel_to_connection(
         connections: Dictionary of connection objects with connection ID as key.
         connection_details: Dictionary mapping semantic model names to connection IDs from parameter.yml.
     """
-    item_type = "SemanticModel"
+    item_type = ItemType.SEMANTIC_MODEL.value
 
     for model_name, connection_id in connection_details.items():
         # Check if the connection ID exists in the connections dict
@@ -284,3 +256,43 @@ def build_request_body(body: dict) -> dict:
             },
         }
     }
+
+
+class SemanticModelPublisher(ItemPublisher):
+    """Publisher for Semantic Model items."""
+
+    item_type = ItemType.SEMANTIC_MODEL.value
+
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single Semantic Model item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type)
+        )
+
+    def post_publish_all(self) -> None:
+        """Bind semantic models to connections after all models are published."""
+        semantic_model_binding = self.fabric_workspace_obj.environment_parameter.get("semantic_model_binding", {})
+        if not semantic_model_binding:
+            return
+
+        # Build connection mapping from semantic_model_binding parameter (support legacy or new formats)
+        environment = fabric_workspace_obj.environment
+        
+        if isinstance(semantic_model_binding, list):
+            binding_mapping = build_binding_mapping_legacy(fabric_workspace_obj, semantic_model_binding)
+        elif isinstance(semantic_model_binding, dict):
+            binding_mapping = build_binding_mapping(fabric_workspace_obj, semantic_model_binding, environment)
+        else:
+            logger.warning(
+                f"Invalid 'semantic_model_binding' type: {type(semantic_model_binding).__name__}. "
+                "Expected list or dict. Skipping semantic model binding."
+            )
+            return
+
+        if binding_mapping:
+            connections = get_connections(fabric_workspace_obj)
+            bind_semanticmodel_to_connection(
+                fabric_workspace_obj=fabric_workspace_obj, 
+                connections=connections, 
+                connection_details=binding_mapping,
+            )
