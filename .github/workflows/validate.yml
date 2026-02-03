@@ -13,48 +13,7 @@ permissions:
     statuses: write
 
 jobs:
-    check-author-permissions:
-        name: Check Author Permissions
-        runs-on: ubuntu-latest
-        outputs:
-            skip_validation: ${{ steps.check_permissions.outputs.skip_validation }}
-        permissions:
-            pull-requests: read
-        steps:
-            - name: Check PR Author Permission Level
-              id: check_permissions
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const prAuthor = context.payload.pull_request.user.login;
-                      const repo = context.repo;
 
-                      console.log(`Checking permissions for PR author: ${prAuthor}`);
-
-                      try {
-                        const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
-                          owner: repo.owner,
-                          repo: repo.repo,
-                          username: prAuthor
-                        });
-                        
-                        const permissionLevel = permission.permission;
-                        console.log(`Permission level for ${prAuthor}: ${permissionLevel}`);
-                        
-                        // Skip validation for users with write, maintain, or admin access
-                        const skipValidation = ['write', 'maintain', 'admin'].includes(permissionLevel);
-                        
-                        core.setOutput('skip_validation', skipValidation.toString());
-                        
-                        if (skipValidation) {
-                          console.log(`✅ User ${prAuthor} has ${permissionLevel} access. Validation jobs will be skipped.`);
-                        } else {
-                          console.log(`ℹ️ User ${prAuthor} has ${permissionLevel} access. Validation jobs will run.`);
-                        }
-                      } catch (error) {
-                        console.log(`⚠️ Could not determine permission level for ${prAuthor}: ${error.message}`);
-                        console.log('Defaulting to running validation jobs.');
-                        core.setOutput('skip_validation', 'false');
                       }
 
     format_ruff:
@@ -173,6 +132,49 @@ jobs:
                     fi
                   fi
                   echo "✅ Version bump validation passed."
+
+    check-author-permissions:
+        name: Check Author Permissions
+        runs-on: ubuntu-latest
+        outputs:
+            skip_validation: ${{ steps.check_permissions.outputs.skip_validation }}
+        permissions:
+            pull-requests: read
+        steps:
+            - name: Check PR Author Collaborator Role
+              id: check_permissions
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const prAuthor = context.payload.pull_request.user.login;
+                      const repo = context.repo;
+
+                      console.log(`Checking collaborator role for PR author: ${prAuthor}`);
+
+                      try {
+                        const { data: collaborator } = await github.rest.repos.getCollaboratorPermissionLevel({
+                          owner: repo.owner,
+                          repo: repo.repo,
+                          username: prAuthor
+                        });
+                        
+                        const roleName = collaborator.role_name;
+                        console.log(`Collaborator role for ${prAuthor}: ${roleName}`);
+                        
+                        // Skip validation for users with admin, maintain, or write role
+                        const skipValidation = ['admin', 'maintain', 'write'].includes(roleName);
+                        
+                        core.setOutput('skip_validation', skipValidation.toString());
+                        
+                        if (skipValidation) {
+                          console.log(`✅ User ${prAuthor} has ${roleName} role. Validation jobs will be skipped.`);
+                        } else {
+                          console.log(`ℹ️ User ${prAuthor} has ${roleName} role. Validation jobs will run.`);
+                        }
+                      } catch (error) {
+                        console.log(`⚠️ Could not determine collaborator role for ${prAuthor}: ${error.message}`);
+                        console.log('Defaulting to running validation jobs.');
+                        core.setOutput('skip_validation', 'false');
 
     validate-linked-issue:
         name: Issue Linked
