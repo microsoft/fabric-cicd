@@ -690,6 +690,7 @@ class FabricWorkspace:
                             description=item.description,
                             guid=item_guid,
                             folder_id="",  # Unknown at this point, folder move logic will handle if needed
+                            logical_id=item.logical_id,
                         )
                         # Set api_response for response tracking to indicate recovery occurred
                         api_response = {
