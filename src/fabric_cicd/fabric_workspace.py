@@ -656,14 +656,57 @@ class FabricWorkspace:
 
             # Create a new item if it does not exist
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/create-item
-            item_create_response = self.endpoint.invoke(
-                method="POST", url=f"{self.base_api_url}/items", body=combined_body
-            )
-            api_response = item_create_response
-            item_guid = item_create_response["body"]["id"]
-            self.repository_items[item_type][item_name].guid = item_guid
+            try:
+                item_create_response = self.endpoint.invoke(
+                    method="POST", url=f"{self.base_api_url}/items", body=combined_body
+                )
+                api_response = item_create_response
+                item_guid = item_create_response["body"]["id"]
+                self.repository_items[item_type][item_name].guid = item_guid
+            except Exception as e:
+                # Handle race condition: item may have been created during a throttled retry
+                # or exists due to stale cache from API throttling delays during deployment.
+                # Check for both the error message and the specific API error code.
+                error_str = str(e).lower()
+                if "already in use" in error_str or "itemdisplaynamealreadyinuse" in error_str:
+                    logger.warning(
+                        f"Item '{item_name}' already exists (possible throttling race condition). "
+                        "Attempting to recover by fetching current state."
+                    )
+                    # Re-fetch the item's GUID from the workspace using existing lookup function
+                    try:
+                        item_guid = self._lookup_item_attribute(self.workspace_id, item_type, item_name, "id")
+                    except InputError:
+                        item_guid = None
+                    if item_guid:
+                        self.repository_items[item_type][item_name].guid = item_guid
+                        is_deployed = True
+                        # Update deployed_items cache to ensure folder move logic works correctly
+                        if item_type not in self.deployed_items:
+                            self.deployed_items[item_type] = {}
+                        self.deployed_items[item_type][item_name] = Item(
+                            type=item_type,
+                            name=item_name,
+                            description=item.description,
+                            guid=item_guid,
+                            folder_id="",  # Unknown at this point, folder move logic will handle if needed
+                        )
+                        # Set api_response for response tracking to indicate recovery occurred
+                        api_response = {
+                            "recovered": True,
+                            "body": {"id": item_guid, "displayName": item_name, "type": item_type},
+                            "status_code": 200,
+                            "header": {},
+                        }
+                        logger.info(
+                            f"{constants.INDENT}Recovered item GUID: {item_guid}. Will update instead of create."
+                        )
+                    else:
+                        raise  # Re-raise if we couldn't recover
+                else:
+                    raise  # Re-raise for other errors
 
-        elif is_deployed and not shell_only_publish:
+        if is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
             update_response = self.endpoint.invoke(
