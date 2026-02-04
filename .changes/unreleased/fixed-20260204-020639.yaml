@@ -1,5 +1,5 @@
 kind: fixed
-body: Handle ItemDisplayNameAlreadyInUse error during API throttling race condition
+body: Handle ItemDisplayNameAlreadyInUse error during retries under API throttling race condition
 time: 2026-02-04T02:06:39Z
 custom:
     Author: slavatrofimov
