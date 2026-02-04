@@ -342,8 +342,7 @@ class Parameter:
 
     def _check_duplicate_keys(self, content: str, msgs: dict[str, str]) -> list[str]:
         """Check for duplicate root-level keys in YAML content."""
-        root_keys = []
-        dupes = []
+        key_counts = {}
 
         for line in content.splitlines():
             # Root-level keys start at column 0 and end with ':'
@@ -351,12 +350,16 @@ class Parameter:
                 key = line.split(":")[0].strip()
                 # Skip comments and empty keys
                 if key and not key.startswith("#"):
-                    if key in root_keys:
-                        dupes.append(key)
-                    else:
-                        root_keys.append(key)
+                    key_counts[key] = key_counts.get(key, 0) + 1
 
-        return [msgs["duplicate"].format(", ".join(dupes))] if dupes else []
+        # Find keys that appear more than once
+        dupes = {key: count for key, count in key_counts.items() if count > 1}
+
+        if dupes:
+            dupe_details = ", ".join(f"'{key}' ({count})" for key, count in dupes.items())
+            return [msgs["duplicate"].format(dupe_details)]
+
+        return []
 
     def _validate_parameter_load(self) -> tuple[bool, str]:
         """Validate the parameter file load."""
