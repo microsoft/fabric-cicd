@@ -289,6 +289,23 @@ spark_pool:
               name: "Pool2"
 """
 
+SAMPLE_PARAMETER_FILE_TRIPLE_DUPLICATE_KEY = """
+find_replace:
+    - find_value: "first-value"
+      replace_value:
+          PPE: "first-ppe"
+
+find_replace:
+    - find_value: "second-value"
+      replace_value:
+          PPE: "second-ppe"
+
+find_replace:
+    - find_value: "third-value"
+      replace_value:
+          PPE: "third-ppe"
+"""
+
 
 @pytest.fixture
 def item_type_in_scope():
@@ -344,6 +361,9 @@ def repository_directory(tmp_path):
 
     multiple_duplicate_keys_file = workspace_dir / "multiple_duplicate_keys_parameter.yml"
     multiple_duplicate_keys_file.write_text(SAMPLE_PARAMETER_FILE_MULTIPLE_DUPLICATE_KEYS)
+
+    triple_duplicate_key_file = workspace_dir / "triple_duplicate_key_parameter.yml"
+    triple_duplicate_key_file.write_text(SAMPLE_PARAMETER_FILE_TRIPLE_DUPLICATE_KEY)
 
     # Create the sample parameter file with ALL environment key
     all_env_parameter_file_path = workspace_dir / "all_env_parameter.yml"
@@ -2357,3 +2377,30 @@ find_replace:
     # Verify integration through _validate_yaml_content
     yaml_errors = parameter_object._validate_yaml_content(content)
     assert len(yaml_errors) == 0
+
+
+def test_check_duplicate_keys_triple_occurrence(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of a key appearing more than twice."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="triple_duplicate_key_parameter.yml",
+    )
+
+    # Read the file content directly to test _check_duplicate_keys
+    file_path = repository_directory / "triple_duplicate_key_parameter.yml"
+    content = file_path.read_text(encoding="utf-8")
+
+    msgs = constants.PARAMETER_MSGS["invalid content"]
+    errors = param_obj._check_duplicate_keys(content, msgs)
+
+    assert len(errors) == 1
+    assert "find_replace" in errors[0]
+    assert "3" in errors[0]  # Verify count is included
+
+    # Verify integration through _validate_yaml_content
+    yaml_errors = param_obj._validate_yaml_content(content)
+    assert len(yaml_errors) == 1
+    assert "find_replace" in yaml_errors[0]
+    assert "3" in yaml_errors[0]
