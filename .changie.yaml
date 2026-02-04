@@ -1,0 +1,54 @@
+# docs: https://changie.dev/config/
+---
+changesDir: .changes
+unreleasedDir: unreleased
+headerPath: header.tpl.md
+versionExt: md
+changelogPath: docs/changelog.md
+versionFormat: '## [{{.Version}}](https://pypi.org/project/fabric-cicd/{{.Version}}) - {{.Time.Format "January 02, 2006"}}'
+kindFormat: "### {{.Kind}}"
+changeFormat: "* {{.Body}} by [{{.Custom.Author}}]({{.Custom.AuthorLink}}) ([#{{.Custom.Issue}}]({{.Custom.IssueLink}}))"
+kinds:
+    - label: "⚠️ Breaking Change"
+      key: breaking
+      auto: major
+    - label: "🆕 New Items Support"
+      key: new-items
+      auto: minor
+    - label: "✨ New Functionality"
+      key: added
+      auto: minor
+    - label: "🔧 Bug Fix"
+      key: fixed
+      auto: patch
+    - label: "⚡ Additional Optimizations"
+      key: optimization
+      auto: patch
+    - label: "📝 Documentation Update"
+      key: docs
+      auto: patch
+newlines:
+    afterChangelogHeader: 0
+    beforeChangelogVersion: 1
+    endOfVersion: 1
+    afterKind: 1
+    beforeKind: 1
+envPrefix: CHANGIE_
+custom:
+    - key: Issue
+      label: Issue Number
+      type: int
+      minLength: 1
+    - key: Author
+      label: Author's GitHub Username
+      type: string
+      minLength: 3
+post:
+    - key: AuthorLink
+      value: "https://github.com/{{.Custom.Author}}"
+    - key: IssueLink
+      value: "https://github.com/microsoft/fabric-cicd/issues/{{.Custom.Issue}}"
+replacements:
+    - path: src/fabric_cicd/constants.py
+      find: 'VERSION = ".*"'
+      replace: 'VERSION = "{{.VersionNoPrefix}}"'
