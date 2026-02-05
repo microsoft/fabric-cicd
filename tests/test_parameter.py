@@ -2005,6 +2005,48 @@ def test_template_merge_validation(tmp_path):
     assert param._validate_parameter_file() == False
 
 
+def test_template_duplicate_keys_detected(tmp_path):
+    """Test that duplicate keys in template files are detected by _DuplicateKeyLoader."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+extend:
+  - ./templates/duplicate_template.yml
+find_replace:
+  - find_value: "base-id"
+    replace_value:
+      DEV: "dev-base"
+"""
+    base_file.write_text(base_content)
+
+    # Create template file with duplicate keys
+    template_file = templates_dir / "duplicate_template.yml"
+    template_content = """
+find_replace:
+  - find_value: "template-id"
+    replace_value:
+      DEV: "dev-template"
+find_replace:
+  - find_value: "duplicate-template-id"
+    replace_value:
+      DEV: "dev-duplicate"
+"""
+    template_file.write_text(template_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Template with duplicate keys should be skipped, only base content should remain
+    assert "extend" not in param.environment_parameter
+    assert len(param.environment_parameter["find_replace"]) == 1
+    assert param.environment_parameter["find_replace"][0]["find_value"] == "base-id"
+
+
 def test_circular_template_reference(tmp_path):
     """Test handling of circular template references."""
     repo_dir = tmp_path / "repo"
