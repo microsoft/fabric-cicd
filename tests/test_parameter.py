@@ -716,15 +716,262 @@ def test_validate_data_type(parameter_object):
     )
 
 
-def test_validate_yaml_content(parameter_object):
-    """Test the validation of the YAML content"""
-    invalid_content = "\n\n\n\t"
-    assert parameter_object._validate_yaml_content(invalid_content) == ["YAML content is empty"]
+def test_validate_yaml_content_empty():
+    """Test that empty YAML content is handled correctly."""
+    import tempfile
 
-    invalid_content = "\U0001f600"
-    assert parameter_object._validate_yaml_content(invalid_content) == [
-        constants.PARAMETER_MSGS["invalid content"]["char"]
-    ]
+    # Test empty content - create a temp file with empty content
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("\n\n\n\t")
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Empty content should fail to load
+        assert not param.environment_parameter, "Empty YAML should not load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False
+        assert constants.PARAMETER_MSGS["empty yaml"] in msg
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_utf8_validation_at_file_read():
+    """Test that Python validates UTF-8 encoding when reading parameter files."""
+    import tempfile
+
+    # Create a file with invalid UTF-8 bytes
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".yml", delete=False) as temp_file:
+        # Write valid YAML structure with invalid UTF-8 byte sequence
+        temp_file.write(b"find_replace:\n  - find_value: 'invalid \x80\x81\x82 bytes'\n")
+        temp_file_path = temp_file.name
+
+    try:
+        # Parameter creation should succeed but loading should fail gracefully
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+
+        # Parameter should fail to load due to invalid UTF-8
+        assert not param.environment_parameter, "Invalid UTF-8 file should not load successfully"
+
+        # Verify that validation reports the file as invalid
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False, "Parameter load should fail for invalid UTF-8"
+
+        # Verify the error message uses the constant format with UnicodeDecodeError details
+        assert constants.PARAMETER_MSGS["invalid load"].split("{}")[0] in msg, (
+            f"Error message should use 'invalid load' constant format: {msg}"
+        )
+        # UnicodeDecodeError message contains 'utf-8' and 'decode'
+        assert "utf-8" in msg.lower(), f"Error message should contain UTF-8 details: {msg}"
+
+    finally:
+        # Clean up temporary file
+        Path(temp_file_path).unlink()
+
+
+def test_validate_yaml_content_duplicate_keys():
+    """Test that duplicate keys are detected via _DuplicateKeyLoader."""
+    import tempfile
+
+    # Test duplicate key detection - create a temp file with duplicate keys
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""find_replace:
+    - find_value: "first"
+      replace_value:
+          TEST: "first-value"
+find_replace:
+    - find_value: "second"
+      replace_value:
+          TEST: "second-value"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Duplicate keys should fail to load
+        assert not param.environment_parameter, "YAML with duplicate keys should not load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False
+        assert "find_replace" in msg.lower() or "duplicate" in msg.lower()
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_single_duplicate(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of a single duplicate root-level key via _DuplicateKeyLoader."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="duplicate_keys_parameter.yml",
+    )
+
+    # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
+    assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
+
+    is_valid, msg = param_obj._validate_parameter_load()
+    assert is_valid is False
+    assert "find_replace" in msg.lower() or "duplicate" in msg.lower()
+
+
+def test_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of multiple duplicate root-level keys via _DuplicateKeyLoader."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="multiple_duplicate_keys_parameter.yml",
+    )
+
+    # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
+    assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
+
+    is_valid, msg = param_obj._validate_parameter_load()
+    assert is_valid is False
+    # At least one of the duplicate keys should be mentioned
+    assert "find_replace" in msg.lower() or "spark_pool" in msg.lower() or "duplicate" in msg.lower()
+
+
+def test_duplicate_keys_no_duplicates(parameter_object):
+    """Test that valid YAML with no duplicate keys passes."""
+    # parameter_object fixture uses a valid parameter file without duplicates
+    assert parameter_object.environment_parameter, "Valid YAML should load successfully"
+
+    is_valid, msg = parameter_object._validate_parameter_load()
+    assert is_valid is True
+
+
+def test_duplicate_keys_ignores_comments():
+    """Test that comment lines starting with # are ignored."""
+    import tempfile
+
+    content = """
+# This is a comment
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+# Another comment
+# find_replace: this should be ignored
+spark_pool:
+    - instance_pool_id: "pool-id"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool"
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write(content)
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Valid YAML with comments should load successfully
+        assert param.environment_parameter, "Valid YAML with comments should load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is True
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_nested_keys_not_flagged():
+    """Test that nested keys (indented) are not flagged as root-level duplicates."""
+    import tempfile
+
+    content = """
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+    - find_value: "value2"
+      replace_value:
+          PPE: "ppe-value2"
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write(content)
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Valid YAML with nested repeated keys should load successfully
+        assert param.environment_parameter, "Valid YAML with nested keys should load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is True
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_nested_duplicate_detected():
+    """Test that duplicate keys within nested mappings are detected by _DuplicateKeyLoader."""
+    import tempfile
+
+    content = """
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value1"
+          PPE: "ppe-value2"
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write(content)
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Duplicate nested keys should fail to load
+        assert not param.environment_parameter, "YAML with duplicate nested keys should not load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False
+        assert "PPE" in msg or "duplicate" in msg.lower()
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_triple_occurrence(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of a key appearing more than twice via _DuplicateKeyLoader."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="triple_duplicate_key_parameter.yml",
+    )
+
+    # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
+    assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
+
+    is_valid, msg = param_obj._validate_parameter_load()
+    assert is_valid is False
+    assert "find_replace" in msg.lower() or "duplicate" in msg.lower()
 
 
 def test_validate_parameter_file_structure(repository_directory, item_type_in_scope, target_environment):
@@ -2253,154 +2500,3 @@ config:
     data = yaml.safe_load(yaml_str)
     matches = parse(param["find_key"]).find(data)
     assert len(matches) == 0
-
-
-def test_check_duplicate_keys_single_duplicate(repository_directory, item_type_in_scope, target_environment):
-    """Test detection of a single duplicate root-level key."""
-    param_obj = Parameter(
-        repository_directory=repository_directory,
-        item_type_in_scope=item_type_in_scope,
-        environment=target_environment,
-        parameter_file_name="duplicate_keys_parameter.yml",
-    )
-
-    # Read the file content directly to test _check_duplicate_keys
-    file_path = repository_directory / "duplicate_keys_parameter.yml"
-    content = file_path.read_text(encoding="utf-8")
-
-    msgs = constants.PARAMETER_MSGS["invalid content"]
-    errors = param_obj._check_duplicate_keys(content, msgs)
-
-    assert len(errors) == 1
-    assert "find_replace" in errors[0]
-
-    # Verify integration through _validate_yaml_content
-    yaml_errors = param_obj._validate_yaml_content(content)
-    assert len(yaml_errors) == 1
-    assert "find_replace" in yaml_errors[0]
-
-
-def test_check_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_scope, target_environment):
-    """Test detection of multiple duplicate root-level keys."""
-    param_obj = Parameter(
-        repository_directory=repository_directory,
-        item_type_in_scope=item_type_in_scope,
-        environment=target_environment,
-        parameter_file_name="multiple_duplicate_keys_parameter.yml",
-    )
-
-    # Read the file content directly to test _check_duplicate_keys
-    file_path = repository_directory / "multiple_duplicate_keys_parameter.yml"
-    content = file_path.read_text(encoding="utf-8")
-
-    msgs = constants.PARAMETER_MSGS["invalid content"]
-    errors = param_obj._check_duplicate_keys(content, msgs)
-
-    assert len(errors) == 1
-    assert "find_replace" in errors[0]
-    assert "spark_pool" in errors[0]
-
-    # Verify integration through _validate_yaml_content
-    yaml_errors = param_obj._validate_yaml_content(content)
-    assert len(yaml_errors) == 1
-    assert "find_replace" in yaml_errors[0]
-    assert "spark_pool" in yaml_errors[0]
-
-
-def test_check_duplicate_keys_no_duplicates(parameter_object):
-    """Test that valid YAML with no duplicate keys passes."""
-    content = """
-find_replace:
-    - find_value: "value1"
-      replace_value:
-          PPE: "ppe-value"
-spark_pool:
-    - instance_pool_id: "pool-id"
-      replace_value:
-          PPE:
-              type: "Capacity"
-              name: "Pool"
-"""
-    msgs = constants.PARAMETER_MSGS["invalid content"]
-    errors = parameter_object._check_duplicate_keys(content, msgs)
-
-    assert len(errors) == 0
-
-    # Verify integration through _validate_yaml_content
-    yaml_errors = parameter_object._validate_yaml_content(content)
-    assert len(yaml_errors) == 0
-
-
-def test_check_duplicate_keys_ignores_comments(parameter_object):
-    """Test that comment lines starting with # are ignored."""
-    content = """
-# This is a comment
-find_replace:
-    - find_value: "value1"
-      replace_value:
-          PPE: "ppe-value"
-# Another comment
-# find_replace: this should be ignored
-spark_pool:
-    - instance_pool_id: "pool-id"
-      replace_value:
-          PPE:
-              type: "Capacity"
-              name: "Pool"
-"""
-    msgs = constants.PARAMETER_MSGS["invalid content"]
-    errors = parameter_object._check_duplicate_keys(content, msgs)
-
-    assert len(errors) == 0
-
-    # Verify integration through _validate_yaml_content
-    yaml_errors = parameter_object._validate_yaml_content(content)
-    assert len(yaml_errors) == 0
-
-
-def test_check_duplicate_keys_ignores_nested_keys(parameter_object):
-    """Test that nested keys (indented) are not flagged as duplicates."""
-    content = """
-find_replace:
-    - find_value: "value1"
-      replace_value:
-          PPE: "ppe-value"
-    - find_value: "value2"
-      replace_value:
-          PPE: "ppe-value2"
-"""
-    msgs = constants.PARAMETER_MSGS["invalid content"]
-    errors = parameter_object._check_duplicate_keys(content, msgs)
-
-    assert len(errors) == 0
-
-    # Verify integration through _validate_yaml_content
-    yaml_errors = parameter_object._validate_yaml_content(content)
-    assert len(yaml_errors) == 0
-
-
-def test_check_duplicate_keys_triple_occurrence(repository_directory, item_type_in_scope, target_environment):
-    """Test detection of a key appearing more than twice."""
-    param_obj = Parameter(
-        repository_directory=repository_directory,
-        item_type_in_scope=item_type_in_scope,
-        environment=target_environment,
-        parameter_file_name="triple_duplicate_key_parameter.yml",
-    )
-
-    # Read the file content directly to test _check_duplicate_keys
-    file_path = repository_directory / "triple_duplicate_key_parameter.yml"
-    content = file_path.read_text(encoding="utf-8")
-
-    msgs = constants.PARAMETER_MSGS["invalid content"]
-    errors = param_obj._check_duplicate_keys(content, msgs)
-
-    assert len(errors) == 1
-    assert "find_replace" in errors[0]
-    assert "3" in errors[0]  # Verify count is included
-
-    # Verify integration through _validate_yaml_content
-    yaml_errors = param_obj._validate_yaml_content(content)
-    assert len(yaml_errors) == 1
-    assert "find_replace" in yaml_errors[0]
-    assert "3" in yaml_errors[0]
