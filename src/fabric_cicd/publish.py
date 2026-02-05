@@ -190,7 +190,7 @@ def publish_all_items(
     total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
     publishers_with_async_check: list[items.ItemPublisher] = []
     for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
-        log_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
+        log_header(logger, f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
         publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
         publisher.publish_all()
         if publisher.has_async_publish_check:
@@ -198,7 +198,7 @@ def publish_all_items(
 
     # Check asynchronous publish status for relevant item types
     for publisher in publishers_with_async_check:
-        log_header(f"Checking {publisher.item_type} Publish State")
+        log_header(logger, f"Checking {publisher.item_type} Publish State")
         publisher.post_publish_all_check()
 
     # Return response data if feature flag is enabled and responses were collected
