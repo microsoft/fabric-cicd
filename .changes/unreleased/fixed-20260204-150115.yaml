@@ -1,0 +1,8 @@
+kind: fixed
+body: Add caching for item attribute lookups
+time: 2026-02-04T15:01:15.4646123+02:00
+custom:
+    Author: MiSchroe
+    AuthorLink: https://github.com/MiSchroe
+    Issue: "704"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/704
