@@ -824,9 +824,9 @@ def test_duplicate_keys_single_duplicate(repository_directory, item_type_in_scop
     # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
     assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
 
-    is_valid, msg = param_obj._validate_parameter_load()
+    is_valid, _msg = param_obj._validate_parameter_load()
     assert is_valid is False
-    assert "find_replace" in msg.lower() or "duplicate" in msg.lower()
+    assert "find_replace" in _msg.lower() or "duplicate" in _msg.lower()
 
 
 def test_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_scope, target_environment):
@@ -841,10 +841,10 @@ def test_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_s
     # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
     assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
 
-    is_valid, msg = param_obj._validate_parameter_load()
+    is_valid, _msg = param_obj._validate_parameter_load()
     assert is_valid is False
     # At least one of the duplicate keys should be mentioned
-    assert "find_replace" in msg.lower() or "spark_pool" in msg.lower() or "duplicate" in msg.lower()
+    assert "find_replace" in _msg.lower() or "spark_pool" in _msg.lower() or "duplicate" in _msg.lower()
 
 
 def test_duplicate_keys_no_duplicates(parameter_object):
@@ -852,7 +852,7 @@ def test_duplicate_keys_no_duplicates(parameter_object):
     # parameter_object fixture uses a valid parameter file without duplicates
     assert parameter_object.environment_parameter, "Valid YAML should load successfully"
 
-    is_valid, msg = parameter_object._validate_parameter_load()
+    is_valid, _msg = parameter_object._validate_parameter_load()
     assert is_valid is True
 
 
@@ -888,7 +888,7 @@ spark_pool:
         )
         # Valid YAML with comments should load successfully
         assert param.environment_parameter, "Valid YAML with comments should load successfully"
-        is_valid, msg = param._validate_parameter_load()
+        is_valid, _msg = param._validate_parameter_load()
         assert is_valid is True
     finally:
         Path(temp_file_path).unlink()
@@ -920,7 +920,7 @@ find_replace:
         )
         # Valid YAML with nested repeated keys should load successfully
         assert param.environment_parameter, "Valid YAML with nested keys should load successfully"
-        is_valid, msg = param._validate_parameter_load()
+        is_valid, _msg = param._validate_parameter_load()
         assert is_valid is True
     finally:
         Path(temp_file_path).unlink()
