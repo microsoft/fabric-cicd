@@ -5,20 +5,20 @@
 
 import logging
 
-from fabric_cicd import FabricWorkspace
+from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
 
 logger = logging.getLogger(__name__)
 
 
-def publish_eventhouses(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all eventhouse items from the repository.
+class EventhousePublisher(ItemPublisher):
+    """Publisher for Eventhouse items."""
 
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published
-    """
-    item_type = "Eventhouse"
+    item_type = ItemType.EVENTHOUSE.value
 
-    for item_name in fabric_workspace_obj.repository_items.get(item_type, {}):
-        exclude_path = r".*\.children[/\\].*"
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type, exclude_path=exclude_path)
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single Eventhouse item."""
+        self.fabric_workspace_obj._publish_item(
+            item_name=item_name, item_type=self.item_type, exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type)
+        )

@@ -16,6 +16,7 @@ from azure.core.credentials import TokenCredential
 
 import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InputError
+from fabric_cicd.constants import FeatureFlag, OperationType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -156,3 +157,98 @@ def validate_token_credential(input_value: TokenCredential) -> TokenCredential:
     validate_data_type("TokenCredential", "credential", input_value)
 
     return input_value
+
+
+def validate_experimental_param(
+    param_value: Optional[str],
+    required_flag: "FeatureFlag",
+    warning_message: str,
+    risk_warning: str,
+) -> None:
+    """
+    Generic validation for optional parameters requiring experimental feature flags.
+
+    Args:
+        param_value: The parameter value (None means skip validation).
+        required_flag: The specific feature flag required (in addition to experimental).
+        warning_message: Primary warning message when feature is enabled.
+        risk_warning: Risk/caution warning message.
+
+    Raises:
+        InputError: If required feature flags are not enabled.
+    """
+    from fabric_cicd.constants import FeatureFlag
+
+    if param_value is None:
+        return
+
+    if (
+        FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+        or required_flag.value not in constants.FEATURE_FLAG
+    ):
+        msg = f"Feature flags 'enable_experimental_features' and '{required_flag.value}' must be set."
+        raise InputError(msg, logger)
+
+    logger.warning(warning_message)
+    logger.warning(risk_warning)
+
+
+def validate_items_to_include(items_to_include: Optional[list[str]], operation: "OperationType") -> None:
+    """
+    Validate items_to_include parameter and check required feature flags.
+
+    Args:
+        items_to_include: List of items in "item_name.item_type" format, or None.
+        operation: The type of operation being performed (publish or unpublish).
+
+    Raises:
+        InputError: If required feature flags are not enabled.
+    """
+    from fabric_cicd.constants import FeatureFlag
+
+    validate_experimental_param(
+        param_value=items_to_include,
+        required_flag=FeatureFlag.ENABLE_ITEMS_TO_INCLUDE,
+        warning_message=f"Selective {operation.value} is enabled.",
+        risk_warning=f"Using items_to_include is risky as it can prevent needed dependencies from being {operation.value}.  Use at your own risk.",
+    )
+
+
+def validate_folder_path_exclude_regex(folder_path_exclude_regex: Optional[str]) -> None:
+    """
+    Validate folder_path_exclude_regex parameter and check required feature flags.
+
+    Args:
+        folder_path_exclude_regex: Regex pattern to exclude items based on their folder path, or None.
+
+    Raises:
+        InputError: If required feature flags are not enabled.
+    """
+    from fabric_cicd.constants import FeatureFlag
+
+    validate_experimental_param(
+        param_value=folder_path_exclude_regex,
+        required_flag=FeatureFlag.ENABLE_EXCLUDE_FOLDER,
+        warning_message="Folder path exclusion is enabled.",
+        risk_warning="Using folder_path_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk.",
+    )
+
+
+def validate_shortcut_exclude_regex(shortcut_exclude_regex: Optional[str]) -> None:
+    """
+    Validate shortcut_exclude_regex parameter and check required feature flags.
+
+    Args:
+        shortcut_exclude_regex: Regex pattern to exclude specific shortcuts from being published, or None.
+
+    Raises:
+        InputError: If required feature flags are not enabled.
+    """
+    from fabric_cicd.constants import FeatureFlag
+
+    validate_experimental_param(
+        param_value=shortcut_exclude_regex,
+        required_flag=FeatureFlag.ENABLE_SHORTCUT_EXCLUDE,
+        warning_message="Shortcut exclusion is enabled.",
+        risk_warning="Using shortcut_exclude_regex will selectively exclude shortcuts from being deployed to lakehouses. Use with caution.",
+    )

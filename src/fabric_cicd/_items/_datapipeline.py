@@ -9,28 +9,12 @@ import re
 import dpath
 
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._items._manage_dependencies import set_publish_order
+from fabric_cicd._common._item import Item
+from fabric_cicd._items._base_publisher import ItemPublisher, ParallelConfig
+from fabric_cicd._items._manage_dependencies import set_publish_order, set_unpublish_order
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
-
-
-def publish_datapipelines(fabric_workspace_obj: FabricWorkspace) -> None:
-    """
-    Publishes all data pipeline items from the repository in the correct order based on their dependencies.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
-    """
-    item_type = "DataPipeline"
-
-    # Set the order of data pipelines to be published based on their dependencies
-    publish_order = set_publish_order(fabric_workspace_obj, item_type, find_referenced_datapipelines)
-
-    fabric_workspace_obj._refresh_deployed_items()
-
-    # Publish
-    for item_name in publish_order:
-        fabric_workspace_obj._publish_item(item_name=item_name, item_type=item_type)
 
 
 def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
@@ -42,7 +26,7 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
         file_content: Dict representation of the pipeline-content file.
         lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
     """
-    item_type = "DataPipeline"
+    item_type = ItemType.DATA_PIPELINE.value
     reference_list = []
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
 
@@ -61,3 +45,40 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
                     reference_list.append(referenced_name)
 
     return reference_list
+
+
+def _get_datapipeline_publish_order(publisher: "DataPipelinePublisher") -> list[str]:
+    """Get the ordered list of data pipeline names based on dependencies."""
+    return set_publish_order(publisher.fabric_workspace_obj, publisher.item_type, find_referenced_datapipelines)
+
+
+class DataPipelinePublisher(ItemPublisher):
+    """Publisher for Data Pipeline items."""
+
+    item_type = ItemType.DATA_PIPELINE.value
+    has_dependency_tracking = True
+
+    parallel_config = ParallelConfig(enabled=False, ordered_items_func=_get_datapipeline_publish_order)
+    """Pipelines must be published in dependency order (sequential)"""
+
+    def get_unpublish_order(self, items_to_unpublish: list[str]) -> list[str]:
+        """
+        Get the ordered list of item names based on dependencies for unpublishing.
+
+        Args:
+            items_to_unpublish: List of item names to be unpublished.
+
+        Returns:
+            List of item names in the order they should be unpublished (reverse dependency order).
+        """
+        return set_unpublish_order(
+            self.fabric_workspace_obj, self.item_type, items_to_unpublish, find_referenced_datapipelines
+        )
+
+    def publish_one(self, item_name: str, _item: Item) -> None:
+        """Publish a single Data Pipeline item."""
+        self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
+
+    def pre_publish_all(self) -> None:
+        """Refresh deployed items before publishing to resolve references."""
+        self.fabric_workspace_obj._refresh_deployed_items()

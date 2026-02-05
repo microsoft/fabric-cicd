@@ -11,7 +11,6 @@ from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
 from fabric_cicd import constants
-from fabric_cicd._common._check_utils import check_regex
 from fabric_cicd._common._config_utils import (
     apply_config_overrides,
     extract_publish_settings,
@@ -24,7 +23,11 @@ from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
+    validate_folder_path_exclude_regex,
+    validate_items_to_include,
+    validate_shortcut_exclude_regex,
 )
+from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -139,10 +142,10 @@ def publish_all_items(
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
     # Initialize response collection if feature flag is enabled
-    if "enable_response_collection" in constants.FEATURE_FLAG:
+    if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG:
         fabric_workspace_obj.responses = {}
 
-    # check if workspace has assigned capacity, if not, exit
+    # Check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
 
     response_state = fabric_workspace_obj.endpoint.invoke(
@@ -157,7 +160,7 @@ def publish_all_items(
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
 
-    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+    if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
         fabric_workspace_obj._publish_folders()
@@ -172,135 +175,36 @@ def publish_all_items(
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     if folder_path_exclude_regex:
-        if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_exclude_folder" not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_exclude_folder' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Folder path exclusion is enabled.")
-        logger.warning(
-            "Using folder_path_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
+        validate_folder_path_exclude_regex(folder_path_exclude_regex)
         fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
     if items_to_include:
-        if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_items_to_include" not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Selective deployment is enabled.")
-        logger.warning(
-            "Using items_to_include is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
+        validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
         fabric_workspace_obj.items_to_include = items_to_include
 
     if shortcut_exclude_regex:
-        if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_shortcut_exclude" not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_shortcut_exclude' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Shortcut exclusion is enabled.")
-        logger.warning(
-            "Using shortcut_exclude_regex will selectively exclude shortcuts from being deployed to lakehouses. Use with caution."
-        )
+        validate_shortcut_exclude_regex(shortcut_exclude_regex)
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-    def _should_publish_item_type(item_type: str) -> bool:
-        """Check if an item type should be published based on scope and repository content."""
-        return (
-            item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.repository_items
-        )
+    # Publish items in the defined order synchronously
+    total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
+    publishers_with_async_check: list[items.ItemPublisher] = []
+    for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
+        log_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
+        publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
+        publisher.publish_all()
+        if publisher.has_async_publish_check:
+            publishers_with_async_check.append(publisher)
 
-    if _should_publish_item_type("VariableLibrary"):
-        log_header(logger, "Publishing Variable Libraries")
-        items.publish_variablelibraries(fabric_workspace_obj)
-    if _should_publish_item_type("Warehouse"):
-        log_header(logger, "Publishing Warehouses")
-        items.publish_warehouses(fabric_workspace_obj)
-    if _should_publish_item_type("MirroredDatabase"):
-        log_header(logger, "Publishing Mirrored Databases")
-        items.publish_mirroreddatabase(fabric_workspace_obj)
-    if _should_publish_item_type("Lakehouse"):
-        log_header(logger, "Publishing Lakehouses")
-        items.publish_lakehouses(fabric_workspace_obj)
-    if _should_publish_item_type("SQLDatabase"):
-        log_header(logger, "Publishing SQL Databases")
-        items.publish_sqldatabases(fabric_workspace_obj)
-    if _should_publish_item_type("Environment"):
-        log_header(logger, "Publishing Environments")
-        items.publish_environments(fabric_workspace_obj)
-    if _should_publish_item_type("UserDataFunction"):
-        log_header(logger, "Publishing User Data Functions")
-        items.publish_userdatafunctions(fabric_workspace_obj)
-    if _should_publish_item_type("Eventhouse"):
-        log_header(logger, "Publishing Eventhouses")
-        items.publish_eventhouses(fabric_workspace_obj)
-    if _should_publish_item_type("SparkJobDefinition"):
-        log_header(logger, "Publishing Spark Job Definitions")
-        items.publish_sparkjobdefinitions(fabric_workspace_obj)
-    if _should_publish_item_type("Notebook"):
-        log_header(logger, "Publishing Notebooks")
-        items.publish_notebooks(fabric_workspace_obj)
-    if _should_publish_item_type("SemanticModel"):
-        log_header(logger, "Publishing Semantic Models")
-        items.publish_semanticmodels(fabric_workspace_obj)
-    if _should_publish_item_type("Report"):
-        log_header(logger, "Publishing Reports")
-        items.publish_reports(fabric_workspace_obj)
-    if _should_publish_item_type("CopyJob"):
-        log_header(logger, "Publishing Copy Jobs")
-        items.publish_copyjobs(fabric_workspace_obj)
-    if _should_publish_item_type("KQLDatabase"):
-        log_header(logger, "Publishing KQL Databases")
-        items.publish_kqldatabases(fabric_workspace_obj)
-    if _should_publish_item_type("KQLQueryset"):
-        log_header(logger, "Publishing KQL Querysets")
-        items.publish_kqlquerysets(fabric_workspace_obj)
-    if _should_publish_item_type("Reflex"):
-        log_header(logger, "Publishing Activators")
-        items.publish_activators(fabric_workspace_obj)
-    if _should_publish_item_type("Eventstream"):
-        log_header(logger, "Publishing Eventstreams")
-        items.publish_eventstreams(fabric_workspace_obj)
-    if _should_publish_item_type("KQLDashboard"):
-        log_header(logger, "Publishing KQL Dashboards")
-        items.publish_kqldashboard(fabric_workspace_obj)
-    if _should_publish_item_type("Dataflow"):
-        log_header(logger, "Publishing Dataflows")
-        items.publish_dataflows(fabric_workspace_obj)
-    if _should_publish_item_type("DataPipeline"):
-        log_header(logger, "Publishing Data Pipelines")
-        items.publish_datapipelines(fabric_workspace_obj)
-    if _should_publish_item_type("GraphQLApi"):
-        log_header(logger, "Publishing GraphQL APIs")
-        items.publish_graphqlapis(fabric_workspace_obj)
-    if _should_publish_item_type("ApacheAirflowJob"):
-        log_header(logger, "Publishing Apache Airflow Jobs")
-        items.publish_apacheairflowjobs(fabric_workspace_obj)
-    if _should_publish_item_type("MountedDataFactory"):
-        log_header(logger, "Publishing Mounted Data Factories")
-        items.publish_mounteddatafactories(fabric_workspace_obj)
-    if _should_publish_item_type("DataAgent"):
-        log_header(logger, "Publishing Data Agents")
-        items.publish_dataagents(fabric_workspace_obj)
-    if _should_publish_item_type("MLExperiment"):
-        log_header(logger, "Publishing ML Experiments")
-        items.publish_mlexperiments(fabric_workspace_obj)
-
-    # Check Environment Publish
-    if _should_publish_item_type("Environment"):
-        log_header(logger, "Checking Environment Publish State")
-        items.check_environment_publish_state(fabric_workspace_obj)
+    # Check asynchronous publish status for relevant item types
+    for publisher in publishers_with_async_check:
+        log_header(f"Checking {publisher.item_type} Publish State")
+        publisher.post_publish_all_check()
 
     # Return response data if feature flag is enabled and responses were collected
     return (
         fabric_workspace_obj.responses
-        if "enable_response_collection" in constants.FEATURE_FLAG and fabric_workspace_obj.responses
+        if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG and fabric_workspace_obj.responses
         else None
     )
 
@@ -358,102 +262,34 @@ def unpublish_all_orphan_items(
         >>> unpublish_orphaned_items(workspace, items_to_include=items_to_include)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
-
-    is_items_to_include_list = False
-    regex_pattern = check_regex(item_name_exclude_regex)
+    validate_items_to_include(items_to_include, operation=constants.OperationType.UNPUBLISH)
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
     log_header(logger, "Unpublishing Orphaned Items")
 
-    if items_to_include:
-        if (
-            "enable_experimental_features" not in constants.FEATURE_FLAG
-            or "enable_items_to_include" not in constants.FEATURE_FLAG
-        ):
-            msg = "Feature flags 'enable_experimental_features' and 'enable_items_to_include' must be set."
-            raise InputError(msg, logger)
-        logger.warning("Selective unpublish is enabled.")
-        logger.warning(
-            "Using items_to_include is risky as it can prevent needed dependencies from being unpublished.  Use at your own risk."
+    # Build unpublish order based on reversed publish order, scope, and feature flags
+    for item_type in items.ItemPublisher.get_item_types_to_unpublish(fabric_workspace_obj):
+        to_delete_list = items.ItemPublisher.get_orphaned_items(
+            fabric_workspace_obj,
+            item_type,
+            item_name_exclude_regex=item_name_exclude_regex if not items_to_include else None,
+            items_to_include=items_to_include,
         )
-        is_items_to_include_list = True
 
-    # Lakehouses, SQL Databases, and Warehouses can only be unpublished if their feature flags are set
-    unpublish_flag_mapping = {
-        "Lakehouse": "enable_lakehouse_unpublish",
-        "SQLDatabase": "enable_sqldatabase_unpublish",
-        "Warehouse": "enable_warehouse_unpublish",
-        "Eventhouse": "enable_eventhouse_unpublish",
-        "KQLDatabase": "enable_kqldatabase_unpublish",
-    }
-
-    # Define order to unpublish items
-    unpublish_order = []
-    for item_type in [
-        "MLExperiment",
-        "DataAgent",
-        "MountedDataFactory",
-        "ApacheAirflowJob",
-        "GraphQLApi",
-        "DataPipeline",
-        "Dataflow",
-        "KQLDashboard",
-        "Eventstream",
-        "Reflex",
-        "KQLQueryset",
-        "KQLDatabase",
-        "CopyJob",
-        "Report",
-        "SemanticModel",
-        "Notebook",
-        "SparkJobDefinition",
-        "Eventhouse",
-        "UserDataFunction",
-        "Environment",
-        "SQLDatabase",
-        "Lakehouse",
-        "MirroredDatabase",
-        "Warehouse",
-        "VariableLibrary",
-    ]:
-        if item_type in fabric_workspace_obj.item_type_in_scope and item_type in fabric_workspace_obj.deployed_items:
-            unpublish_flag = unpublish_flag_mapping.get(item_type)
-            # Append item_type if no feature flag is required or the corresponding flag is enabled
-            if not unpublish_flag or unpublish_flag in constants.FEATURE_FLAG:
-                unpublish_order.append(item_type)
-            elif unpublish_flag and unpublish_flag not in constants.FEATURE_FLAG:
-                # Log warning when unpublish is skipped due to missing feature flag
-                logger.warning(
-                    f"Skipping unpublish for {item_type} items because the '{unpublish_flag}' feature flag is not enabled."
-                )
-
-    for item_type in unpublish_order:
-        deployed_names = set(fabric_workspace_obj.deployed_items.get(item_type, {}).keys())
-        repository_names = set(fabric_workspace_obj.repository_items.get(item_type, {}).keys())
-
-        to_delete_set = deployed_names - repository_names
-
-        if is_items_to_include_list:
-            to_delete_list = [name for name in to_delete_set if f"{name}.{item_type}" in items_to_include]
+        if items_to_include and to_delete_list:
             logger.debug(f"Items to include for unpublishing ({item_type}): {to_delete_list}")
-        else:
-            to_delete_list = [name for name in to_delete_set if not regex_pattern.match(name)]
 
-        if item_type == "DataPipeline":
-            find_referenced_items_func = items.find_referenced_datapipelines
-
-            # Determine order to delete w/o dependencies
-            to_delete_list = items.set_unpublish_order(
-                fabric_workspace_obj, item_type, to_delete_list, find_referenced_items_func
-            )
+        publisher = items.ItemPublisher.create(ItemType(item_type), fabric_workspace_obj)
+        if to_delete_list and publisher.has_dependency_tracking:
+            to_delete_list = publisher.get_unpublish_order(to_delete_list)
 
         for item_name in to_delete_list:
             fabric_workspace_obj._unpublish_item(item_name=item_name, item_type=item_type)
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_deployed_folders()
-    if "disable_workspace_folder_publish" not in constants.FEATURE_FLAG:
+    if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         fabric_workspace_obj._unpublish_folders()
 
 
@@ -519,8 +355,8 @@ def deploy_with_config(
     """
     # Experimental feature flags required to enable
     if (
-        "enable_experimental_features" not in constants.FEATURE_FLAG
-        or "enable_config_deploy" not in constants.FEATURE_FLAG
+        FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
+        or FeatureFlag.ENABLE_CONFIG_DEPLOY.value not in constants.FEATURE_FLAG
     ):
         msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
         raise InputError(msg, logger)

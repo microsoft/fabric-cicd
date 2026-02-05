@@ -22,7 +22,6 @@ nav:
           - Deployment Variables: example/deployment_variable.md
           - Release Pipelines: example/release_pipeline.md
     - Code Reference: code_reference.md
-    - Contribution: contribution.md
     - Changelog: changelog.md
     - About: about.md
 
@@ -119,6 +118,7 @@ markdown_extensions:
     - md_in_html
     - toc:
           permalink: true
+          toc_depth: 2
     - admonition
     - pymdownx.highlight:
           anchor_linenums: true
