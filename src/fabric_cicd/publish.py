@@ -19,7 +19,7 @@ from fabric_cicd._common._config_utils import (
     load_config_file,
 )
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
-from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
     validate_fabric_workspace_obj,
@@ -190,7 +190,7 @@ def publish_all_items(
     total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
     publishers_with_async_check: list[items.ItemPublisher] = []
     for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
-        print_header(f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
+        log_header(logger, f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
         publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
         publisher.publish_all()
         if publisher.has_async_publish_check:
@@ -198,7 +198,7 @@ def publish_all_items(
 
     # Check asynchronous publish status for relevant item types
     for publisher in publishers_with_async_check:
-        print_header(f"Checking {publisher.item_type} Publish State")
+        log_header(logger, f"Checking {publisher.item_type} Publish State")
         publisher.post_publish_all_check()
 
     # Return response data if feature flag is enabled and responses were collected
@@ -266,7 +266,7 @@ def unpublish_all_orphan_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
-    print_header("Unpublishing Orphaned Items")
+    log_header(logger, "Unpublishing Orphaned Items")
 
     # Build unpublish order based on reversed publish order, scope, and feature flags
     for item_type in items.ItemPublisher.get_item_types_to_unpublish(fabric_workspace_obj):
@@ -361,7 +361,7 @@ def deploy_with_config(
         msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
         raise InputError(msg, logger)
 
-    print_header("Config-Based Deployment")
+    log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
     # Validate environment
