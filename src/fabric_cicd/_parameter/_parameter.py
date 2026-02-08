@@ -167,10 +167,7 @@ class Parameter:
 
                 return True, parameter_dict
 
-        except UnicodeDecodeError as e:
-            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
-            return False, parameter_dict
-        except yaml.YAMLError as e:
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
 
@@ -270,10 +267,7 @@ class Parameter:
             # Use custom loader that detects duplicate keys
             return yaml.load(param_content, Loader=_DuplicateKeyLoader) or {}
 
-        except UnicodeDecodeError as e:
-            logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
-            return {}
-        except yaml.YAMLError as e:
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
             logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
             return {}
 
