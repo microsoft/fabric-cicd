@@ -816,15 +816,26 @@ class _DuplicateKeyLoader(yaml.SafeLoader):
 
 def _check_duplicate_keys_constructor(loader: _DuplicateKeyLoader, node: yaml.MappingNode) -> dict:
     """Constructor that checks for duplicate keys in YAML mappings."""
-    key_counts: dict[str, int] = {}
+    seen_keys: dict[str, list[str]] = {}
     for key_node, _ in node.value:
         key = loader.construct_object(key_node)
-        key_counts[key] = key_counts.get(key, 0) + 1
+        normalized_key = key.lower() if isinstance(key, str) else key
+        if normalized_key not in seen_keys:
+            seen_keys[normalized_key] = []
+        seen_keys[normalized_key].append(str(key))
 
     # Find keys that appear more than once
-    duplicates = {key: count for key, count in key_counts.items() if count > 1}
+    duplicates = {key: variants for key, variants in seen_keys.items() if len(variants) > 1}
     if duplicates:
-        dupe_details = ", ".join(f"'{key}' ({count})" for key, count in duplicates.items())
+        details = []
+        for _, variants in duplicates.items():
+            count = len(variants)
+            unique_variants = set(variants)
+            if len(unique_variants) == 1:
+                details.append(f"'{next(iter(unique_variants))}' ({count})")
+            else:
+                details.append(f"{sorted(unique_variants)} ({count})")
+        dupe_details = ", ".join(details)
         raise yaml.YAMLError(constants.PARAMETER_MSGS["duplicate key"].format(dupe_details))
 
     return loader.construct_mapping(node)

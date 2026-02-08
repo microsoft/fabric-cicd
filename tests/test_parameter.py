@@ -926,17 +926,121 @@ find_replace:
         Path(temp_file_path).unlink()
 
 
-def test_duplicate_keys_nested_duplicate_detected():
-    """Test that duplicate keys within nested mappings are detected by _DuplicateKeyLoader."""
-    import tempfile
-
-    content = """
+@pytest.mark.parametrize(
+    ("content", "duplicate_keys"),
+    [
+        # Duplicate environment key within replace_value
+        (
+            """
 find_replace:
     - find_value: "value1"
       replace_value:
           PPE: "ppe-value1"
           PPE: "ppe-value2"
-"""
+""",
+            ["PPE"],
+        ),
+        # Duplicate find_value within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "first"
+      find_value: "second"
+      replace_value:
+          PPE: "ppe-value"
+""",
+            ["find_value"],
+        ),
+        # Duplicate replace_value within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "first-ppe"
+      replace_value:
+          PPE: "second-ppe"
+""",
+            ["replace_value"],
+        ),
+        # Duplicate optional field (item_type)
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "ppe-value"
+      item_type: "Notebook"
+      item_type: "DataPipeline"
+""",
+            ["item_type"],
+        ),
+        # Case-insensitive duplicate environment key
+        (
+            """
+find_replace:
+    - find_value: "abc"
+      replace_value:
+          PROD: "value1"
+          prod: "value2"
+""",
+            ["prod"],
+        ),
+        # Duplicate item_name within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "ppe-value"
+      item_name: "Notebook1"
+      item_name: "Notebook2"
+""",
+            ["item_name"],
+        ),
+        # Duplicate file_path within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "ppe-value"
+      file_path: "/path/one.py"
+      file_path: "/path/two.py"
+""",
+            ["file_path"],
+        ),
+        # Multiple different duplicate keys in the same entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      find_value: "test-id-2"
+      replace_value:
+          PPE: "first-ppe"
+      replace_value:
+          PPE: "second-ppe"
+      item_type: "Notebook"
+      item_type: "DataPipeline"
+""",
+            ["find_value", "replace_value", "item_type"],
+        ),
+    ],
+    ids=[
+        "duplicate_environment_key",
+        "duplicate_find_value",
+        "duplicate_replace_value",
+        "duplicate_item_type",
+        "case_insensitive_duplicate",
+        "duplicate_item_name",
+        "duplicate_file_path",
+        "multiple_different_duplicate_keys",
+    ],
+)
+def test_duplicate_keys_nested_duplicate_detected(content, duplicate_keys):
+    """Test that duplicate keys within nested mappings are detected by _DuplicateKeyLoader."""
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
         temp_file.write(content)
         temp_file_path = temp_file.name
@@ -948,11 +1052,14 @@ find_replace:
             environment="PPE",
             parameter_file_name=Path(temp_file_path).name,
         )
-        # Duplicate nested keys should fail to load
-        assert not param.environment_parameter, "YAML with duplicate nested keys should not load successfully"
+        # Duplicate keys should fail to load
+        assert not param.environment_parameter, (
+            f"YAML with duplicate '{duplicate_keys}' keys should not load successfully"
+        )
         is_valid, msg = param._validate_parameter_load()
         assert is_valid is False
-        assert "PPE" in msg or "duplicate" in msg.lower()
+        for key in duplicate_keys:
+            assert key.lower() in msg.lower(), f"Expected '{key}' in error message: {msg}"
     finally:
         Path(temp_file_path).unlink()
 
