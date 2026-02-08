@@ -19,7 +19,7 @@ from fabric_cicd._common._check_utils import check_regex, check_valid_json_conte
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _generate_fabric_credential, _is_fabric_runtime
 from fabric_cicd._common._item import Item
-from fabric_cicd._common._logging import print_header
+from fabric_cicd._common._logging import log_header
 from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
@@ -242,7 +242,7 @@ class FabricWorkspace:
         """Load parameters if file is present."""
         from fabric_cicd._parameter._parameter import Parameter
 
-        print_header("Validating Parameter File")
+        log_header(logger, "Validating Parameter File")
 
         # Initialize the parameter dict and Parameter object
         self.environment_parameter = {}
@@ -827,7 +827,7 @@ class FabricWorkspace:
         """Publishes all folders from the repository."""
         # Sort folders by the number of '/' in their paths (ascending order)
         sorted_folders = sorted(self.repository_folders.keys(), key=lambda path: path.count("/"))
-        print_header("Publishing Workspace Folders")
+        log_header(logger, "Publishing Workspace Folders")
         logger.info("Publishing Workspace Folders")
         for folder_path in sorted_folders:
             if folder_path in self.deployed_folders:
