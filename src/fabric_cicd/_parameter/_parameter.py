@@ -814,29 +814,55 @@ class _DuplicateKeyLoader(yaml.SafeLoader):
     pass
 
 
+def _collect_duplicate_key_errors(root_node: yaml.MappingNode, loader: _DuplicateKeyLoader) -> list[str]:
+    """Collect duplicate key errors from all mapping nodes using iterative traversal."""
+    errors: list[str] = []
+    stack = [root_node]
+
+    while stack:
+        node = stack.pop()
+        # Group original key names by their lowercase form
+        seen_keys: dict[str, list[str]] = {}
+
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node)
+            # Case-insensitive comparison (e.g., "PROD" and "prod" are duplicates)
+            normalized_key = key.lower() if isinstance(key, str) else key
+            if normalized_key not in seen_keys:
+                seen_keys[normalized_key] = []
+            seen_keys[normalized_key].append(str(key))
+
+            # Queue child mappings for checking at their own level
+            if isinstance(value_node, yaml.MappingNode):
+                stack.append(value_node)
+            elif isinstance(value_node, yaml.SequenceNode):
+                for item_node in value_node.value:
+                    if isinstance(item_node, yaml.MappingNode):
+                        stack.append(item_node)
+
+        for _, variants in seen_keys.items():
+            if len(variants) > 1:
+                unique_variants = set(variants)
+                count = len(variants)
+                # Show key once if all cases match, otherwise show all variants
+                if len(unique_variants) == 1:
+                    errors.append(f"'{next(iter(unique_variants))}' ({count})")
+                else:
+                    errors.append(f"{sorted(unique_variants)} ({count})")
+
+    return errors
+
+
 def _check_duplicate_keys_constructor(loader: _DuplicateKeyLoader, node: yaml.MappingNode) -> dict:
     """Constructor that checks for duplicate keys in YAML mappings."""
-    seen_keys: dict[str, list[str]] = {}
-    for key_node, _ in node.value:
-        key = loader.construct_object(key_node)
-        normalized_key = key.lower() if isinstance(key, str) else key
-        if normalized_key not in seen_keys:
-            seen_keys[normalized_key] = []
-        seen_keys[normalized_key].append(str(key))
+    # Run full traversal only from the root node; inner nodes skip to avoid redundant checks
+    if not getattr(loader, "_root_checked", False):
+        loader._root_checked = True
+        errors = _collect_duplicate_key_errors(node, loader)
 
-    # Find keys that appear more than once
-    duplicates = {key: variants for key, variants in seen_keys.items() if len(variants) > 1}
-    if duplicates:
-        details = []
-        for _, variants in duplicates.items():
-            count = len(variants)
-            unique_variants = set(variants)
-            if len(unique_variants) == 1:
-                details.append(f"'{next(iter(unique_variants))}' ({count})")
-            else:
-                details.append(f"{sorted(unique_variants)} ({count})")
-        dupe_details = ", ".join(details)
-        raise yaml.YAMLError(constants.PARAMETER_MSGS["duplicate key"].format(dupe_details))
+        if errors:
+            dupe_details = ", ".join(errors)
+            raise yaml.YAMLError(constants.PARAMETER_MSGS["duplicate key"].format(dupe_details))
 
     return loader.construct_mapping(node)
 
