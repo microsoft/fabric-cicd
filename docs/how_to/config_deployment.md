@@ -27,8 +27,6 @@ deploy_with_config(
 )
 ```
 
-**IMPORTANT:** Configuration-based deployment is currently an experimental feature and requires feature flags `enable_experimental_features` and `enable_config_deploy` to be set.
-
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional capabilities or a [bug report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml) for issues.
 
 ## Configuration File Setup
