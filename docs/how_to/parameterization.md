@@ -189,6 +189,7 @@ semantic_model_binding:
 
 - The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
 - Connection ID values must be valid GUIDs.
+- **Only a single connection binding per Semantic Model is currently supported.** If your Semantic Model uses multiple connections (e.g., connecting to both a SQL database and a Lakehouse), only one can be configured through `semantic_model_binding`. Additional connections must be configured manually after deployment.
 
 ## Advanced Find and Replace
 

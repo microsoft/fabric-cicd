@@ -368,6 +368,7 @@ def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) 
 def process_environment_key(environment: str, replace_value_dict: dict) -> dict:
     """Processes the replace_value dictionary to replace the '_ALL_' environment key with the target environment when present."""
     # If there's only one key, check if it's "_ALL_" (case insensitive) and replace it
+    # Note: When other env keys are present with _ALL_, upstream parameter validation fails
     if len(replace_value_dict) == 1:
         key = next(iter(replace_value_dict))
         if key.lower() == "_all_":

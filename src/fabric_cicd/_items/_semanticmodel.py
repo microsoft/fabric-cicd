@@ -90,7 +90,7 @@ def build_binding_mapping(
     default_config = semantic_model_binding.get("default", {})
     if default_config:
         connection_id_config = default_config.get("connection_id", {})
-        connection_id_config = process_environment_key(fabric_workspace_obj, connection_id_config)
+        connection_id_config = process_environment_key(environment, connection_id_config)
         default_connection_id = connection_id_config.get(environment)
         if not default_connection_id:
             logger.debug(f"Environment '{environment}' not found in default.connection_id")
@@ -106,7 +106,7 @@ def build_binding_mapping(
         if isinstance(model_names, str):
             model_names = [model_names]
 
-        connection_id_config = process_environment_key(fabric_workspace_obj, connection_id_config)
+        connection_id_config = process_environment_key(environment, connection_id_config)
         connection_id = connection_id_config.get(environment)
         if not connection_id:
             logger.debug(f"Environment '{environment}' not found in connection_id for semantic model(s): {model_names}")
