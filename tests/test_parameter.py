@@ -807,7 +807,7 @@ find_replace:
         assert not param.environment_parameter, "YAML with duplicate keys should not load successfully"
         is_valid, msg = param._validate_parameter_load()
         assert is_valid is False
-        assert "find_replace" in msg.lower() or "duplicate" in msg.lower()
+        assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in msg.lower()
     finally:
         Path(temp_file_path).unlink()
 
@@ -826,7 +826,7 @@ def test_duplicate_keys_single_duplicate(repository_directory, item_type_in_scop
 
     is_valid, _msg = param_obj._validate_parameter_load()
     assert is_valid is False
-    assert "find_replace" in _msg.lower() or "duplicate" in _msg.lower()
+    assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in _msg.lower()
 
 
 def test_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_scope, target_environment):
@@ -843,8 +843,7 @@ def test_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_s
 
     is_valid, _msg = param_obj._validate_parameter_load()
     assert is_valid is False
-    # At least one of the duplicate keys should be mentioned
-    assert "find_replace" in _msg.lower() or "spark_pool" in _msg.lower() or "duplicate" in _msg.lower()
+    assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in _msg.lower()
 
 
 def test_duplicate_keys_no_duplicates(parameter_object):
@@ -1078,7 +1077,7 @@ def test_duplicate_keys_triple_occurrence(repository_directory, item_type_in_sco
 
     is_valid, msg = param_obj._validate_parameter_load()
     assert is_valid is False
-    assert "find_replace" in msg.lower() or "duplicate" in msg.lower()
+    assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in msg.lower()
 
 
 def test_validate_parameter_file_structure(repository_directory, item_type_in_scope, target_environment):
