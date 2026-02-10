@@ -1,0 +1,8 @@
+kind: optimization
+body: Enable configuration-based deployment without feature flags
+time: 2026-02-10T12:04:25.4279663+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "805"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/805
