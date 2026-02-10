@@ -1,5 +1,5 @@
 kind: optimization
-body: Enable config deployment without feature flags
+body: Enable configuration-based deployment without feature flags
 time: 2026-02-10T12:04:25.4279663+02:00
 custom:
     Author: shirasassoon
