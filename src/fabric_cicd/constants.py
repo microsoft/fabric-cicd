@@ -229,7 +229,6 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
-INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
 INVALID_REPLACE_VALUE_SPARK_POOL = {
     "missing key": "The '{}' environment dict in spark_pool must contain a 'type' and a 'name' key",
     "missing value": "The '{}' environment in spark_pool is missing a value for '{}' key",
@@ -243,9 +242,10 @@ PARAMETER_MSGS = {
     "found": f"Found {PARAMETER_FILE_NAME} file",
     "not found": "Parameter file not found with path: {}",
     "not set": "Parameter file path is not set",
-    "invalid content": INVALID_YAML,
+    "empty yaml": "YAML content is empty",
+    "duplicate key": "duplicate key(s) found: {}",
     "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
-    "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "{}",
+    "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "'{}'",
     "invalid structure": "Invalid parameter file structure",
     "valid structure": "Parameter file structure is valid",
     "invalid name": "Invalid parameter name '{}' found in the parameter file",

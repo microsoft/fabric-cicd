@@ -150,20 +150,24 @@ class Parameter:
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
-                validation_errors = self._validate_yaml_content(yaml_content)
-                if validation_errors:
-                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(validation_errors)
+
+                # Check for empty YAML content
+                if not yaml_content.strip():
+                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(
+                        constants.PARAMETER_MSGS["empty yaml"]
+                    )
                     return False, parameter_dict
 
-                parameter_dict = yaml.full_load(yaml_content) or {}
+                # Use custom loader that detects duplicate keys
+                parameter_dict = yaml.load(yaml_content, Loader=_DuplicateKeyLoader) or {}
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
 
-                # Process template parameter files if present
                 if parameter_dict.get("extend"):
                     parameter_dict = self._process_template_parameters(parameter_dict)
 
                 return True, parameter_dict
-        except yaml.YAMLError as e:
+
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
 
@@ -251,18 +255,19 @@ class Parameter:
                 param_content = param_file.read()
                 param_content = replace_variables_in_parameter_file(param_content)
 
-                # Validate the content
-                param_validation_errors = self._validate_yaml_content(param_content)
-                if param_validation_errors:
+                # Check for empty YAML content
+                if not param_content.strip():
                     logger.error(
-                        constants.PARAMETER_MSGS["template_file_invalid"].format(file_path, param_validation_errors)
+                        constants.PARAMETER_MSGS["template_file_invalid"].format(
+                            file_path, constants.PARAMETER_MSGS["empty yaml"]
+                        )
                     )
                     return {}
 
-                # Load the content
-                return yaml.full_load(param_content) or {}
+            # Use custom loader that detects duplicate keys
+            return yaml.load(param_content, Loader=_DuplicateKeyLoader) or {}
 
-        except yaml.YAMLError as e:
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
             logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
             return {}
 
@@ -300,40 +305,6 @@ class Parameter:
                 logger.debug(f"Type mismatch for key '{key}': creating list of values for validation")
 
         return result
-
-    def _validate_yaml_content(self, content: str) -> list[str]:
-        """Validate the yaml content of the parameter file."""
-        errors = []
-        msgs = constants.PARAMETER_MSGS["invalid content"]
-
-        # Check for empty YAML content
-        if content.strip() == "":
-            errors.append("YAML content is empty")
-            return errors
-
-        # Regex patterns to match all valid UTF-8 characters
-        utf8_pattern = r"""
-        (
-        [\x00-\x7F] # Single-byte sequences (ASCII)
-        | [\xC2-\xDF][\x80-\xBF] # Two-byte sequences
-        | [\xE0][\xA0-\xBF][\x80-\xBF] # Three-byte sequences (special case)
-        | [\xE1-\xEC][\x80-\xBF]{2} # Three-byte sequences
-        | [\xED][\x80-\x9F][\x80-\xBF] # Three-byte sequences (special case)
-        | [\xEE-\xEF][\x80-\xBF]{2} # Three-byte sequences
-        | [\xF0][\x90-\xBF][\x80-\xBF]{2} # Four-byte sequences (special case)
-        | [\xF1-\xF3][\x80-\xBF]{3} # Four-byte sequences
-        | [\xF4][\x80-\x8F][\x80-\xBF]{2} # Four-byte sequences (special case)
-        )
-        """
-
-        # Compile the pattern with the re.VERBOSE flag to allow comments and whitespace
-        compiled_utf8_pattern = re.compile(utf8_pattern, re.VERBOSE)
-
-        # Check for invalid characters (non-UTF-8)
-        if not re.match(compiled_utf8_pattern, content):
-            errors.append(msgs["char"])
-
-        return errors
 
     def _validate_parameter_load(self) -> tuple[bool, str]:
         """Validate the parameter file load."""
@@ -1010,3 +981,65 @@ class Parameter:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
+
+
+class _DuplicateKeyLoader(yaml.SafeLoader):
+    """Custom YAML loader that raises an error on duplicate keys."""
+
+    pass
+
+
+def _collect_duplicate_key_errors(root_node: yaml.MappingNode, loader: _DuplicateKeyLoader) -> list[str]:
+    """Collect duplicate key errors from all mapping nodes using iterative traversal."""
+    errors: list[str] = []
+    stack = [root_node]
+
+    while stack:
+        node = stack.pop()
+        # Group original key names by their lowercase form
+        seen_keys: dict[str, list[str]] = {}
+
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node)
+            # Case-insensitive comparison (e.g., "PROD" and "prod" are duplicates)
+            normalized_key = key.lower() if isinstance(key, str) else key
+            if normalized_key not in seen_keys:
+                seen_keys[normalized_key] = []
+            seen_keys[normalized_key].append(str(key))
+
+            # Queue child mappings for checking at their own level
+            if isinstance(value_node, yaml.MappingNode):
+                stack.append(value_node)
+            elif isinstance(value_node, yaml.SequenceNode):
+                for item_node in value_node.value:
+                    if isinstance(item_node, yaml.MappingNode):
+                        stack.append(item_node)
+
+        for _, variants in seen_keys.items():
+            if len(variants) > 1:
+                unique_variants = set(variants)
+                count = len(variants)
+                # Show key once if all cases match, otherwise show all variants
+                if len(unique_variants) == 1:
+                    errors.append(f"'{next(iter(unique_variants))}' ({count})")
+                else:
+                    errors.append(f"{sorted(unique_variants)} ({count})")
+
+    return errors
+
+
+def _check_duplicate_keys_constructor(loader: _DuplicateKeyLoader, node: yaml.MappingNode) -> dict:
+    """Constructor that checks for duplicate keys in YAML mappings."""
+    # Run full traversal only from the root node; inner nodes skip to avoid redundant checks
+    if not getattr(loader, "_root_checked", False):
+        loader._root_checked = True
+        errors = _collect_duplicate_key_errors(node, loader)
+
+        if errors:
+            dupe_details = ", ".join(errors)
+            raise yaml.YAMLError(constants.PARAMETER_MSGS["duplicate key"].format(dupe_details))
+
+    return loader.construct_mapping(node)
+
+
+_DuplicateKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _check_duplicate_keys_constructor)

@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix duplicate YAML key detection in parameter validation
+time: 2026-02-04T10:30:56.491775+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "752"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/752
