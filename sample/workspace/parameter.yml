@@ -126,17 +126,7 @@ spark_pool:
       # Optional field:
       item_name:
       
-# Deprecation notice: 'gateway_binding' will not be supported in future releases.
-gateway_binding:
-    - gateway_id: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
-      dataset_name: "gateway_sm2"
-
-# Deprecation notice: Legacy format will not be supported in future releases.
-semantic_model_binding:
-    - connection_id: "76e05dfe-9855-4e3d-a410-1dda048dbe99"
-      semantic_model_name: ["cloudconnections", "MySemanticModel_ADLS_Gen2"]
-
-# New format (recommended): Supports default connections and per-item overrides
+# Supports default connections and per-item overrides (single connection only per model)
 semantic_model_binding:
     default:
         connection_id:
