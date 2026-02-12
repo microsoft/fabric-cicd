@@ -25,7 +25,6 @@ Support for this **PROJECT or PRODUCT** is limited to the resources listed above
 **Found a bug or have a suggestion?**
 
 - [Report an issue](https://github.com/microsoft/fabric-cicd/issues)
-- [Request a feature](https://github.com/microsoft/fabric-cicd/discussions)
 - [Share feedback via Microsoft Form](https://forms.office.com/r/uhL6b6tNsi)
 - [Submit ideas to Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
 
