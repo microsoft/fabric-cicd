@@ -2933,3 +2933,106 @@ def test_semantic_model_binding_legacy_format_mixed_with_new_keys(empty_paramete
     ok, msg = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
     assert ok is False
     assert "mixed format" in msg.lower()
+
+
+@pytest.mark.parametrize(
+    ("param_value", "is_new_format", "expected_duplicates"),
+    [
+        # New format: duplicate name triggers warning
+        (
+            {
+                "default": {"connection_id": {"PPE": "00000000-0000-0000-0000-000000000001"}},
+                "models": [
+                    {"semantic_model_name": "ModelA", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000002"}},
+                    {"semantic_model_name": "ModelA", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000003"}},
+                ],
+            },
+            True,
+            {"ModelA"},
+        ),
+        # New format: no duplicates, no warning
+        (
+            {
+                "default": {"connection_id": {"PPE": "00000000-0000-0000-0000-000000000001"}},
+                "models": [
+                    {"semantic_model_name": "ModelA", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000002"}},
+                    {"semantic_model_name": "ModelB", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000003"}},
+                ],
+            },
+            True,
+            set(),
+        ),
+        # Legacy format: duplicate name triggers warning
+        (
+            [
+                {"semantic_model_name": "ModelA", "connection_id": "00000000-0000-0000-0000-000000000001"},
+                {"semantic_model_name": "ModelA", "connection_id": "00000000-0000-0000-0000-000000000002"},
+            ],
+            False,
+            {"ModelA"},
+        ),
+        # Legacy format: no duplicates, no warning
+        (
+            [
+                {"semantic_model_name": "ModelA", "connection_id": "00000000-0000-0000-0000-000000000001"},
+                {"semantic_model_name": "ModelB", "connection_id": "00000000-0000-0000-0000-000000000002"},
+            ],
+            False,
+            set(),
+        ),
+        # New format: duplicate within a list value
+        (
+            {
+                "default": {"connection_id": {"PPE": "00000000-0000-0000-0000-000000000001"}},
+                "models": [
+                    {
+                        "semantic_model_name": ["ModelA", "ModelA"],
+                        "connection_id": {"PPE": "00000000-0000-0000-0000-000000000002"},
+                    },
+                ],
+            },
+            True,
+            {"ModelA"},
+        ),
+        # Legacy format: duplicate across list values in different entries
+        (
+            [
+                {"semantic_model_name": ["ModelA", "ModelB"], "connection_id": "00000000-0000-0000-0000-000000000001"},
+                {"semantic_model_name": ["ModelB", "ModelC"], "connection_id": "00000000-0000-0000-0000-000000000002"},
+            ],
+            False,
+            {"ModelB"},
+        ),
+    ],
+    ids=[
+        "new_format_duplicate",
+        "new_format_no_duplicate",
+        "legacy_duplicate",
+        "legacy_no_duplicate",
+        "new_format_duplicate_within_list",
+        "legacy_duplicate_across_lists",
+    ],
+)
+def test_check_duplicate_semantic_model_names(empty_parameter, param_value, is_new_format, expected_duplicates, caplog):
+    """Test that _check_duplicate_semantic_model_names warns on duplicate names."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        empty_parameter._check_duplicate_semantic_model_names(param_value, is_new_format)
+
+    if expected_duplicates:
+        expected_msg = constants.PARAMETER_MSGS["duplicate_semantic_model"].format(
+            ", ".join(sorted(expected_duplicates))
+        )
+        assert expected_msg in caplog.messages, (
+            f"Expected warning message not found.\nExpected: {expected_msg}\nActual messages: {caplog.messages}"
+        )
+        # Verify exactly one warning was logged
+        duplicate_warnings = [m for m in caplog.messages if "Duplicate semantic model names found" in m]
+        assert len(duplicate_warnings) == 1, (
+            f"Expected exactly 1 duplicate warning, found {len(duplicate_warnings)}: {duplicate_warnings}"
+        )
+    else:
+        assert not any("Duplicate semantic model names found" in m for m in caplog.messages), (
+            f"Unexpected duplicate warning found in messages: {caplog.messages}"
+        )
