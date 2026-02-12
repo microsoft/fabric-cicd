@@ -19,3 +19,24 @@ Support for this **PROJECT or PRODUCT** is limited to the resources listed above
 ## License
 
 {% include "../LICENSE" %}
+
+## Get help
+
+**Found a bug or have a suggestion?**
+
+- [Report an issue](https://github.com/microsoft/fabric-cicd/issues)
+- [Request a feature](https://github.com/microsoft/fabric-cicd/discussions)
+- [Share feedback via Microsoft Form](https://forms.office.com/r/uhL6b6tNsi)
+- [Submit ideas to Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
+
+**Need help using the CLI?**
+
+- See [Troubleshooting](./how-to/troubleshooting.md) for common problems and solutions
+- Ask questions in [GitHub Discussions](https://github.com/microsoft/fabric-cicd/discussions)
+- Connect with the community on [r/MicrosoftFabric](https://www.reddit.com/r/MicrosoftFabric/)
+- Join the [Microsoft Developer Community](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
+
+**Need enterprise assistance?**
+
+- Contact your Microsoft account manager
+- Open a ticket with the [Fabric Support Team](https://support.fabric.microsoft.com/)
