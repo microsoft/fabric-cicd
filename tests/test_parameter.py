@@ -3032,6 +3032,10 @@ def test_check_duplicate_semantic_model_names(empty_parameter, param_value, is_n
         assert len(duplicate_warnings) == 1, (
             f"Expected exactly 1 duplicate warning, found {len(duplicate_warnings)}: {duplicate_warnings}"
         )
+        # Verify duplicates produce a warning but do not cause validation failure
+        empty_parameter.environment_parameter = {"semantic_model_binding": param_value}
+        ok, _ = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
+        assert ok is True, "Duplicate semantic model names should warn but not fail validation"
     else:
         assert not any("Duplicate semantic model names found" in m for m in caplog.messages), (
             f"Unexpected duplicate warning found in messages: {caplog.messages}"
