@@ -476,6 +476,31 @@ def test_handle_response_item_display_name_already_in_use(setup_mocks, monkeypat
     assert dl.messages == [expected]
 
 
+def test_handle_response_item_display_name_already_in_use_permanent(setup_mocks):
+    """
+    Test _handle_response raises an exception when item display name is already in use (permanent conflict).
+
+    This error code indicates the item already exists in the workspace, not a temporary reservation.
+    """
+    _, _mock_requests = setup_mocks
+    response = Mock(
+        status_code=400,
+        headers={"x-ms-public-api-error-code": "ItemDisplayNameAlreadyInUse", "Content-Type": "application/json"},
+        text='{"message": "Requested \'Test Item\' is already in use."}',
+    )
+    response.json.return_value = {"message": "Requested 'Test Item' is already in use."}
+
+    with pytest.raises(Exception, match="already exists in the workspace"):
+        _handle_response(
+            response=response,
+            method="POST",
+            url="http://example.com/items",
+            body="{}",
+            long_running=False,
+            iteration_count=1,
+        )
+
+
 def test_handle_response_environment_libraries_not_found(setup_mocks):
     """Test _handle_response exits loop when environment libraries are not found (404)."""
     _, _mock_requests = setup_mocks
