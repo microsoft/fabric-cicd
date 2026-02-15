@@ -7,7 +7,7 @@ import os
 from enum import Enum
 
 # General
-VERSION = "0.1.34"
+VERSION = "0.2.0"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
