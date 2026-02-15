@@ -1,8 +1,0 @@
-kind: added
-body: Add support for semantic model binding per environment
-time: 2026-02-10T10:55:59.3192978+02:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "689"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/689
