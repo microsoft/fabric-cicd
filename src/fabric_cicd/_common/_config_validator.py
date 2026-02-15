@@ -690,13 +690,16 @@ class ConfigValidator:
         # Validate exclude_regex if present
         if "exclude_regex" in section:
             exclude_regex = section["exclude_regex"]
+
             if isinstance(exclude_regex, str):
                 if not exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(f"{section_name}.exclude_regex")
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(
+                            f"{section_name}.exclude_regex"
+                        )
                     )
                 else:
-                    self._validate_regex(exclude_regex, section_name)
+                    self._validate_regex(exclude_regex, f"{section_name}.exclude_regex")
 
             elif isinstance(exclude_regex, dict):
                 # Validate environment mapping
@@ -705,15 +708,8 @@ class ConfigValidator:
 
                 # Validate each environment's regex pattern
                 for env, regex_pattern in exclude_regex.items():
-                    if not regex_pattern.strip():
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
-                                f"{section_name}.exclude_regex.{env}"
-                            )
-                        )
-                        continue
-
                     self._validate_regex(regex_pattern, f"{section_name}.exclude_regex.{env}")
+
             else:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
@@ -728,7 +724,7 @@ class ConfigValidator:
             if isinstance(items, list):
                 if not items:
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_list"].format(
                             f"{section_name}.items_to_include"
                         )
                     )
@@ -742,18 +738,13 @@ class ConfigValidator:
 
                 # Validate each environment's items list
                 for env, items_list in items.items():
-                    if not items_list:
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format(
-                                f"{section_name}.items_to_include.{env}"
-                            )
-                        )
-                        continue
                     self._validate_items_list(items_list, f"{section_name}.items_to_include.{env}")
 
             else:
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["field"]["item_types_list_or_dict"].format(type(items).__name__)
+                    constants.CONFIG_VALIDATION_MSGS["field"]["list_or_dict"].format(
+                        f"{section_name}.items_to_include", type(items).__name__
+                    )
                 )
 
         # Validate folder_exclude_regex if present (publish only)
@@ -769,7 +760,7 @@ class ConfigValidator:
             if isinstance(folder_exclude_regex, str):
                 if not folder_exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(
                             f"{section_name}.folder_exclude_regex"
                         )
                     )
@@ -785,19 +776,48 @@ class ConfigValidator:
 
                 # Validate each environment's regex pattern
                 for env, regex_pattern in folder_exclude_regex.items():
-                    if not regex_pattern.strip():
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
-                                f"{section_name}.folder_exclude_regex.{env}"
-                            )
-                        )
-                        continue
-
                     self._validate_regex(regex_pattern, f"{section_name}.folder_exclude_regex.{env}")
+
             else:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
                         f"{section_name}.folder_exclude_regex", type(folder_exclude_regex).__name__
+                    )
+                )
+
+        # Validate folder_path_to_include if present (publish only)
+        if "folder_path_to_include" in section:
+            if section_name != "publish":
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unsupported_field"].format(
+                        "folder_path_to_include", section_name
+                    )
+                )
+
+            folders = section["folder_path_to_include"]
+            if isinstance(folders, list):
+                if not folders:
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_list"].format(
+                            f"{section_name}.folder_path_to_include"
+                        )
+                    )
+                else:
+                    self._validate_folders_list(folders, f"{section_name}.folder_path_to_include")
+
+            elif isinstance(folders, dict):
+                # Validate environment mapping
+                if not self._validate_environment_mapping(folders, f"{section_name}.folder_path_to_include", list):
+                    return
+
+                # Validate each environment's folders list
+                for env, folders_list in folders.items():
+                    self._validate_folders_list(folders_list, f"{section_name}.folder_path_to_include.{env}")
+
+            else:
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["list_or_dict"].format(
+                        f"{section_name}.folder_path_to_include", type(folders).__name__
                     )
                 )
 
@@ -812,7 +832,7 @@ class ConfigValidator:
             if isinstance(shortcut_exclude_regex, str):
                 if not shortcut_exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(
                             f"{section_name}.shortcut_exclude_regex"
                         )
                     )
@@ -828,15 +848,8 @@ class ConfigValidator:
 
                 # Validate each environment's regex pattern
                 for env, regex_pattern in shortcut_exclude_regex.items():
-                    if not regex_pattern.strip():
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
-                                f"{section_name}.shortcut_exclude_regex.{env}"
-                            )
-                        )
-                        continue
-
                     self._validate_regex(regex_pattern, f"{section_name}.shortcut_exclude_regex.{env}")
+
             else:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
@@ -878,12 +891,28 @@ class ConfigValidator:
         for i, item in enumerate(items_list):
             if not isinstance(item, str):
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_type"].format(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
                         context, i, type(item).__name__
                     )
                 )
             elif not item.strip():
-                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(context, i))
+
+    def _validate_folders_list(self, folders_list: list, context: str) -> None:
+        """Validate a list of folder paths with proper context for error messages."""
+        for i, folder in enumerate(folders_list):
+            if not isinstance(folder, str):
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
+                        context, i, type(folder).__name__
+                    )
+                )
+            elif not folder.strip():
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(context, i))
+            elif not folder.startswith("/"):
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["folders_list_prefix"].format(context, i, folder)
+                )
 
     def _validate_features_section(self, features: any) -> None:
         """Validate features section."""
@@ -919,12 +948,12 @@ class ConfigValidator:
         for i, feature in enumerate(features_list):
             if not isinstance(feature, str):
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_type"].format(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
                         context, i, type(feature).__name__
                     )
                 )
             elif not feature.strip():
-                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(context, i))
 
     def _validate_constants_section(self, constants_section: any) -> None:
         """Validate constants section."""
@@ -989,6 +1018,7 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
         # Publish section fields - optional (debug if missing)
         (config.get("publish", {}), "exclude_regex", "publish.exclude_regex", False, False),
         (config.get("publish", {}), "folder_exclude_regex", "publish.folder_exclude_regex", False, False),
+        (config.get("publish", {}), "folder_path_to_include", "publish.folder_path_to_include", False, False),
         (config.get("publish", {}), "shortcut_exclude_regex", "publish.shortcut_exclude_regex", False, False),
         (config.get("publish", {}), "items_to_include", "publish.items_to_include", False, False),
         (config.get("publish", {}), "skip", "publish.skip", False, False),
