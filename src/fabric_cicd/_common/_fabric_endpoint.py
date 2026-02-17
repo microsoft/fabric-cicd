@@ -293,7 +293,7 @@ def _handle_response(
         msg = f"The executing identity is not authorized to call {method} on '{url}'."
         raise Exception(msg)
 
-    # Handle item name conflicts
+    # Handle item name conflicts (temporarily reserved)
     elif (
         response.status_code == 400
         and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameNotAvailableYet"
@@ -306,6 +306,16 @@ def _handle_response(
             response_retry_after=constants.RETRY_AFTER_SECONDS,
             prepend_message="Item name is reserved.",
         )
+
+    # Handle item name already exists (permanent conflict - item exists in workspace)
+    elif (
+        response.status_code == 400
+        and response.headers.get("x-ms-public-api-error-code") == "ItemDisplayNameAlreadyInUse"
+    ):
+        response_json = response.json() if response.text else {}
+        item_name = response_json.get("message", "").replace("Requested '", "").split("'")[0] if response_json else ""
+        msg = f"Item '{item_name}' already exists in the workspace but was not found during initial scan. "
+        raise Exception(msg)
 
     # Handle scenario where library removed from environment before being removed from repo
     elif response.status_code == 400 and "is not present in the environment." in response.json().get(
