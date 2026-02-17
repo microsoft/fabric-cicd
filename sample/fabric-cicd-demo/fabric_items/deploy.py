@@ -4,7 +4,7 @@ from fabric_cicd import FabricWorkspace, publish_all_items  # 👈 import the fu
 repo_dir = Path(__file__).resolve().parent  # ...\fabric_items
 
 workspace = FabricWorkspace(
-    workspace_id="<YOUR_WORKSPACE_ID>",
+    workspace_id="<YOUR_WORKSPACE_ID>",  # Replace with your Fabric workspace ID (found in the workspace URL). See Microsoft Fabric docs for details.
     repository_directory=str(repo_dir),
     # environment="DEV",  # optional, but required if you use parameter replacement via parameter.yml
     # item_type_in_scope=["Notebook", "DataPipeline", "Environment"],  # optional scope
