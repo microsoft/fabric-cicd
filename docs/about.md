@@ -14,17 +14,16 @@
 
 ## Get help
 
-This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issues) to track bugs, feature requests, and questions. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your [bug](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md), [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml), or [question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml) as a new Issue.
+This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issues) to track bugs, feature requests, and questions. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your [bug](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml), [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml), or [question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml) as a new Issue.
 
 **Found a bug or have a suggestion?**
 
-- [Report an issue](https://github.com/microsoft/fabric-cicd/issues)
+- [Raise a GitHub issue](https://github.com/microsoft/fabric-cicd/issues)
 - [Submit ideas to Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
 
 **Need help using the fabric-cicd library?**
 
 - See [Troubleshooting](../docs/how_to/troubleshooting.md) for common problems and solutions
-- Ask questions in [GitHub Discussions](https://github.com/microsoft/fabric-cicd/discussions)
 - Connect with the community on [r/MicrosoftFabric](https://www.reddit.com/r/MicrosoftFabric/)
 - Join the [Microsoft Developer Community](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
 
