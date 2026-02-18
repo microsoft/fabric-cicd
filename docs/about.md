@@ -23,7 +23,6 @@ This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issue
 
 **Need help using the fabric-cicd library?**
 
-- See [Troubleshooting](../docs/how_to/troubleshooting.md) for common problems and solutions
 - Connect with the community on [r/MicrosoftFabric](https://www.reddit.com/r/MicrosoftFabric/)
 - Join the [Microsoft Developer Community](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
 
