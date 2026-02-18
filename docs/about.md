@@ -14,7 +14,7 @@
 
 ## Get help
 
-This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issues) to track bugs, feature requests, and questions. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your [bug](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml), [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml), or [question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml) as a new Issue.
+This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issues) to track bugs, feature requests, and questions. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your [bug](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml), [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml), or [question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml) as a new issue.
 
 **Found a bug or have a suggestion?**
 
