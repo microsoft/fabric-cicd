@@ -583,6 +583,113 @@ def test_folder_exclusion_with_regex(mock_endpoint):
                 constants.FEATURE_FLAG.update(original_flags)
 
 
+def test_folder_exclusion_with_anchored_regex(mock_endpoint):
+    """Test that excluding a parent folder with an anchored regex also excludes
+    items in child folders, preserving consistent hierarchy behavior."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create item directly under /legacy (should be excluded - direct match)
+        legacy_notebook_dir = temp_path / "legacy" / "LegacyNotebook.Notebook"
+        legacy_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_notebook_platform = legacy_notebook_dir / ".platform"
+        legacy_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "LegacyNotebook",
+                "description": "Legacy notebook in excluded parent folder",
+            },
+            "config": {"logicalId": "legacy-notebook-id"},
+        }
+
+        with legacy_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(legacy_notebook_metadata, f)
+
+        with (legacy_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create item in /legacy/archived (should also be excluded - ancestor excluded)
+        archived_notebook_dir = temp_path / "legacy" / "archived" / "ArchivedNotebook.Notebook"
+        archived_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        archived_notebook_platform = archived_notebook_dir / ".platform"
+        archived_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "ArchivedNotebook",
+                "description": "Notebook in child folder of excluded parent - should also be excluded",
+            },
+            "config": {"logicalId": "archived-notebook-id"},
+        }
+
+        with archived_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(archived_notebook_metadata, f)
+
+        with (archived_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create item in /current (should NOT be excluded)
+        current_notebook_dir = temp_path / "current" / "CurrentNotebook.Notebook"
+        current_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        current_notebook_platform = current_notebook_dir / ".platform"
+        current_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "CurrentNotebook",
+                "description": "Current notebook to be included",
+            },
+            "config": {"logicalId": "current-notebook-id"},
+        }
+
+        with current_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(current_notebook_metadata, f)
+
+        with (current_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook"],
+                )
+
+                # Use an anchored regex that only matches /legacy exactly,
+                # NOT /legacy/archived directly. The ancestor walk logic should
+                # still exclude /legacy/archived because its parent /legacy is excluded.
+                exclude_regex = r"^/legacy$"
+                publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
+
+                # Direct match: /legacy is excluded
+                assert workspace.repository_items["Notebook"]["LegacyNotebook"].skip_publish is True
+
+                # Ancestor excluded: /legacy/archived is excluded because /legacy matches
+                assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is True
+
+                # Unrelated folder: /current is NOT excluded
+                assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
+
+            finally:
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
+
+
 def test_item_name_exclusion_still_works(mock_endpoint):
     """Test that existing item name exclusion still works with the new folder exclusion feature."""
 
@@ -743,7 +850,7 @@ def test_legacy_folder_exclusion_example(mock_endpoint):
                 )
 
                 # Test: Exclude all items in 'legacy' folder using the folder path regex pattern
-                exclude_regex = r"^legacy/"  # Match items that start with 'legacy/'
+                exclude_regex = r"^/legacy"  # Match items that start with '/legacy'
                 publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
 
                 # Verify that legacy items were excluded
@@ -755,5 +862,337 @@ def test_legacy_folder_exclusion_example(mock_endpoint):
 
             finally:
                 # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_folder_inclusion_with_folder_path_to_include(mock_endpoint):
+    """Test that folder_path_to_include only filters items found within a Fabric folder.
+    Root-level items (not located within any subfolder) are always published,
+    as folder inclusion can only apply to items that reside inside a folder.
+    Items in ancestor folders of included paths are excluded even though the
+    ancestor folder itself is created to preserve hierarchy.
+    When an ancestor folder is explicitly included, its items are also published."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create items in 'active' folder (should be included via folder_path_to_include)
+        active_notebook_dir = temp_path / "active" / "ActiveNotebook.Notebook"
+        active_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        active_notebook_platform = active_notebook_dir / ".platform"
+        active_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "ActiveNotebook",
+                "description": "Active notebook to be included",
+            },
+            "config": {"logicalId": "active-notebook-id"},
+        }
+
+        with active_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(active_notebook_metadata, f)
+
+        with (active_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        active_model_dir = temp_path / "active" / "ActiveModel.SemanticModel"
+        active_model_dir.mkdir(parents=True, exist_ok=True)
+
+        active_model_platform = active_model_dir / ".platform"
+        active_model_metadata = {
+            "metadata": {
+                "type": "SemanticModel",
+                "displayName": "ActiveModel",
+                "description": "Active semantic model to be included",
+            },
+            "config": {"logicalId": "active-model-id"},
+        }
+
+        with active_model_platform.open("w", encoding="utf-8") as f:
+            json.dump(active_model_metadata, f)
+
+        with (active_model_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create items in 'archive' folder (should be excluded - folder not in inclusion list)
+        archive_notebook_dir = temp_path / "archive" / "ArchivedNotebook.Notebook"
+        archive_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        archive_notebook_platform = archive_notebook_dir / ".platform"
+        archive_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "ArchivedNotebook",
+                "description": "Archived notebook to be excluded",
+            },
+            "config": {"logicalId": "archived-notebook-id"},
+        }
+
+        with archive_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(archive_notebook_metadata, f)
+
+        with (archive_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create root-level item (not inside any folder - always published)
+        root_notebook_dir = temp_path / "RootNotebook.Notebook"
+        root_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        root_notebook_platform = root_notebook_dir / ".platform"
+        root_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "RootNotebook",
+                "description": "Root level notebook - always published regardless of folder inclusion",
+            },
+            "config": {"logicalId": "root-notebook-id"},
+        }
+
+        with root_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(root_notebook_metadata, f)
+
+        with (root_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create nested folder structure: /projects/team1/NestedNotebook.Notebook
+        # Only /projects/team1 is in the include list (not /projects), so:
+        #   - /projects folder is created (ancestor) but items directly under it are excluded
+        #   - /projects/team1 items are included
+        projects_notebook_dir = temp_path / "projects" / "ProjectNotebook.Notebook"
+        projects_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        projects_notebook_platform = projects_notebook_dir / ".platform"
+        projects_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "ProjectNotebook",
+                "description": "Item directly under ancestor folder - should be excluded",
+            },
+            "config": {"logicalId": "projects-notebook-id"},
+        }
+
+        with projects_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(projects_notebook_metadata, f)
+
+        with (projects_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        nested_notebook_dir = temp_path / "projects" / "team1" / "NestedNotebook.Notebook"
+        nested_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        nested_notebook_platform = nested_notebook_dir / ".platform"
+        nested_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "NestedNotebook",
+                "description": "Notebook in nested included folder",
+            },
+            "config": {"logicalId": "nested-notebook-id"},
+        }
+
+        with nested_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(nested_notebook_metadata, f)
+
+        with (nested_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        # Create structure where ancestor IS in the include list: /dept/eng/EngNotebook.Notebook
+        # Both /dept and /dept/eng are in the include list, so items under both should be published
+        dept_notebook_dir = temp_path / "dept" / "DeptNotebook.Notebook"
+        dept_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        dept_notebook_platform = dept_notebook_dir / ".platform"
+        dept_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "DeptNotebook",
+                "description": "Item under explicitly included ancestor folder - should be published",
+            },
+            "config": {"logicalId": "dept-notebook-id"},
+        }
+
+        with dept_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(dept_notebook_metadata, f)
+
+        with (dept_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        eng_notebook_dir = temp_path / "dept" / "eng" / "EngNotebook.Notebook"
+        eng_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        eng_notebook_platform = eng_notebook_dir / ".platform"
+        eng_notebook_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "EngNotebook",
+                "description": "Item in nested folder under explicitly included ancestor",
+            },
+            "config": {"logicalId": "eng-notebook-id"},
+        }
+
+        with eng_notebook_platform.open("w", encoding="utf-8") as f:
+            json.dump(eng_notebook_metadata, f)
+
+        with (eng_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            # Enable experimental feature flags for folder inclusion
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_include_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook", "SemanticModel"],
+                )
+
+                # Test: Include items in 'active', 'projects/team1', 'dept', and 'dept/eng' folders
+                publish.publish_all_items(
+                    workspace,
+                    folder_path_to_include=["/active", "/projects/team1", "/dept", "/dept/eng"],
+                )
+
+                # Verify that repository_items are populated correctly
+                assert "Notebook" in workspace.repository_items
+                assert "SemanticModel" in workspace.repository_items
+
+                # Check that items in the included folder are published (skip_publish = False)
+                assert workspace.repository_items["Notebook"]["ActiveNotebook"].skip_publish is False
+                assert workspace.repository_items["SemanticModel"]["ActiveModel"].skip_publish is False
+
+                # Check that items in a non-included folder are excluded (skip_publish = True)
+                assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is True
+
+                # Root-level items are not located within any Fabric folder, so
+                # folder_path_to_include does not apply to them. They are always
+                # published regardless of the folder inclusion filter.
+                assert workspace.repository_items["Notebook"]["RootNotebook"].skip_publish is False
+
+                # Nested folder: items in the included nested path are published
+                assert workspace.repository_items["Notebook"]["NestedNotebook"].skip_publish is False
+
+                # Ancestor folder: /projects is NOT in the include list (only /projects/team1 is),
+                # so items directly under /projects are excluded
+                assert workspace.repository_items["Notebook"]["ProjectNotebook"].skip_publish is True
+
+                # Explicitly included ancestor: /dept IS in the include list,
+                # so items directly under /dept are published
+                assert workspace.repository_items["Notebook"]["DeptNotebook"].skip_publish is False
+
+                # Nested folder under explicitly included ancestor: /dept/eng is also
+                # in the include list, so its items are published too
+                assert workspace.repository_items["Notebook"]["EngNotebook"].skip_publish is False
+
+            finally:
+                # Restore original feature flags
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_folder_inclusion_and_exclusion_together(mock_endpoint):
+    """Test that using both folder_path_to_include and folder_path_exclude_regex raises InputError."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create a minimal item so the workspace can be initialized
+        deploy_notebook_dir = temp_path / "deploy" / "DeployNotebook.Notebook"
+        deploy_notebook_dir.mkdir(parents=True, exist_ok=True)
+
+        deploy_platform = deploy_notebook_dir / ".platform"
+        deploy_metadata = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": "DeployNotebook",
+                "description": "Notebook in included folder",
+            },
+            "config": {"logicalId": "deploy-notebook-id"},
+        }
+
+        with deploy_platform.open("w", encoding="utf-8") as f:
+            json.dump(deploy_metadata, f)
+
+        with (deploy_notebook_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_include_folder")
+            constants.FEATURE_FLAG.add("enable_exclude_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook"],
+                )
+
+                with pytest.raises(
+                    InputError,
+                    match="Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include'",
+                ):
+                    publish.publish_all_items(
+                        workspace,
+                        folder_path_to_include=["/deploy"],
+                        folder_path_exclude_regex=r"^/deploy/legacy",
+                    )
+
+            finally:
+                constants.FEATURE_FLAG.clear()
+                constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_empty_folder_path_to_include_raises_error(mock_endpoint):
+    """Test that passing an empty list for folder_path_to_include raises an InputError."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+        ):
+            original_flags = constants.FEATURE_FLAG.copy()
+            constants.FEATURE_FLAG.add("enable_experimental_features")
+            constants.FEATURE_FLAG.add("enable_include_folder")
+
+            try:
+                workspace = FabricWorkspace(
+                    workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                    repository_directory=str(temp_path),
+                    item_type_in_scope=["Notebook"],
+                )
+
+                with pytest.raises(InputError, match="folder_path_to_include must not be an empty list"):
+                    publish.publish_all_items(workspace, folder_path_to_include=[])
+
+            finally:
                 constants.FEATURE_FLAG.clear()
                 constants.FEATURE_FLAG.update(original_flags)

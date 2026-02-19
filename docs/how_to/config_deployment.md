@@ -33,7 +33,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 The configuration file includes several sections with configurable settings for different aspects of the deployment process.
 
-**Note**: Configuration values can be specified in two ways: as a single value (applied to any environment provided) or as an environment mapping. Both approaches can be used within the same configuration file - for example, using environment mappings for workspace IDs while keeping a single value for repository directory.
+**Note**: Configuration values can be specified in two ways: as a single value (applied to any target environment provided) or as an environment mapping. Both approaches can be used within the same configuration file - for example, using environment mappings for workspace IDs while keeping a single value for repository directory.
 
 ### Core Settings
 
@@ -115,18 +115,33 @@ core:
 
 `publish` is optional and can be used to control item publishing behavior. It includes various optional settings to enable/disable publishing operations or selectively publish items.
 
+**Note:** Folder-level filtering only applies to items within a Fabric folder. Folder paths must start with `/` (e.g., `/folder_name` or `/folder_name/nested_folder`). `folder_exclude_regex` and `folder_path_to_include` are **mutually exclusive** — providing both for the same environment will result in a validation error.
+
+When using `folder_exclude_regex`, the pattern is matched using `search()` (substring match), so a pattern like `subfolder1` will match any folder path containing "subfolder1" (e.g., `/subfolder1`, `/subfolder1/subfolder2`, `/other/subfolder1`). To target a specific folder, use an anchored pattern with a leading `/` (e.g., `^/subfolder1$`) — this ensures only the exact folder path matches directly. Note that child folders like `/subfolder1/subfolder2` will also be excluded automatically since their parent folder was excluded, preserving a consistent folder hierarchy.
+
+When using `folder_path_to_include` with nested paths (e.g., `/subfolder1/subfolder2`), ancestor folders (e.g., `/subfolder1`) are automatically created to preserve the correct folder hierarchy, but items directly under the ancestor folder are **not** published unless the ancestor folder is also explicitly included in the list.
+
 ```yaml
 publish:
     # Optional - pattern to exclude items from publishing
     exclude_regex: <regex_pattern_string>
 
-    # Optional - pattern to exclude items in specific folders from publishing
+    # Optional - pattern to exclude specific folder paths with items from publishing (requires feature flags)
     folder_exclude_regex: <regex_pattern_string>
+
+    # Optional - specific folder paths with items to publish (requires feature flags)
+    folder_path_to_include:
+        - </subfolder_1>
+        - </subfolder_2>
+        - </subfolder_2/subfolder_3> # publish items found in nested folder - subfolder_3
 
     # Optional - specific items to publish (requires feature flags)
     items_to_include:
         - <item_name.item_type_1>
         - <item_name.item_type..>
+
+    # Optional - pattern to exclude Lakehouse shortcuts from publishing (requires feature flags)
+    shortcut_exclude_regex: <regex_pattern_string>
 
     # Optional - control publishing by environment
     skip: <bool_value>
@@ -141,15 +156,32 @@ publish:
         <env_1>: <regex_pattern_string_1>
         <env..>: <regex_pattern_string..>
 
-    # Optional - pattern to exclude items in specific folders from publishing
+    # Optional - pattern to exclude specific folder paths with items from publishing (requires feature flags)
     folder_exclude_regex:
         <env_1>: <regex_pattern_string_1>
         <env..>: <regex_pattern_string..>
 
+    # Optional - specific folder paths with items to publish (requires feature flags)
+    folder_path_to_include:
+        <env_1>:
+            - </subfolder_1>
+            - </subfolder_2/subfolder_3>
+        <env..>:
+            - </subfolder_1>
+
     # Optional - specific items to publish (requires feature flags)
     items_to_include:
-        - <item_name.item_type_1>
-        - <item_name.item_type..>
+        <env_1>:
+            - <item_name.item_type_1>
+            - <item_name.item_type..>
+        <env..>:
+            - <item_name.item_type_1>
+            - <item_name.item_type..>
+
+    # Optional - pattern to exclude Lakehouse Shortcuts from publishing (requires feature flags)
+    shortcut_exclude_regex:
+        <env_1>: <regex_pattern_string_1>
+        <env..>: <regex_pattern_string..>
 
     # Optional - control publishing by environment
     skip:
@@ -188,7 +220,9 @@ unpublish:
     items_to_include:
         <env_1>:
             - <item_name.item_type_1>
+            - <item_name.item_type..>
         <env..>:
+            - <item_name.item_type_1>
             - <item_name.item_type..>
 
     # Optional - control unpublishing by environment
@@ -215,7 +249,9 @@ features:
 features:
     <env_1>:
         - <feature_flag_1>
+        - <feature_flag..>
     <env..>:
+        - <feature_flag_1>
         - <feature_flag..>
 ```
 
@@ -262,6 +298,7 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `publish.exclude_regex`                 | ❌       | Debug logged, setting skipped   |
 | `publish.folder_exclude_regex`          | ❌       | Debug logged, setting skipped   |
 | `publish.shortcut_exclude_regex`        | ❌       | Debug logged, setting skipped   |
+| `publish.folder_path_to_include`        | ❌       | Debug logged, setting skipped   |
 | `publish.items_to_include`              | ❌       | Debug logged, setting skipped   |
 | `publish.skip`                          | ❌       | Defaults to `False`             |
 | `unpublish.exclude_regex`               | ❌       | Debug logged, setting skipped   |
@@ -285,7 +322,7 @@ core:
 publish:
     # Only exclude legacy folders in prod environment
     folder_exclude_regex:
-        prod: "^legacy_.*"
+        prod: "^/legacy_.*"
         # dev and test not specified - no folder exclusion applied
 
     # Skip publish in dev, run in test and prod
@@ -298,7 +335,7 @@ In this example:
 
 - Deploying to `dev`: No folder exclusion applied, `skip` = `true`
 - Deploying to `test`: No folder exclusion applied, `skip` = `false`
-- Deploying to `prod`: `folder_exclude_regex` = `"^legacy_.*"`, `skip` = `false`
+- Deploying to `prod`: `folder_exclude_regex` = `"^/legacy_.*"`, `skip` = `false`
 
 ### Logging Behavior
 
@@ -347,11 +384,21 @@ publish:
     # Don't publish items matching this pattern
     exclude_regex: "^DONT_DEPLOY.*"
 
-    folder_exclude_regex: "^DONT_DEPLOY_FOLDER/"
+    # Use folder_exclude_regex OR folder_path_to_include, not both for the same environment
+    folder_exclude_regex:
+        dev: "^/DONT_DEPLOY_FOLDER"
+
+    folder_path_to_include:
+        prod:
+            - "/DEPLOY_FOLDER"
+            - "/DEPLOY_FOLDER/DEPLOY_NESTED_FOLDER"
 
     items_to_include:
         - "Hello World.Notebook"
         - "Run Hello World.DataPipeline"
+
+    shortcut_exclude_regex:
+        test: "^temp_.*"
 
     skip:
         dev: true
@@ -371,6 +418,9 @@ features:
     - enable_shortcut_publish
     - enable_experimental_features
     - enable_items_to_include
+    - enable_exclude_folder
+    - enable_include_folder
+    - enable_shortcut_exclude
 
 constants:
     DEFAULT_API_ROOT_URL: "https://api.fabric.microsoft.com"

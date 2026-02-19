@@ -123,6 +123,8 @@ class FeatureFlag(str, Enum):
     """Set to enable selective publishing/unpublishing of items."""
     ENABLE_EXCLUDE_FOLDER = "enable_exclude_folder"
     """Set to enable folder-based exclusion during publish operations."""
+    ENABLE_INCLUDE_FOLDER = "enable_include_folder"
+    """Set to enable folder-based inclusion during publish operations."""
     ENABLE_SHORTCUT_EXCLUDE = "enable_shortcut_exclude"
     """Set to enable selective publishing of shortcuts in a Lakehouse."""
     ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
@@ -322,7 +324,14 @@ CONFIG_SECTIONS = {
     },
     "publish": {
         "type": dict,
-        "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "shortcut_exclude_regex", "skip"],
+        "settings": [
+            "exclude_regex",
+            "folder_exclude_regex",
+            "folder_path_to_include",
+            "items_to_include",
+            "shortcut_exclude_regex",
+            "skip",
+        ],
     },
     "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
     "features": {"type": (list, dict), "settings": []},
@@ -372,6 +381,7 @@ CONFIG_VALIDATION_MSGS = {
     # Field validation
     "field": {
         "string_or_dict": "'{}' must be either a string or environment mapping dictionary (e.g., {{dev: 'dev_value', prod: 'prod_value'}}), got type {}",
+        "list_or_dict": "'{}' must be either a list or environment mapping dictionary (e.g., {{dev: ['dev_value1', 'dev_value2'], prod: ['prod_value']}}), got type {}",
         "empty_value": "'{}' cannot be empty",
         "empty_list": "'{}' cannot be empty if specified",
         "invalid_guid": "'{}' must be a valid GUID format: {}",
@@ -393,15 +403,21 @@ CONFIG_VALIDATION_MSGS = {
     },
     # Operation section validation
     "operation": {
+        "unsupported_field": "'{}' field is not supported in '{}' section",
         "not_dict": "'{}' section must be a dictionary, got {}",
         "invalid_regex": "'{}' in {} is not a valid regex pattern: {}",
-        "items_list_type": "'{}[{}]' must be a string, got {}",
-        "items_list_empty": "'{}[{}]' cannot be empty",
+        "empty_string": "'{}' cannot be an empty string",
+        "empty_list": "'{}' cannot be an empty list",
+        "list_entry_type": "'{}[{}]' must be a string, got {}",
+        "list_entry_empty": "'{}[{}]' cannot be an empty string",
         "features_type": "'features' section must be either a list or environment mapping dictionary, got {}",
         "empty_section": "'{}' section cannot be empty if specified",
         "empty_section_env": "'{}.{}' cannot be empty if specified",
         "invalid_constant_key": "Constant key in '{}' must be a non-empty string, got: {}",
         "unknown_constant": "Unknown constant '{}' in '{}' - this constant does not exist in fabric_cicd.constants",
+        "folders_list_prefix": "'{}[{}]' entry must start with '/' (got '{}')",
+        "mutually_exclusive": "Cannot specify both '{}' and '{}'. Choose one filtering strategy.",
+        "mutually_exclusive_env": "Cannot specify both '{}' and '{}' for the same environment(s): {}. Choose one filtering strategy per environment.",
     },
     # Log messages
     "log": {
