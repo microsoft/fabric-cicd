@@ -7,7 +7,7 @@ import os
 from enum import Enum
 
 # General
-VERSION = "0.1.34"
+VERSION = "0.2.0"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
@@ -125,8 +125,6 @@ class FeatureFlag(str, Enum):
     """Set to enable folder-based exclusion during publish operations."""
     ENABLE_SHORTCUT_EXCLUDE = "enable_shortcut_exclude"
     """Set to enable selective publishing of shortcuts in a Lakehouse."""
-    ENABLE_CONFIG_DEPLOY = "enable_config_deploy"
-    """Set to enable config file-based deployment."""
     ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
     """Set to enable collection of API responses during publish operations."""
     DISABLE_PRINT_IDENTITY = "disable_print_identity"
@@ -231,7 +229,6 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
-INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
 INVALID_REPLACE_VALUE_SPARK_POOL = {
     "missing key": "The '{}' environment dict in spark_pool must contain a 'type' and a 'name' key",
     "missing value": "The '{}' environment in spark_pool is missing a value for '{}' key",
@@ -245,9 +242,10 @@ PARAMETER_MSGS = {
     "found": f"Found {PARAMETER_FILE_NAME} file",
     "not found": "Parameter file not found with path: {}",
     "not set": "Parameter file path is not set",
-    "invalid content": INVALID_YAML,
+    "empty yaml": "YAML content is empty",
+    "duplicate key": "duplicate key(s) found: {}",
     "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
-    "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "{}",
+    "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "'{}'",
     "invalid structure": "Invalid parameter file structure",
     "valid structure": "Parameter file structure is valid",
     "invalid name": "Invalid parameter name '{}' found in the parameter file",
@@ -256,6 +254,7 @@ PARAMETER_MSGS = {
     "missing key": "{} is missing keys",
     "invalid key": "{} contains invalid keys",
     "valid keys": "{} contains valid keys",
+    "mixed format": "Parameter '{}' contains mixed format keys (legacy and new format cannot be combined)",
     "missing required value": "Missing value for '{}' key in {}",
     "valid required values": "Required values in {} are valid",
     "missing replace value": "{} is missing a replace value for '{}' environment'",
@@ -287,7 +286,7 @@ PARAMETER_MSGS = {
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
     "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
-    "duplicate_semantic_model": "Duplicate semantic model names found: {}. Multiple connections to the same semantic model are permitted. Ensure this is intentional.",
+    "duplicate_semantic_model": "Duplicate semantic model names found: {}. Each semantic model should only appear once in the configuration as only one connection can be bound per semantic model. Please remove duplicate entries to avoid unpredictable binding behavior.",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",

@@ -18,7 +18,7 @@ from fabric_cicd._common._config_utils import (
     extract_workspace_settings,
     load_config_file,
 )
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
@@ -353,14 +353,6 @@ def deploy_with_config(
         ...     }
         ... )
     """
-    # Experimental feature flags required to enable
-    if (
-        FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG
-        or FeatureFlag.ENABLE_CONFIG_DEPLOY.value not in constants.FEATURE_FLAG
-    ):
-        msg = "Config file-based deployment is currently an experimental feature. Both 'enable_experimental_features' and 'enable_config_deploy' feature flags must be set."
-        raise InputError(msg, logger)
-
     log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 

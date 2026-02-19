@@ -249,6 +249,63 @@ SAMPLE_PLATFORM_FILE = """
 
 SAMPLE_NOTEBOOK_FILE = "print('Hello World and replace connection string: db52be81-c2b2-4261-84fa-840c67f4bbd0')"
 
+SAMPLE_PARAMETER_FILE_DUPLICATE_KEYS = """
+find_replace:
+    - find_value: "first-value"
+      replace_value:
+          PPE: "first-ppe"
+          PROD: "first-prod"
+
+find_replace:
+    - find_value: "second-value"
+      replace_value:
+          PPE: "second-ppe"
+          PROD: "second-prod"
+"""
+
+SAMPLE_PARAMETER_FILE_MULTIPLE_DUPLICATE_KEYS = """
+find_replace:
+    - find_value: "first-value"
+      replace_value:
+          PPE: "first-ppe"
+
+spark_pool:
+    - instance_pool_id: "pool-1"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool1"
+
+find_replace:
+    - find_value: "second-value"
+      replace_value:
+          PPE: "second-ppe"
+
+spark_pool:
+    - instance_pool_id: "pool-2"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool2"
+"""
+
+SAMPLE_PARAMETER_FILE_TRIPLE_DUPLICATE_KEY = """
+find_replace:
+    - find_value: "first-value"
+      replace_value:
+          PPE: "first-ppe"
+
+find_replace:
+    - find_value: "second-value"
+      replace_value:
+          PPE: "second-ppe"
+
+find_replace:
+    - find_value: "third-value"
+      replace_value:
+          PPE: "third-ppe"
+"""
+
 
 @pytest.fixture
 def item_type_in_scope():
@@ -297,6 +354,16 @@ def repository_directory(tmp_path):
 
     invalid_parameter_file_path8 = workspace_dir / "invalid_is_regex_parameter.yml"
     invalid_parameter_file_path8.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX)
+
+    # Create duplicate keys parameter files
+    duplicate_keys_file = workspace_dir / "duplicate_keys_parameter.yml"
+    duplicate_keys_file.write_text(SAMPLE_PARAMETER_FILE_DUPLICATE_KEYS)
+
+    multiple_duplicate_keys_file = workspace_dir / "multiple_duplicate_keys_parameter.yml"
+    multiple_duplicate_keys_file.write_text(SAMPLE_PARAMETER_FILE_MULTIPLE_DUPLICATE_KEYS)
+
+    triple_duplicate_key_file = workspace_dir / "triple_duplicate_key_parameter.yml"
+    triple_duplicate_key_file.write_text(SAMPLE_PARAMETER_FILE_TRIPLE_DUPLICATE_KEY)
 
     # Create the sample parameter file with ALL environment key
     all_env_parameter_file_path = workspace_dir / "all_env_parameter.yml"
@@ -649,15 +716,368 @@ def test_validate_data_type(parameter_object):
     )
 
 
-def test_validate_yaml_content(parameter_object):
-    """Test the validation of the YAML content"""
-    invalid_content = "\n\n\n\t"
-    assert parameter_object._validate_yaml_content(invalid_content) == ["YAML content is empty"]
+def test_validate_yaml_content_empty():
+    """Test that empty YAML content is handled correctly."""
+    import tempfile
 
-    invalid_content = "\U0001f600"
-    assert parameter_object._validate_yaml_content(invalid_content) == [
-        constants.PARAMETER_MSGS["invalid content"]["char"]
-    ]
+    # Test empty content - create a temp file with empty content
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("\n\n\n\t")
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Empty content should fail to load
+        assert not param.environment_parameter, "Empty YAML should not load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False
+        assert constants.PARAMETER_MSGS["empty yaml"] in msg
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_utf8_validation_at_file_read():
+    """Test that Python validates UTF-8 encoding when reading parameter files."""
+    import tempfile
+
+    # Create a file with invalid UTF-8 bytes
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".yml", delete=False) as temp_file:
+        # Write valid YAML structure with invalid UTF-8 byte sequence
+        temp_file.write(b"find_replace:\n  - find_value: 'invalid \x80\x81\x82 bytes'\n")
+        temp_file_path = temp_file.name
+
+    try:
+        # Parameter creation should succeed but loading should fail gracefully
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+
+        # Parameter should fail to load due to invalid UTF-8
+        assert not param.environment_parameter, "Invalid UTF-8 file should not load successfully"
+
+        # Verify that validation reports the file as invalid
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False, "Parameter load should fail for invalid UTF-8"
+
+        # Verify the error message uses the constant format with UnicodeDecodeError details
+        assert constants.PARAMETER_MSGS["invalid load"].split("{}")[0] in msg, (
+            f"Error message should use 'invalid load' constant format: {msg}"
+        )
+        # UnicodeDecodeError message contains 'utf-8' and 'decode'
+        assert "utf-8" in msg.lower(), f"Error message should contain UTF-8 details: {msg}"
+
+    finally:
+        # Clean up temporary file
+        Path(temp_file_path).unlink()
+
+
+def test_validate_yaml_content_duplicate_keys():
+    """Test that duplicate keys are detected via _DuplicateKeyLoader."""
+    import tempfile
+
+    # Test duplicate key detection - create a temp file with duplicate keys
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write("""find_replace:
+    - find_value: "first"
+      replace_value:
+          TEST: "first-value"
+find_replace:
+    - find_value: "second"
+      replace_value:
+          TEST: "second-value"
+""")
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Duplicate keys should fail to load
+        assert not param.environment_parameter, "YAML with duplicate keys should not load successfully"
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False
+        assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in msg.lower()
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_single_duplicate(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of a single duplicate root-level key via _DuplicateKeyLoader."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="duplicate_keys_parameter.yml",
+    )
+
+    # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
+    assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
+
+    is_valid, _msg = param_obj._validate_parameter_load()
+    assert is_valid is False
+    assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in _msg.lower()
+
+
+def test_duplicate_keys_multiple_duplicates(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of multiple duplicate root-level keys via _DuplicateKeyLoader."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="multiple_duplicate_keys_parameter.yml",
+    )
+
+    # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
+    assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
+
+    is_valid, _msg = param_obj._validate_parameter_load()
+    assert is_valid is False
+    assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in _msg.lower()
+
+
+def test_duplicate_keys_no_duplicates(parameter_object):
+    """Test that valid YAML with no duplicate keys passes."""
+    # parameter_object fixture uses a valid parameter file without duplicates
+    assert parameter_object.environment_parameter, "Valid YAML should load successfully"
+
+    is_valid, _msg = parameter_object._validate_parameter_load()
+    assert is_valid is True
+
+
+def test_duplicate_keys_ignores_comments():
+    """Test that comment lines starting with # are ignored."""
+    import tempfile
+
+    content = """
+# This is a comment
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+# Another comment
+# find_replace: this should be ignored
+spark_pool:
+    - instance_pool_id: "pool-id"
+      replace_value:
+          PPE:
+              type: "Capacity"
+              name: "Pool"
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write(content)
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Valid YAML with comments should load successfully
+        assert param.environment_parameter, "Valid YAML with comments should load successfully"
+        is_valid, _msg = param._validate_parameter_load()
+        assert is_valid is True
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_nested_keys_not_flagged():
+    """Test that nested keys (indented) are not flagged as root-level duplicates."""
+    import tempfile
+
+    content = """
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value"
+    - find_value: "value2"
+      replace_value:
+          PPE: "ppe-value2"
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write(content)
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Valid YAML with nested repeated keys should load successfully
+        assert param.environment_parameter, "Valid YAML with nested keys should load successfully"
+        is_valid, _msg = param._validate_parameter_load()
+        assert is_valid is True
+    finally:
+        Path(temp_file_path).unlink()
+
+
+@pytest.mark.parametrize(
+    ("content", "duplicate_keys"),
+    [
+        # Duplicate environment key within replace_value
+        (
+            """
+find_replace:
+    - find_value: "value1"
+      replace_value:
+          PPE: "ppe-value1"
+          PPE: "ppe-value2"
+""",
+            ["PPE"],
+        ),
+        # Duplicate find_value within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "first"
+      find_value: "second"
+      replace_value:
+          PPE: "ppe-value"
+""",
+            ["find_value"],
+        ),
+        # Duplicate replace_value within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "first-ppe"
+      replace_value:
+          PPE: "second-ppe"
+""",
+            ["replace_value"],
+        ),
+        # Duplicate optional field (item_type)
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "ppe-value"
+      item_type: "Notebook"
+      item_type: "DataPipeline"
+""",
+            ["item_type"],
+        ),
+        # Case-insensitive duplicate environment key
+        (
+            """
+find_replace:
+    - find_value: "abc"
+      replace_value:
+          PROD: "value1"
+          prod: "value2"
+""",
+            ["prod"],
+        ),
+        # Duplicate item_name within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "ppe-value"
+      item_name: "Notebook1"
+      item_name: "Notebook2"
+""",
+            ["item_name"],
+        ),
+        # Duplicate file_path within a single list entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      replace_value:
+          PPE: "ppe-value"
+      file_path: "/path/one.py"
+      file_path: "/path/two.py"
+""",
+            ["file_path"],
+        ),
+        # Multiple different duplicate keys in the same entry
+        (
+            """
+find_replace:
+    - find_value: "test-id"
+      find_value: "test-id-2"
+      replace_value:
+          PPE: "first-ppe"
+      replace_value:
+          PPE: "second-ppe"
+      item_type: "Notebook"
+      item_type: "DataPipeline"
+""",
+            ["find_value", "replace_value", "item_type"],
+        ),
+    ],
+    ids=[
+        "duplicate_environment_key",
+        "duplicate_find_value",
+        "duplicate_replace_value",
+        "duplicate_item_type",
+        "case_insensitive_duplicate",
+        "duplicate_item_name",
+        "duplicate_file_path",
+        "multiple_different_duplicate_keys",
+    ],
+)
+def test_duplicate_keys_nested_duplicate_detected(content, duplicate_keys):
+    """Test that duplicate keys within nested mappings are detected by _DuplicateKeyLoader."""
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
+        temp_file.write(content)
+        temp_file_path = temp_file.name
+
+    try:
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        # Duplicate keys should fail to load
+        assert not param.environment_parameter, (
+            f"YAML with duplicate '{duplicate_keys}' keys should not load successfully"
+        )
+        is_valid, msg = param._validate_parameter_load()
+        assert is_valid is False
+        for key in duplicate_keys:
+            assert key.lower() in msg.lower(), f"Expected '{key}' in error message: {msg}"
+    finally:
+        Path(temp_file_path).unlink()
+
+
+def test_duplicate_keys_triple_occurrence(repository_directory, item_type_in_scope, target_environment):
+    """Test detection of a key appearing more than twice via _DuplicateKeyLoader."""
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name="triple_duplicate_key_parameter.yml",
+    )
+
+    # Duplicate keys should fail to load - _DuplicateKeyLoader catches them during yaml.load()
+    assert not param_obj.environment_parameter, "YAML with duplicate keys should not load successfully"
+
+    is_valid, msg = param_obj._validate_parameter_load()
+    assert is_valid is False
+    assert constants.PARAMETER_MSGS["duplicate key"].split("{}")[0].lower() in msg.lower()
 
 
 def test_validate_parameter_file_structure(repository_directory, item_type_in_scope, target_environment):
@@ -1691,6 +2111,48 @@ def test_template_merge_validation(tmp_path):
     assert param._validate_parameter_file() == False
 
 
+def test_template_duplicate_keys_detected(tmp_path):
+    """Test that duplicate keys in template files are detected by _DuplicateKeyLoader."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    templates_dir = repo_dir / "templates"
+    templates_dir.mkdir()
+
+    # Create base parameter file
+    base_file = repo_dir / "parameter.yml"
+    base_content = """
+extend:
+  - ./templates/duplicate_template.yml
+find_replace:
+  - find_value: "base-id"
+    replace_value:
+      DEV: "dev-base"
+"""
+    base_file.write_text(base_content)
+
+    # Create template file with duplicate keys
+    template_file = templates_dir / "duplicate_template.yml"
+    template_content = """
+find_replace:
+  - find_value: "template-id"
+    replace_value:
+      DEV: "dev-template"
+find_replace:
+  - find_value: "duplicate-template-id"
+    replace_value:
+      DEV: "dev-duplicate"
+"""
+    template_file.write_text(template_content)
+
+    # Initialize parameter object
+    param = Parameter(repository_directory=repo_dir, item_type_in_scope=["Notebook"], environment="DEV")
+
+    # Template with duplicate keys should be skipped, only base content should remain
+    assert "extend" not in param.environment_parameter
+    assert len(param.environment_parameter["find_replace"]) == 1
+    assert param.environment_parameter["find_replace"][0]["find_value"] == "base-id"
+
+
 def test_circular_template_reference(tmp_path):
     """Test handling of circular template references."""
     repo_dir = tmp_path / "repo"
@@ -2186,3 +2648,395 @@ config:
     data = yaml.safe_load(yaml_str)
     matches = parse(param["find_key"]).find(data)
     assert len(matches) == 0
+
+
+@pytest.mark.parametrize(
+    ("param_value", "expected_ok", "expected_msg_contains"),
+    [
+        # ===== Legacy format tests =====
+        pytest.param(
+            [{"connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99", "semantic_model_name": ["model1", "model2"]}],
+            True,
+            "parameter is valid",
+            id="legacy_string_connection_id",
+        ),
+        pytest.param(
+            [
+                {
+                    "connection_id": {
+                        "PPE": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+                        "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+                    },
+                    "semantic_model_name": ["model1", "model2"],
+                }
+            ],
+            False,
+            "must be a string guid",
+            id="legacy_dict_connection_id_not_supported",
+        ),
+        pytest.param(
+            [
+                {
+                    "connection_id": "invalid-guid-format",
+                    "semantic_model_name": ["model1"],
+                }
+            ],
+            False,
+            "not a valid guid",
+            id="legacy_invalid_guid",
+        ),
+        pytest.param(
+            [
+                {
+                    "connection_id": 12345,
+                    "semantic_model_name": ["model1"],
+                }
+            ],
+            False,
+            "must be a string guid",
+            id="legacy_connection_id_not_string",
+        ),
+        pytest.param(
+            [{"connection_id": "", "semantic_model_name": ["model1"]}],
+            False,
+            "missing value",
+            id="legacy_empty_connection_id",
+        ),
+        pytest.param(
+            [
+                {
+                    "connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+                    "semantic_model_name": "Model1",
+                    "default": "x",
+                }
+            ],
+            False,
+            "mixed format",
+            id="legacy_mixed_with_new_keys",
+        ),
+        # ===== New format tests =====
+        pytest.param(
+            {"default": {"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}},
+            True,
+            "parameter is valid",
+            id="new_default_only",
+        ),
+        pytest.param(
+            {
+                "models": [
+                    {"semantic_model_name": "MyModel", "connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}
+                ]
+            },
+            True,
+            "parameter is valid",
+            id="new_models_only",
+        ),
+        pytest.param(
+            {
+                "default": {"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}},
+                "models": [
+                    {
+                        "semantic_model_name": ["Model1", "Model2"],
+                        "connection_id": {
+                            "DEV": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+                            "PROD": "b2c3d4e5-6789-0abc-def1-234567890abc",
+                        },
+                    }
+                ],
+            },
+            True,
+            "parameter is valid",
+            id="new_default_and_models",
+        ),
+        pytest.param(
+            {},
+            False,
+            "requires 'default' or 'models'",
+            id="new_empty_dict",
+        ),
+        pytest.param(
+            {"default": {"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}, "invalid_key": "x"},
+            False,
+            "invalid key",
+            id="new_invalid_key",
+        ),
+        pytest.param(
+            {"default": "not-a-dict"},
+            False,
+            "dictionary",
+            id="new_default_not_dict",
+        ),
+        pytest.param(
+            {"default": {"some_key": "value"}},
+            False,
+            "connection_id",
+            id="new_default_missing_connection_id",
+        ),
+        pytest.param(
+            {"models": []},
+            False,
+            "non-empty list",
+            id="new_models_empty_list",
+        ),
+        pytest.param(
+            {"models": "not-a-list"},
+            False,
+            "non-empty list",
+            id="new_models_not_list",
+        ),
+        pytest.param(
+            {"models": ["not-a-dict"]},
+            False,
+            "dictionary",
+            id="new_model_entry_not_dict",
+        ),
+        pytest.param(
+            {"models": [{"connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}]},
+            False,
+            "semantic_model_name",
+            id="new_missing_semantic_model_name",
+        ),
+        pytest.param(
+            {"models": [{"semantic_model_name": "MyModel"}]},
+            False,
+            "connection_id",
+            id="new_missing_connection_id",
+        ),
+        pytest.param(
+            {
+                "models": [
+                    {"semantic_model_name": 12345, "connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}
+                ]
+            },
+            False,
+            "string or list[string]",
+            id="new_invalid_semantic_model_name_type",
+        ),
+        pytest.param(
+            {"models": [{"semantic_model_name": "MyModel", "connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}]},
+            False,
+            "must be a dictionary",
+            id="new_string_connection_id_not_supported",
+        ),
+        pytest.param(
+            {"models": [{"semantic_model_name": "MyModel", "connection_id": {"DEV": "invalid-guid"}}]},
+            False,
+            "not a valid guid",
+            id="new_invalid_connection_guid",
+        ),
+        pytest.param(
+            {"models": [{"semantic_model_name": "MyModel", "connection_id": {}}]},
+            False,
+            "non-empty dictionary",
+            id="new_empty_connection_id_dict",
+        ),
+    ],
+)
+def test_semantic_model_binding_validation(empty_parameter, param_value, expected_ok, expected_msg_contains):
+    """Parametrized test for semantic_model_binding validation covering legacy and new formats."""
+    empty_parameter.environment_parameter = {"semantic_model_binding": param_value}
+    ok, msg = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
+    assert ok is expected_ok
+    assert expected_msg_contains.lower() in msg.lower()
+
+
+@pytest.mark.parametrize(
+    ("connection_id", "require_string", "require_dict", "expected_ok", "expected_msg_contains"),
+    [
+        pytest.param(
+            "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+            True,
+            False,
+            True,
+            "Valid",
+            id="legacy_valid_string_guid",
+        ),
+        pytest.param(
+            "invalid-guid",
+            True,
+            False,
+            False,
+            "not a valid GUID",
+            id="legacy_invalid_guid",
+        ),
+        pytest.param(
+            {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"},
+            True,
+            False,
+            False,
+            "must be a string GUID",
+            id="legacy_dict_not_supported",
+        ),
+        pytest.param(
+            {
+                "PPE": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+                "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+            },
+            False,
+            True,
+            True,
+            "Valid",
+            id="new_valid_multi_env",
+        ),
+        pytest.param(
+            {"PPE": "not-a-guid", "PROD": "a1b2c3d4-5678-90ab-cdef-1234567890ab"},
+            False,
+            True,
+            False,
+            "not a valid GUID",
+            id="new_invalid_guid_format",
+        ),
+        pytest.param(
+            "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+            False,
+            True,
+            False,
+            "must be a dictionary",
+            id="new_string_not_supported",
+        ),
+    ],
+)
+def test_validate_connection_id(
+    empty_parameter, connection_id, require_string, require_dict, expected_ok, expected_msg_contains
+):
+    """Test _validate_connection_id with various inputs."""
+    ok, msg = empty_parameter._validate_connection_id(
+        connection_id, "semantic_model_binding", require_string=require_string, require_dict=require_dict
+    )
+    assert ok is expected_ok
+    assert expected_msg_contains in msg
+
+
+def test_semantic_model_binding_new_format_models_invalid_connection_guid(empty_parameter):
+    """Test semantic_model_binding new format with invalid GUID in models connections."""
+    empty_parameter.environment_parameter = {
+        "semantic_model_binding": {
+            "models": [{"semantic_model_name": "MyModel", "connection_id": {"DEV": "not-a-valid-guid"}}]
+        }
+    }
+    ok, msg = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
+    assert ok is False
+    assert "not a valid guid" in msg.lower()
+
+
+def test_semantic_model_binding_legacy_format_mixed_with_new_keys(empty_parameter):
+    """Test semantic_model_binding legacy format with new format keys mixed in (should fail)."""
+    empty_parameter.environment_parameter = {
+        "semantic_model_binding": [
+            {
+                "connection_id": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+                "semantic_model_name": "Model1",
+                "default": "should-not-be-here",  # New format key in legacy entry
+            }
+        ]
+    }
+    ok, msg = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
+    assert ok is False
+    assert "mixed format" in msg.lower()
+
+
+@pytest.mark.parametrize(
+    ("param_value", "is_new_format", "expected_duplicates"),
+    [
+        # New format: duplicate name triggers warning
+        (
+            {
+                "default": {"connection_id": {"PPE": "00000000-0000-0000-0000-000000000001"}},
+                "models": [
+                    {"semantic_model_name": "ModelA", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000002"}},
+                    {"semantic_model_name": "ModelA", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000003"}},
+                ],
+            },
+            True,
+            {"ModelA"},
+        ),
+        # New format: no duplicates, no warning
+        (
+            {
+                "default": {"connection_id": {"PPE": "00000000-0000-0000-0000-000000000001"}},
+                "models": [
+                    {"semantic_model_name": "ModelA", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000002"}},
+                    {"semantic_model_name": "ModelB", "connection_id": {"PPE": "00000000-0000-0000-0000-000000000003"}},
+                ],
+            },
+            True,
+            set(),
+        ),
+        # Legacy format: duplicate name triggers warning
+        (
+            [
+                {"semantic_model_name": "ModelA", "connection_id": "00000000-0000-0000-0000-000000000001"},
+                {"semantic_model_name": "ModelA", "connection_id": "00000000-0000-0000-0000-000000000002"},
+            ],
+            False,
+            {"ModelA"},
+        ),
+        # Legacy format: no duplicates, no warning
+        (
+            [
+                {"semantic_model_name": "ModelA", "connection_id": "00000000-0000-0000-0000-000000000001"},
+                {"semantic_model_name": "ModelB", "connection_id": "00000000-0000-0000-0000-000000000002"},
+            ],
+            False,
+            set(),
+        ),
+        # New format: duplicate within a list value
+        (
+            {
+                "default": {"connection_id": {"PPE": "00000000-0000-0000-0000-000000000001"}},
+                "models": [
+                    {
+                        "semantic_model_name": ["ModelA", "ModelA"],
+                        "connection_id": {"PPE": "00000000-0000-0000-0000-000000000002"},
+                    },
+                ],
+            },
+            True,
+            {"ModelA"},
+        ),
+        # Legacy format: duplicate across list values in different entries
+        (
+            [
+                {"semantic_model_name": ["ModelA", "ModelB"], "connection_id": "00000000-0000-0000-0000-000000000001"},
+                {"semantic_model_name": ["ModelB", "ModelC"], "connection_id": "00000000-0000-0000-0000-000000000002"},
+            ],
+            False,
+            {"ModelB"},
+        ),
+    ],
+    ids=[
+        "new_format_duplicate",
+        "new_format_no_duplicate",
+        "legacy_duplicate",
+        "legacy_no_duplicate",
+        "new_format_duplicate_within_list",
+        "legacy_duplicate_across_lists",
+    ],
+)
+def test_check_duplicate_semantic_model_names(empty_parameter, param_value, is_new_format, expected_duplicates, caplog):
+    """Test that _check_duplicate_semantic_model_names warns on duplicate names."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        empty_parameter._check_duplicate_semantic_model_names(param_value, is_new_format)
+
+    if expected_duplicates:
+        expected_msg = constants.PARAMETER_MSGS["duplicate_semantic_model"].format(
+            ", ".join(sorted(expected_duplicates))
+        )
+        assert expected_msg in caplog.messages, (
+            f"Expected warning message not found.\nExpected: {expected_msg}\nActual messages: {caplog.messages}"
+        )
+        # Verify exactly one warning was logged
+        duplicate_warnings = [m for m in caplog.messages if "Duplicate semantic model names found" in m]
+        assert len(duplicate_warnings) == 1, (
+            f"Expected exactly 1 duplicate warning, found {len(duplicate_warnings)}: {duplicate_warnings}"
+        )
+        # Verify duplicates produce a warning but do not cause validation failure
+        empty_parameter.environment_parameter = {"semantic_model_binding": param_value}
+        ok, _ = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
+        assert ok is True, "Duplicate semantic model names should warn but not fail validation"
+    else:
+        assert not any("Duplicate semantic model names found" in m for m in caplog.messages), (
+            f"Unexpected duplicate warning found in messages: {caplog.messages}"
+        )

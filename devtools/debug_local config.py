@@ -16,10 +16,6 @@ from fabric_cicd import append_feature_flag, change_log_level, deploy_with_confi
 # Uncomment to enable debug
 # change_log_level()
 
-# feature flags required for this feature
-append_feature_flag("enable_experimental_features")
-append_feature_flag("enable_config_deploy")
-
 # In this example, the config file sits within the root/sample/workspace directory
 config_file = str(root_directory / "sample" / "workspace" / "config.yml")
 

@@ -409,7 +409,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_full_deployment(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test full deployment with config file."""
         # Create the actual directory structure that the config references
@@ -471,7 +470,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_skip_operations(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with skip flags enabled."""
         # Create the actual directory structure that the config references
@@ -509,7 +507,6 @@ class TestDeployWithConfig:
         mock_publish.assert_not_called()
         mock_unpublish.assert_not_called()
 
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_missing_file(self):
         """Test deployment with missing config file."""
         with pytest.raises(ConfigValidationError, match="Configuration file not found"):
@@ -518,7 +515,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_with_token_credential(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with custom token credential."""
         # Mark unused mocks to avoid linting warnings
@@ -562,7 +558,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_with_config_override(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with config override."""
         # Create the actual directory structure that the config references
@@ -609,7 +604,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_shortcut_exclude_regex(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with shortcut_exclude_regex in config."""
         # Create the actual directory structure that the config references

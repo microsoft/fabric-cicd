@@ -590,6 +590,56 @@ class TestParameterUtilities:
         # Test with empty dict
         assert is_valid_structure({}) is False
 
+    def test_is_valid_structure_semantic_model_binding_new_format(self):
+        """Tests is_valid_structure with new dictionary format for semantic_model_binding."""
+        # New format with default and models
+        valid_new_format = {
+            "semantic_model_binding": {
+                "default": {
+                    "connection_id": {
+                        "PPE": "76e05dfe-9855-4e3d-a410-1dda048dbe99",
+                    }
+                },
+                "models": [
+                    {
+                        "semantic_model_name": ["Model1", "Model2"],
+                        "connection_id": {
+                            "PPE": "f96870d5-5f86-49ad-bf41-5967fd7c1c6d",
+                        },
+                    }
+                ],
+            }
+        }
+        assert is_valid_structure(valid_new_format) is True
+        assert is_valid_structure(valid_new_format, "semantic_model_binding") is True
+
+        # New format with only default
+        valid_default_only = {
+            "semantic_model_binding": {"default": {"connection_id": {"_ALL_": "76e05dfe-9855-4e3d-a410-1dda048dbe99"}}}
+        }
+        assert is_valid_structure(valid_default_only) is True
+
+        # New format with only models
+        valid_models_only = {
+            "semantic_model_binding": {
+                "models": [
+                    {
+                        "semantic_model_name": "SingleModel",
+                        "connection_id": {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"},
+                    }
+                ]
+            }
+        }
+        assert is_valid_structure(valid_models_only) is True
+
+        # String is invalid
+        invalid_string = {"semantic_model_binding": "not valid"}
+        assert is_valid_structure(invalid_string) is False
+
+        # Empty dict is invalid (no bindings configured)
+        invalid_empty = {"semantic_model_binding": {}}
+        assert is_valid_structure(invalid_empty) is False
+
     @mock.patch("fabric_cicd._parameter._parameter.Parameter")
     @mock.patch("fabric_cicd._common._validate_input.validate_repository_directory")
     @mock.patch("fabric_cicd._common._validate_input.validate_item_type_in_scope")
@@ -1261,10 +1311,10 @@ runtime_version: "1.2"
         mock_workspace.environment = "TEST"
 
         # Call the function
-        result_1 = process_environment_key(mock_workspace, replace_value_dict_1)
-        result_2 = process_environment_key(mock_workspace, replace_value_dict_2)
-        result_3 = process_environment_key(mock_workspace, replace_value_dict_3)
-        result_4 = process_environment_key(mock_workspace, replace_value_dict_4)
+        result_1 = process_environment_key(mock_workspace.environment, replace_value_dict_1)
+        result_2 = process_environment_key(mock_workspace.environment, replace_value_dict_2)
+        result_3 = process_environment_key(mock_workspace.environment, replace_value_dict_3)
+        result_4 = process_environment_key(mock_workspace.environment, replace_value_dict_4)
 
         # Verify _ALL_ key is replaced with the target environment
         assert "_ALL_" not in result_1
@@ -1299,7 +1349,7 @@ runtime_version: "1.2"
         mock_workspace.environment = "TEST"
 
         # Call the function
-        result = process_environment_key(mock_workspace, replace_value_dict_5)
+        result = process_environment_key(mock_workspace.environment, replace_value_dict_5)
 
         # Dictionary should remain unchanged
         assert result == replace_value_dict_5

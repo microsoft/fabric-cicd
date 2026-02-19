@@ -50,8 +50,15 @@ spark_pool:
               name: "PROD-Pool-name"
 
 semantic_model_binding:
-    - connection_id: "connection_id"
-      semantic_model_name: "semantic_model_name"
+    default:
+        connection_id:
+            PPE: "PPE-connection_id"
+            PROD: "PROD-connection_id"
+    models:
+        - semantic_model_name: "semantic_model_name"
+          connection_id:
+              PPE: "PPE-connection_id"
+              PROD: "PROD-connection_id"
 ```
 
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional parameterization capabilities.
@@ -138,18 +145,54 @@ spark_pool:
 
 ### `semantic_model_binding`
 
-Semantic model binding is used to connect semantic models that require cloud or on-premises data sources to the appropriate connection after deployment. The `semantic_model_binding` parameter automatically configures these connections during the deployment process, ensuring your semantic models can refresh data from cloud and on-premises sources in the target environment.
+Semantic model binding automatically connects semantic models to the appropriate data source connection (e.g., cloud or gateway/on-premises) after deployment, ensuring your models can refresh data in the target environment.
+
+**Important:** 
+
+- The legacy `gateway_binding` parameter is deprecated and will be removed in a future release.
+- The legacy `semantic_model_binding` parameter format is deprecated and will be removed in a future release. Please migrate to the recommended format below.
+
+**Recommended format:**
 
 ```yaml
 semantic_model_binding:
-    # Required field: value must be a string (GUID)
-    # Connection Ids can be found from the Fabric UI under Settings -> Manage Connections and gateways -> Settings pane of the connection
-    - connection_id: <connection_id>
-    # Required field: value must be a string or a list of strings
-      semantic_model_name: <semantic_model_name>
-    # OR
-      semantic_model_name: [<semantic_model_name1>,<semantic_model_name2>,...]
+    # Default connection for all models not explicitly listed
+    default:
+        connection_id:
+            PPE: <PPE-connection_guid>
+            PROD: <PROD-connection_guid>
+            # OR use _ALL_ for same connection across environments
+            # _ALL_: <connection_guid>
+
+    # Explicit bindings override default
+    models:
+        - semantic_model_name: "<semantic_model_name>"
+          connection_id:
+              PPE: <PPE-connection_guid>
+              PROD: <PROD-connection_guid>
+
+        - semantic_model_name: ["<semantic_model_name1>", "<semantic_model_name2>", ...]
+          connection_id:
+              _ALL_: <connection_guid>
 ```
+
+**Legacy format:**
+
+```yaml
+# Legacy format:
+semantic_model_binding:
+    - connection_id: <connection_guid>
+      # Required field: value must be a string or a list of strings
+      semantic_model_name: "<semantic_model_name>"
+      # OR
+      semantic_model_name: ["<semantic_model_name1>","<semantic_model_name2>", ...]
+```
+
+**Notes:**
+
+- The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
+- Connection ID values must be valid GUIDs.
+- **Only a single connection binding per Semantic Model is currently supported.** If your Semantic Model uses multiple connections (e.g., connecting to both a SQL database and a Lakehouse), only one can be configured through `semantic_model_binding`. Additional connections must be configured manually after deployment.
 
 ## Advanced Find and Replace
 

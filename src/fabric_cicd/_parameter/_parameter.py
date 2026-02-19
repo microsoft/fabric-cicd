@@ -45,8 +45,8 @@ class Parameter:
             "maximum": {"gateway_id", "dataset_name"},
         },
         "semantic_model_binding": {
-            "minimum": {"connection_id", "semantic_model_name"},
-            "maximum": {"connection_id", "semantic_model_name"},
+            "minimum": set(),
+            "maximum": {"connection_id", "semantic_model_name", "default", "models"},
         },
         "extend": {"minimum": set(), "maximum": set()},
     }
@@ -150,20 +150,24 @@ class Parameter:
             with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
                 yaml_content = yaml_file.read()
                 yaml_content = replace_variables_in_parameter_file(yaml_content)
-                validation_errors = self._validate_yaml_content(yaml_content)
-                if validation_errors:
-                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(validation_errors)
+
+                # Check for empty YAML content
+                if not yaml_content.strip():
+                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(
+                        constants.PARAMETER_MSGS["empty yaml"]
+                    )
                     return False, parameter_dict
 
-                parameter_dict = yaml.full_load(yaml_content) or {}
+                # Use custom loader that detects duplicate keys
+                parameter_dict = yaml.load(yaml_content, Loader=_DuplicateKeyLoader) or {}
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
 
-                # Process template parameter files if present
                 if parameter_dict.get("extend"):
                     parameter_dict = self._process_template_parameters(parameter_dict)
 
                 return True, parameter_dict
-        except yaml.YAMLError as e:
+
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
             self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
             return False, parameter_dict
 
@@ -251,18 +255,19 @@ class Parameter:
                 param_content = param_file.read()
                 param_content = replace_variables_in_parameter_file(param_content)
 
-                # Validate the content
-                param_validation_errors = self._validate_yaml_content(param_content)
-                if param_validation_errors:
+                # Check for empty YAML content
+                if not param_content.strip():
                     logger.error(
-                        constants.PARAMETER_MSGS["template_file_invalid"].format(file_path, param_validation_errors)
+                        constants.PARAMETER_MSGS["template_file_invalid"].format(
+                            file_path, constants.PARAMETER_MSGS["empty yaml"]
+                        )
                     )
                     return {}
 
-                # Load the content
-                return yaml.full_load(param_content) or {}
+            # Use custom loader that detects duplicate keys
+            return yaml.load(param_content, Loader=_DuplicateKeyLoader) or {}
 
-        except yaml.YAMLError as e:
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
             logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
             return {}
 
@@ -301,40 +306,6 @@ class Parameter:
 
         return result
 
-    def _validate_yaml_content(self, content: str) -> list[str]:
-        """Validate the yaml content of the parameter file."""
-        errors = []
-        msgs = constants.PARAMETER_MSGS["invalid content"]
-
-        # Check for empty YAML content
-        if content.strip() == "":
-            errors.append("YAML content is empty")
-            return errors
-
-        # Regex patterns to match all valid UTF-8 characters
-        utf8_pattern = r"""
-        (
-        [\x00-\x7F] # Single-byte sequences (ASCII)
-        | [\xC2-\xDF][\x80-\xBF] # Two-byte sequences
-        | [\xE0][\xA0-\xBF][\x80-\xBF] # Three-byte sequences (special case)
-        | [\xE1-\xEC][\x80-\xBF]{2} # Three-byte sequences
-        | [\xED][\x80-\x9F][\x80-\xBF] # Three-byte sequences (special case)
-        | [\xEE-\xEF][\x80-\xBF]{2} # Three-byte sequences
-        | [\xF0][\x90-\xBF][\x80-\xBF]{2} # Four-byte sequences (special case)
-        | [\xF1-\xF3][\x80-\xBF]{3} # Four-byte sequences
-        | [\xF4][\x80-\x8F][\x80-\xBF]{2} # Four-byte sequences (special case)
-        )
-        """
-
-        # Compile the pattern with the re.VERBOSE flag to allow comments and whitespace
-        compiled_utf8_pattern = re.compile(utf8_pattern, re.VERBOSE)
-
-        # Check for invalid characters (non-UTF-8)
-        if not re.match(compiled_utf8_pattern, content):
-            errors.append(msgs["char"])
-
-        return errors
-
     def _validate_parameter_load(self) -> tuple[bool, str]:
         """Validate the parameter file load."""
         if self.parameter_file_path is None:
@@ -351,27 +322,11 @@ class Parameter:
         return True, constants.PARAMETER_MSGS["valid load"]
 
     def _validate_parameter_file(self) -> bool:
-        """This code will be removed in future releases, after deprecating 'gateway_binding' support."""
-        # first, extend semantic_model_binding by adding gateway_binding into one dict
-        if "gateway_binding" in self.environment_parameter or "semantic_model_binding" in self.environment_parameter:
-            sm_list = self.environment_parameter.get("semantic_model_binding", [])
-            gw_list = self.environment_parameter.get("gateway_binding", [])
-
-            if gw_list:
-                # Transform gateway entries to semantic_model_binding shape
-                sm_list.extend(
-                    {
-                        "connection_id": entry.get("gateway_id"),
-                        "semantic_model_name": entry.get("dataset_name", []),
-                    }
-                    for entry in gw_list
-                )
-                self.environment_parameter["semantic_model_binding"] = sm_list
-                # Remove original gateway_binding after merging
-                del self.environment_parameter["gateway_binding"]
-                logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
-
         """Validate the parameter file."""
+        # Handle gateway_binding deprecation
+        if "gateway_binding" in self.environment_parameter or "semantic_model_binding" in self.environment_parameter:
+            self._handle_gateway_binding_parameter()
+
         validation_steps = [
             ("parameter file load", self._validate_parameter_load),
             ("parameter names", self._validate_parameter_names),
@@ -410,6 +365,35 @@ class Parameter:
         logger.info(constants.PARAMETER_MSGS["validation_complete"])
         return True
 
+    def _handle_gateway_binding_parameter(self) -> None:
+        """This code will be removed in future releases, after deprecating 'gateway_binding' support."""
+        # Extend semantic_model_binding by adding gateway_binding into one dict
+        sm_param = self.environment_parameter.get("semantic_model_binding", [])
+        gw_list = self.environment_parameter.get("gateway_binding", [])
+
+        if gw_list:
+            # Only merge gateway_binding if semantic_model_binding is legacy format (list) or doesn't exist
+            if isinstance(sm_param, list):
+                # Transform gateway entries to semantic_model_binding shape
+                sm_param.extend(
+                    {
+                        "connection_id": entry.get("gateway_id"),
+                        "semantic_model_name": entry.get("dataset_name", []),
+                    }
+                    for entry in gw_list
+                )
+                self.environment_parameter["semantic_model_binding"] = sm_param
+            else:
+                # New format (dict) - cannot merge gateway_binding, log warning
+                logger.warning(
+                    "Cannot merge 'gateway_binding' with new format 'semantic_model_binding'. "
+                    "Please migrate gateway_binding entries to the new semantic_model_binding format."
+                )
+
+            # Remove original gateway_binding after processing
+            del self.environment_parameter["gateway_binding"]
+            logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
+
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
         if not is_valid_structure(self.environment_parameter):
@@ -427,17 +411,23 @@ class Parameter:
         return True, constants.PARAMETER_MSGS["valid name"]
 
     def _validate_parameter(self, param_name: str) -> tuple[bool, str]:
-        """Validate the specified parameter."""
+        """Validate the specific parameter and its contents."""
         if param_name not in self.environment_parameter:
             logger.debug(constants.PARAMETER_MSGS["param_not_found"].format(param_name))
             return False, "parameter not found"
 
         logger.debug(constants.PARAMETER_MSGS["param_found"].format(param_name))
+
         param_count = len(self.environment_parameter[param_name])
         multiple_param = param_count > 1
         if multiple_param:
             logger.debug(constants.PARAMETER_MSGS["param_count"].format(param_count, param_name))
 
+        # Run a separate validation for semantic_model_binding parameter
+        if param_name == "semantic_model_binding":
+            return self._validate_semantic_model_binding_parameter(param_name, multiple_param)
+
+        # Validation for other kinds of parameters
         validation_steps = [
             ("keys", lambda param_dict: self._validate_parameter_keys(param_name, list(param_dict.keys()))),
             ("required values", lambda param_dict: self._validate_required_values(param_name, param_dict)),
@@ -449,8 +439,6 @@ class Parameter:
             key_name = "find_key"
         elif param_name == "spark_pool":
             key_name = "instance_pool_id"
-        elif param_name == "semantic_model_binding":
-            key_name = "connection_id"
         else:
             key_name = "find_value"
 
@@ -458,16 +446,12 @@ class Parameter:
             param_num_str = str(param_num) if multiple_param else ""
             find_value = parameter_dict.get(key_name)
             for step, validation_func in validation_steps:
-                if param_name in ["semantic_model_binding"] and step == "replace_value":
-                    continue
                 logger.debug(constants.PARAMETER_MSGS["validating"].format(f"{param_name} {param_num_str} {step}"))
                 is_valid, msg = validation_func(parameter_dict)
                 if not is_valid:
                     return False, msg
                 logger.debug(constants.PARAMETER_MSGS["passed"].format(msg))
-            # Special case to skip environment validation for semantic_model_binding
-            if param_name in ["semantic_model_binding"]:
-                continue
+
             # Check if replacement will be skipped for a given find value
             is_valid_env, env_type = self._validate_environment(parameter_dict["replace_value"])
             is_valid_optional_val, msg = self._validate_optional_values(param_name, parameter_dict, check_match=True)
@@ -481,13 +465,11 @@ class Parameter:
             )
 
             if self.environment != "N/A" and not is_valid_env:
-                # Return validation error for invalid _ALL_ case (_ALL_ used with other envs)
                 if env_type.lower() == "_all_":
                     return False, constants.PARAMETER_MSGS["other target env"].format(
                         env_type, parameter_dict["replace_value"]
                     )
 
-                # Otherwise, replacement skipped if target environment is not present
                 skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
                 log_func(
                     constants.PARAMETER_MSGS["skip"].format(
@@ -496,13 +478,11 @@ class Parameter:
                 )
                 continue
 
-            # Log if _ALL_ environment is present in replace_value
             if env_type.lower() == "_all_":
                 logger.warning(
                     constants.PARAMETER_MSGS["all target env"].format(parameter_dict["replace_value"][env_type])
                 )
 
-            # Replacement skipped if optional filter values don't match
             if msg == "no match" and not is_valid_optional_val:
                 skip_msg = constants.PARAMETER_MSGS["no filter match"]
                 log_func(
@@ -511,11 +491,196 @@ class Parameter:
                     )
                 )
 
-        # Validate semantic model names are unique (once after all entries processed)
-        if param_name == "semantic_model_binding":
-            self._validate_semantic_model_name()
+        return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
+
+    def _validate_semantic_model_binding_parameter(
+        self, param_name: str, multiple_param: bool = False
+    ) -> tuple[bool, str]:
+        """Validate semantic_model_binding parameter, supporting both legacy and new formats.
+
+        Legacy format (list): Only string connection_id allowed (no environment mapping)
+        New format (dict): Only dict connection_id allowed (environment mapping required, use _ALL_ for all)
+        """
+        param_value = self.environment_parameter.get(param_name)
+        is_new_format = isinstance(param_value, dict)
+        legacy_keys = {"connection_id", "semantic_model_name"}
+        new_keys = {"default", "models"}
+
+        if is_new_format:
+            # New format: dict with 'default' and/or 'models'
+            param_keys_set = set(param_value.keys())
+
+            # Validate top-level keys
+            if param_keys_set & legacy_keys:
+                return False, constants.PARAMETER_MSGS["mixed format"].format(param_name)
+            if not param_keys_set <= new_keys:
+                return False, constants.PARAMETER_MSGS["invalid key"].format(param_name)
+
+            # Require at least one of 'default' or 'models'
+            if "default" not in param_value and "models" not in param_value:
+                return False, constants.PARAMETER_MSGS["missing key"].format(
+                    f"{param_name} (requires 'default' or 'models')"
+                )
+
+            # Validate 'default' section
+            if "default" in param_value:
+                default_value = param_value["default"]
+                is_valid, msg = self._validate_data_type(default_value, "dictionary", "default", param_name)
+                if not is_valid:
+                    return False, msg
+                if "connection_id" not in default_value:
+                    return False, constants.PARAMETER_MSGS["missing key"].format(
+                        f"{param_name}.default (requires 'connection_id')"
+                    )
+                # New format requires dict connection_id
+                is_valid, msg = self._validate_connection_id(
+                    default_value["connection_id"], f"{param_name}.default.connection_id", require_dict=True
+                )
+                if not is_valid:
+                    return False, msg
+
+            # Validate 'models' section
+            if "models" in param_value:
+                models_value = param_value["models"]
+                section_name = f"{param_name}.models"
+
+                if not isinstance(models_value, list) or not models_value:
+                    return False, f"{section_name} must be a non-empty list"
+
+                for idx, entry in enumerate(models_value):
+                    entry_name = f"{section_name}[{idx}]"
+
+                    is_valid, msg = self._validate_data_type(entry, "dictionary", entry_name, section_name)
+                    if not is_valid:
+                        return False, msg
+                    if "semantic_model_name" not in entry:
+                        return False, constants.PARAMETER_MSGS["missing key"].format(
+                            f"{entry_name} (requires 'semantic_model_name')"
+                        )
+                    if "connection_id" not in entry:
+                        return False, constants.PARAMETER_MSGS["missing key"].format(
+                            f"{entry_name} (requires 'connection_id')"
+                        )
+
+                    is_valid, msg = self._validate_data_type(
+                        entry["semantic_model_name"], "string or list[string]", "semantic_model_name", entry_name
+                    )
+                    if not is_valid:
+                        return False, msg
+
+                    # New format requires dict connection_id
+                    is_valid, msg = self._validate_connection_id(
+                        entry["connection_id"], f"{entry_name}.connection_id", require_dict=True
+                    )
+                    if not is_valid:
+                        return False, msg
+
+        else:
+            # Legacy format: list of dicts with 'connection_id' and 'semantic_model_name'
+            for param_num, entry in enumerate(param_value, start=1):
+                context_name = f"{param_name} {param_num}" if multiple_param else param_name
+                param_keys_set = set(entry.keys())
+
+                # Validate keys
+                if param_keys_set & new_keys:
+                    return False, constants.PARAMETER_MSGS["mixed format"].format(param_name)
+                if not legacy_keys <= param_keys_set:
+                    return False, constants.PARAMETER_MSGS["missing key"].format(param_name)
+                if not param_keys_set <= legacy_keys:
+                    return False, constants.PARAMETER_MSGS["invalid key"].format(param_name)
+
+                connection_id = entry.get("connection_id")
+                semantic_model_name = entry.get("semantic_model_name")
+
+                if not connection_id:
+                    return False, constants.PARAMETER_MSGS["missing required value"].format("connection_id", param_name)
+                if not semantic_model_name:
+                    return False, constants.PARAMETER_MSGS["missing required value"].format(
+                        "semantic_model_name", param_name
+                    )
+
+                is_valid, msg = self._validate_data_type(
+                    semantic_model_name, "string or list[string]", "semantic_model_name", param_name
+                )
+                if not is_valid:
+                    return False, msg
+
+                # Legacy format requires string connection_id (no environment mapping)
+                is_valid, msg = self._validate_connection_id(connection_id, context_name, require_string=True)
+                if not is_valid:
+                    return False, msg
+
+        # Check for duplicate semantic model names
+        self._check_duplicate_semantic_model_names(param_value, is_new_format)
 
         return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
+
+    def _validate_connection_id(
+        self, connection_id: any, context_name: str, require_string: bool = False, require_dict: bool = False
+    ) -> tuple[bool, str]:
+        """Validate a connection_id value."""
+        # Legacy format: require string GUID only
+        if require_string:
+            if not isinstance(connection_id, str):
+                return False, (
+                    f"connection_id in {context_name} must be a string GUID. "
+                    "Environment-specific dictionaries are not supported in the legacy format. "
+                    "Please migrate to the new dictionary format with 'default' and 'models' keys."
+                )
+            if not re.match(constants.VALID_GUID_REGEX, connection_id):
+                return False, f"connection_id '{connection_id}' is not a valid GUID in {context_name}"
+            return True, f"Valid {context_name}"
+
+        # New format: require dict with environment keys
+        if require_dict:
+            if not isinstance(connection_id, dict):
+                return False, (
+                    f"{context_name} must be a dictionary with environment keys (e.g., DEV, PPE, PROD) or '_ALL_'. "
+                    "Use '_ALL_' to apply the same connection to all environments."
+                )
+            if not connection_id:
+                return False, f"{context_name} must be a non-empty dictionary"
+
+            for env_key, guid_value in connection_id.items():
+                if not isinstance(guid_value, str):
+                    return False, f"connection_id value for environment '{env_key}' must be a string (GUID)"
+                if not re.match(constants.VALID_GUID_REGEX, guid_value):
+                    return False, f"connection_id for environment '{env_key}' is not a valid GUID: '{guid_value}'"
+
+            # Validate environment exists
+            is_valid_env, env_type = self._validate_environment(connection_id)
+            if self.environment != "N/A" and not is_valid_env:
+                if env_type.lower() == "_all_":
+                    return False, constants.PARAMETER_MSGS["other target env"].format(env_type, connection_id)
+                logger.warning(constants.PARAMETER_MSGS["no target env"].format(self.environment, context_name))
+
+            return True, f"Valid {context_name}"
+
+        # Should not reach here - caller must specify require_string or require_dict
+        return False, f"Invalid validation call for {context_name}: must specify require_string or require_dict"
+
+    def _check_duplicate_semantic_model_names(self, param_value: any, is_new_format: bool) -> None:
+        """Check for duplicate semantic model names and log a warning if found."""
+        names = []
+
+        if is_new_format:
+            for item in param_value.get("models", []):
+                raw = item.get("semantic_model_name", [])
+                if isinstance(raw, str):
+                    names.append(raw)
+                elif isinstance(raw, list):
+                    names.extend(n for n in raw if isinstance(n, str))
+        else:
+            for entry in param_value:
+                raw = entry.get("semantic_model_name", [])
+                if isinstance(raw, str):
+                    names.append(raw)
+                elif isinstance(raw, list):
+                    names.extend(n for n in raw if isinstance(n, str))
+
+        duplicates = {n for n in names if names.count(n) > 1}
+        if duplicates:
+            logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
 
     def _validate_parameter_keys(self, param_name: str, param_keys: list) -> tuple[bool, str]:
         """Validate the keys in the parameter."""
@@ -537,13 +702,7 @@ class Parameter:
             if not param_dict.get(key):
                 return False, constants.PARAMETER_MSGS["missing required value"].format(key, param_name)
 
-            if key == "replace_value":
-                expected_type = "dictionary"
-            elif key in ["semantic_model_name"]:
-                expected_type = "string or list[string]"
-            else:
-                expected_type = "string"
-
+            expected_type = "dictionary" if key == "replace_value" else "string"
             is_valid, msg = self._validate_data_type(param_dict[key], expected_type, key, param_name)
             if not is_valid:
                 return False, msg
@@ -580,19 +739,6 @@ class Parameter:
             return False, f"Invalid JSONPath expression '{find_key}': {e}"
 
         return True, "Valid JSONPath"
-
-    def _validate_semantic_model_name(self) -> None:
-        """Validate that semantic model names are unique across all semantic_model_binding entries."""
-        names = []
-        for entry in self.environment_parameter.get("semantic_model_binding", []):
-            raw = entry.get("semantic_model_name", [])
-            if isinstance(raw, str):
-                names.append(raw)
-            elif isinstance(raw, list):
-                names.extend(n for n in raw if isinstance(n, str))
-        duplicates = {n for n in names if names.count(n) > 1}
-        if duplicates:
-            logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
 
     def _validate_find_regex(self, param_name: str, param_dict: dict) -> tuple[bool, str]:
         """Validate the find_value is a valid regex if is_regex is set to true."""
@@ -835,3 +981,65 @@ class Parameter:
             return False, constants.PARAMETER_MSGS["invalid file path"].format(input_path, path_diff)
 
         return True, "Valid file path"
+
+
+class _DuplicateKeyLoader(yaml.SafeLoader):
+    """Custom YAML loader that raises an error on duplicate keys."""
+
+    pass
+
+
+def _collect_duplicate_key_errors(root_node: yaml.MappingNode, loader: _DuplicateKeyLoader) -> list[str]:
+    """Collect duplicate key errors from all mapping nodes using iterative traversal."""
+    errors: list[str] = []
+    stack = [root_node]
+
+    while stack:
+        node = stack.pop()
+        # Group original key names by their lowercase form
+        seen_keys: dict[str, list[str]] = {}
+
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node)
+            # Case-insensitive comparison (e.g., "PROD" and "prod" are duplicates)
+            normalized_key = key.lower() if isinstance(key, str) else key
+            if normalized_key not in seen_keys:
+                seen_keys[normalized_key] = []
+            seen_keys[normalized_key].append(str(key))
+
+            # Queue child mappings for checking at their own level
+            if isinstance(value_node, yaml.MappingNode):
+                stack.append(value_node)
+            elif isinstance(value_node, yaml.SequenceNode):
+                for item_node in value_node.value:
+                    if isinstance(item_node, yaml.MappingNode):
+                        stack.append(item_node)
+
+        for _, variants in seen_keys.items():
+            if len(variants) > 1:
+                unique_variants = set(variants)
+                count = len(variants)
+                # Show key once if all cases match, otherwise show all variants
+                if len(unique_variants) == 1:
+                    errors.append(f"'{next(iter(unique_variants))}' ({count})")
+                else:
+                    errors.append(f"{sorted(unique_variants)} ({count})")
+
+    return errors
+
+
+def _check_duplicate_keys_constructor(loader: _DuplicateKeyLoader, node: yaml.MappingNode) -> dict:
+    """Constructor that checks for duplicate keys in YAML mappings."""
+    # Run full traversal only from the root node; inner nodes skip to avoid redundant checks
+    if not getattr(loader, "_root_checked", False):
+        loader._root_checked = True
+        errors = _collect_duplicate_key_errors(node, loader)
+
+        if errors:
+            dupe_details = ", ".join(errors)
+            raise yaml.YAMLError(constants.PARAMETER_MSGS["duplicate key"].format(dupe_details))
+
+    return loader.construct_mapping(node)
+
+
+_DuplicateKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _check_duplicate_keys_constructor)
