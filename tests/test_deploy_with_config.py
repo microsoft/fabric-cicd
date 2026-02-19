@@ -906,3 +906,275 @@ class TestGetConfigValue:
         config = {"key": True}
         result = get_config_value(config, "key", "dev")
         assert result is True
+
+
+class TestDeployWithConfigResponseCollection:
+    """Test response collection functionality in deploy_with_config."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_returns_none_without_response_collection(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config returns None when response collection is not enabled."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "11111111-1111-1111-1111-111111111111"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance without responses
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = None
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify that None is returned
+        assert result is None
+
+        # Verify workspace creation and operations were called
+        mock_workspace.assert_called_once()
+        mock_publish.assert_called_once()
+        mock_unpublish.assert_called_once()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_returns_responses_with_feature_flag(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config returns responses when feature flag is enabled."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "22222222-2222-2222-2222-222222222222"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance with responses
+        mock_workspace_instance = MagicMock()
+        mock_responses = {
+            "Notebook": {
+                "TestNotebook": {"body": {"id": "test-id-123", "displayName": "TestNotebook"}},
+            }
+        }
+        mock_workspace_instance.responses = mock_responses
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify that responses are returned
+        assert result is not None
+        assert result == mock_responses
+        assert "Notebook" in result
+        assert "TestNotebook" in result["Notebook"]
+
+        # Verify workspace creation and operations were called
+        mock_workspace.assert_called_once()
+        mock_publish.assert_called_once()
+        mock_unpublish.assert_called_once()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_attaches_partial_results_on_failure(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config attaches partial results to exception on failure."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "33333333-3333-3333-3333-333333333333"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook", "DataPipeline"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance with partial responses
+        mock_workspace_instance = MagicMock()
+        mock_partial_responses = {
+            "Notebook": {
+                "SuccessfulNotebook": {"body": {"id": "success-id-123", "displayName": "SuccessfulNotebook"}},
+            }
+        }
+        mock_workspace_instance.responses = mock_partial_responses
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Make unpublish raise an exception (simulating failure after partial success)
+        test_exception = RuntimeError("Unpublish operation failed")
+        mock_unpublish.side_effect = test_exception
+
+        # Execute deployment and catch exception
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        # Verify the exception was raised
+        assert str(exc_info.value) == "Unpublish operation failed"
+
+        # Verify that publish was called (succeeded) but unpublish failed
+        mock_publish.assert_called_once()
+
+        # Verify that partial_results attribute was attached to the exception
+        assert hasattr(exc_info.value, "partial_results")
+        assert exc_info.value.partial_results == mock_partial_responses
+        assert "Notebook" in exc_info.value.partial_results
+        assert "SuccessfulNotebook" in exc_info.value.partial_results["Notebook"]
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_no_partial_results_when_responses_none(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that no partial_results are attached when responses is None."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "44444444-4444-4444-4444-444444444444"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance without responses (None)
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = None
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Make publish raise an exception
+        test_exception = RuntimeError("Publish operation failed")
+        mock_publish.side_effect = test_exception
+
+        # Execute deployment and catch exception
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        # Verify the exception was raised
+        assert str(exc_info.value) == "Publish operation failed"
+
+        # Verify unpublish was not called (because publish failed first)
+        mock_unpublish.assert_not_called()
+
+        # Verify that partial_results attribute was NOT attached (because responses was None)
+        assert not hasattr(exc_info.value, "partial_results")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_no_partial_results_when_responses_empty(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that no partial_results are attached when responses is empty dict."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "55555555-5555-5555-5555-555555555555"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance with empty responses dict
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {}
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Make publish raise an exception
+        test_exception = RuntimeError("Publish operation failed")
+        mock_publish.side_effect = test_exception
+
+        # Execute deployment and catch exception
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        # Verify the exception was raised
+        assert str(exc_info.value) == "Publish operation failed"
+
+        # Verify unpublish was not called (because publish failed first)
+        mock_unpublish.assert_not_called()
+
+        # Verify that partial_results attribute was NOT attached (because responses was empty)
+        assert not hasattr(exc_info.value, "partial_results")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_returns_empty_dict_when_no_items_published(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config returns empty dict when response collection enabled but no items published."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "66666666-6666-6666-6666-666666666666"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance with empty responses dict (feature flag enabled but no items)
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {}
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify that empty dict is returned
+        assert result == {}
+
+        # Verify workspace creation and operations were called
+        mock_workspace.assert_called_once()
+        mock_publish.assert_called_once()
+        mock_unpublish.assert_called_once()
