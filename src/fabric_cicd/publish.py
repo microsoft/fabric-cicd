@@ -298,7 +298,7 @@ def deploy_with_config(
     environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
     config_override: Optional[dict] = None,
-) -> None:
+) -> Optional[dict]:
     """
     Deploy items using YAML configuration file with environment-specific settings.
     This function provides a simplified deployment interface that loads configuration
@@ -312,9 +312,14 @@ def deploy_with_config(
         token_credential: Optional Azure token credential for authentication.
         config_override: Optional dictionary to override specific configuration values.
 
+    Returns:
+        Dict containing all API responses if the "enable_response_collection" feature flag is enabled and responses were collected, otherwise None.
+        On failure, the exception will have a `partial_results` attribute containing the responses collected before the failure if response collection was enabled.
+
     Raises:
         InputError: If configuration file is invalid or environment not found.
         FileNotFoundError: If configuration file doesn't exist.
+        Exception: Any exception raised during deployment. If response collection is enabled, the exception will have a `partial_results` attribute.
 
     Examples:
         Basic usage
@@ -352,6 +357,36 @@ def deploy_with_config(
         ...         }
         ...     }
         ... )
+
+        With response collection
+        >>> from fabric_cicd import deploy_with_config, append_feature_flag
+        >>> append_feature_flag("enable_response_collection")
+        >>> results = deploy_with_config(
+        ...     config_file_path="workspace/config.yml",
+        ...     environment="prod"
+        ... )
+        >>> # Access results on success
+        >>> if results:
+        ...     print(results)
+
+        Handling failures with partial results
+        >>> from fabric_cicd import deploy_with_config, append_feature_flag
+        >>> append_feature_flag("enable_response_collection")
+        >>> try:
+        ...     results = deploy_with_config(
+        ...         config_file_path="workspace/config.yml",
+        ...         environment="prod"
+        ...     )
+        ...     print("Deployment Success!")
+        ...     if results:
+        ...         print(results)
+        ... except Exception as e:
+        ...     print("Deployment Failed!")
+        ...     if hasattr(e, 'partial_results'):
+        ...         print("Items that succeeded before failure:")
+        ...         for item_type, items in e.partial_results.items():
+        ...             print(f"- {item_type}: {list(items.keys())}")
+        ...     raise
     """
     log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
@@ -380,25 +415,37 @@ def deploy_with_config(
         token_credential=token_credential,
         parameter_file_path=workspace_settings.get("parameter_file_path"),
     )
-    # Execute deployment operations based on skip settings
-    if not publish_settings.get("skip", False):
-        publish_all_items(
-            workspace,
-            item_name_exclude_regex=publish_settings.get("exclude_regex"),
-            folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
-            items_to_include=publish_settings.get("items_to_include"),
-            shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
-        )
-    else:
-        logger.info(f"Skipping publish operation for environment '{environment}'")
 
-    if not unpublish_settings.get("skip", False):
-        unpublish_all_orphan_items(
-            workspace,
-            item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
-            items_to_include=unpublish_settings.get("items_to_include"),
-        )
-    else:
-        logger.info(f"Skipping unpublish operation for environment '{environment}'")
+    try:
+        # Execute deployment operations based on skip settings
+        if not publish_settings.get("skip", False):
+            publish_all_items(
+                workspace,
+                item_name_exclude_regex=publish_settings.get("exclude_regex"),
+                folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
+                items_to_include=publish_settings.get("items_to_include"),
+                shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+            )
+        else:
+            logger.info(f"Skipping publish operation for environment '{environment}'")
 
-    logger.info("Config-based deployment completed successfully")
+        if not unpublish_settings.get("skip", False):
+            unpublish_all_orphan_items(
+                workspace,
+                item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
+                items_to_include=unpublish_settings.get("items_to_include"),
+            )
+        else:
+            logger.info(f"Skipping unpublish operation for environment '{environment}'")
+
+        logger.info("Config-based deployment completed successfully")
+
+    except Exception as e:
+        # Attach partial responses to the exception object before re-raising
+        # This preserves the data that would otherwise be lost when 'workspace' goes out of scope
+        if hasattr(workspace, "responses") and workspace.responses:
+            e.partial_results = workspace.responses
+        raise
+
+    # Happy path return - return responses if collection was enabled
+    return getattr(workspace, "responses", None)
