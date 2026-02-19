@@ -1041,6 +1041,9 @@ class TestDeployWithConfigResponseCollection:
         # Verify the exception was raised
         assert str(exc_info.value) == "Unpublish operation failed"
 
+        # Verify that publish was called (succeeded) but unpublish failed
+        mock_publish.assert_called_once()
+
         # Verify that partial_results attribute was attached to the exception
         assert hasattr(exc_info.value, "partial_results")
         assert exc_info.value.partial_results == mock_partial_responses
@@ -1086,6 +1089,9 @@ class TestDeployWithConfigResponseCollection:
         # Verify the exception was raised
         assert str(exc_info.value) == "Publish operation failed"
 
+        # Verify unpublish was not called (because publish failed first)
+        mock_unpublish.assert_not_called()
+
         # Verify that partial_results attribute was NOT attached (because responses was None)
         assert not hasattr(exc_info.value, "partial_results")
 
@@ -1127,6 +1133,9 @@ class TestDeployWithConfigResponseCollection:
 
         # Verify the exception was raised
         assert str(exc_info.value) == "Publish operation failed"
+
+        # Verify unpublish was not called (because publish failed first)
+        mock_unpublish.assert_not_called()
 
         # Verify that partial_results attribute was NOT attached (because responses was empty)
         assert not hasattr(exc_info.value, "partial_results")
