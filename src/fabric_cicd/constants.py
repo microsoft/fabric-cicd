@@ -33,6 +33,8 @@ class EnvVar(str, Enum):
     """Override base delay for item name conflict retries. Defaults to 30 seconds."""
     RETRY_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_MAX_DURATION_SECONDS"
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
+    VERSION_CHECK_DISABLED = "FABRIC_CICD_VERSION_CHECK_DISABLED"
+    """Set to '1', 'true', or 'yes' to skip version check at startup."""
 
 
 class ItemType(str, Enum):
@@ -163,6 +165,9 @@ RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECOND
 
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
+
+# Version Check
+VERSION_CHECK_DISABLED = bool(os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "false") in VALID_ENABLE_FLAGS)
 
 # Publish
 SHELL_ONLY_PUBLISH = [
