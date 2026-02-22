@@ -167,7 +167,7 @@ RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECOND
 AUTHORIZATION_HEADER = "authorization"
 
 # Version Check
-VERSION_CHECK_DISABLED = bool(os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "false") in VALID_ENABLE_FLAGS)
+VERSION_CHECK_DISABLED = os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "").lower() in VALID_ENABLE_FLAGS
 
 # Publish
 SHELL_ONLY_PUBLISH = [
