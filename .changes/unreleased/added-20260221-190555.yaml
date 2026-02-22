@@ -1,0 +1,8 @@
+kind: added
+body: Add check for FABRIC_CICD_VERSION_CHECK_DISABLED environment variable to disable version checking on startup
+time: 2026-02-21T19:05:55.474769-05:00
+custom:
+    Author: Ricapar
+    AuthorLink: https://github.com/Ricapar
+    Issue: "811"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/811
