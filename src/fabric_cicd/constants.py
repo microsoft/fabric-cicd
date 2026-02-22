@@ -33,6 +33,8 @@ class EnvVar(str, Enum):
     """Override base delay for item name conflict retries. Defaults to 30 seconds."""
     RETRY_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_MAX_DURATION_SECONDS"
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
+    PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
+    """Override max parallel workers for concurrent item publishing. Defaults to 8."""
 
 
 class ItemType(str, Enum):
@@ -160,6 +162,12 @@ FABRIC_API_ROOT_URL = os.environ.get(EnvVar.FABRIC_API_ROOT_URL.value, "https://
 RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))
 RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.value, 30))
 RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
+
+# Parallel Settings
+_parallel_max_workers_raw = os.environ.get(EnvVar.PARALLEL_MAX_WORKERS.value)
+PARALLEL_MAX_WORKERS: int = (
+    int(_parallel_max_workers_raw) if _parallel_max_workers_raw and _parallel_max_workers_raw.isdigit() else 8
+)
 
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"

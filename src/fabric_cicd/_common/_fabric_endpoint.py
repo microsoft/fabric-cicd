@@ -119,6 +119,19 @@ class FabricEndpoint:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(invoke_log_message)
 
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                iteration_count += 1
+                if max_duration is not None and time.time() - start_time >= max_duration:
+                    logger.debug(invoke_log_message)
+                    raise InvokeError(e, logger, invoke_log_message) from e
+                handle_retry(
+                    attempt=iteration_count,
+                    base_delay=10,
+                    max_duration=max_duration,
+                    start_time=start_time,
+                    prepend_message="Connection error encountered.",
+                )
+
             except Exception as e:
                 logger.debug(invoke_log_message)
                 raise InvokeError(e, logger, invoke_log_message) from e
