@@ -1,5 +1,5 @@
 kind: added
-body: Add check for FABRIC_CICD_VERSION_CHECK_DISABLED environment variable to disable version checking on startup
+body: Add FABRIC_CICD_VERSION_CHECK_DISABLED environment variable to disable version check on startup
 time: 2026-02-21T19:05:55.474769-05:00
 custom:
     Author: Ricapar
