@@ -953,7 +953,7 @@ class Parameter:
             # valid item directory with .platform file within
             if ".platform" in files:
                 item_metadata_path = Path(directory, ".platform")
-                with Path.open(item_metadata_path) as file:
+                with Path.open(item_metadata_path, encoding="utf-8") as file:
                     item_metadata = json.load(file)
                 # Ensure required metadata fields are present
                 if item_metadata and "type" in item_metadata["metadata"] and "displayName" in item_metadata["metadata"]:
