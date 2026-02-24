@@ -33,6 +33,10 @@ class EnvVar(str, Enum):
     """Override base delay for item name conflict retries. Defaults to 30 seconds."""
     RETRY_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_MAX_DURATION_SECONDS"
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
+    PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
+    """Override max parallel workers for concurrent item publishing. Defaults to 8."""
+    VERSION_CHECK_DISABLED = "FABRIC_CICD_VERSION_CHECK_DISABLED"
+    """Set to '1', 'true', or 'yes' to skip version check at startup."""
 
 
 class ItemType(str, Enum):
@@ -161,8 +165,17 @@ RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300
 RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.value, 30))
 RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
 
+# Parallel Settings
+_parallel_max_workers_raw = os.environ.get(EnvVar.PARALLEL_MAX_WORKERS.value)
+PARALLEL_MAX_WORKERS: int = (
+    int(_parallel_max_workers_raw) if _parallel_max_workers_raw and _parallel_max_workers_raw.isdigit() else 8
+)
+
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
+
+# Version Check
+VERSION_CHECK_DISABLED = os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "").lower() in VALID_ENABLE_FLAGS
 
 # Publish
 SHELL_ONLY_PUBLISH = [
