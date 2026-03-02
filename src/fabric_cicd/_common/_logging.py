@@ -89,8 +89,8 @@ def _configure_file_handler(
     if use_file_rotation and file_path:
         handler = RotatingFileHandler(
             filename=file_path,
-            maxBytes=5 * 1024 * 1024,  # 5 MB
-            backupCount=7,  # Retain 7 rotated files (35 MB total)
+            maxBytes=constants.ROTATION_LOG_FILE_MAX_BYTES,  # 5 MB (default)
+            backupCount=constants.ROTATION_LOG_FILE_BACKUP_COUNT,  # Retain 7 rotated files (35 MB total) (default)
         )
         handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     else:
