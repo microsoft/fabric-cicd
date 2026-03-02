@@ -55,24 +55,34 @@ def configure_logger_with_rotation(file_path: str) -> None:
     """
     Configure fabric_cicd logging with file rotation (size-based).
 
-    This function only writes DEBUG logs to a rotating log file while keeping
-    console output at INFO level. The log file rotates at 5 MB, retaining
-    up to 7 backup files (35 MB total).
+    Writes only DEBUG logs to a rotating log file while keeping console output
+    at INFO level. The log file rotates at 5 MB, retaining up to 7 backup
+    files (35 MB total).
+
+    Note:
+        This resets logging configuration. Use as an alternative to
+        ``change_log_level`` or ``disable_file_logging``, not in combination.
+
+        The rotating log file only captures DEBUG-level messages. Exceptions
+        are displayed on the console but full stack traces are not persisted
+        to any log file in this mode.
+
+        The rotating log file uses a simplified format compared to the default::
+
+            Default:  2026-03-02 10:30:00,123 - ERROR - fabric_cicd.publish - message
+            Rotating: 2026-03-02 10:30:00,123 - DEBUG - message
 
     Args:
         file_path: The path to the log file in which rotation will be applied.
 
     Examples:
-        Custom log file with size-based rotation (default is append mode)
         >>> from fabric_cicd import configure_logger_with_rotation
-        >>> configure_logger_with_rotation(
-        ...     file_path="C:/my_app/logs/fabric.log",
-        ... )
+        >>> configure_logger_with_rotation(file_path="C:/my_app/logs/fabric.log")
     """
     configure_logger(
         level=logging.DEBUG,
         file_path=validate_log_file_path(file_path),
-        rotate_on=True,
+        use_file_rotation=True,
         suppress_debug_console=True,
         debug_only_file=True,
     )
