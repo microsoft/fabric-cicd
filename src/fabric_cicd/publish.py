@@ -298,7 +298,7 @@ def deploy_with_config(
     environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
     config_override: Optional[dict] = None,
-) -> Optional[dict]:
+) -> dict:
     """
     Deploy items using YAML configuration file with environment-specific settings.
     This function provides a simplified deployment interface that loads configuration
@@ -313,7 +313,8 @@ def deploy_with_config(
         config_override: Optional dictionary to override specific configuration values.
 
     Returns:
-        Dict containing all API responses if the "enable_response_collection" feature flag is enabled and responses were collected, otherwise None.
+        Dict with "message" (str) and "details" (dict or None) keys.
+        "details" contains all API responses if the "enable_response_collection" feature flag is enabled and responses were collected, otherwise None.
         On failure, the exception will have a `partial_results` attribute containing the responses collected before the failure if response collection was enabled.
 
     Raises:
@@ -324,16 +325,17 @@ def deploy_with_config(
     Examples:
         Basic usage
         >>> from fabric_cicd import deploy_with_config
-        >>> deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod"
         ... )
+        >>> print(result["message"])
 
         With custom authentication
         >>> from fabric_cicd import deploy_with_config
         >>> from azure.identity import ClientSecretCredential
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
-        >>> deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod",
         ...     token_credential=credential
@@ -343,7 +345,7 @@ def deploy_with_config(
         >>> from fabric_cicd import deploy_with_config
         >>> from azure.identity import ClientSecretCredential
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
-        >>> deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod",
         ...     config_override={
@@ -361,25 +363,25 @@ def deploy_with_config(
         With response collection
         >>> from fabric_cicd import deploy_with_config, append_feature_flag
         >>> append_feature_flag("enable_response_collection")
-        >>> results = deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod"
         ... )
-        >>> # Access results on success
-        >>> if results:
-        ...     print(results)
+        >>> print(result["message"])
+        >>> if result["details"]:
+        ...     print(result["details"])
 
         Handling failures with partial results
         >>> from fabric_cicd import deploy_with_config, append_feature_flag
         >>> append_feature_flag("enable_response_collection")
         >>> try:
-        ...     results = deploy_with_config(
+        ...     result = deploy_with_config(
         ...         config_file_path="workspace/config.yml",
         ...         environment="prod"
         ...     )
-        ...     print("Deployment Success!")
-        ...     if results:
-        ...         print(results)
+        ...     print(result["message"])
+        ...     if result["details"]:
+        ...         print(result["details"])
         ... except Exception as e:
         ...     print("Deployment Failed!")
         ...     if hasattr(e, 'partial_results'):
@@ -447,5 +449,8 @@ def deploy_with_config(
             e.partial_results = workspace.responses
         raise
 
-    # Happy path return - return responses if collection was enabled
-    return getattr(workspace, "responses", None)
+    # Happy path return
+    return {
+        "message": "Deployment completed successfully",
+        "details": getattr(workspace, "responses", None),
+    }

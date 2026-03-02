@@ -917,7 +917,7 @@ class TestDeployWithConfigResponseCollection:
     def test_deploy_with_config_returns_none_without_response_collection(
         self, mock_unpublish, mock_publish, mock_workspace, tmp_path
     ):
-        """Test that deploy_with_config returns None when response collection is not enabled."""
+        """Test that deploy_with_config returns structured response with details=None when response collection is not enabled."""
         # Create the actual directory structure that the config references
         test_repo_dir = tmp_path / "test" / "path"
         test_repo_dir.mkdir(parents=True)
@@ -942,8 +942,12 @@ class TestDeployWithConfigResponseCollection:
         # Execute deployment
         result = deploy_with_config(str(config_file), "dev")
 
-        # Verify that None is returned
-        assert result is None
+        # Verify structured response with details=None
+        assert isinstance(result, dict)
+        assert "message" in result
+        assert "details" in result
+        assert result["message"] == "Deployment completed successfully"
+        assert result["details"] is None
 
         # Verify workspace creation and operations were called
         mock_workspace.assert_called_once()
@@ -956,7 +960,7 @@ class TestDeployWithConfigResponseCollection:
     def test_deploy_with_config_returns_responses_with_feature_flag(
         self, mock_unpublish, mock_publish, mock_workspace, tmp_path
     ):
-        """Test that deploy_with_config returns responses when feature flag is enabled."""
+        """Test that deploy_with_config returns structured response with details when feature flag is enabled."""
         # Create the actual directory structure that the config references
         test_repo_dir = tmp_path / "test" / "path"
         test_repo_dir.mkdir(parents=True)
@@ -986,11 +990,13 @@ class TestDeployWithConfigResponseCollection:
         # Execute deployment
         result = deploy_with_config(str(config_file), "dev")
 
-        # Verify that responses are returned
-        assert result is not None
-        assert result == mock_responses
-        assert "Notebook" in result
-        assert "TestNotebook" in result["Notebook"]
+        # Verify structured response with details
+        assert isinstance(result, dict)
+        assert result["message"] == "Deployment completed successfully"
+        assert result["details"] is not None
+        assert result["details"] == mock_responses
+        assert "Notebook" in result["details"]
+        assert "TestNotebook" in result["details"]["Notebook"]
 
         # Verify workspace creation and operations were called
         mock_workspace.assert_called_once()
@@ -1146,7 +1152,7 @@ class TestDeployWithConfigResponseCollection:
     def test_deploy_with_config_returns_empty_dict_when_no_items_published(
         self, mock_unpublish, mock_publish, mock_workspace, tmp_path
     ):
-        """Test that deploy_with_config returns empty dict when response collection enabled but no items published."""
+        """Test that deploy_with_config returns structured response with empty details when no items published."""
         # Create the actual directory structure that the config references
         test_repo_dir = tmp_path / "test" / "path"
         test_repo_dir.mkdir(parents=True)
@@ -1171,8 +1177,10 @@ class TestDeployWithConfigResponseCollection:
         # Execute deployment
         result = deploy_with_config(str(config_file), "dev")
 
-        # Verify that empty dict is returned
-        assert result == {}
+        # Verify structured response with empty details
+        assert isinstance(result, dict)
+        assert result["message"] == "Deployment completed successfully"
+        assert result["details"] == {}
 
         # Verify workspace creation and operations were called
         mock_workspace.assert_called_once()
