@@ -1433,11 +1433,9 @@ def test_duplicate_non_default_logical_id_raises_error(
 
 def test_replace_logical_ids_skips_default_guid(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that _replace_logical_ids skips items with DEFAULT_GUID as their logical ID."""
-    from unittest.mock import patch as mock_patch
-
     from fabric_cicd._common._item import Item
 
-    with mock_patch.object(FabricWorkspace, "_refresh_repository_items"):
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
         workspace = patched_fabric_workspace(
             workspace_id=valid_workspace_id,
             repository_directory=str(temp_workspace_dir),
@@ -1479,11 +1477,9 @@ def test_replace_logical_ids_replaces_non_default_guid(
     temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
 ):
     """Test that _replace_logical_ids still replaces non-default logical IDs correctly."""
-    from unittest.mock import patch as mock_patch
-
     from fabric_cicd._common._item import Item
 
-    with mock_patch.object(FabricWorkspace, "_refresh_repository_items"):
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
         workspace = patched_fabric_workspace(
             workspace_id=valid_workspace_id,
             repository_directory=str(temp_workspace_dir),
@@ -1525,7 +1521,7 @@ def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_
     }
     with (item_dir_1 / ".platform").open("w", encoding="utf-8") as f:
         json.dump(metadata_1, f)
-    with (item_dir_1 / "dummy.txt").open("w") as f:
+    with (item_dir_1 / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("content")
 
     # Item 2: git integration item with unique logical ID
@@ -1537,7 +1533,7 @@ def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_
     }
     with (item_dir_2 / ".platform").open("w", encoding="utf-8") as f:
         json.dump(metadata_2, f)
-    with (item_dir_2 / "dummy.txt").open("w") as f:
+    with (item_dir_2 / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("content")
 
     # Item 3: another export API item with default GUID
@@ -1549,7 +1545,7 @@ def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_
     }
     with (item_dir_3 / ".platform").open("w", encoding="utf-8") as f:
         json.dump(metadata_3, f)
-    with (item_dir_3 / "dummy.txt").open("w") as f:
+    with (item_dir_3 / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("content")
 
     # Should NOT raise any error
