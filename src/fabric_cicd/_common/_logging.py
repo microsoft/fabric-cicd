@@ -88,14 +88,14 @@ def _configure_file_handler(
     """Configure a file handler (default or rotating)."""
     if use_file_rotation and file_path:
         handler = RotatingFileHandler(
-            file_path,
+            filename=file_path,
             maxBytes=5 * 1024 * 1024,  # 5 MB
             backupCount=7,  # Retain 7 rotated files (35 MB total)
         )
         handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     else:
         handler = logging.FileHandler(
-            "fabric_cicd.error.log",
+            filename="fabric_cicd.error.log",
             mode="w",
             delay=True,  # Delay file creation until first log
         )
