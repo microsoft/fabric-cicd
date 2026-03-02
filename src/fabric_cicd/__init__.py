@@ -81,13 +81,14 @@ def disable_file_logging() -> None:
     """
     Disable file logging for the fabric_cicd package.
 
-    This function is only applicable when logging is at the default INFO level.
-    When called, no log file will be created for INFO-level logging.
-    Console logging will still occur for INFO-level messages.
+    When called, no log file will be created and only console logging will occur
+    at the default INFO level.
 
     Note:
-        This does not affect DEBUG-level file logging configured via
-        `change_log_level` or `configure_logger_with_rotation`.
+        This function is intended to be used as an alternative to
+        `change_log_level` or `configure_logger_with_rotation`, not in
+        combination with them as this will reset logging configurations
+        to INFO-level console output only.
 
     Examples:
         Basic usage

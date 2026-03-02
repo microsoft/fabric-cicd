@@ -237,18 +237,49 @@ class TestConfigureLogger:
         assert len(console_only_logger.handlers) == 1
 
     def test_configure_logger_clears_existing_handlers(self):
-        """Test that configuring logger clears existing handlers."""
-        # Add some handlers first
-        configure_logger(disable_log_file=True)
-
+        """Test that configuring logger clears existing managed handlers without affecting external ones."""
+        # Add an external handler to the root logger
+        external_handler = logging.StreamHandler()
         root_logger = logging.getLogger()
-        initial_handler_count = len(root_logger.handlers)
+        root_logger.addHandler(external_handler)
 
-        # Reconfigure
+        # Configure fabric_cicd logging
         configure_logger(disable_log_file=True)
 
-        # Should not accumulate handlers
-        assert len(root_logger.handlers) == initial_handler_count
+        # Reconfigure - should not accumulate managed handlers
+        managed_count_before = len(root_logger.handlers)
+        configure_logger(disable_log_file=True)
+        managed_count_after = len(root_logger.handlers)
+
+        assert managed_count_after == managed_count_before
+
+        # External handler should still be present
+        assert external_handler in root_logger.handlers
+
+        # Clean up the external handler
+        root_logger.removeHandler(external_handler)
+
+    def test_configure_logger_preserves_external_handlers(self):
+        """Test that external (non-fabric_cicd) handlers survive reconfiguration."""
+        root_logger = logging.getLogger()
+        package_logger = logging.getLogger("fabric_cicd")
+
+        # Add external handlers
+        external_root_handler = logging.StreamHandler()
+        external_package_handler = logging.StreamHandler()
+        root_logger.addHandler(external_root_handler)
+        package_logger.addHandler(external_package_handler)
+
+        # Configure fabric_cicd logging
+        configure_logger(disable_log_file=True)
+
+        # External handlers should still be present
+        assert external_root_handler in root_logger.handlers
+        assert external_package_handler in package_logger.handlers
+
+        # Clean up
+        root_logger.removeHandler(external_root_handler)
+        package_logger.removeHandler(external_package_handler)
 
 
 class TestLogHeader:
@@ -521,7 +552,7 @@ class TestFileLoggingIntegration:
 
             # Check file was created and contains the message
             assert log_file.exists()
-            content = log_file.read_text()
+            content = log_file.read_text(encoding="utf-8")
             assert "Debug message for rotation test" in content
 
         finally:
@@ -552,7 +583,7 @@ class TestFileLoggingIntegration:
                     handler.flush()
 
             # Check file contains only DEBUG message
-            content = log_file.read_text()
+            content = log_file.read_text(encoding="utf-8")
             assert "Debug message" in content
             assert "Info message" not in content
             assert "Warning message" not in content
@@ -596,7 +627,7 @@ class TestLoggerFiltering:
                     handler.flush()
 
             # Check file contains only fabric_cicd message
-            content = log_file.read_text()
+            content = log_file.read_text(encoding="utf-8")
             assert "Fabric CICD message" in content
             assert "Other package message" not in content
 

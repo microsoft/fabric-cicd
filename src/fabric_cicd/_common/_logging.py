@@ -59,6 +59,37 @@ class CustomFormatter(logging.Formatter):
         return full_message
 
 
+_FABRIC_CICD_HANDLER_ATTR = "_fabric_cicd_managed"
+
+
+def _cleanup_managed_handlers(*loggers: logging.Logger) -> None:
+    """Close and remove only handlers previously added by fabric_cicd."""
+    for logger_instance in loggers:
+        for handler in list(logger_instance.handlers):
+            if getattr(handler, _FABRIC_CICD_HANDLER_ATTR, False):
+                handler.close()
+                logger_instance.removeHandler(handler)
+
+
+def _mark_handler(handler: logging.Handler) -> logging.Handler:
+    """Mark a handler as managed by fabric_cicd."""
+    setattr(handler, _FABRIC_CICD_HANDLER_ATTR, True)
+    return handler
+
+
+def _create_console_handler(level: int) -> logging.StreamHandler:
+    """Create a console handler with the standard fabric_cicd formatter."""
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+    handler.setFormatter(
+        CustomFormatter(
+            "[%(levelname)s] %(asctime)s - %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+    return handler
+
+
 def configure_logger(
     level: int = logging.INFO,
     file_path: Optional[str] = None,
@@ -80,11 +111,15 @@ def configure_logger(
     """
     # For non-fabric_cicd packages: INFO if DEBUG, else ERROR
     root_level = logging.INFO if level == logging.DEBUG else logging.ERROR
+
     root_logger = logging.getLogger()
     root_logger.setLevel(root_level)
 
-    # Clear existing handlers to prevent duplicate logging
-    root_logger.handlers = []
+    package_logger = logging.getLogger("fabric_cicd")
+    console_only_logger = logging.getLogger("console_only")
+
+    # Close and remove only handlers previously added by fabric_cicd
+    _cleanup_managed_handlers(root_logger, package_logger, console_only_logger)
 
     # Configure file handler unless disabled
     if not disable_log_file:
@@ -112,34 +147,20 @@ def configure_logger(
 
         # Filter to only accept fabric_cicd logs
         file_handler.addFilter(lambda record: record.name.startswith("fabric_cicd"))
-        root_logger.addHandler(file_handler)
+        root_logger.addHandler(_mark_handler(file_handler))
 
     # Determine console level
     console_level = level
     if suppress_debug_console and level == logging.DEBUG:
         console_level = logging.INFO
 
-    # Configure Console Handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(console_level)
-    console_handler.setFormatter(
-        CustomFormatter(
-            "[%(levelname)s] %(asctime)s - %(message)s",
-            datefmt="%H:%M:%S",
-        )
-    )
-
     # Create a logger that writes to the console and log file
-    package_logger = logging.getLogger("fabric_cicd")
     package_logger.setLevel(level)
-    package_logger.handlers = []
-    package_logger.addHandler(console_handler)
+    package_logger.addHandler(_mark_handler(_create_console_handler(console_level)))
 
     # Create a logger that only writes to the console
-    console_only_logger = logging.getLogger("console_only")
     console_only_logger.setLevel(console_level)
-    console_only_logger.handlers = []
-    console_only_logger.addHandler(console_handler)
+    console_only_logger.addHandler(_mark_handler(_create_console_handler(console_level)))
     console_only_logger.propagate = False  # Prevent logs from being propagated to other loggers
 
 
@@ -160,10 +181,15 @@ def exception_handler(exception_type: type[BaseException], exception: BaseExcept
         # Log the exception using the logger associated with the exception
         original_logger = exception.logger
 
-        # Check if file logging is enabled by looking for file handlers
+        # Check if file logging is enabled by looking for managed file handlers
         root_logger = logging.getLogger()
         file_handler = next(
-            (h for h in root_logger.handlers if isinstance(h, (logging.FileHandler, RotatingFileHandler))),
+            (
+                h
+                for h in root_logger.handlers
+                if isinstance(h, (logging.FileHandler, RotatingFileHandler))
+                and getattr(h, _FABRIC_CICD_HANDLER_ATTR, False)
+            ),
             None,
         )
 
@@ -181,7 +207,8 @@ def exception_handler(exception_type: type[BaseException], exception: BaseExcept
         additional_info = getattr(exception, "additional_info", None)
         additional_info = "\n\nAdditional Info: \n" + additional_info if additional_info is not None else ""
 
-        package_logger.handlers = []
+        # Remove only managed console handlers so the stack trace goes to file only (not terminal)
+        _cleanup_managed_handlers(package_logger)
         original_logger.exception(f"%s{additional_info}", exception, exc_info=(exception_type, exception, traceback))
     else:
         # If the exception is not from _common._exceptions, use the default exception handler
