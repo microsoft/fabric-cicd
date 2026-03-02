@@ -67,6 +67,12 @@ def configure_logger_with_rotation(file_path: str) -> None:
         are displayed on the console but full stack traces are not persisted
         to any log file in this mode.
 
+        Rotation settings can be overridden before calling this function::
+
+            import fabric_cicd.constants as constants
+            constants.ROTATION_LOG_FILE_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+            constants.ROTATION_LOG_FILE_BACKUP_COUNT = 3              # 3 backups
+
         The rotating log file uses a simplified format compared to the default::
 
             Default:  2026-03-02 10:30:00,123 - ERROR - fabric_cicd.publish - message
