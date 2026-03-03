@@ -1,0 +1,8 @@
+kind: added
+body: Support selective folder deployment using inclusion list
+time: 2026-02-10T15:18:50.3316666+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "757"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/757
