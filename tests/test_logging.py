@@ -27,7 +27,7 @@ from fabric_cicd._common._logging import (
 )
 
 
-def close_all_file_handlers():
+def _close_all_file_handlers():
     """Close all file handlers to release file locks on Windows."""
     root_logger = logging.getLogger()
     for handler in root_logger.handlers[:]:
@@ -40,6 +40,25 @@ def close_all_file_handlers():
         if isinstance(handler, (logging.FileHandler, RotatingFileHandler)):
             handler.close()
             package_logger.removeHandler(handler)
+
+
+@pytest.fixture(autouse=True)
+def _clean_logging_state():
+    """Reset logging state before and after each test to release file locks on Windows."""
+    _close_all_file_handlers()
+
+    root_logger = logging.getLogger()
+    root_logger.handlers = []
+
+    package_logger = logging.getLogger("fabric_cicd")
+    package_logger.handlers = []
+
+    console_only_logger = logging.getLogger("console_only")
+    console_only_logger.handlers = []
+
+    yield
+
+    _close_all_file_handlers()
 
 
 class TestCustomFormatter:
@@ -365,16 +384,6 @@ class TestConfigureConsoleHandler:
 class TestGetFileHandler:
     """Tests for the _get_file_handler function."""
 
-    def setup_method(self):
-        """Reset root logger handlers before each test."""
-        close_all_file_handlers()
-        root_logger = logging.getLogger()
-        root_logger.handlers = []
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
-
     def test_returns_none_when_no_file_handler(self):
         """Test returns None when no file handler exists on root logger."""
         assert _get_file_handler() is None
@@ -488,24 +497,6 @@ class TestBuildFileMessage:
 class TestConfigureLogger:
     """Tests for the configure_logger function."""
 
-    def setup_method(self):
-        """Reset loggers before each test."""
-        close_all_file_handlers()
-
-        # Clear all handlers from root and package loggers
-        root_logger = logging.getLogger()
-        root_logger.handlers = []
-
-        package_logger = logging.getLogger("fabric_cicd")
-        package_logger.handlers = []
-
-        console_only_logger = logging.getLogger("console_only")
-        console_only_logger.handlers = []
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
-
     def test_configure_logger_default_info_level(self):
         """Test default configuration sets INFO level."""
         configure_logger(disable_log_file=True)
@@ -562,7 +553,7 @@ class TestConfigureLogger:
             rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
             assert len(rotating_handlers) == 1
         finally:
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_configure_logger_suppress_debug_console(self):
@@ -698,25 +689,13 @@ class TestLogHeader:
 class TestWrapperFunctions:
     """Tests for the wrapper functions in __init__.py."""
 
-    def setup_method(self):
-        """Reset loggers and feature flags before each test."""
+    @pytest.fixture(autouse=True)
+    def _clear_feature_flags(self):
+        """Clear feature flags before each wrapper test."""
         from fabric_cicd import constants
 
-        close_all_file_handlers()
-
-        # Clear feature flags
         constants.FEATURE_FLAG.clear()
-
-        # Reset loggers
-        root_logger = logging.getLogger()
-        root_logger.handlers = []
-
-        package_logger = logging.getLogger("fabric_cicd")
-        package_logger.handlers = []
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
+        return
 
     def test_append_feature_flag(self):
         """Test append_feature_flag adds flag to set."""
@@ -818,20 +797,12 @@ class TestWrapperFunctions:
             assert len(console_handlers) == 1
             assert console_handlers[0].level == logging.INFO
         finally:
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class TestExceptionHandler:
     """Tests for the exception_handler function."""
-
-    def setup_method(self):
-        """Reset loggers before each test."""
-        close_all_file_handlers()
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
 
     def test_exception_handler_custom_exception(self):
         """Test exception handler handles custom exceptions."""
@@ -896,14 +867,6 @@ class TestExceptionHandler:
 class TestDelayedFileCreation:
     """Tests for delayed file creation behavior."""
 
-    def setup_method(self):
-        """Reset loggers before each test."""
-        close_all_file_handlers()
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
-
     def test_file_not_created_until_log_written(self):
         """Test that log file is not created until first log is written (delay=True)."""
         tmpdir = Path(tempfile.mkdtemp())
@@ -925,7 +888,7 @@ class TestDelayedFileCreation:
             import os
 
             os.chdir(original_cwd)
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_disable_file_logging_prevents_file_creation(self):
@@ -955,20 +918,12 @@ class TestDelayedFileCreation:
             import os
 
             os.chdir(original_cwd)
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class TestFileLoggingIntegration:
     """Integration tests for file logging functionality."""
-
-    def setup_method(self):
-        """Reset loggers before each test."""
-        close_all_file_handlers()
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
 
     def test_rotating_file_handler_writes_logs(self):
         """Test that rotating file handler actually writes logs."""
@@ -992,7 +947,7 @@ class TestFileLoggingIntegration:
             assert "Debug message for rotation test" in content
 
         finally:
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_debug_only_file_filter(self):
@@ -1025,20 +980,12 @@ class TestFileLoggingIntegration:
             assert "Warning message" not in content
 
         finally:
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class TestLoggerFiltering:
     """Tests for logger filtering behavior."""
-
-    def setup_method(self):
-        """Reset loggers before each test."""
-        close_all_file_handlers()
-
-    def teardown_method(self):
-        """Clean up file handlers after each test."""
-        close_all_file_handlers()
 
     def test_file_handler_filters_non_fabric_cicd_logs(self):
         """Test that file handler only accepts fabric_cicd logs."""
@@ -1067,7 +1014,7 @@ class TestLoggerFiltering:
             assert "Other package message" not in content
 
         finally:
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_console_only_logger_does_not_propagate(self):
@@ -1092,5 +1039,5 @@ class TestLoggerFiltering:
                 assert "Console only error" not in content
 
         finally:
-            close_all_file_handlers()
+            _close_all_file_handlers()
             shutil.rmtree(tmpdir, ignore_errors=True)
