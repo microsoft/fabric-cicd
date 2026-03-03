@@ -59,8 +59,28 @@ class CustomFormatter(logging.Formatter):
         return full_message
 
 
+class PackageFilter(logging.Filter):
+    """
+    Filter that only allows records from the fabric_cicd package logs.
+
+    Args:
+        debug_only: If True, only allows DEBUG level records. If False, allows all levels.
+    """
+
+    def __init__(self, debug_only: bool = False) -> None:
+        super().__init__()
+        self.debug_only = debug_only
+
+    def filter(self, record: LogRecord) -> bool:
+        is_fabric_cicd = record.name.startswith("fabric_cicd")
+        if self.debug_only:
+            return is_fabric_cicd and record.levelno == logging.DEBUG
+        return is_fabric_cicd
+
+
 """Helper functions to configure logging and handle exceptions across the fabric_cicd package."""
 
+_DEFAULT_LOG_FILENAME = "fabric_cicd.error.log"
 _FABRIC_CICD_HANDLER_ATTR = "_fabric_cicd_managed"
 
 
@@ -79,37 +99,50 @@ def _mark_handler(handler: logging.Handler) -> logging.Handler:
     return handler
 
 
-def _configure_file_handler(
+def _configure_default_file_handler() -> logging.Handler:
+    """Configure the default file handler for standalone fabric_cicd usage."""
+    handler = logging.FileHandler(
+        filename=_DEFAULT_LOG_FILENAME,
+        mode="w",
+        delay=True,
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s"))
+    handler.addFilter(PackageFilter())  # All levels from fabric_cicd package logs
+
+    return _mark_handler(handler)
+
+
+def _configure_external_file_handler(
+    external_handler: logging.FileHandler | RotatingFileHandler,
     level: int,
-    file_path: str | None,
-    use_file_rotation: bool,
     debug_only_file: bool,
 ) -> logging.Handler:
-    """Configure a file handler (default or rotating)."""
-    if use_file_rotation and file_path:
-        handler = RotatingFileHandler(
-            filename=file_path,
-            maxBytes=constants.ROTATION_LOG_FILE_MAX_BYTES,  # 5 MB (default)
-            backupCount=constants.ROTATION_LOG_FILE_BACKUP_COUNT,  # Retain 7 rotated files (35 MB total) (default)
-        )
-        handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    """
+    Configure a file handler that appends fabric_cicd package logs
+    to an external logger's file. The external logger remains responsible
+    for file rotation, formatting, and other configurations.
+
+    When level is DEBUG, there is an option to only write DEBUG messages from
+    fabric_cicd to the file, controlled by the debug_only_file flag.
+    """
+    handler = logging.FileHandler(
+        filename=external_handler.baseFilename,
+        mode="a",
+    )
+    # Use the external handler's formatter for consistent log format
+    if external_handler.formatter:
+        handler.setFormatter(external_handler.formatter)
     else:
-        handler = logging.FileHandler(
-            filename="fabric_cicd.error.log",
-            mode="w",
-            delay=True,  # Delay file creation until first log
-        )
-        handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s"))
+        # Otherwise, use a simplified formatter
+        handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
-    # Capture only DEBUG messages in log file when DEBUG level is set and debug_only_file is True
-    if debug_only_file and level == logging.DEBUG:
+    # Write only DEBUG messages from fabric_cicd package if the level is DEBUG and the flag is True
+    if level == logging.DEBUG and debug_only_file:
         handler.setLevel(logging.DEBUG)
-        handler.addFilter(lambda record: record.levelno == logging.DEBUG)
-
-    # The file handler sits on the root logger, which receives propagated records from ALL loggers
-    # (e.g. azure.identity, urllib3, requests). This filter ensures only fabric_cicd package logs
-    # are written to the file, preventing third-party noise in the log output.
-    handler.addFilter(lambda record: record.name.startswith("fabric_cicd"))
+        handler.addFilter(PackageFilter(debug_only=True))  # Only DEBUG level from fabric_cicd package logs
+    else:
+        # Otherwise, write all levels from fabric_cicd package to file
+        handler.addFilter(PackageFilter())
 
     return _mark_handler(handler)
 
@@ -127,27 +160,15 @@ def _configure_console_handler(level: int) -> logging.StreamHandler:
     return _mark_handler(handler)
 
 
-def _get_file_handler() -> logging.FileHandler | None:
-    """Get the file handler on the root logger, if one exists."""
-    root_logger = logging.getLogger()
-    return next(
-        (
-            h
-            for h in root_logger.handlers
-            if isinstance(h, (logging.FileHandler, RotatingFileHandler))
-            and getattr(h, _FABRIC_CICD_HANDLER_ATTR, False)
-        ),
-        None,
-    )
-
-
 def _build_console_message(exception: BaseException, file_handler: logging.FileHandler | None) -> str:
     """Build the user-facing console error message, optionally referencing the log file."""
-    # Skip file reference for RotatingFileHandler since it only contains DEBUG logs
-    if file_handler is not None and not isinstance(file_handler, RotatingFileHandler):
-        log_file_path = Path(file_handler.baseFilename).resolve()
-        return f"{exception!s}\n\nSee {log_file_path} for full details."
-    return f"{exception!s}"
+    # Write exception to console when file logging is disabled or when using an external file handler
+    if file_handler is None or Path(file_handler.baseFilename).name != _DEFAULT_LOG_FILENAME:
+        return f"{exception!s}"
+
+    # Only reference the default log file which contains full error details
+    log_file_path = Path(file_handler.baseFilename).resolve()
+    return f"{exception!s}\n\nSee {log_file_path} for full details."
 
 
 def _build_file_message(exception: BaseException) -> str:
@@ -158,27 +179,54 @@ def _build_file_message(exception: BaseException) -> str:
     return "%s"
 
 
-"""Main logging configuration function and exception handler for fabric_cicd."""
+"""Main logging configuration and exception handling functions for fabric_cicd."""
+
+
+def get_file_handler(
+    logger: logging.Logger | None = None,
+) -> logging.FileHandler | RotatingFileHandler | None:
+    """
+    Get a file handler from a logger.
+
+    Args:
+        logger: The logger to search for a file handler. If None, searches the root logger
+            for fabric_cicd-managed handlers only.
+
+    Returns:
+        The first FileHandler or RotatingFileHandler found, or None if not found.
+    """
+    target_logger = logger if logger is not None else logging.getLogger()
+
+    # When searching root logger, only return fabric_cicd-managed handlers
+    check_managed = logger is None
+
+    return next(
+        (
+            h
+            for h in target_logger.handlers
+            if isinstance(h, (logging.FileHandler, RotatingFileHandler))
+            and (getattr(h, _FABRIC_CICD_HANDLER_ATTR, False) if check_managed else True)
+        ),
+        None,
+    )
 
 
 def configure_logger(
     level: int = logging.INFO,
-    file_path: Optional[str] = None,
-    use_file_rotation: bool = False,
     suppress_debug_console: bool = False,
     debug_only_file: bool = False,
     disable_log_file: bool = False,
+    external_file_handler: Optional[logging.FileHandler | RotatingFileHandler] = None,
 ) -> None:
     """
     Configure the logger.
 
     Args:
         level: The log level to set. Must be one of the standard logging levels.
-        file_path: Path to custom log file (optional).
-        use_file_rotation: Use RotatingFileHandler with size-based rotation.
         suppress_debug_console: Suppress DEBUG output to console (only applies when level is DEBUG).
         debug_only_file: Only write DEBUG messages to file (only applies when level is DEBUG).
         disable_log_file: Disable file logging entirely.
+        external_file_handler: External file handler to append logs to instead of creating the default one.
     """
     # Determine console level - suppress DEBUG to console if specified, otherwise same as level
     console_level = logging.INFO if suppress_debug_console and level == logging.DEBUG else level
@@ -196,9 +244,14 @@ def configure_logger(
     # Set root logger level - for non-fabric_cicd packages: INFO if DEBUG, else ERROR
     root_logger.setLevel(level=logging.INFO if level == logging.DEBUG else logging.ERROR)
 
-    # Configure file handler unless disabled
-    if not disable_log_file:
-        root_logger.addHandler(_configure_file_handler(level, file_path, use_file_rotation, debug_only_file))
+    # Configure file handler based on parameters
+    if external_file_handler is not None:
+        # Use provided external file handler for fabric_cicd logs
+        root_logger.addHandler(_configure_external_file_handler(external_file_handler, level, debug_only_file))
+
+    elif not disable_log_file:
+        # Use the default file handler for fabric_cicd logs
+        root_logger.addHandler(_configure_default_file_handler())
 
     # Package logger - primary logger for all fabric_cicd library logging
     # Writes to console via its own handler and to file via propagation to root
@@ -230,16 +283,19 @@ def exception_handler(exception_type: type[BaseException], exception: BaseExcept
         return
 
     # Step 1: Write user-facing error message to console only (no file)
-    file_handler = _get_file_handler()
+    file_handler = get_file_handler()  # searches root logger for managed handlers
     console_message = _build_console_message(exception, file_handler)
     logging.getLogger("console_only").error(console_message)
 
     # Step 2: Write full stack trace to file only (not terminal)
-    # Remove console handler first from the package logger so the stack trace doesn't also print to terminal
-    package_logger = logging.getLogger("fabric_cicd")
-    _cleanup_managed_handlers(package_logger)
-    file_message = _build_file_message(exception)
-    exception.logger.exception(file_message, exception, exc_info=(exception_type, exception, traceback))
+    # Only write to file if using fabric_cicd default file handler (includes ERROR level logs)
+    is_default_file_handler = file_handler is not None and Path(file_handler.baseFilename).name == _DEFAULT_LOG_FILENAME
+    if is_default_file_handler:
+        # Remove console handler from package logger so stack trace doesn't print to terminal
+        package_logger = logging.getLogger("fabric_cicd")
+        _cleanup_managed_handlers(package_logger)
+        file_message = _build_file_message(exception)
+        exception.logger.exception(file_message, exception, exc_info=(exception_type, exception, traceback))
 
 
 def log_header(logger: logging.Logger, message: str) -> None:

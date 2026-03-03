@@ -8,8 +8,7 @@ import sys
 
 import fabric_cicd.constants as constants
 from fabric_cicd._common._check_utils import check_version
-from fabric_cicd._common._logging import configure_logger, exception_handler
-from fabric_cicd._common._validate_input import validate_log_file_path
+from fabric_cicd._common._logging import configure_logger, exception_handler, get_file_handler
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import deploy_with_config, publish_all_items, unpublish_all_orphan_items
@@ -51,46 +50,57 @@ def change_log_level(level: str = "DEBUG") -> None:
         logger.warning(f"Log level '{level}' not supported.  Only DEBUG is supported at this time. No changes made.")
 
 
-def configure_logger_with_rotation(file_path: str) -> None:
+def configure_external_file_logging(external_logger: logging.Logger) -> None:
     """
-    Configure fabric_cicd logging with file rotation (size-based).
+    Configure fabric_cicd logging to integrate with an external logger's file handler.
+    This is an advanced alternative to the fabric_cicd default file logging configuration.
 
-    Writes only DEBUG logs to a rotating log file while keeping console output
-    at INFO level. The log file rotates at 5 MB, retaining up to 7 backup
-    files (35 MB total).
+    Extracts the file handler from the provided logger and configures fabric_cicd
+    to append only DEBUG logs (e.g., API request/response details) to the same file.
+    The external logger remains responsible for file rotation (if applicable).
 
     Note:
-        This resets logging configuration. Use as an alternative to
+        This function resets logging configuration. Use as an alternative to
         ``change_log_level`` or ``disable_file_logging``, not in combination.
 
-        The rotating log file only captures DEBUG-level messages. Exceptions
-        are displayed on the console but full stack traces are not persisted
-        to any log file in this mode.
+        Only DEBUG logs from the fabric_cicd package are written to the file.
 
-        Rotation settings can be overridden before calling this function::
+        If no format is set on the external logger's file handler, a simplified
+        message format will be used for fabric_cicd logs in that file.
 
-            import fabric_cicd.constants as constants
-            constants.ROTATION_LOG_FILE_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
-            constants.ROTATION_LOG_FILE_BACKUP_COUNT = 3              # 3 backups
-
-        The rotating log file uses a simplified format compared to the default::
-
-            Default:  2026-03-02 10:30:00,123 - ERROR - fabric_cicd.publish - message
-            Rotating: 2026-03-02 10:30:00,123 - DEBUG - message
+        Console output remains at INFO level (default fabric-cicd behavior).
 
     Args:
-        file_path: The path to the log file in which rotation will be applied.
+        external_logger: The external logger instance (e.g., from CLI) that has
+            a FileHandler or RotatingFileHandler attached.
 
     Examples:
-        >>> from fabric_cicd import configure_logger_with_rotation
-        >>> configure_logger_with_rotation(file_path="C:/my_app/logs/fabric.log")
+        General usage::
+
+            import logging
+            from logging.handlers import RotatingFileHandler
+            from fabric_cicd import configure_file_logging
+
+            # Set up your own logger with a file handler
+            my_logger = logging.getLogger("MyApp")
+            handler = RotatingFileHandler("app.log", maxBytes=5*1024*1024, backupCount=7)
+            handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            my_logger.addHandler(handler)
+
+            # Configure fabric_cicd to use the same file
+            configure_file_logging(my_logger)
     """
+    # Extract file handler from external logger
+    file_handler = get_file_handler(external_logger)
+    if file_handler is None:
+        msg = "No FileHandler or RotatingFileHandler found on the provided logger."
+        raise ValueError(msg)
+
     configure_logger(
         level=logging.DEBUG,
-        file_path=validate_log_file_path(file_path),
-        use_file_rotation=True,
         suppress_debug_console=True,
         debug_only_file=True,
+        external_file_handler=file_handler,
     )
 
 
@@ -103,7 +113,7 @@ def disable_file_logging() -> None:
 
     Note:
         This function is intended to be used as an alternative to
-        `change_log_level` or `configure_logger_with_rotation`, not in
+        `change_log_level` or `configure_external_file_logging`, not in
         combination with them as this will reset logging configurations
         to INFO-level console output only.
 
@@ -127,7 +137,7 @@ __all__ = [
     "ItemType",
     "append_feature_flag",
     "change_log_level",
-    "configure_logger_with_rotation",
+    "configure_external_file_logging",
     "deploy_with_config",
     "disable_file_logging",
     "publish_all_items",

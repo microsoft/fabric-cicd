@@ -49,30 +49,6 @@ def validate_data_type(expected_type: str, variable_name: str, input_value: any)
     return input_value
 
 
-def validate_log_file_path(input_value: str) -> str:
-    """
-    Validate the log file path.
-
-    Args:
-        input_value: The input value to validate.
-    """
-    validate_data_type("string", "file_path", input_value)
-
-    file_path = Path(input_value)
-    parent_directory = file_path.parent
-
-    if not parent_directory.is_dir():
-        msg = f"The parent directory of the provided file_path '{input_value}' does not exist."
-        raise InputError(msg, logger)
-
-    if not file_path.is_absolute():
-        absolute_path = file_path.resolve()
-        logger.info(f"Relative file path '{file_path}' resolved as '{absolute_path}'")
-        input_value = str(absolute_path)
-
-    return input_value
-
-
 def validate_item_type_in_scope(input_value: Optional[list]) -> list:
     """
     Validate the item type in scope.
