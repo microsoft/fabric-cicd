@@ -117,10 +117,12 @@ def disable_file_logging() -> None:
     at the default INFO level.
 
     Note:
-        This function is intended to be used as an alternative to
+        - This function is intended to be used as an alternative to
         `change_log_level()` or `configure_external_file_logging()`, not in
         combination with them as this will reset logging configurations
         to INFO-level console output only.
+        - Exception messages will still be displayed on the console, but full
+        stack traces will not be written to any log file or console.
 
     Examples:
         Basic usage
