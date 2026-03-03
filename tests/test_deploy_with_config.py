@@ -1083,7 +1083,7 @@ class TestDeployWithConfigReturnValue:
         # Verify result is a DeploymentResult with FAILED status
         assert isinstance(result, DeploymentResult)
         assert result.status == DeploymentStatus.FAILED
-        assert "failed" in result.message
+        assert result.message == "Config-based deployment failed"
         assert len(result.errors) > 0
 
     @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))

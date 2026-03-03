@@ -5,6 +5,7 @@
 
 import os
 from enum import Enum
+from typing import Optional
 
 # General
 VERSION = "0.1.34"
@@ -164,7 +165,7 @@ class DeploymentResult:
         errors: List of error messages if the deployment failed, empty list otherwise.
     """
 
-    def __init__(self, status: DeploymentStatus, message: str, errors: list[str] | None = None) -> None:
+    def __init__(self, status: DeploymentStatus, message: str, errors: Optional[list[str]] = None) -> None:
         """Initialize the DeploymentResult.
 
         Args:
