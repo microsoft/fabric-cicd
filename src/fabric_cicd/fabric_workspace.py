@@ -304,11 +304,12 @@ class FabricWorkspace:
                     empty_logical_id_paths.append(str(item_metadata_path))
                     continue  # Skip processing this item further
 
-                if item_logical_id not in visited_logical_ids:
+                # Validate duplicate logical IDs (skip default GUID as export API uses it as a placeholder)
+                if item_logical_id != constants.DEFAULT_GUID:
+                    if item_logical_id in visited_logical_ids:
+                        msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
+                        raise FailedPublishedItemStatusError(msg, logger)
                     visited_logical_ids.add(item_logical_id)
-                else:
-                    msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
-                    raise FailedPublishedItemStatusError(msg, logger)
 
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
@@ -424,6 +425,10 @@ class FabricWorkspace:
             for item_details in item_name.values():
                 logical_id = item_details.logical_id
                 item_guid = item_details.guid
+
+                # Skip placeholder logical IDs (default GUID) used by items via export API
+                if logical_id == constants.DEFAULT_GUID:
+                    continue
 
                 if logical_id in raw_file:
                     if item_guid == "":
