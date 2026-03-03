@@ -176,10 +176,6 @@ PARALLEL_MAX_WORKERS: int = (
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
 
-# Log File Rotation Settings
-ROTATION_LOG_FILE_MAX_BYTES = 5 * 1024 * 1024
-ROTATION_LOG_FILE_BACKUP_COUNT = 7
-
 # Version Check
 VERSION_CHECK_DISABLED = os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "").lower() in VALID_ENABLE_FLAGS
 
