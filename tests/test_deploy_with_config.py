@@ -920,7 +920,6 @@ class TestDeploymentResult:
     def test_deployment_status_enum_values(self):
         """Test DeploymentStatus enum has expected values."""
         assert DeploymentStatus.COMPLETED.value == "completed"
-        assert DeploymentStatus.FAILED.value == "failed"
 
     def test_deployment_result_structure(self):
         """Test DeploymentResult structure."""
@@ -930,18 +929,6 @@ class TestDeploymentResult:
         )
         assert result.status == DeploymentStatus.COMPLETED
         assert result.message == "Test message"
-        assert result.errors == []
-
-    def test_deployment_result_with_errors(self):
-        """Test DeploymentResult with errors list."""
-        result = DeploymentResult(
-            status=DeploymentStatus.FAILED,
-            message="Deployment failed",
-            errors=["Error 1", "Error 2"],
-        )
-        assert result.status == DeploymentStatus.FAILED
-        assert result.message == "Deployment failed"
-        assert result.errors == ["Error 1", "Error 2"]
 
 
 class TestDeployWithConfigReturnValue:
@@ -1070,42 +1057,3 @@ class TestDeployWithConfigReturnValue:
         # Test equality comparison
         is_success = result.status == DeploymentStatus.COMPLETED
         assert is_success is True
-
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
-    def test_deploy_with_config_returns_failed_on_missing_file(self, tmp_path):
-        """Test that deploy_with_config returns FAILED status when config file is missing."""
-        # Non-existent config file
-        config_file = tmp_path / "nonexistent.yml"
-
-        # Execute deployment with raise_on_error=False
-        result = deploy_with_config(str(config_file), "dev", raise_on_error=False)
-
-        # Verify result is a DeploymentResult with FAILED status
-        assert isinstance(result, DeploymentResult)
-        assert result.status == DeploymentStatus.FAILED
-        assert result.message == "Config-based deployment failed"
-        assert len(result.errors) > 0
-
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
-    def test_deploy_with_config_raises_on_error_by_default(self, tmp_path):
-        """Test that deploy_with_config raises exception by default when error occurs."""
-        # Non-existent config file
-        config_file = tmp_path / "nonexistent.yml"
-
-        # Execute deployment without raise_on_error (defaults to True)
-        with pytest.raises(ConfigValidationError, match="Configuration file not found"):
-            deploy_with_config(str(config_file), "dev")
-
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
-    def test_deploy_with_config_captures_error_message(self, tmp_path):
-        """Test that error message is captured in DeploymentResult.errors."""
-        # Non-existent config file
-        config_file = tmp_path / "nonexistent.yml"
-
-        # Execute deployment with raise_on_error=False
-        result = deploy_with_config(str(config_file), "dev", raise_on_error=False)
-
-        # Verify error message is captured
-        assert result.status == DeploymentStatus.FAILED
-        assert len(result.errors) == 1
-        assert "nonexistent.yml" in result.errors[0] or "No such file" in result.errors[0]

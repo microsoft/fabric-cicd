@@ -5,7 +5,6 @@
 
 import os
 from enum import Enum
-from typing import Optional
 
 # General
 VERSION = "0.1.34"
@@ -148,34 +147,28 @@ class DeploymentStatus(str, Enum):
 
     COMPLETED = "completed"
     """Deployment completed successfully without any errors."""
-    FAILED = "failed"
-    """Deployment failed with errors."""
 
 
 class DeploymentResult:
     """Result of a config-based deployment operation.
 
     This class provides a structured way to return deployment results.
-    Use the `raise_on_error` parameter in `deploy_with_config` to control
-    whether exceptions are raised or captured in the errors list.
+    Currently only returned on successful completion; failures raise exceptions.
 
     Attributes:
-        status: The deployment status (COMPLETED or FAILED).
+        status: The deployment status (DeploymentStatus.COMPLETED on success).
         message: A human-readable message describing the result.
-        errors: List of error messages if the deployment failed, empty list otherwise.
     """
 
-    def __init__(self, status: DeploymentStatus, message: str, errors: Optional[list[str]] = None) -> None:
+    def __init__(self, status: DeploymentStatus, message: str) -> None:
         """Initialize the DeploymentResult.
 
         Args:
             status: The deployment status.
             message: A human-readable message describing the result.
-            errors: List of error messages if the deployment failed.
         """
         self.status = status
         self.message = message
-        self.errors = errors if errors is not None else []
 
 
 # The following resources can be unpublished only if their feature flags are set
