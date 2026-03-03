@@ -1352,3 +1352,211 @@ def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace
             workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "sqlendpoint")
         # Should still be only 1 API call (cached error)
         assert mock_endpoint.invoke.call_count == 2
+
+
+def test_multiple_items_with_default_guid_logical_id(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that multiple items with DEFAULT_GUID as logical ID don't raise a duplicate error."""
+    # Create multiple items all using the default GUID (export API scenario)
+    default_guid = constants.DEFAULT_GUID
+
+    for i, item_dir_name in enumerate(["Notebook1.Notebook", "Notebook2.Notebook", "Pipeline1.DataPipeline"]):
+        item_dir = temp_workspace_dir / item_dir_name
+        item_dir.mkdir(parents=True, exist_ok=True)
+
+        item_type = "Notebook" if "Notebook" in item_dir_name else "DataPipeline"
+        metadata_content = {
+            "metadata": {
+                "type": item_type,
+                "displayName": f"Item {i}",
+                "description": "",
+            },
+            "config": {"logicalId": default_guid},
+        }
+
+        with (item_dir / ".platform").open("w", encoding="utf-8") as f:
+            json.dump(metadata_content, f, ensure_ascii=False)
+
+        with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+    # Should NOT raise any error
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook", "DataPipeline"],
+    )
+
+    # Verify all items were loaded
+    assert "Notebook" in workspace.repository_items
+    assert len(workspace.repository_items["Notebook"]) == 2
+    assert "DataPipeline" in workspace.repository_items
+    assert len(workspace.repository_items["DataPipeline"]) == 1
+
+
+def test_duplicate_non_default_logical_id_raises_error(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """Test that duplicate non-default logical IDs still raise an error."""
+    from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
+
+    duplicate_logical_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+    for i, item_dir_name in enumerate(["Notebook1.Notebook", "Notebook2.Notebook"]):
+        item_dir = temp_workspace_dir / item_dir_name
+        item_dir.mkdir(parents=True, exist_ok=True)
+
+        metadata_content = {
+            "metadata": {
+                "type": "Notebook",
+                "displayName": f"Duplicate Item {i}",
+                "description": "",
+            },
+            "config": {"logicalId": duplicate_logical_id},
+        }
+
+        with (item_dir / ".platform").open("w", encoding="utf-8") as f:
+            json.dump(metadata_content, f, ensure_ascii=False)
+
+        with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
+            f.write("Dummy file content")
+
+    with pytest.raises(FailedPublishedItemStatusError) as exc_info:
+        patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+    assert "Duplicate logicalId" in str(exc_info.value)
+    assert duplicate_logical_id in str(exc_info.value)
+
+
+def test_replace_logical_ids_skips_default_guid(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test that _replace_logical_ids skips items with DEFAULT_GUID as their logical ID."""
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+    # Set up repository items with DEFAULT_GUID logical IDs
+    workspace.repository_items = {
+        "Notebook": {
+            "Notebook1": Item(
+                type="Notebook",
+                name="Notebook1",
+                description="",
+                guid="actual-guid-1111",
+                logical_id=constants.DEFAULT_GUID,
+            ),
+            "Notebook2": Item(
+                type="Notebook",
+                name="Notebook2",
+                description="",
+                guid="actual-guid-2222",
+                logical_id=constants.DEFAULT_GUID,
+            ),
+        }
+    }
+
+    # File content containing the default GUID (e.g., as a workspace ID placeholder)
+    raw_file = f'{{"workspaceId": "{constants.DEFAULT_GUID}"}}'
+
+    result = workspace._replace_logical_ids(raw_file)
+
+    # DEFAULT_GUID should NOT have been replaced by any item GUID
+    assert constants.DEFAULT_GUID in result
+    assert "actual-guid-1111" not in result
+    assert "actual-guid-2222" not in result
+
+
+def test_replace_logical_ids_replaces_non_default_guid(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """Test that _replace_logical_ids still replaces non-default logical IDs correctly."""
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+    logical_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    item_guid = "11111111-2222-3333-4444-555555555555"
+
+    workspace.repository_items = {
+        "Notebook": {
+            "MyNotebook": Item(
+                type="Notebook",
+                name="MyNotebook",
+                description="",
+                guid=item_guid,
+                logical_id=logical_id,
+            ),
+        }
+    }
+
+    raw_file = f'{{"notebookId": "{logical_id}"}}'
+    result = workspace._replace_logical_ids(raw_file)
+
+    assert logical_id not in result
+    assert item_guid in result
+
+
+def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
+    """Test repository with a mix of DEFAULT_GUID and unique logical IDs."""
+    unique_logical_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+    # Item 1: export API item with default GUID
+    item_dir_1 = temp_workspace_dir / "ExportedNotebook.Notebook"
+    item_dir_1.mkdir(parents=True, exist_ok=True)
+    metadata_1 = {
+        "metadata": {"type": "Notebook", "displayName": "Exported Notebook", "description": ""},
+        "config": {"logicalId": constants.DEFAULT_GUID},
+    }
+    with (item_dir_1 / ".platform").open("w", encoding="utf-8") as f:
+        json.dump(metadata_1, f)
+    with (item_dir_1 / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("content")
+
+    # Item 2: git integration item with unique logical ID
+    item_dir_2 = temp_workspace_dir / "GitNotebook.Notebook"
+    item_dir_2.mkdir(parents=True, exist_ok=True)
+    metadata_2 = {
+        "metadata": {"type": "Notebook", "displayName": "Git Notebook", "description": ""},
+        "config": {"logicalId": unique_logical_id},
+    }
+    with (item_dir_2 / ".platform").open("w", encoding="utf-8") as f:
+        json.dump(metadata_2, f)
+    with (item_dir_2 / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("content")
+
+    # Item 3: another export API item with default GUID
+    item_dir_3 = temp_workspace_dir / "ExportedPipeline.DataPipeline"
+    item_dir_3.mkdir(parents=True, exist_ok=True)
+    metadata_3 = {
+        "metadata": {"type": "DataPipeline", "displayName": "Exported Pipeline", "description": ""},
+        "config": {"logicalId": constants.DEFAULT_GUID},
+    }
+    with (item_dir_3 / ".platform").open("w", encoding="utf-8") as f:
+        json.dump(metadata_3, f)
+    with (item_dir_3 / "dummy.txt").open("w", encoding="utf-8") as f:
+        f.write("content")
+
+    # Should NOT raise any error
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        item_type_in_scope=["Notebook", "DataPipeline"],
+    )
+
+    assert len(workspace.repository_items["Notebook"]) == 2
+    assert len(workspace.repository_items["DataPipeline"]) == 1
+    assert workspace.repository_items["Notebook"]["Exported Notebook"].logical_id == constants.DEFAULT_GUID
+    assert workspace.repository_items["Notebook"]["Git Notebook"].logical_id == unique_logical_id
+    assert workspace.repository_items["DataPipeline"]["Exported Pipeline"].logical_id == constants.DEFAULT_GUID
