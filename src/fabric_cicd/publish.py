@@ -298,6 +298,7 @@ def deploy_with_config(
     environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
     config_override: Optional[dict] = None,
+    raise_on_error: bool = True,
 ) -> "constants.DeploymentResult":
     """
     Deploy items using YAML configuration file with environment-specific settings.
@@ -311,15 +312,17 @@ def deploy_with_config(
         environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod'), if missing defaults to 'N/A'.
         token_credential: Optional Azure token credential for authentication.
         config_override: Optional dictionary to override specific configuration values.
+        raise_on_error: If True (default), exceptions are raised on failure for backward compatibility.
+            If False, exceptions are caught and returned in DeploymentResult.errors.
 
     Returns:
         DeploymentResult: A result object containing the deployment status and message.
-            The status will be DeploymentStatus.COMPLETED on success.
-            Exceptions are raised on failure rather than returning a failed status.
+            The status will be DeploymentStatus.COMPLETED on success, or
+            DeploymentStatus.FAILED if raise_on_error=False and an error occurred.
 
     Raises:
-        InputError: If configuration file is invalid or environment not found.
-        FileNotFoundError: If configuration file doesn't exist.
+        InputError: If configuration file is invalid or environment not found (only when raise_on_error=True).
+        FileNotFoundError: If configuration file doesn't exist (only when raise_on_error=True).
 
     Examples:
         Basic usage
@@ -358,6 +361,47 @@ def deploy_with_config(
         ...         }
         ...     }
         ... )
+
+        Capture errors instead of raising
+        >>> result = deploy_with_config(
+        ...     config_file_path="workspace/config.yml",
+        ...     environment="prod",
+        ...     raise_on_error=False
+        ... )
+        >>> if result.status == DeploymentStatus.FAILED:
+        ...     print(result.errors)
+    """
+    try:
+        return _execute_deploy_with_config(config_file_path, environment, token_credential, config_override)
+    except Exception as e:
+        if raise_on_error:
+            raise
+        error_message = str(e)
+        logger.error(f"Deployment failed: {error_message}")
+        return constants.DeploymentResult(
+            status=constants.DeploymentStatus.FAILED,
+            message="Config-based deployment failed",
+            errors=[error_message],
+        )
+
+
+def _execute_deploy_with_config(
+    config_file_path: str,
+    environment: str,
+    token_credential: Optional[TokenCredential],
+    config_override: Optional[dict],
+) -> "constants.DeploymentResult":
+    """
+    Internal implementation of deploy_with_config.
+
+    Args:
+        config_file_path: Path to the YAML configuration file as a string.
+        environment: Environment name to use for deployment.
+        token_credential: Optional Azure token credential for authentication.
+        config_override: Optional dictionary to override specific configuration values.
+
+    Returns:
+        DeploymentResult: A result object containing the deployment status and message.
     """
     # Experimental feature flags required to enable
     if (
