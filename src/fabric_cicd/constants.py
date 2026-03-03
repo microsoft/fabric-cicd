@@ -6,7 +6,6 @@
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 # General
 VERSION = "0.1.34"
@@ -160,12 +159,12 @@ class DeploymentResult:
     Attributes:
         status: The deployment status indicating success or failure.
         message: A human-readable message describing the result.
-        errors: Optional list of error details if the deployment failed.
+        errors: List of error details if the deployment failed, empty list otherwise.
     """
 
     status: DeploymentStatus
     message: str
-    errors: Optional[list[str]] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 # The following resources can be unpublished only if their feature flags are set
