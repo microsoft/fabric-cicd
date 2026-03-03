@@ -920,28 +920,15 @@ class TestDeploymentResult:
     def test_deployment_status_enum_values(self):
         """Test DeploymentStatus enum has expected values."""
         assert DeploymentStatus.COMPLETED.value == "completed"
-        assert DeploymentStatus.FAILED.value == "failed"
 
-    def test_deployment_result_dataclass(self):
-        """Test DeploymentResult dataclass structure."""
+    def test_deployment_result_structure(self):
+        """Test DeploymentResult structure."""
         result = DeploymentResult(
             status=DeploymentStatus.COMPLETED,
             message="Test message",
         )
         assert result.status == DeploymentStatus.COMPLETED
         assert result.message == "Test message"
-        assert result.errors == []
-
-    def test_deployment_result_with_errors(self):
-        """Test DeploymentResult with errors list."""
-        result = DeploymentResult(
-            status=DeploymentStatus.FAILED,
-            message="Deployment failed",
-            errors=["Error 1", "Error 2"],
-        )
-        assert result.status == DeploymentStatus.FAILED
-        assert result.message == "Deployment failed"
-        assert result.errors == ["Error 1", "Error 2"]
 
 
 class TestDeployWithConfigReturnValue:
@@ -983,7 +970,6 @@ class TestDeployWithConfigReturnValue:
         assert isinstance(result, DeploymentResult)
         assert result.status == DeploymentStatus.COMPLETED
         assert "completed successfully" in result.message
-        assert result.errors == []
 
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
@@ -1024,7 +1010,6 @@ class TestDeployWithConfigReturnValue:
         # Verify result is a DeploymentResult with COMPLETED status
         assert isinstance(result, DeploymentResult)
         assert result.status == DeploymentStatus.COMPLETED
-        assert result.errors == []
 
         # Verify that publish and unpublish are NOT called due to skip flags
         mock_publish.assert_not_called()
@@ -1034,8 +1019,8 @@ class TestDeployWithConfigReturnValue:
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
     @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
-    def test_deploy_with_config_result_can_be_used_by_cli(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
-        """Test that DeploymentResult can be easily used by CLI tools."""
+    def test_deploy_with_config_result_status_and_message(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that DeploymentResult has correct status and message attributes."""
         # Mark unused mocks to avoid linting warnings
         _ = mock_unpublish
         _ = mock_publish
@@ -1062,13 +1047,13 @@ class TestDeployWithConfigReturnValue:
         # Execute deployment
         result = deploy_with_config(str(config_file), "dev")
 
-        # Test that CLI can use the result for status checks
+        # Test result status checks
         assert result.status == DeploymentStatus.COMPLETED
 
-        # Test string representation for CLI output
+        # Test string representation for output
         assert result.status.value == "completed"
         assert isinstance(result.message, str)
 
-        # Test boolean-like usage pattern for CLI exit codes
+        # Test equality comparison
         is_success = result.status == DeploymentStatus.COMPLETED
         assert is_success is True

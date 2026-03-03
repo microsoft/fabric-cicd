@@ -4,7 +4,6 @@
 """Constants for the fabric-cicd package."""
 
 import os
-from dataclasses import dataclass, field
 from enum import Enum
 
 # General
@@ -148,23 +147,28 @@ class DeploymentStatus(str, Enum):
 
     COMPLETED = "completed"
     """Deployment completed successfully without any errors."""
-    FAILED = "failed"
-    """Deployment failed with errors."""
 
 
-@dataclass
 class DeploymentResult:
     """Result of a config-based deployment operation.
 
+    This class provides a structured way to return deployment results.
+    Exceptions are raised on failure, so this result is only returned on success.
+
     Attributes:
-        status: The deployment status indicating success or failure.
+        status: The deployment status (DeploymentStatus.COMPLETED on success).
         message: A human-readable message describing the result.
-        errors: List of error details if the deployment failed, empty list otherwise.
     """
 
-    status: DeploymentStatus
-    message: str
-    errors: list[str] = field(default_factory=list)
+    def __init__(self, status: DeploymentStatus, message: str) -> None:
+        """Initialize the DeploymentResult.
+
+        Args:
+            status: The deployment status.
+            message: A human-readable message describing the result.
+        """
+        self.status = status
+        self.message = message
 
 
 # The following resources can be unpublished only if their feature flags are set
