@@ -52,43 +52,48 @@ def change_log_level(level: str = "DEBUG") -> None:
 
 def configure_external_file_logging(external_logger: logging.Logger) -> None:
     """
-    Configure fabric_cicd logging to integrate with an external logger's file handler.
-    This is an advanced alternative to the fabric_cicd default file logging configuration.
+    Configure fabric_cicd package logging to integrate with an external logger's
+    file handler. This is an advanced alternative to the default file logging
+    configuration when level is set to DEBUG via `change_log_level()`.
 
     Extracts the file handler from the provided logger and configures fabric_cicd
     to append only DEBUG logs (e.g., API request/response details) to the same file.
     The external logger remains responsible for file rotation (if applicable).
 
     Note:
-        This function resets logging configuration. Use as an alternative to
-        ``change_log_level`` or ``disable_file_logging``, not in combination.
+        - This function resets logging configuration. Use as an alternative to
+        ``change_log_level()`` or ``disable_file_logging()``, not in combination
 
-        Only DEBUG logs from the fabric_cicd package are written to the file.
+        - Only DEBUG logs from the fabric_cicd package are written to the log file.
+        Exception messages are displayed on the console, but full stack traces
+        are not written to the external log file
 
-        If no format is set on the external logger's file handler, a simplified
-        message format will be used for fabric_cicd logs in that file.
+        - If no format is set on the external logger's file handler, a simplified
+        message format will be used for fabric_cicd logs in that file (timestamp - level - message)
 
-        Console output remains at INFO level (default fabric-cicd behavior).
+        - Console output remains at INFO level (default fabric_cicd console behavior)
 
     Args:
-        external_logger: The external logger instance (e.g., from CLI) that has
-            a FileHandler or RotatingFileHandler attached.
+        external_logger: The external logger instance that has
+            a `FileHandler` or `RotatingFileHandler` attached.
+
+    Raises:
+        ValueError: If no file handler is found on the provided logger.
 
     Examples:
-        General usage::
-
-            import logging
-            from logging.handlers import RotatingFileHandler
-            from fabric_cicd import configure_file_logging
-
-            # Set up your own logger with a file handler
-            my_logger = logging.getLogger("MyApp")
-            handler = RotatingFileHandler("app.log", maxBytes=5*1024*1024, backupCount=7)
-            handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-            my_logger.addHandler(handler)
-
-            # Configure fabric_cicd to use the same file
-            configure_file_logging(my_logger)
+        General usage:
+        >>> import logging
+        >>> from logging.handlers import RotatingFileHandler
+        >>> from fabric_cicd import configure_external_file_logging
+        ...
+        >>> # Set up your own logger with a file handler
+        >>> my_logger = logging.getLogger("MyApp")
+        >>> handler = RotatingFileHandler("app.log", maxBytes=5*1024*1024, backupCount=7)
+        >>> handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        >>> my_logger.addHandler(handler)
+        ...
+        >>> # Configure fabric_cicd to use the same file
+        >>> configure_external_file_logging(my_logger)
     """
     # Extract file handler from external logger
     file_handler = get_file_handler(external_logger)
@@ -113,7 +118,7 @@ def disable_file_logging() -> None:
 
     Note:
         This function is intended to be used as an alternative to
-        `change_log_level` or `configure_external_file_logging`, not in
+        `change_log_level()` or `configure_external_file_logging()`, not in
         combination with them as this will reset logging configurations
         to INFO-level console output only.
 
