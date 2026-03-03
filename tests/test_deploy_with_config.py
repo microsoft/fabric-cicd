@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from fabric_cicd import deploy_with_config
+from fabric_cicd import DeploymentResult, DeploymentStatus, deploy_with_config
 from fabric_cicd._common._config_utils import (
     apply_config_overrides,
     extract_publish_settings,
@@ -912,3 +912,163 @@ class TestGetConfigValue:
         config = {"key": True}
         result = get_config_value(config, "key", "dev")
         assert result is True
+
+
+class TestDeploymentResult:
+    """Test DeploymentResult and DeploymentStatus types."""
+
+    def test_deployment_status_enum_values(self):
+        """Test DeploymentStatus enum has expected values."""
+        assert DeploymentStatus.COMPLETED.value == "completed"
+        assert DeploymentStatus.FAILED.value == "failed"
+
+    def test_deployment_result_dataclass(self):
+        """Test DeploymentResult dataclass structure."""
+        result = DeploymentResult(
+            status=DeploymentStatus.COMPLETED,
+            message="Test message",
+        )
+        assert result.status == DeploymentStatus.COMPLETED
+        assert result.message == "Test message"
+        assert result.errors == []
+
+    def test_deployment_result_with_errors(self):
+        """Test DeploymentResult with errors list."""
+        result = DeploymentResult(
+            status=DeploymentStatus.FAILED,
+            message="Deployment failed",
+            errors=["Error 1", "Error 2"],
+        )
+        assert result.status == DeploymentStatus.FAILED
+        assert result.message == "Deployment failed"
+        assert result.errors == ["Error 1", "Error 2"]
+
+
+class TestDeployWithConfigReturnValue:
+    """Test deploy_with_config returns DeploymentResult."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_returns_deployment_result(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that deploy_with_config returns a DeploymentResult on success."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify result is a DeploymentResult
+        assert isinstance(result, DeploymentResult)
+        assert result.status == DeploymentStatus.COMPLETED
+        assert "completed successfully" in result.message
+        assert result.errors == []
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_returns_completed_when_skipping_operations(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config returns COMPLETED status even when skipping operations."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file with skip flags
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "88888888-8888-8888-8888-888888888888"},
+                "repository_directory": "test/path",
+            },
+            "publish": {
+                "skip": {"dev": True},
+            },
+            "unpublish": {
+                "skip": {"dev": True},
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify result is a DeploymentResult with COMPLETED status
+        assert isinstance(result, DeploymentResult)
+        assert result.status == DeploymentStatus.COMPLETED
+        assert result.errors == []
+
+        # Verify that publish and unpublish are NOT called due to skip flags
+        mock_publish.assert_not_called()
+        mock_unpublish.assert_not_called()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_result_can_be_used_by_cli(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that DeploymentResult can be easily used by CLI tools."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "99999999-9999-9999-9999-999999999999"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Test that CLI can use the result for status checks
+        assert result.status == DeploymentStatus.COMPLETED
+
+        # Test string representation for CLI output
+        assert result.status.value == "completed"
+        assert isinstance(result.message, str)
+
+        # Test boolean-like usage pattern for CLI exit codes
+        is_success = result.status == DeploymentStatus.COMPLETED
+        assert is_success is True

@@ -298,7 +298,7 @@ def deploy_with_config(
     environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
     config_override: Optional[dict] = None,
-) -> None:
+) -> "constants.DeploymentResult":
     """
     Deploy items using YAML configuration file with environment-specific settings.
     This function provides a simplified deployment interface that loads configuration
@@ -312,6 +312,11 @@ def deploy_with_config(
         token_credential: Optional Azure token credential for authentication.
         config_override: Optional dictionary to override specific configuration values.
 
+    Returns:
+        DeploymentResult: A result object containing the deployment status and message.
+            The status will be DeploymentStatus.COMPLETED on success.
+            Exceptions are raised on failure rather than returning a failed status.
+
     Raises:
         InputError: If configuration file is invalid or environment not found.
         FileNotFoundError: If configuration file doesn't exist.
@@ -319,16 +324,17 @@ def deploy_with_config(
     Examples:
         Basic usage
         >>> from fabric_cicd import deploy_with_config
-        >>> deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod"
         ... )
+        >>> print(result.status)  # DeploymentStatus.COMPLETED
 
         With custom authentication
         >>> from fabric_cicd import deploy_with_config
         >>> from azure.identity import ClientSecretCredential
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
-        >>> deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod",
         ...     token_credential=credential
@@ -338,7 +344,7 @@ def deploy_with_config(
         >>> from fabric_cicd import deploy_with_config
         >>> from azure.identity import ClientSecretCredential
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
-        >>> deploy_with_config(
+        >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod",
         ...     config_override={
@@ -410,3 +416,7 @@ def deploy_with_config(
         logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
     logger.info("Config-based deployment completed successfully")
+    return constants.DeploymentResult(
+        status=constants.DeploymentStatus.COMPLETED,
+        message="Config-based deployment completed successfully",
+    )
