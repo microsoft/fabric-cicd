@@ -442,5 +442,5 @@ def deploy_with_config(
     logger.info("Config-based deployment completed successfully")
     return DeploymentResult(
         status=DeploymentStatus.COMPLETED,
-        message="Config-based deployment completed successfully",
+        message="Deployment completed successfully",
     )
