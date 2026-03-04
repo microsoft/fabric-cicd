@@ -18,6 +18,7 @@ from fabric_cicd._common._config_utils import (
     extract_workspace_settings,
     load_config_file,
 )
+from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
@@ -298,7 +299,7 @@ def deploy_with_config(
     environment: str = "N/A",
     token_credential: Optional[TokenCredential] = None,
     config_override: Optional[dict] = None,
-) -> "constants.DeploymentResult":
+) -> DeploymentResult:
     """
     Deploy items using YAML configuration file with environment-specific settings.
     This function provides a simplified deployment interface that loads configuration
@@ -415,7 +416,7 @@ def deploy_with_config(
         logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
     logger.info("Config-based deployment completed successfully")
-    return constants.DeploymentResult(
-        status=constants.DeploymentStatus.COMPLETED,
+    return DeploymentResult(
+        status=DeploymentStatus.COMPLETED,
         message="Config-based deployment completed successfully",
     )

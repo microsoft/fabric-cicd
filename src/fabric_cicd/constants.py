@@ -142,11 +142,6 @@ class OperationType(str, Enum):
     """Unpublishing/removing items from the workspace."""
 
 
-# Re-export from _common for backward compatibility
-from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
-
-__all__ = ["DeploymentResult", "DeploymentStatus"]
-
 # The following resources can be unpublished only if their feature flags are set
 UNPUBLISH_FLAG_MAPPING = {
     ItemType.LAKEHOUSE.value: FeatureFlag.ENABLE_LAKEHOUSE_UNPUBLISH.value,
