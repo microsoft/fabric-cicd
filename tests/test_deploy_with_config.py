@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from fabric_cicd import deploy_with_config
+from fabric_cicd import DeploymentResult, DeploymentStatus, deploy_with_config
 from fabric_cicd._common._config_utils import (
     apply_config_overrides,
     extract_publish_settings,
@@ -18,7 +18,7 @@ from fabric_cicd._common._config_utils import (
     load_config_file,
 )
 from fabric_cicd._common._config_validator import ConfigValidationError
-from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._common._exceptions import InputError, PublishError
 
 
 class TestConfigFileLoading:
@@ -1025,3 +1025,291 @@ class TestGetConfigValue:
         config = {"key": True}
         result = get_config_value(config, "key", "dev")
         assert result is True
+
+
+class TestDeploymentResult:
+    """Test DeploymentResult and DeploymentStatus types."""
+
+    def test_deployment_status_enum_values(self):
+        """Test DeploymentStatus enum has expected values."""
+        assert DeploymentStatus.COMPLETED.value == "completed"
+
+    def test_deployment_result_structure(self):
+        """Test DeploymentResult structure."""
+        result = DeploymentResult(
+            status=DeploymentStatus.COMPLETED,
+            message="Test message",
+        )
+        assert result.status == DeploymentStatus.COMPLETED
+        assert result.message == "Test message"
+
+
+class TestDeployWithConfigReturnValue:
+    """Test deploy_with_config returns DeploymentResult."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_returns_deployment_result(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that deploy_with_config returns a DeploymentResult on success."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify result is a DeploymentResult
+        assert isinstance(result, DeploymentResult)
+        assert result.status == DeploymentStatus.COMPLETED
+        assert "completed successfully" in result.message
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_returns_completed_when_skipping_operations(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config returns COMPLETED status even when skipping operations."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file with skip flags
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "88888888-8888-8888-8888-888888888888"},
+                "repository_directory": "test/path",
+            },
+            "publish": {
+                "skip": {"dev": True},
+            },
+            "unpublish": {
+                "skip": {"dev": True},
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify result is a DeploymentResult with COMPLETED status
+        assert isinstance(result, DeploymentResult)
+        assert result.status == DeploymentStatus.COMPLETED
+
+        # Verify that publish and unpublish are NOT called due to skip flags
+        mock_publish.assert_not_called()
+        mock_unpublish.assert_not_called()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_result_status_and_message(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that DeploymentResult has correct status and message attributes."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "99999999-9999-9999-9999-999999999999"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Test result status checks
+        assert result.status == DeploymentStatus.COMPLETED
+
+        # Test string representation for output
+        assert result.status.value == "completed"
+        assert isinstance(result.message, str)
+
+        # Test equality comparison
+        is_success = result.status == DeploymentStatus.COMPLETED
+        assert is_success is True
+
+
+class TestDeployWithConfigFailures:
+    """Test deploy_with_config raises exceptions properly on failure."""
+
+    def test_deploy_with_config_invalid_yaml_raises_input_error(self, tmp_path):
+        """Test that deploy_with_config raises InputError for invalid YAML syntax."""
+        config_file = tmp_path / "invalid.yml"
+        config_file.write_text("invalid: yaml: content: [")
+
+        with pytest.raises(InputError, match="Invalid YAML syntax"):
+            deploy_with_config(str(config_file), "dev")
+
+    def test_deploy_with_config_missing_core_raises_config_validation_error(self, tmp_path):
+        """Test that deploy_with_config raises ConfigValidationError when core section is missing."""
+        config_data = {"publish": {"skip": True}}
+        config_file = tmp_path / "no_core.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(ConfigValidationError, match="must contain a 'core' section"):
+            deploy_with_config(str(config_file), "dev")
+
+    def test_deploy_with_config_missing_environment_raises_config_validation_error(self, tmp_path):
+        """Test that deploy_with_config raises ConfigValidationError when environment is not in workspace mappings."""
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "12345678-1234-1234-1234-123456789abc"},
+                "repository_directory": "test/path",
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(ConfigValidationError, match="Environment 'prod' not found"):
+            deploy_with_config(str(config_file), "prod")
+
+    def test_deploy_with_config_missing_workspace_id_raises_config_validation_error(self, tmp_path):
+        """Test that deploy_with_config raises ConfigValidationError when workspace_id is missing."""
+        config_data = {
+            "core": {
+                "repository_directory": "test/path",
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(ConfigValidationError, match="must specify either 'workspace_id' or 'workspace'"):
+            deploy_with_config(str(config_file), "dev")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_publish_error_propagates(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that PublishError from publish_all_items propagates through deploy_with_config."""
+        _ = mock_unpublish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_publish.side_effect = PublishError(
+            errors=[("FailedNotebook", RuntimeError("API call failed"))],
+            logger=MagicMock(),
+        )
+
+        with pytest.raises(PublishError, match="Failed to publish 1 item"):
+            deploy_with_config(str(config_file), "dev")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_workspace_creation_error_propagates(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that exceptions from FabricWorkspace constructor propagate through deploy_with_config."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.side_effect = Exception("Workspace initialization failed")
+
+        with pytest.raises(Exception, match="Workspace initialization failed"):
+            deploy_with_config(str(config_file), "dev")
+
+        mock_publish.assert_not_called()
+        mock_unpublish.assert_not_called()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_unpublish_error_propagates(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that exceptions from unpublish_all_orphan_items propagate and publish was already called."""
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_unpublish.side_effect = RuntimeError("Unpublish operation failed")
+
+        with pytest.raises(RuntimeError, match="Unpublish operation failed"):
+            deploy_with_config(str(config_file), "dev")
+
+        # Verify publish was called successfully before unpublish failed
+        mock_publish.assert_called_once()
