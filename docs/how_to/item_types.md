@@ -125,6 +125,7 @@
 - **Parameterization:**
     - Notebooks attached to lakehouses always point to the original lakehouse unless parameterized in the `find_replace` section of the `parameter.yml` file.
 - **Resources** are not source controlled and will not be deployed.
+- **Note:** Both `.py` and `.ipynb` formats are supported. Git-integrated Notebooks only support `.py`, while Notebooks exported via the Get Item Definition API support both formats.
 
 ## Real-Time Dashboard
 
