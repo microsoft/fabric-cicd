@@ -12,6 +12,13 @@ from unittest.mock import patch
 
 import pytest
 
+from fabric_cicd import (
+    append_feature_flag,
+    change_log_level,
+    configure_external_file_logging,
+    constants,
+    disable_file_logging,
+)
 from fabric_cicd._common._logging import (
     CustomFormatter,
     PackageFilter,
@@ -125,7 +132,6 @@ class TestCustomFormatter:
 
     def test_format_with_indent(self):
         """Test formatting of messages with indent marker."""
-        from fabric_cicd import constants
 
         formatter = CustomFormatter("[%(levelname)s] %(asctime)s - %(message)s", datefmt="%H:%M:%S")
         record = logging.LogRecord(
@@ -615,14 +621,11 @@ class TestWrapperFunctions:
     @pytest.fixture(autouse=True)
     def _clear_feature_flags(self):
         """Clear feature flags before each wrapper test."""
-        from fabric_cicd import constants
 
         constants.FEATURE_FLAG.clear()
 
     def test_append_feature_flag(self):
         """Test append_feature_flag adds flags correctly."""
-        from fabric_cicd import append_feature_flag, constants
-
         append_feature_flag("feature_1")
         append_feature_flag("feature_2")
         append_feature_flag("feature_1")  # Duplicate
@@ -634,15 +637,11 @@ class TestWrapperFunctions:
     @pytest.mark.parametrize("level_input", ["DEBUG", "debug"])
     def test_change_log_level(self, level_input):
         """Test change_log_level sets level correctly."""
-        from fabric_cicd import change_log_level
-
         change_log_level(level_input)
         assert logging.getLogger("fabric_cicd").level == logging.DEBUG
 
     def test_change_log_level_unsupported(self, capsys):
         """Test change_log_level warns on unsupported level."""
-        from fabric_cicd import change_log_level
-
         configure_logger(disable_log_file=True)
         change_log_level("TRACE")
 
@@ -651,7 +650,6 @@ class TestWrapperFunctions:
 
     def test_disable_file_logging(self):
         """Test disable_file_logging removes file handlers."""
-        from fabric_cicd import disable_file_logging
 
         configure_logger()
         disable_file_logging()
@@ -666,8 +664,6 @@ class TestConfigureExternalFileLogging:
 
     def test_configures_correctly(self, external_logger_with_handler):
         """Test that configure_external_file_logging configures correctly."""
-        from fabric_cicd import configure_external_file_logging
-
         external_logger, external_handler, log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
@@ -695,8 +691,6 @@ class TestConfigureExternalFileLogging:
 
     def test_raises_without_handler(self):
         """Test that configure_external_file_logging raises ValueError if no file handler."""
-        from fabric_cicd import configure_external_file_logging
-
         external_logger = logging.getLogger("NoFileHandler")
         external_logger.handlers = []
 
@@ -705,9 +699,7 @@ class TestConfigureExternalFileLogging:
 
     def test_writes_only_debug_logs(self, external_logger_with_handler):
         """Test that only DEBUG logs from fabric_cicd are written to external file."""
-        from fabric_cicd import configure_external_file_logging
-
-        external_logger, external_handler, log_file = external_logger_with_handler
+        external_logger, _external_handler, log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
 
@@ -830,8 +822,6 @@ class TestFileLoggingIntegration:
 
     def test_external_handler_writes_fabric_cicd_logs(self, external_logger_with_handler):
         """Test that external handler writes fabric_cicd logs to the shared file."""
-        from fabric_cicd import configure_external_file_logging
-
         external_logger, external_handler, log_file = external_logger_with_handler
 
         external_logger.debug("Program message 1")
@@ -852,9 +842,7 @@ class TestFileLoggingIntegration:
 
     def test_console_only_logger_does_not_propagate_to_file(self, external_logger_with_handler):
         """Test that console_only logger does not write to file."""
-        from fabric_cicd import configure_external_file_logging
-
-        external_logger, _, log_file = external_logger_with_handler
+        external_logger, _external_handler, log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
 
@@ -875,9 +863,7 @@ class TestExternalHandlerReconfiguration:
 
     def test_debug_to_non_debug_cleans_up_filter(self, external_logger_with_handler):
         """Test switching from debug mode to non-debug mode cleans up filter."""
-        from fabric_cicd import configure_external_file_logging, disable_file_logging
-
-        external_logger, external_handler, _ = external_logger_with_handler
+        external_logger, external_handler, _log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
         assert len(external_handler.filters) == 1
@@ -890,9 +876,7 @@ class TestExternalHandlerReconfiguration:
 
     def test_non_debug_to_debug_adds_filter(self, external_logger_with_handler):
         """Test switching from non-debug mode to debug mode adds filter correctly."""
-        from fabric_cicd import configure_external_file_logging, disable_file_logging
-
-        external_logger, external_handler, _ = external_logger_with_handler
+        external_logger, external_handler, _log_file = external_logger_with_handler
 
         disable_file_logging()
         assert len(external_handler.filters) == 0
@@ -905,9 +889,7 @@ class TestExternalHandlerReconfiguration:
 
     def test_multiple_debug_runs_no_filter_accumulation(self, external_logger_with_handler):
         """Test multiple debug runs don't accumulate filters on the same handler."""
-        from fabric_cicd import configure_external_file_logging
-
-        external_logger, external_handler, _ = external_logger_with_handler
+        external_logger, external_handler, _log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
         configure_external_file_logging(external_logger)
@@ -918,8 +900,6 @@ class TestExternalHandlerReconfiguration:
 
     def test_handler_not_closed_on_disable(self, external_logger_with_handler):
         """Test external handler is not closed when file logging is disabled."""
-        from fabric_cicd import configure_external_file_logging, disable_file_logging
-
         external_logger, external_handler, log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
@@ -933,9 +913,7 @@ class TestExternalHandlerReconfiguration:
 
     def test_rotating_handler_preserves_rotation_settings(self, external_logger_with_handler):
         """Test that RotatingFileHandler rotation settings are preserved."""
-        from fabric_cicd import configure_external_file_logging
-
-        external_logger, external_handler, _ = external_logger_with_handler
+        external_logger, external_handler, _log_file = external_logger_with_handler
 
         original_max_bytes = external_handler.maxBytes
         original_backup_count = external_handler.backupCount
@@ -952,4 +930,4 @@ class TestExternalHandlerReconfiguration:
         assert len(external_handlers) == 1
         handler = external_handlers[0]
         assert handler.maxBytes == original_max_bytes
-        assert handler.backUpCount == original_backup_count
+        assert handler.backupCount == original_backup_count
