@@ -202,6 +202,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
 # API Format Mapping for item types that require specific API formats
 API_FORMAT_MAPPING = {
     ItemType.SPARK_JOB_DEFINITION.value: "SparkJobDefinitionV2",
+    ItemType.NOTEBOOK.value: "ipynb",
 }
 
 # REGEX Constants
