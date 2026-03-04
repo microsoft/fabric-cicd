@@ -7,6 +7,7 @@ import json
 import logging
 import tempfile
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -64,7 +65,7 @@ def experimental_feature_flags():
     constants.FEATURE_FLAG.update(original_flags)
 
 
-def create_test_item(base_path: Path, folder: str | None, name: str, item_type: str, logical_id: str) -> Path:
+def create_test_item(base_path: Path, folder: Optional[str], name: str, item_type: str, logical_id: str) -> Path:
     """Helper to create a test item with .platform file.
 
     Args:
