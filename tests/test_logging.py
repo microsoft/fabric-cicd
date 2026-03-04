@@ -854,7 +854,7 @@ class TestFileLoggingIntegration:
         """Test that console_only logger does not write to file."""
         from fabric_cicd import configure_external_file_logging
 
-        external_logger, external_handler, log_file = external_logger_with_handler
+        external_logger, _, log_file = external_logger_with_handler
 
         configure_external_file_logging(external_logger)
 
@@ -952,4 +952,4 @@ class TestExternalHandlerReconfiguration:
         assert len(external_handlers) == 1
         handler = external_handlers[0]
         assert handler.maxBytes == original_max_bytes
-        assert handler.backupCount == original_backup_count
+        assert handler.backUpCount == original_backup_count
