@@ -144,7 +144,11 @@
 - **Parameterization:**
     - Semantic Models connected to sources outside of the same workspace always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Semantic Models connected to sources within the same workspace may or may not be re-pointed; it is best to test this before taking a dependency. Use the `find_replace` section of the `parameter.yml` file as needed.
-- **Initial deployment** requires manual configuration of the connection after deployment.
+- **Automatic Connection Binding:**
+    - Use the `semantic_model_binding` parameter in `parameter.yml` to automatically bind Semantic Model connections after deployment, removing the need for manual connection configuration on initial deployment.
+    - **Note:** Only a single connection binding per Semantic Model is currently supported. If your Semantic Model uses multiple connections, additional connections must be configured manually after deployment.
+    - See [Parameterization -> semantic_model_binding](parameterization.md#semantic_model_binding) for configuration details.
+- **Initial deployment** requires manual configuration of the connection after deployment **unless** `semantic_model_binding` is configured in the `parameter.yml` file.
 
 ## Spark Job Definition
 

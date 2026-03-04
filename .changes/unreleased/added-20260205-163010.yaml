@@ -1,8 +1,0 @@
-kind: added
-body: Change header print messages to info log
-time: 2026-02-05T16:30:10.310834+02:00
-custom:
-    Author: mwc360
-    AuthorLink: https://github.com/mwc360
-    Issue: "771"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/771

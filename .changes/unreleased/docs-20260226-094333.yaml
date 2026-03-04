@@ -1,0 +1,8 @@
+kind: docs
+body: Remove incorrect statement on support for parameter replacements in Platform files
+time: 2026-02-26T09:43:33.6588775+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "839"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/839

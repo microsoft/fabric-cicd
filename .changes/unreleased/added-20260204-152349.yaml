@@ -1,8 +1,0 @@
-kind: added
-body: Add a black-box REST API testing harness
-time: 2026-02-04T15:23:49.0207511+02:00
-custom:
-    Author: mdrakiburrahman
-    AuthorLink: https://github.com/mdrakiburrahman
-    Issue: "738"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/738

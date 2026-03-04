@@ -1,0 +1,7 @@
+kind: fixed
+body: Add max workers soft cap with override and handle garbage response from Fabric Data Plane
+custom:
+  Author: mdrakiburrahman
+  AuthorLink: https://github.com/mdrakiburrahman
+  Issue: "827"
+  IssueLink: https://github.com/microsoft/fabric-cicd/issues/827

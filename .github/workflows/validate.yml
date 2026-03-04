@@ -118,13 +118,19 @@ jobs:
                     fi
                   fi
 
-                  # 2. If title is version format, only constants.py and changelog.md should be changed
+                  # 2. If title is version format, constants.py, changelog.md, and .changes/v<version>.md must be included in changed files
+                  # Note: Additional files (e.g., removed unreleased change files) are allowed alongside the required files
                   if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
-                    EXPECTED_FILES="src/fabric_cicd/constants.py docs/changelog.md"
-                    SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
-                    SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
-                    if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
-                      echo "❌ Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X."
+                    VERSION_NUMBER="${BASH_REMATCH[1]}"
+                    REQUIRED_FILES=("src/fabric_cicd/constants.py" "docs/changelog.md" ".changes/v${VERSION_NUMBER}.md")
+                    MISSING_FILES=()
+                    for file in "${REQUIRED_FILES[@]}"; do
+                      if ! echo "$CHANGED_FILES" | grep -Fqx "$file"; then
+                        MISSING_FILES+=("$file")
+                      fi
+                    done
+                    if [ ${#MISSING_FILES[@]} -ne 0 ]; then
+                      echo "❌ The following required files must be included in a PR titled vX.X.X: ${MISSING_FILES[*]}"
                       exit 1
                     fi
                   fi

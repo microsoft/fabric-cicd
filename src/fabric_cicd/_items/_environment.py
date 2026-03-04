@@ -197,7 +197,7 @@ def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: s
             parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
             for key in parameter_dict:
                 instance_pool_id = key["instance_pool_id"]
-                replace_value = process_environment_key(fabric_workspace_obj, key["replace_value"])
+                replace_value = process_environment_key(fabric_workspace_obj.environment, key["replace_value"])
                 input_name = key.get("item_name")
                 if instance_pool_id == pool_id and (input_name == item_name or not input_name):
                     # replace any found references with specified environment value
