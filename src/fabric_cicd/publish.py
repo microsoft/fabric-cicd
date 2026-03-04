@@ -359,7 +359,7 @@ def deploy_with_config(
         ...     environment="prod"
         ... )
         >>> print(result.status)  # DeploymentStatus.COMPLETED
-        >>> print(result.message) # "Config-based deployment completed successfully"
+        >>> print(result.message) # "Deployment completed successfully"
 
         With custom authentication
         >>> from fabric_cicd import deploy_with_config
