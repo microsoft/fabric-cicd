@@ -58,7 +58,8 @@ def configure_external_file_logging(external_logger: logging.Logger) -> None:
 
     Extracts the file handler from the provided logger and configures fabric_cicd
     to append only DEBUG logs (e.g., API request/response details) to the same file.
-    The external logger remains responsible for file rotation (if applicable).
+    The external logger retains full ownership of the handler, including file
+    rotation (if applicable) and lifecycle management.
 
     Note:
         - This function resets logging configuration. Use as an alternative to
@@ -67,10 +68,6 @@ def configure_external_file_logging(external_logger: logging.Logger) -> None:
         - Only DEBUG logs from the fabric_cicd package are written to the log file.
         Exception messages are displayed on the console, but full stack traces
         are not written to the external log file
-
-        - If no formatter is set on the external logger's file handler, the
-        default fabric_cicd formatter will be used for fabric_cicd logs in that file
-        (timestamp - level - name - message)
 
         - Console output remains at INFO level (default fabric_cicd console behavior)
 

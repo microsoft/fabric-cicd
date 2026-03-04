@@ -21,6 +21,7 @@ from fabric_cicd._common._logging import (
     _configure_console_handler,
     _configure_default_file_handler,
     _configure_external_file_handler,
+    _mark_external_handler,
     _mark_handler,
     configure_logger,
     exception_handler,
@@ -31,32 +32,26 @@ from fabric_cicd._common._logging import (
 
 def _close_all_file_handlers():
     """Close all file handlers to release file locks on Windows."""
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
-        if isinstance(handler, (logging.FileHandler, RotatingFileHandler)):
-            handler.close()
-            root_logger.removeHandler(handler)
+    for logger_name in ("", "fabric_cicd"):
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers[:]:
+            if isinstance(handler, (logging.FileHandler, RotatingFileHandler)):
+                handler.close()
+                logger.removeHandler(handler)
 
-    package_logger = logging.getLogger("fabric_cicd")
-    for handler in package_logger.handlers[:]:
-        if isinstance(handler, (logging.FileHandler, RotatingFileHandler)):
-            handler.close()
-            package_logger.removeHandler(handler)
+
+def _reset_logger(logger_name: str) -> None:
+    """Reset a logger to clean state."""
+    logger = logging.getLogger(logger_name)
+    logger.handlers = []
 
 
 @pytest.fixture(autouse=True)
 def _clean_logging_state():
     """Reset logging state before and after each test to release file locks on Windows."""
     _close_all_file_handlers()
-
-    root_logger = logging.getLogger()
-    root_logger.handlers = []
-
-    package_logger = logging.getLogger("fabric_cicd")
-    package_logger.handlers = []
-
-    console_only_logger = logging.getLogger("console_only")
-    console_only_logger.handlers = []
+    for logger_name in ("", "fabric_cicd", "console_only"):
+        _reset_logger(logger_name)
 
     yield
 
@@ -80,6 +75,23 @@ def external_rotating_handler(temp_log_dir):
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     yield handler
     handler.close()
+
+
+@pytest.fixture
+def external_logger_with_handler(temp_log_dir):
+    """Create an external logger with a RotatingFileHandler attached."""
+    log_file = temp_log_dir / "external.log"
+    handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
+    logger = logging.getLogger(f"ExternalLogger_{id(handler)}")
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    yield logger, handler, log_file
+
+    handler.close()
+    logger.removeHandler(handler)
 
 
 class TestCustomFormatter:
@@ -190,13 +202,21 @@ class TestPackageFilter:
 
 
 class TestMarkHandler:
-    """Tests for the _mark_handler function."""
+    """Tests for the _mark_handler and _mark_external_handler functions."""
 
     def test_mark_handler(self):
         """Test that _mark_handler sets attribute and returns same handler."""
         handler = logging.StreamHandler()
         marked = _mark_handler(handler)
         assert getattr(marked, "_fabric_cicd_managed", False) is True
+        assert marked is handler
+
+    def test_mark_external_handler(self):
+        """Test that _mark_external_handler sets attribute and returns same handler."""
+        handler = logging.StreamHandler()
+        marked = _mark_external_handler(handler)
+        assert getattr(marked, "_fabric_cicd_external", False) is True
+        assert getattr(marked, "_fabric_cicd_managed", False) is False
         assert marked is handler
 
 
@@ -216,7 +236,6 @@ class TestCleanupManagedHandlers:
         assert external_handler in logger.handlers
         assert managed_handler not in logger.handlers
 
-        # Clean up
         logger.removeHandler(external_handler)
 
     def test_cleanup_multiple_loggers(self):
@@ -233,9 +252,32 @@ class TestCleanupManagedHandlers:
         assert handler_a not in logger_a.handlers
         assert handler_b not in logger_b.handlers
 
-        # Clean up
         logger_a.handlers = []
         logger_b.handlers = []
+
+    def test_cleanup_external_handler_removes_filters(self, temp_log_dir):
+        """Test cleanup removes PackageFilter from external handlers."""
+        log_file = temp_log_dir / "external.log"
+        external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
+
+        try:
+            _mark_external_handler(external_handler)
+            external_handler.addFilter(PackageFilter(debug_only=True))
+
+            root_logger = logging.getLogger()
+            root_logger.addHandler(external_handler)
+
+            assert len(external_handler.filters) == 1
+            assert isinstance(external_handler.filters[0], PackageFilter)
+
+            _cleanup_managed_handlers(root_logger)
+
+            assert external_handler not in root_logger.handlers
+            assert len(external_handler.filters) == 0
+            assert getattr(external_handler, "_fabric_cicd_external", False) is False
+
+        finally:
+            external_handler.close()
 
 
 class TestConfigureDefaultFileHandler:
@@ -262,8 +304,8 @@ class TestConfigureDefaultFileHandler:
 class TestConfigureExternalFileHandler:
     """Tests for the _configure_external_file_handler function."""
 
-    def test_external_file_handler_configuration(self, temp_log_dir):
-        """Test external file handler has correct configuration."""
+    def test_reuses_handler_directly(self, temp_log_dir):
+        """Test external file handler is reused directly (preserving rotation)."""
         log_file = temp_log_dir / "external.log"
         external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
         custom_formatter = logging.Formatter("CUSTOM - %(message)s")
@@ -272,48 +314,62 @@ class TestConfigureExternalFileHandler:
         try:
             handler = _configure_external_file_handler(external_handler, logging.DEBUG, debug_only_file=True)
 
-            assert isinstance(handler, logging.FileHandler)
-            assert not isinstance(handler, RotatingFileHandler)
+            assert handler is external_handler
+            assert isinstance(handler, RotatingFileHandler)
             assert handler.baseFilename == str(log_file)
-            assert handler.mode == "a"
-            assert getattr(handler, "_fabric_cicd_managed", False) is True
+            assert getattr(handler, "_fabric_cicd_managed", False) is False
+            assert getattr(handler, "_fabric_cicd_external", False) is True
             assert handler.formatter is custom_formatter
-            assert handler.level == logging.DEBUG
             assert len(handler.filters) == 1
             assert isinstance(handler.filters[0], PackageFilter)
             assert handler.filters[0].debug_only is True
         finally:
-            handler.close()
             external_handler.close()
 
-    def test_external_file_handler_default_formatter(self, temp_log_dir):
-        """Test external file handler uses default formatter when none is set."""
+    def test_preserves_caller_formatter(self, temp_log_dir):
+        """Test external file handler preserves caller's formatter."""
         log_file = temp_log_dir / "external.log"
+        custom_formatter = logging.Formatter("CUSTOM - %(levelname)s - %(message)s")
         external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
-        # No formatter set
+        external_handler.setFormatter(custom_formatter)
 
         try:
             handler = _configure_external_file_handler(external_handler, logging.DEBUG, debug_only_file=True)
-            assert handler.formatter is not None
-            # Verify the documented format: timestamp - level - name - message
-            assert "%(asctime)s" in handler.formatter._fmt
-            assert "%(levelname)s" in handler.formatter._fmt
-            assert "%(name)s" in handler.formatter._fmt
-            assert "%(message)s" in handler.formatter._fmt
+
+            # Verify formatter is preserved by checking it formats correctly
+            record = logging.LogRecord(
+                name="fabric_cicd", level=logging.DEBUG, pathname="", lineno=0, msg="test", args=(), exc_info=None
+            )
+            formatted = handler.formatter.format(record)
+            assert formatted.startswith("CUSTOM - DEBUG - test")
         finally:
-            handler.close()
             external_handler.close()
 
-    def test_external_file_handler_info_level_ignores_debug_only(self, temp_log_dir):
+    def test_info_level_ignores_debug_only(self, temp_log_dir):
         """Test external file handler at INFO level ignores debug_only_file flag."""
         log_file = temp_log_dir / "external.log"
         external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
 
         try:
             handler = _configure_external_file_handler(external_handler, logging.INFO, debug_only_file=True)
-            assert handler.filters[0].debug_only is False  # Not applied because level != DEBUG
+            assert handler.filters[0].debug_only is False
         finally:
-            handler.close()
+            external_handler.close()
+
+    def test_works_with_regular_file_handler(self, temp_log_dir):
+        """Test external file handler works with regular FileHandler."""
+        log_file = temp_log_dir / "external.log"
+        external_handler = logging.FileHandler(str(log_file))
+
+        try:
+            handler = _configure_external_file_handler(external_handler, logging.DEBUG, debug_only_file=False)
+
+            assert handler is external_handler
+            assert isinstance(handler, logging.FileHandler)
+            assert not isinstance(handler, RotatingFileHandler)
+            assert len(handler.filters) == 1
+            assert handler.filters[0].debug_only is False
+        finally:
             external_handler.close()
 
 
@@ -356,14 +412,25 @@ class TestGetFileHandler:
         root_logger.addHandler(handler)
 
         try:
-            result = get_file_handler()
-            assert result is None
+            assert get_file_handler() is None
         finally:
             handler.close()
             root_logger.removeHandler(handler)
 
-    def test_returns_any_file_handler_from_external_logger(self):
-        """Test returns any file handler (managed or not) from external logger."""
+    def test_ignores_external_file_handler_on_root(self):
+        """Test ignores file handlers marked as external on root logger."""
+        root_logger = logging.getLogger()
+        handler = _mark_external_handler(logging.FileHandler("test_external.log", delay=True))
+        root_logger.addHandler(handler)
+
+        try:
+            assert get_file_handler() is None
+        finally:
+            handler.close()
+            root_logger.removeHandler(handler)
+
+    def test_returns_any_file_handler_from_provided_logger(self):
+        """Test returns any file handler from provided logger."""
         external_logger = logging.getLogger("external_test")
         handler = logging.FileHandler("test_external.log", delay=True)
         external_logger.addHandler(handler)
@@ -446,28 +513,28 @@ class TestConfigureLogger:
             (logging.DEBUG, logging.DEBUG, logging.INFO),
         ],
     )
-    def test_configure_logger_levels(self, level, expected_package_level, expected_root_level):
+    def test_logger_levels(self, level, expected_package_level, expected_root_level):
         """Test logger level configuration."""
         configure_logger(level=level, disable_log_file=True)
 
         assert logging.getLogger("fabric_cicd").level == expected_package_level
         assert logging.getLogger().level == expected_root_level
 
-    def test_configure_logger_file_handler(self):
+    def test_default_includes_file_handler(self):
         """Test default configuration includes file handler."""
         configure_logger()
         root_logger = logging.getLogger()
         file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) == 1
 
-    def test_configure_logger_disable_file_logging(self):
+    def test_disable_file_logging(self):
         """Test file logging can be disabled."""
         configure_logger(disable_log_file=True)
         root_logger = logging.getLogger()
         file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) == 0
 
-    def test_configure_logger_with_external_file_handler(self, external_rotating_handler, temp_log_dir):
+    def test_with_external_file_handler(self, external_rotating_handler, temp_log_dir):
         """Test configuration with external file handler."""
         log_file = temp_log_dir / "external.log"
 
@@ -479,16 +546,17 @@ class TestConfigureLogger:
         )
 
         root_logger = logging.getLogger()
-        file_handlers = [
+        external_handlers = [
             h
             for h in root_logger.handlers
-            if isinstance(h, logging.FileHandler) and getattr(h, "_fabric_cicd_managed", False)
+            if isinstance(h, logging.FileHandler) and getattr(h, "_fabric_cicd_external", False)
         ]
-        assert len(file_handlers) == 1
-        assert file_handlers[0].baseFilename == str(log_file)
-        assert not isinstance(file_handlers[0], RotatingFileHandler)
+        assert len(external_handlers) == 1
+        assert external_handlers[0] is external_rotating_handler
+        assert external_handlers[0].baseFilename == str(log_file)
+        assert isinstance(external_handlers[0], RotatingFileHandler)
 
-    def test_configure_logger_suppress_debug_console(self):
+    def test_suppress_debug_console(self):
         """Test suppressing DEBUG output to console."""
         configure_logger(level=logging.DEBUG, suppress_debug_console=True, disable_log_file=True)
 
@@ -497,7 +565,7 @@ class TestConfigureLogger:
         assert len(console_handlers) == 1
         assert console_handlers[0].level == logging.INFO
 
-    def test_configure_logger_console_only_logger(self):
+    def test_console_only_logger_configured(self):
         """Test console_only logger is properly configured."""
         configure_logger(disable_log_file=True)
 
@@ -508,19 +576,19 @@ class TestConfigureLogger:
         assert len(console_only_logger.handlers) == 1
         assert package_logger.handlers[0] is not console_only_logger.handlers[0]
 
-    def test_configure_logger_preserves_external_handlers(self):
-        """Test that external handlers survive reconfiguration."""
+    def test_preserves_unmanaged_handlers(self):
+        """Test that unmanaged handlers survive reconfiguration."""
         root_logger = logging.getLogger()
         external_handler = logging.StreamHandler()
         root_logger.addHandler(external_handler)
 
         configure_logger(disable_log_file=True)
-        configure_logger(disable_log_file=True)  # Reconfigure
+        configure_logger(disable_log_file=True)
 
         assert external_handler in root_logger.handlers
         root_logger.removeHandler(external_handler)
 
-    def test_configure_logger_package_logger_propagates(self):
+    def test_package_logger_propagates(self):
         """Test that package logger propagates to root."""
         configure_logger(disable_log_file=True)
         assert logging.getLogger("fabric_cicd").propagate is True
@@ -529,7 +597,7 @@ class TestConfigureLogger:
 class TestLogHeader:
     """Tests for the log_header function."""
 
-    def test_log_header_calls_logger(self, caplog):
+    def test_logs_expected_messages(self, caplog):
         """Test log_header logs the expected messages."""
         logger = logging.getLogger("fabric_cicd.test")
         logger.setLevel(logging.INFO)
@@ -596,44 +664,36 @@ class TestWrapperFunctions:
 class TestConfigureExternalFileLogging:
     """Tests for the configure_external_file_logging wrapper function."""
 
-    def test_configure_external_file_logging(self, temp_log_dir):
+    def test_configures_correctly(self, external_logger_with_handler):
         """Test that configure_external_file_logging configures correctly."""
         from fabric_cicd import configure_external_file_logging
 
-        log_file = temp_log_dir / "program.log"
-        external_logger = logging.getLogger("ProgramLogger")
-        external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
-        external_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-        external_logger.addHandler(external_handler)
+        external_logger, external_handler, log_file = external_logger_with_handler
 
-        try:
-            configure_external_file_logging(external_logger)
+        configure_external_file_logging(external_logger)
 
-            package_logger = logging.getLogger("fabric_cicd")
-            assert package_logger.level == logging.DEBUG
+        package_logger = logging.getLogger("fabric_cicd")
+        assert package_logger.level == logging.DEBUG
 
-            console_handlers = [
-                h
-                for h in package_logger.handlers
-                if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
-            ]
-            assert len(console_handlers) == 1
-            assert console_handlers[0].level == logging.INFO
+        console_handlers = [
+            h
+            for h in package_logger.handlers
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+        ]
+        assert len(console_handlers) == 1
+        assert console_handlers[0].level == logging.INFO
 
-            root_logger = logging.getLogger()
-            file_handlers = [
-                h
-                for h in root_logger.handlers
-                if isinstance(h, logging.FileHandler) and getattr(h, "_fabric_cicd_managed", False)
-            ]
-            assert len(file_handlers) == 1
-            assert file_handlers[0].baseFilename == str(log_file)
+        root_logger = logging.getLogger()
+        external_handlers = [
+            h
+            for h in root_logger.handlers
+            if isinstance(h, logging.FileHandler) and getattr(h, "_fabric_cicd_external", False)
+        ]
+        assert len(external_handlers) == 1
+        assert external_handlers[0] is external_handler
+        assert external_handlers[0].baseFilename == str(log_file)
 
-        finally:
-            external_handler.close()
-            external_logger.removeHandler(external_handler)
-
-    def test_configure_external_file_logging_raises_without_handler(self):
+    def test_raises_without_handler(self):
         """Test that configure_external_file_logging raises ValueError if no file handler."""
         from fabric_cicd import configure_external_file_logging
 
@@ -643,46 +703,36 @@ class TestConfigureExternalFileLogging:
         with pytest.raises(ValueError, match="No FileHandler or RotatingFileHandler found"):
             configure_external_file_logging(external_logger)
 
-    def test_configure_external_file_logging_debug_only(self, temp_log_dir):
+    def test_writes_only_debug_logs(self, external_logger_with_handler):
         """Test that only DEBUG logs from fabric_cicd are written to external file."""
         from fabric_cicd import configure_external_file_logging
 
-        log_file = temp_log_dir / "program_debug.log"
-        external_logger = logging.getLogger("ProgramDebug")
-        external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
-        external_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-        external_logger.addHandler(external_handler)
+        external_logger, external_handler, log_file = external_logger_with_handler
 
-        try:
-            configure_external_file_logging(external_logger)
+        configure_external_file_logging(external_logger)
 
-            fabric_logger = logging.getLogger("fabric_cicd")
-            fabric_logger.debug("Debug message")
-            fabric_logger.info("Info message")
+        fabric_logger = logging.getLogger("fabric_cicd")
+        fabric_logger.debug("Debug message")
+        fabric_logger.info("Info message")
 
-            # Also test third-party filtering
-            azure_logger = logging.getLogger("azure.identity")
-            azure_logger.setLevel(logging.DEBUG)
-            azure_logger.debug("Azure debug")
+        azure_logger = logging.getLogger("azure.identity")
+        azure_logger.setLevel(logging.DEBUG)
+        azure_logger.debug("Azure debug")
 
-            for handler in logging.getLogger().handlers:
-                if hasattr(handler, "flush"):
-                    handler.flush()
+        for handler in logging.getLogger().handlers:
+            if hasattr(handler, "flush"):
+                handler.flush()
 
-            content = log_file.read_text(encoding="utf-8")
-            assert "Debug message" in content
-            assert "Info message" not in content
-            assert "Azure debug" not in content
-
-        finally:
-            external_handler.close()
-            external_logger.removeHandler(external_handler)
+        content = log_file.read_text(encoding="utf-8")
+        assert "Debug message" in content
+        assert "Info message" not in content
+        assert "Azure debug" not in content
 
 
 class TestExceptionHandler:
     """Tests for the exception_handler function."""
 
-    def test_exception_handler_custom_exception(self):
+    def test_handles_custom_exception(self):
         """Test exception handler handles custom exceptions."""
         from fabric_cicd._common._exceptions import InputError
 
@@ -695,14 +745,14 @@ class TestExceptionHandler:
         except Exception:
             pytest.fail("exception_handler raised an unexpected exception")
 
-    def test_exception_handler_standard_exception(self):
+    def test_falls_back_for_standard_exception(self):
         """Test exception handler falls back to default for standard exceptions."""
         with patch("sys.__excepthook__") as mock_excepthook:
             exception = ValueError("Standard error")
             exception_handler(ValueError, exception, None)
             mock_excepthook.assert_called_once()
 
-    def test_exception_handler_console_only_message(self):
+    def test_writes_to_console_only_logger(self):
         """Test that exception handler writes to console_only logger."""
         from fabric_cicd._common._exceptions import InputError
 
@@ -715,9 +765,9 @@ class TestExceptionHandler:
             mock_error.assert_called_once()
             message = mock_error.call_args[0][0]
             assert "User-facing error" in message
-            assert "See" not in message  # No file reference when disabled
+            assert "See" not in message
 
-    def test_exception_handler_removes_console_from_package_logger(self):
+    def test_removes_console_handler_when_using_default_file(self):
         """Test that exception handler removes console handler when using default file handler."""
         from fabric_cicd._common._exceptions import InputError
 
@@ -778,67 +828,128 @@ class TestFileLoggingIntegration:
         finally:
             os.chdir(original_cwd)
 
-    def test_external_handler_appends_to_shared_file(self, temp_log_dir):
-        """Test that external handler writes to the same file as the program's handler."""
+    def test_external_handler_writes_fabric_cicd_logs(self, external_logger_with_handler):
+        """Test that external handler writes fabric_cicd logs to the shared file."""
         from fabric_cicd import configure_external_file_logging
 
-        log_file = temp_log_dir / "shared.log"
-        external_handler = RotatingFileHandler(str(log_file), maxBytes=1024 * 1024, backupCount=1)
-        external_handler.setFormatter(logging.Formatter("PROGRAM - %(message)s"))
+        external_logger, external_handler, log_file = external_logger_with_handler
 
-        external_logger = logging.getLogger("ProgramLogger")
-        external_logger.addHandler(external_handler)
-        external_logger.setLevel(logging.DEBUG)
+        external_logger.debug("Program message 1")
 
-        try:
-            external_logger.debug("Program message 1")
+        configure_external_file_logging(external_logger)
 
-            configure_external_file_logging(external_logger)
+        fabric_logger = logging.getLogger("fabric_cicd")
+        fabric_logger.debug("Fabric CICD message")
 
-            fabric_logger = logging.getLogger("fabric_cicd")
-            fabric_logger.debug("Fabric CICD message")
+        for handler in logging.getLogger().handlers:
+            if hasattr(handler, "flush"):
+                handler.flush()
+        external_handler.flush()
 
-            external_logger.debug("Program message 2")
+        content = log_file.read_text(encoding="utf-8")
+        assert "Program message 1" in content
+        assert "Fabric CICD message" in content
 
-            for handler in logging.getLogger().handlers:
-                if hasattr(handler, "flush"):
-                    handler.flush()
-            external_handler.flush()
-
-            content = log_file.read_text(encoding="utf-8")
-            assert "Program message 1" in content
-            assert "Fabric CICD message" in content
-            assert "Program message 2" in content
-
-        finally:
-            external_handler.close()
-            external_logger.removeHandler(external_handler)
-
-    def test_console_only_logger_does_not_propagate_to_file(self, temp_log_dir):
+    def test_console_only_logger_does_not_propagate_to_file(self, external_logger_with_handler):
         """Test that console_only logger does not write to file."""
-        log_file = temp_log_dir / "propagation_test.log"
-        external_handler = RotatingFileHandler(str(log_file), maxBytes=1024, backupCount=1)
-        external_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        from fabric_cicd import configure_external_file_logging
 
-        external_logger = logging.getLogger("PropagationTest")
-        external_logger.addHandler(external_handler)
+        external_logger, external_handler, log_file = external_logger_with_handler
 
-        try:
-            from fabric_cicd import configure_external_file_logging
+        configure_external_file_logging(external_logger)
 
-            configure_external_file_logging(external_logger)
+        console_only_logger = logging.getLogger("console_only")
+        console_only_logger.error("Console only error")
 
-            console_only_logger = logging.getLogger("console_only")
-            console_only_logger.error("Console only error")
+        for handler in logging.getLogger().handlers:
+            if hasattr(handler, "flush"):
+                handler.flush()
 
-            for handler in logging.getLogger().handlers:
-                if hasattr(handler, "flush"):
-                    handler.flush()
+        if log_file.exists():
+            content = log_file.read_text(encoding="utf-8")
+            assert "Console only error" not in content
 
-            if log_file.exists():
-                content = log_file.read_text(encoding="utf-8")
-                assert "Console only error" not in content
 
-        finally:
-            external_handler.close()
-            external_logger.removeHandler(external_handler)
+class TestExternalHandlerReconfiguration:
+    """Tests for external handler reconfiguration scenarios."""
+
+    def test_debug_to_non_debug_cleans_up_filter(self, external_logger_with_handler):
+        """Test switching from debug mode to non-debug mode cleans up filter."""
+        from fabric_cicd import configure_external_file_logging, disable_file_logging
+
+        external_logger, external_handler, _ = external_logger_with_handler
+
+        configure_external_file_logging(external_logger)
+        assert len(external_handler.filters) == 1
+        assert isinstance(external_handler.filters[0], PackageFilter)
+
+        disable_file_logging()
+
+        assert len(external_handler.filters) == 0
+        assert getattr(external_handler, "_fabric_cicd_external", False) is False
+
+    def test_non_debug_to_debug_adds_filter(self, external_logger_with_handler):
+        """Test switching from non-debug mode to debug mode adds filter correctly."""
+        from fabric_cicd import configure_external_file_logging, disable_file_logging
+
+        external_logger, external_handler, _ = external_logger_with_handler
+
+        disable_file_logging()
+        assert len(external_handler.filters) == 0
+
+        configure_external_file_logging(external_logger)
+
+        assert len(external_handler.filters) == 1
+        assert isinstance(external_handler.filters[0], PackageFilter)
+        assert external_handler.filters[0].debug_only is True
+
+    def test_multiple_debug_runs_no_filter_accumulation(self, external_logger_with_handler):
+        """Test multiple debug runs don't accumulate filters on the same handler."""
+        from fabric_cicd import configure_external_file_logging
+
+        external_logger, external_handler, _ = external_logger_with_handler
+
+        configure_external_file_logging(external_logger)
+        configure_external_file_logging(external_logger)
+        configure_external_file_logging(external_logger)
+
+        assert len(external_handler.filters) == 1
+        assert isinstance(external_handler.filters[0], PackageFilter)
+
+    def test_handler_not_closed_on_disable(self, external_logger_with_handler):
+        """Test external handler is not closed when file logging is disabled."""
+        from fabric_cicd import configure_external_file_logging, disable_file_logging
+
+        external_logger, external_handler, log_file = external_logger_with_handler
+
+        configure_external_file_logging(external_logger)
+        disable_file_logging()
+
+        external_logger.debug("Message after disable")
+        external_handler.flush()
+
+        content = log_file.read_text(encoding="utf-8")
+        assert "Message after disable" in content
+
+    def test_rotating_handler_preserves_rotation_settings(self, external_logger_with_handler):
+        """Test that RotatingFileHandler rotation settings are preserved."""
+        from fabric_cicd import configure_external_file_logging
+
+        external_logger, external_handler, _ = external_logger_with_handler
+
+        original_max_bytes = external_handler.maxBytes
+        original_backup_count = external_handler.backupCount
+
+        configure_external_file_logging(external_logger)
+
+        root_logger = logging.getLogger()
+        external_handlers = [
+            h
+            for h in root_logger.handlers
+            if isinstance(h, RotatingFileHandler) and getattr(h, "_fabric_cicd_external", False)
+        ]
+
+        assert len(external_handlers) == 1
+        handler = external_handlers[0]
+        assert handler.maxBytes == original_max_bytes
+        assert handler.backupCount == original_backup_count

@@ -83,11 +83,30 @@ class PackageFilter(logging.Filter):
 _DEFAULT_LOG_FILENAME = "fabric_cicd.error.log"
 _DEFAULT_LOG_FILE_FORMATTER = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 _FABRIC_CICD_HANDLER_ATTR = "_fabric_cicd_managed"
+_FABRIC_CICD_EXTERNAL_HANDLER_ATTR = "_fabric_cicd_external"
+
+
+def _cleanup_external_handler_filters(root_logger: logging.Logger) -> None:
+    """Remove PackageFilter from any external handler previously configured by fabric_cicd."""
+    for handler in list(root_logger.handlers):
+        if getattr(handler, _FABRIC_CICD_EXTERNAL_HANDLER_ATTR, False):
+            # Remove all PackageFilters that were added
+            for f in list(handler.filters):
+                if isinstance(f, PackageFilter):
+                    handler.removeFilter(f)
+            # Remove the marker attribute
+            delattr(handler, _FABRIC_CICD_EXTERNAL_HANDLER_ATTR)
+            # Remove handler from root logger (don't close it - caller owns it)
+            root_logger.removeHandler(handler)
 
 
 def _cleanup_managed_handlers(*loggers: logging.Logger) -> None:
     """Close and remove only handlers previously added by fabric_cicd."""
     for logger_instance in loggers:
+        # First, clean up any external handlers configured (filters only, don't close)
+        _cleanup_external_handler_filters(logger_instance)
+
+        # Then clean up fabric_cicd-managed handlers (close and remove)
         for handler in list(logger_instance.handlers):
             if getattr(handler, _FABRIC_CICD_HANDLER_ATTR, False):
                 handler.close()
@@ -97,6 +116,12 @@ def _cleanup_managed_handlers(*loggers: logging.Logger) -> None:
 def _mark_handler(handler: logging.Handler) -> logging.Handler:
     """Mark a handler as managed by fabric_cicd."""
     setattr(handler, _FABRIC_CICD_HANDLER_ATTR, True)
+    return handler
+
+
+def _mark_external_handler(handler: logging.Handler) -> logging.Handler:
+    """Mark an external handler as configured by fabric_cicd (for filter cleanup only)."""
+    setattr(handler, _FABRIC_CICD_EXTERNAL_HANDLER_ATTR, True)
     return handler
 
 
@@ -119,33 +144,23 @@ def _configure_external_file_handler(
     debug_only_file: bool,
 ) -> logging.Handler:
     """
-    Configure a file handler that appends fabric_cicd package logs
-    to an external logger's file. The external logger remains responsible
-    for file rotation, formatting, and other configurations.
+    Configure an external file handler for fabric_cicd package logs.
 
-    When level is DEBUG, there is an option to only write DEBUG messages from
-    fabric_cicd to the file, controlled by the debug_only_file flag.
+    Reuses the external handler directly to preserve rotation behavior (if any).
+    The external handler is not marked as fabric_cicd-managed (won't be closed),
+    but is marked as external so filters can be cleaned up on reconfiguration.
+
+    Note: Any existing PackageFilter is already removed by _cleanup_managed_handlers()
+    before this function is called.
     """
-    handler = logging.FileHandler(
-        filename=external_handler.baseFilename,
-        mode="a",
-    )
-    # Use the external handler's formatter for consistent log format
-    if external_handler.formatter:
-        handler.setFormatter(external_handler.formatter)
-    else:
-        # Otherwise, use the default fabric_cicd formatter
-        handler.setFormatter(logging.Formatter(_DEFAULT_LOG_FILE_FORMATTER))
-
-    # Write only DEBUG messages from fabric_cicd package if the level is DEBUG and the flag is True
+    # Add the appropriate filter
     if level == logging.DEBUG and debug_only_file:
-        handler.setLevel(logging.DEBUG)
-        handler.addFilter(PackageFilter(debug_only=True))  # Only DEBUG level from fabric_cicd package logs
+        external_handler.addFilter(PackageFilter(debug_only=True))
     else:
-        # Otherwise, write all levels from fabric_cicd package to file
-        handler.addFilter(PackageFilter())
+        external_handler.addFilter(PackageFilter())
 
-    return _mark_handler(handler)
+    # Mark as external in order to clean up filters later (but don't close it)
+    return _mark_external_handler(external_handler)
 
 
 def _configure_console_handler(level: int) -> logging.StreamHandler:
@@ -238,6 +253,7 @@ def configure_logger(
     console_only_logger = logging.getLogger("console_only")
 
     # Close and remove old handlers before adding new ones
+    # This also cleans up any PackageFilter added to external handlers
     _cleanup_managed_handlers(root_logger, package_logger, console_only_logger)
 
     # Root logger - receives propagated records from fabric_cicd loggers
