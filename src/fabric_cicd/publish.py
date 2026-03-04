@@ -439,6 +439,7 @@ def deploy_with_config(
     else:
         logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
+    logger.info("Config-based deployment completed successfully")
     return DeploymentResult(
         status=DeploymentStatus.COMPLETED,
         message="Config-based deployment completed successfully",
