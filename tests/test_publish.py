@@ -18,7 +18,6 @@ from fabric_cicd._items._notebook import NotebookPublisher
 from fabric_cicd.constants import API_FORMAT_MAPPING, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
-
 # =============================================================================
 # Shared Fixtures and Helpers
 # =============================================================================
@@ -78,10 +77,7 @@ def create_test_item(base_path: Path, folder: str | None, name: str, item_type: 
     Returns:
         Path to the created item directory.
     """
-    if folder:
-        item_dir = base_path / folder / f"{name}.{item_type}"
-    else:
-        item_dir = base_path / f"{name}.{item_type}"
+    item_dir = base_path / folder / f"{name}.{item_type}" if folder else base_path / f"{name}.{item_type}"
 
     item_dir.mkdir(parents=True, exist_ok=True)
 
@@ -372,7 +368,8 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint, temp_worksp
 # =============================================================================
 
 
-def test_folder_exclusion_with_regex(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_exclusion_with_regex(mock_endpoint, temp_workspace_dir):
     """Test that folder_path_exclude_regex can exclude entire folders of items."""
     create_test_item(temp_workspace_dir, "legacy", "LegacyNotebook", "Notebook", "legacy-notebook-id")
     create_test_item(temp_workspace_dir, "legacy", "LegacyModel", "SemanticModel", "legacy-model-id")
@@ -405,7 +402,8 @@ def test_folder_exclusion_with_regex(mock_endpoint, temp_workspace_dir, experime
         assert workspace.repository_items["Notebook"]["RootNotebook"].skip_publish is False
 
 
-def test_folder_exclusion_with_anchored_regex(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_exclusion_with_anchored_regex(mock_endpoint, temp_workspace_dir):
     """Test that excluding a parent folder with an anchored regex also excludes
     items in child folders, preserving consistent hierarchy behavior."""
     create_test_item(temp_workspace_dir, "legacy", "LegacyNotebook", "Notebook", "legacy-notebook-id")
@@ -458,7 +456,8 @@ def test_item_name_exclusion_still_works(mock_endpoint, temp_workspace_dir):
         assert workspace.repository_items["Notebook"]["TestNotebook"].skip_publish is False
 
 
-def test_legacy_folder_exclusion_example(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_legacy_folder_exclusion_example(mock_endpoint, temp_workspace_dir):
     """Test the specific use case mentioned in the issue: excluding items in a 'legacy' folder."""
     create_test_item(temp_workspace_dir, "legacy", "FabricNotebook", "Notebook", "legacy-notebook-id")
     create_test_item(temp_workspace_dir, "legacy", "Model", "SemanticModel", "legacy-model-id")
@@ -490,7 +489,8 @@ def test_legacy_folder_exclusion_example(mock_endpoint, temp_workspace_dir, expe
 # =============================================================================
 
 
-def test_folder_inclusion_with_folder_path_to_include(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_inclusion_with_folder_path_to_include(mock_endpoint, temp_workspace_dir):
     """Test that folder_path_to_include only filters items found within a Fabric folder."""
     create_test_item(temp_workspace_dir, "active", "ActiveNotebook", "Notebook", "active-notebook-id")
     create_test_item(temp_workspace_dir, "active", "ActiveModel", "SemanticModel", "active-model-id")
@@ -532,7 +532,8 @@ def test_folder_inclusion_with_folder_path_to_include(mock_endpoint, temp_worksp
         assert workspace.repository_items["Notebook"]["EngNotebook"].skip_publish is False
 
 
-def test_folder_inclusion_and_exclusion_together(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_inclusion_and_exclusion_together(mock_endpoint, temp_workspace_dir):
     """Test that using both folder_path_to_include and folder_path_exclude_regex raises InputError."""
     create_test_item(temp_workspace_dir, "deploy", "DeployNotebook", "Notebook", "deploy-notebook-id")
 
@@ -560,7 +561,8 @@ def test_folder_inclusion_and_exclusion_together(mock_endpoint, temp_workspace_d
             )
 
 
-def test_empty_folder_path_to_include_raises_error(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_empty_folder_path_to_include_raises_error(mock_endpoint, temp_workspace_dir):
     """Test that passing an empty list for folder_path_to_include raises an InputError."""
     with (
         patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
@@ -584,7 +586,8 @@ def test_empty_folder_path_to_include_raises_error(mock_endpoint, temp_workspace
 # =============================================================================
 
 
-def test_folder_exclusion_with_items_to_include(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_exclusion_with_items_to_include(mock_endpoint, temp_workspace_dir):
     """Test that folder exclusion takes precedence over items_to_include."""
     create_test_item(temp_workspace_dir, "legacy", "ImportantNotebook", "Notebook", "important-notebook-id")
     create_test_item(temp_workspace_dir, None, "StandaloneNotebook", "Notebook", "standalone-notebook-id")
@@ -614,7 +617,8 @@ def test_folder_exclusion_with_items_to_include(mock_endpoint, temp_workspace_di
         assert workspace.repository_items["Notebook"]["OtherNotebook"].skip_publish is True
 
 
-def test_folder_inclusion_with_item_exclusion(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_inclusion_with_item_exclusion(mock_endpoint, temp_workspace_dir):
     """Test that item_name_exclude_regex can exclude specific items within an included folder."""
     create_test_item(temp_workspace_dir, "active", "ActiveNotebook", "Notebook", "active-notebook-id")
     create_test_item(temp_workspace_dir, "active", "DebugNotebook", "Notebook", "debug-notebook-id")
@@ -642,7 +646,8 @@ def test_folder_inclusion_with_item_exclusion(mock_endpoint, temp_workspace_dir,
         assert workspace.repository_items["Notebook"]["ActiveNotebook"].skip_publish is False
 
 
-def test_folder_inclusion_with_items_to_include(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_inclusion_with_items_to_include(mock_endpoint, temp_workspace_dir):
     """Test that folder_path_to_include and items_to_include work together to narrow the scope."""
     create_test_item(temp_workspace_dir, "active", "Notebook1", "Notebook", "notebook1-id")
     create_test_item(temp_workspace_dir, "active", "Notebook2", "Notebook", "notebook2-id")
@@ -672,7 +677,8 @@ def test_folder_inclusion_with_items_to_include(mock_endpoint, temp_workspace_di
         assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is True
 
 
-def test_all_filters_combined(mock_endpoint, temp_workspace_dir, experimental_feature_flags):
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_all_filters_combined(mock_endpoint, temp_workspace_dir):
     """Test the complete filter evaluation order with all filters applied."""
     create_test_item(temp_workspace_dir, "active", "DebugNotebook", "Notebook", "debug-id")
     create_test_item(temp_workspace_dir, "active", "TargetNotebook", "Notebook", "target-id")
