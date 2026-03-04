@@ -3,6 +3,7 @@
 
 """Deployment result types for config-based deployment operations."""
 
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -13,6 +14,7 @@ class DeploymentStatus(str, Enum):
     """Deployment completed successfully without any errors."""
 
 
+@dataclass
 class DeploymentResult:
     """Result of a config-based deployment operation.
 
@@ -24,12 +26,5 @@ class DeploymentResult:
         message: A human-readable message describing the result.
     """
 
-    def __init__(self, status: DeploymentStatus, message: str) -> None:
-        """Initialize the DeploymentResult.
-
-        Args:
-            status: The deployment status.
-            message: A human-readable message describing the result.
-        """
-        self.status = status
-        self.message = message
+    status: DeploymentStatus
+    message: str
