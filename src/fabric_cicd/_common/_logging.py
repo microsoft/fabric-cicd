@@ -81,6 +81,7 @@ class PackageFilter(logging.Filter):
 """Helper functions to configure logging and handle exceptions across the fabric_cicd package."""
 
 _DEFAULT_LOG_FILENAME = "fabric_cicd.error.log"
+_DEFAULT_LOG_FILE_FORMATTER = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 _FABRIC_CICD_HANDLER_ATTR = "_fabric_cicd_managed"
 
 
@@ -106,7 +107,7 @@ def _configure_default_file_handler() -> logging.Handler:
         mode="w",
         delay=True,
     )
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s"))
+    handler.setFormatter(logging.Formatter(_DEFAULT_LOG_FILE_FORMATTER))
     handler.addFilter(PackageFilter())  # All levels from fabric_cicd package logs
 
     return _mark_handler(handler)
@@ -133,8 +134,8 @@ def _configure_external_file_handler(
     if external_handler.formatter:
         handler.setFormatter(external_handler.formatter)
     else:
-        # Otherwise, use a simplified formatter
-        handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        # Otherwise, use the default fabric_cicd formatter
+        handler.setFormatter(logging.Formatter(_DEFAULT_LOG_FILE_FORMATTER))
 
     # Write only DEBUG messages from fabric_cicd package if the level is DEBUG and the flag is True
     if level == logging.DEBUG and debug_only_file:
@@ -160,7 +161,7 @@ def _configure_console_handler(level: int) -> logging.StreamHandler:
     return _mark_handler(handler)
 
 
-def _build_console_message(exception: BaseException, file_handler: logging.FileHandler | None) -> str:
+def _build_console_message(exception: BaseException, file_handler: Optional[logging.FileHandler] = None) -> str:
     """Build the user-facing console error message, optionally referencing the log file."""
     # Write exception to console when file logging is disabled or when using an external file handler
     if file_handler is None or Path(file_handler.baseFilename).name != _DEFAULT_LOG_FILENAME:
@@ -183,8 +184,8 @@ def _build_file_message(exception: BaseException) -> str:
 
 
 def get_file_handler(
-    logger: logging.Logger | None = None,
-) -> logging.FileHandler | RotatingFileHandler | None:
+    logger: Optional[logging.Logger] = None,
+) -> Optional[logging.FileHandler | RotatingFileHandler]:
     """
     Get a file handler from a logger.
 

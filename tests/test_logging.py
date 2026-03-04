@@ -295,7 +295,11 @@ class TestConfigureExternalFileHandler:
         try:
             handler = _configure_external_file_handler(external_handler, logging.DEBUG, debug_only_file=True)
             assert handler.formatter is not None
+            # Verify the documented format: timestamp - level - name - message
             assert "%(asctime)s" in handler.formatter._fmt
+            assert "%(levelname)s" in handler.formatter._fmt
+            assert "%(name)s" in handler.formatter._fmt
+            assert "%(message)s" in handler.formatter._fmt
         finally:
             handler.close()
             external_handler.close()

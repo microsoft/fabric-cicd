@@ -68,8 +68,9 @@ def configure_external_file_logging(external_logger: logging.Logger) -> None:
         Exception messages are displayed on the console, but full stack traces
         are not written to the external log file
 
-        - If no format is set on the external logger's file handler, a simplified
-        message format will be used for fabric_cicd logs in that file (timestamp - level - message)
+        - If no formatter is set on the external logger's file handler, the
+        default fabric_cicd formatter will be used for fabric_cicd logs in that file
+        (timestamp - level - name - message)
 
         - Console output remains at INFO level (default fabric_cicd console behavior)
 
