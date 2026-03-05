@@ -3,8 +3,9 @@
 
 """Deployment result types for config-based deployment operations."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Optional
 
 
 class DeploymentStatus(str, Enum):
@@ -12,6 +13,8 @@ class DeploymentStatus(str, Enum):
 
     COMPLETED = "completed"
     """Deployment completed successfully without any errors."""
+    FAILED = "failed"
+    """Deployment failed due to one or more errors."""
 
 
 @dataclass
@@ -24,7 +27,9 @@ class DeploymentResult:
     Attributes:
         status: The deployment status (DeploymentStatus.COMPLETED on success).
         message: A human-readable message describing the result.
+        responses: Optional dictionary of API response data from the deployment.
     """
 
     status: DeploymentStatus
     message: str
+    responses: Optional[dict] = field(default=None)

@@ -344,12 +344,20 @@ def deploy_with_config(
         config_override: Optional dictionary to override specific configuration values.
 
     Returns:
-        DeploymentResult: A result object containing the deployment status and message.
-            The status will be DeploymentStatus.COMPLETED on success.
+        DeploymentResult: A result object containing the deployment status, message, and
+            optional responses. The status will be DeploymentStatus.COMPLETED on success.
+            The responses field contains API response data when the
+            ``enable_response_collection`` feature flag is enabled, otherwise None.
 
     Raises:
         InputError: If configuration file is invalid or environment not found.
         FileNotFoundError: If configuration file doesn't exist.
+
+    Note:
+        On failure, the raised exception will have ``deployment_status`` and ``deployment_message``
+        attributes attached. If the ``enable_response_collection`` feature flag is enabled and some
+        items were published before the failure, the exception will also have a ``partial_results``
+        attribute containing the collected API responses.
 
     Examples:
         Basic usage
@@ -393,54 +401,69 @@ def deploy_with_config(
     log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
-    # Validate environment
-    environment = validate_environment(environment)
+    # Initialize workspace as None so it exists in except block scope
+    workspace = None
 
-    # Load and validate configuration file
-    config = load_config_file(config_file_path, environment, config_override)
+    try:
+        # Validate environment
+        environment = validate_environment(environment)
 
-    # Extract environment-specific settings
-    workspace_settings = extract_workspace_settings(config, environment)
-    publish_settings = extract_publish_settings(config, environment)
-    unpublish_settings = extract_unpublish_settings(config, environment)
+        # Load and validate configuration file
+        config = load_config_file(config_file_path, environment, config_override)
 
-    # Apply feature flags and constants if specified
-    apply_config_overrides(config, environment)
+        # Extract environment-specific settings
+        workspace_settings = extract_workspace_settings(config, environment)
+        publish_settings = extract_publish_settings(config, environment)
+        unpublish_settings = extract_unpublish_settings(config, environment)
 
-    # Create FabricWorkspace object with extracted settings
-    workspace = FabricWorkspace(
-        repository_directory=workspace_settings["repository_directory"],
-        item_type_in_scope=workspace_settings.get("item_types_in_scope"),
-        environment=environment,
-        workspace_id=workspace_settings.get("workspace_id"),
-        workspace_name=workspace_settings.get("workspace_name"),
-        token_credential=token_credential,
-        parameter_file_path=workspace_settings.get("parameter_file_path"),
-    )
-    # Execute deployment operations based on skip settings
-    if not publish_settings.get("skip", False):
-        publish_all_items(
-            workspace,
-            item_name_exclude_regex=publish_settings.get("exclude_regex"),
-            folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
-            folder_path_to_include=publish_settings.get("folder_path_to_include"),
-            items_to_include=publish_settings.get("items_to_include"),
-            shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+        # Apply feature flags and constants if specified
+        apply_config_overrides(config, environment)
+
+        # Create FabricWorkspace object with extracted settings
+        workspace = FabricWorkspace(
+            repository_directory=workspace_settings["repository_directory"],
+            item_type_in_scope=workspace_settings.get("item_types_in_scope"),
+            environment=environment,
+            workspace_id=workspace_settings.get("workspace_id"),
+            workspace_name=workspace_settings.get("workspace_name"),
+            token_credential=token_credential,
+            parameter_file_path=workspace_settings.get("parameter_file_path"),
         )
-    else:
-        logger.info(f"Skipping publish operation for environment '{environment}'")
+        # Execute deployment operations based on skip settings
+        if not publish_settings.get("skip", False):
+            publish_all_items(
+                workspace,
+                item_name_exclude_regex=publish_settings.get("exclude_regex"),
+                folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
+                folder_path_to_include=publish_settings.get("folder_path_to_include"),
+                items_to_include=publish_settings.get("items_to_include"),
+                shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+            )
+        else:
+            logger.info(f"Skipping publish operation for environment '{environment}'")
 
-    if not unpublish_settings.get("skip", False):
-        unpublish_all_orphan_items(
-            workspace,
-            item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
-            items_to_include=unpublish_settings.get("items_to_include"),
-        )
-    else:
-        logger.info(f"Skipping unpublish operation for environment '{environment}'")
+        if not unpublish_settings.get("skip", False):
+            unpublish_all_orphan_items(
+                workspace,
+                item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
+                items_to_include=unpublish_settings.get("items_to_include"),
+            )
+        else:
+            logger.info(f"Skipping unpublish operation for environment '{environment}'")
+
+    except Exception as e:
+        # Preserve partial results before workspace goes out of scope
+        if workspace is not None:
+            partial_results = getattr(workspace, "responses", None)
+            if partial_results:
+                e.partial_results = partial_results
+        e.deployment_status = DeploymentStatus.FAILED
+        e.deployment_message = "Deployment failed"
+        raise
 
     logger.info("Config-based deployment completed successfully")
     return DeploymentResult(
         status=DeploymentStatus.COMPLETED,
         message="Deployment completed successfully",
+        responses=getattr(workspace, "responses", None),
     )
