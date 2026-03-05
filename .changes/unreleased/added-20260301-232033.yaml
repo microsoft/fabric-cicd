@@ -1,0 +1,8 @@
+kind: added
+body: Add enhanced logging configuration options via public functions
+time: 2026-03-01T23:20:33.9200449+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "842"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/842

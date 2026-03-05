@@ -1145,6 +1145,45 @@ def test_validate_parameter_environment_and_filters(parameter_object, param_name
     )
 
 
+def test_validate_item_name_with_accented_characters(repository_directory, item_type_in_scope, target_environment):
+    """Test that _validate_item_name correctly handles item names with accented characters."""
+    # Create a notebook directory with accented characters in the displayName
+    accented_name = "Rôles et parcours de formation"
+    accented_dir = repository_directory / f"{accented_name}.Report"
+    accented_dir.mkdir(parents=True, exist_ok=True)
+
+    platform_content = f"""{{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {{
+    "type": "Report",
+    "displayName": "{accented_name}",
+    "description": "Report with accented characters"
+  }},
+  "config": {{
+    "version": "2.0",
+    "logicalId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c"
+  }}
+}}
+"""
+    platform_file = accented_dir / ".platform"
+    platform_file.write_text(platform_content, encoding="utf-8")
+
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        environment=target_environment,
+        parameter_file_name=constants.PARAMETER_FILE_NAME,
+    )
+
+    # Should find the item with accented characters
+    assert param_obj._validate_item_name(accented_name) == (True, "Valid item name")
+    # Should not find a non-existent item
+    assert param_obj._validate_item_name("Roles et parcours de formation") == (
+        False,
+        constants.PARAMETER_MSGS["invalid item name"].format("Roles et parcours de formation"),
+    )
+
+
 @pytest.mark.parametrize(
     ("param_file_name", "result", "msg"),
     [

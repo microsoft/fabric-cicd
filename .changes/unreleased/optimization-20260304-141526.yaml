@@ -1,0 +1,8 @@
+kind: optimization
+body: Add return value to deploy_with_config
+time: 2026-03-04T14:15:26.525442+02:00
+custom:
+    Author: ayeshurun
+    AuthorLink: https://github.com/ayeshurun
+    Issue: "851"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/851

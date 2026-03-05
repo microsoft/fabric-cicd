@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 from fabric_cicd._common._exceptions import PublishError
 from fabric_cicd._common._item import Item
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import PARALLEL_MAX_WORKERS, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class ParallelConfig:
     """
 
     enabled: bool = True
-    max_workers: Optional[int] = None
+    max_workers: Optional[int] = PARALLEL_MAX_WORKERS
     ordered_items_func: Optional[Callable[["ItemPublisher"], list[str]]] = None
 
 

@@ -91,7 +91,7 @@ find_replace:
 
 Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_key` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
-Note: A common use case for this function is to replace values in key/value file types like Pipelines, Platform files, Schedules files, etc. The function automatically detects and processes any file containing valid JSON content, regardless of file extension (e.g., `.schedules`, `.platform` files).
+Note: A common use case for this parameter is to replace values in key/value file types like Data Pipeline, Schedule files, etc. The `key_value_replace` parameter automatically detects and processes any file containing valid JSON or YAML content, regardless of file extension (e.g., `.schedules` files). This does not apply to `.platform` files, which are intentionally excluded from parameterization to maintain item integrity.
 
 The `replace_value` field supports the same dynamic replacement variables as `find_replace`, including `$items` and `$workspace` notation. See the **Dynamic Replacement** section under `find_replace` for details on supported variables and attributes.
 
