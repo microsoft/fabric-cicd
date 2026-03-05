@@ -11,7 +11,7 @@ import traceback
 from logging import LogRecord
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, Union
 
 from fabric_cicd import constants
 from fabric_cicd._common import _exceptions
@@ -139,7 +139,7 @@ def _configure_default_file_handler() -> logging.Handler:
 
 
 def _configure_external_file_handler(
-    external_handler: logging.FileHandler | RotatingFileHandler,
+    external_handler: Union[logging.FileHandler, RotatingFileHandler],
     level: int,
     debug_only_file: bool,
 ) -> logging.Handler:
@@ -200,7 +200,7 @@ def _build_file_message(exception: BaseException) -> str:
 
 def get_file_handler(
     logger: Optional[logging.Logger] = None,
-) -> Optional[logging.FileHandler | RotatingFileHandler]:
+) -> Optional[Union[logging.FileHandler, RotatingFileHandler]]:
     """
     Get a file handler from a logger.
 
@@ -232,7 +232,7 @@ def configure_logger(
     suppress_debug_console: bool = False,
     debug_only_file: bool = False,
     disable_log_file: bool = False,
-    external_file_handler: Optional[logging.FileHandler | RotatingFileHandler] = None,
+    external_file_handler: Optional[Union[logging.FileHandler, RotatingFileHandler]] = None,
 ) -> None:
     """
     Configure the logger.

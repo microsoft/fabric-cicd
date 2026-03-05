@@ -4,7 +4,7 @@
 """Utilities for YAML-based deployment configuration."""
 
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 from fabric_cicd import constants
 from fabric_cicd._common._config_validator import ConfigValidator
@@ -27,7 +27,7 @@ def load_config_file(config_file_path: str, environment: str, config_override: O
     return validator.validate_config_file(config_file_path, environment, config_override)
 
 
-def get_config_value(config_section: dict, key: str, environment: str) -> str | list | bool | None:
+def get_config_value(config_section: dict, key: str, environment: str) -> Optional[Union[str, list, bool]]:
     """Extract a value from config, handling both single and environment-specific formats.
 
     Args:

@@ -6,7 +6,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import yaml
 
@@ -201,7 +201,7 @@ class ConfigValidator:
 
         return True
 
-    def _merge_overrides(self, section: str, value: dict | list) -> None:
+    def _merge_overrides(self, section: str, value: Union[dict, list]) -> None:
         """Merge section and setting overrides into config file."""
         # Special handling for features and constants sections
         if section == "features":
@@ -569,7 +569,7 @@ class ConfigValidator:
             )
 
     def _resolve_path_field(
-        self, field_value: str | dict, field_name: str, section_name: str, path_type: str = "directory"
+        self, field_value: Union[str, dict], field_name: str, section_name: str, path_type: str = "directory"
     ) -> None:
         """Path resolution for configuration "path" fields (e.g, repository_directory, parameter)."""
         # Prepare paths for resolution

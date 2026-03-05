@@ -206,8 +206,8 @@ def _handle_response(
     body: str,
     long_running: bool,
     iteration_count: int,
-    max_duration: int | None = None,
-    start_time: float | None = None,
+    max_duration: Optional[int] = None,
+    start_time: Optional[float] = None,
 ) -> tuple:
     """
     Handles the response from an HTTP request, including retries, throttling, and token expiration.
@@ -361,8 +361,8 @@ def handle_retry(
     base_delay: float,
     response_retry_after: float = 60,
     prepend_message: str = "",
-    max_duration: int | None = None,
-    start_time: float | None = None,
+    max_duration: Optional[int] = None,
+    start_time: Optional[float] = None,
 ) -> None:
     """
     Handles retry logic with exponential backoff based on the response, retrying
