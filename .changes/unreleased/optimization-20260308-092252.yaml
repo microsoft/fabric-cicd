@@ -1,0 +1,8 @@
+kind: optimization
+body: Add support for Python 3.13 in the library
+time: 2026-03-08T09:22:52.7803602+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "855"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/855
