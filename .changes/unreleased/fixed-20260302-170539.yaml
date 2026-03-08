@@ -1,8 +1,0 @@
-kind: fixed
-body: Exclude items with placeholder logical ID from duplicate logical ID check
-time: 2026-03-02T17:05:39.5336733+02:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "843"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/843
