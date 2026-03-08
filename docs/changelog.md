@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.3.0](https://pypi.org/project/fabric-cicd/v0.3.0) - March 09, 2026
+## [v0.3.0](https://pypi.org/project/fabric-cicd/0.3.0) - March 09, 2026
 
 ### ✨ New Functionality
 
