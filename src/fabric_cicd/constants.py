@@ -6,6 +6,8 @@
 import os
 from enum import Enum
 
+from fabric_cicd._common._validate_env_vars import validate_api_url
+
 # General
 VERSION = "0.3.0"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
@@ -159,8 +161,8 @@ UNPUBLISH_FLAG_MAPPING = {
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
 
 # API URLs
-DEFAULT_API_ROOT_URL = os.environ.get(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
-FABRIC_API_ROOT_URL = os.environ.get(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
+DEFAULT_API_ROOT_URL = validate_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
+FABRIC_API_ROOT_URL = validate_api_url(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
 
 # Retry Settings
 RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))
