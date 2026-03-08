@@ -50,7 +50,7 @@ def on_page_markdown(markdown, **kwargs):
         except Exception:
             # Use fallback values
             min_version = "3.9"
-            max_version = "3.12"
+            max_version = "3.13"
         
         # Replace placeholders
         markdown = markdown.replace("<!--MIN-PYTHON-VERSION-->", min_version)
