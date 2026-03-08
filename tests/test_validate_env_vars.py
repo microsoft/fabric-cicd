@@ -10,12 +10,17 @@ from fabric_cicd._common._validate_env_vars import validate_api_url
 
 ENV_VAR = "TEST_API_URL"
 
+_ENV_VARS_TO_CLEAR = (
+    "DEFAULT_API_ROOT_URL",
+    "FABRIC_API_ROOT_URL",
+    ENV_VAR,
+)
+
 
 @pytest.fixture(autouse=True)
-def _clean_env():
-    """Ensure the test env var is cleaned up after each test."""
-    yield
-    os.environ.pop(ENV_VAR, None)
+def isolate_url_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in _ENV_VARS_TO_CLEAR:
+        monkeypatch.delenv(name, raising=False)
 
 
 # --- Valid URLs ---
