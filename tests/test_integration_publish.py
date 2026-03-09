@@ -24,7 +24,7 @@ def allow_localhost_http_for_integration(monkeypatch: pytest.MonkeyPatch):
     """
     Test-only override: allow http://localhost for mocked integration servers.
     """
-    real_validate = validate_env_vars.validate_api_url_hostname
+    real_validate = validate_env_vars.validate_env_var_api_url
 
     def _validate_api_url_test(env_var_name: str, default_value: str) -> str:
         value = os.environ.get(env_var_name, default_value)
@@ -36,13 +36,12 @@ def allow_localhost_http_for_integration(monkeypatch: pytest.MonkeyPatch):
 
         return real_validate(env_var_name, default_value)
 
-    monkeypatch.setattr(validate_env_vars, "validate_api_url_hostname", _validate_api_url_test)
+    monkeypatch.setattr(validate_env_vars, "validate_env_var_api_url", _validate_api_url_test)
     return
 
 
 @pytest.fixture
-def mock_fabric_api_server(allow_localhost_http_for_integration):
-    _ = allow_localhost_http_for_integration
+def mock_fabric_api_server(allow_localhost_http_for_integration):  # noqa: ARG001
     """
     Start mock Fabric API server for the test.
 

@@ -12,6 +12,7 @@ import yaml
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url
 
 logger = logging.getLogger(__name__)
 
@@ -1028,7 +1029,7 @@ class ConfigValidator:
 
     def _validate_constants_dict(self, constants_dict: dict, context: str) -> None:
         """Validate a constants dictionary with proper context for error messages."""
-        for key, _ in constants_dict.items():
+        for key, value in constants_dict.items():
             if not isinstance(key, str) or not key.strip():
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_constant_key"].format(context, key)
@@ -1040,6 +1041,17 @@ class ConfigValidator:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, context)
                 )
+                continue
+
+            # Validate URL constants
+            if key in _URL_CONSTANTS:
+                if not isinstance(value, str):
+                    self.errors.append(f"'{key}' in '{context}' must be a string URL, got {type(value).__name__}")
+                    continue
+                try:
+                    validate_api_url(value, f"{context}.{key}")
+                except InputError as e:
+                    self.errors.append(str(e))
 
 
 def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:

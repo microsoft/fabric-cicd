@@ -504,10 +504,61 @@ class TestConfigValidator:
     def test_validate_constants_dict_valid_various_types(self):
         """Test _validate_constants_dict with valid constants of various types."""
         constants_dict = {
-            "DEFAULT_API_ROOT_URL": "https://api.example.com",  # string
-            "ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"],  # can override with different types
-            "FEATURE_FLAG": {"flag1", "flag2"},  # can override with different types
+            "DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com",  # valid URL constant
+            "ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"],  # non-URL constant, no URL check
         }
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert self.validator.errors == []
+
+    def test_validate_constants_dict_url_constant_non_string_type(self):
+        """Test _validate_constants_dict rejects non-string URL constant."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": 12345}
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert len(self.validator.errors) == 1
+        assert "'DEFAULT_API_ROOT_URL' in 'test_context' must be a string URL, got int" in self.validator.errors[0]
+
+    def test_validate_constants_dict_url_constant_invalid_hostname(self):
+        """Test _validate_constants_dict rejects URL with invalid hostname."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": "https://evil.example.com"}
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert len(self.validator.errors) == 1
+        assert "invalid hostname" in self.validator.errors[0].lower()
+
+    def test_validate_constants_dict_url_constant_http_scheme(self):
+        """Test _validate_constants_dict rejects URL with HTTP scheme."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": "http://api.fabric.microsoft.com"}
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert len(self.validator.errors) == 1
+        assert "must use HTTPS scheme" in self.validator.errors[0]
+
+    def test_validate_constants_dict_url_constant_with_path(self):
+        """Test _validate_constants_dict rejects URL with path components."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com/v1"}
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert len(self.validator.errors) == 1
+        assert "without path components" in self.validator.errors[0]
+
+    def test_validate_constants_dict_url_constant_valid_powerbi(self):
+        """Test _validate_constants_dict accepts valid PowerBI URL constant."""
+        constants_dict = {"FABRIC_API_ROOT_URL": "https://api.powerbi.com"}
+
+        self.validator._validate_constants_dict(constants_dict, "test_context")
+
+        assert self.validator.errors == []
+
+    def test_validate_constants_dict_non_url_constant_skips_url_validation(self):
+        """Test _validate_constants_dict skips URL validation for non-URL constants."""
+        constants_dict = {"ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"]}
 
         self.validator._validate_constants_dict(constants_dict, "test_context")
 
@@ -1278,13 +1329,13 @@ constants:
 
         config_override = {
             "core": {"workspace_id": "87654321-4321-4321-4321-123456789abc"},
-            "constants": {"DEFAULT_API_ROOT_URL": "https://api.override.com"},
+            "constants": {"DEFAULT_API_ROOT_URL": "https://api.powerbi.com"},
         }
 
         result = self.validator.validate_config_file(str(config_file), "DEV", config_override)
 
         assert result["core"]["workspace_id"] == "87654321-4321-4321-4321-123456789abc"
-        assert result["constants"]["DEFAULT_API_ROOT_URL"] == "https://api.override.com"
+        assert result["constants"]["DEFAULT_API_ROOT_URL"] == "https://api.powerbi.com"
 
     def test_validate_config_file_with_invalid_overrides_integration(self, tmp_path):
         """Integration test for validate_config_file with invalid overrides."""
@@ -1534,7 +1585,7 @@ class TestConfigValidatorIntegration:
             },
             "constants": {
                 "UNKNOWN_CONSTANT": "some_value",  # Unknown constant
-                "DEFAULT_API_ROOT_URL": "https://api.example.com",  # Known constant with any type
+                "DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com",  # Valid URL constant
             },
         }
 
@@ -1602,7 +1653,7 @@ class TestConfigSectionValidation:
         with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
             self.validator._validate_config_sections()
 
-        assert self.validator.errors == []
+        assert self.validator.errors == ["'constants.DEFAULT_API_ROOT_URL' has invalid hostname: api.example.com"]
 
     def test_validate_config_sections_missing_workspace_identifier(self):
         """Test _validate_config_sections with missing workspace identifier."""
@@ -2115,7 +2166,7 @@ class TestConstantsSectionValidation:
 
     def test_validate_constants_section_dict(self):
         """Test _validate_constants_section with valid constants dictionary."""
-        constants_section = {"DEFAULT_API_ROOT_URL": "https://api.example.com"}
+        constants_section = {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com"}
 
         with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
             self.validator._validate_constants_section(constants_section)
@@ -2134,8 +2185,8 @@ class TestConstantsSectionValidation:
     def test_validate_constants_section_environment_mapping(self):
         """Test _validate_constants_section with environment mapping."""
         constants_section = {
-            "dev": {"DEFAULT_API_ROOT_URL": "https://dev-api.example.com"},
-            "prod": {"DEFAULT_API_ROOT_URL": "https://prod-api.example.com"},
+            "dev": {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com"},
+            "prod": {"DEFAULT_API_ROOT_URL": "https://api.powerbi.com"},
         }
 
         with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
