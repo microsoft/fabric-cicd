@@ -6,113 +6,157 @@ import os
 import pytest
 
 from fabric_cicd._common._exceptions import InputError
-from fabric_cicd._common._validate_env_vars import validate_api_url
-
-ENV_VAR = "TEST_API_URL"
-
-_ENV_VARS_TO_CLEAR = (
-    "DEFAULT_API_ROOT_URL",
-    "FABRIC_API_ROOT_URL",
-    ENV_VAR,
+from fabric_cicd._common._validate_env_vars import (
+    _VALID_HOSTNAME_REGEX,
+    validate_api_url_hostname,
 )
 
 
-@pytest.fixture(autouse=True)
-def isolate_url_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in _ENV_VARS_TO_CLEAR:
-        monkeypatch.delenv(name, raising=False)
+class TestValidHostnameRegex:
+    """Tests for the VALID_HOSTNAME_REGEX pattern."""
+
+    @pytest.mark.parametrize(
+        "hostname",
+        [
+            "api.fabric.microsoft.com",
+            "api.powerbi.com",
+            "myapi.fabric.microsoft.com",
+            "myapi.powerbi.com",
+            "someapi.fabric.microsoft.com",
+            "someapi.powerbi.com",
+            "some.api.fabric.microsoft.com",
+            "some.api.powerbi.com",
+            "my-org.api.fabric.microsoft.com",
+            "a.b.api.fabric.microsoft.com",
+            "abcdef01234567890abcdef012345678.z01.w.api.fabric.microsoft.com",
+            "abcdef01234567890abcdef012345678.z42.w.api.powerbi.com",
+            # Hyphen and underscore in labels
+            "staging-api.fabric.microsoft.com",
+            "staging-api.powerbi.com",
+            "my_org.api.fabric.microsoft.com",
+            # Deeply nested subdomains
+            "a.b.c.d.api.fabric.microsoft.com",
+            # Numeric subdomain label
+            "123.api.powerbi.com",
+            # Case insensitive
+            "API.fabric.microsoft.com",
+            "api.FABRIC.microsoft.com",
+            "api.fabric.MICROSOFT.com",
+            "Api.PowerBI.Com",
+        ],
+    )
+    def test_valid_hostnames(self, hostname):
+        assert _VALID_HOSTNAME_REGEX.match(hostname), f"Expected '{hostname}' to be valid"
+
+    @pytest.mark.parametrize(
+        "hostname",
+        [
+            "fabric.microsoft.com",
+            "powerbi.com",
+            "contoso.com",
+            "api.fabric.microsoft.com.contoso.com",
+            "api.powerbi.com.contoso.com",
+            "",
+            "https://api.fabric.microsoft.com",
+            "api.fabric.microsoft.com/path",
+            "random.hostname.com",
+            # Label doesn't end with 'api'
+            "dfs.fabric.microsoft.com",
+            "management.fabric.microsoft.com",
+            "apix.fabric.microsoft.com",
+            "my-apix.fabric.microsoft.com",
+            # Trailing dot
+            "api.fabric.microsoft.com.",
+            # Leading dot
+            ".api.fabric.microsoft.com",
+            # Domain suffix spoofing
+            "api.fabric.microsoft.com.br",
+            "api.fabric.microsoft.community",
+            "api.notfabric.microsoft.com",
+            "api.fakepowerbi.com",
+        ],
+    )
+    def test_invalid_hostnames(self, hostname):
+        assert not _VALID_HOSTNAME_REGEX.match(hostname), f"Expected '{hostname}' to be invalid"
 
 
-# --- Valid URLs ---
+class TestValidateAndGetEnvVariable:
+    """Tests for the validate_and_get_env_variable function."""
 
+    def test_returns_default_when_env_not_set(self):
+        env_var = "TEST_HOSTNAME_NOT_SET_12345"
+        assert env_var not in os.environ
+        result = validate_api_url_hostname(env_var, "https://api.fabric.microsoft.com")
+        assert result == "https://api.fabric.microsoft.com"
 
-def test_accepts_default_when_env_not_set():
-    """When env var is not set, the default value is returned."""
-    result = validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-    assert result == "https://api.fabric.microsoft.com"
+    def test_returns_default_powerbi_url_when_env_not_set(self):
+        env_var = "TEST_HOSTNAME_NOT_SET_12345"
+        assert env_var not in os.environ
+        result = validate_api_url_hostname(env_var, "https://api.powerbi.com")
+        assert result == "https://api.powerbi.com"
 
+    def test_returns_env_value_when_set(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https://api.powerbi.com")
+        result = validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+        assert result == "https://api.powerbi.com"
 
-def test_accepts_valid_fabric_url():
-    os.environ[ENV_VAR] = "https://api.fabric.microsoft.com"
-    result = validate_api_url(ENV_VAR, "https://api.powerbi.com")
-    assert result == "https://api.fabric.microsoft.com"
+    def test_rejects_path_components(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com/v1/workspaces")
+        with pytest.raises(InputError, match="root URL without path components"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
+    def test_raises_on_invalid_hostname(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https://evil.com")
+        with pytest.raises(InputError, match="Invalid hostname"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
-def test_accepts_valid_powerbi_url():
-    os.environ[ENV_VAR] = "https://api.powerbi.com"
-    result = validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-    assert result == "https://api.powerbi.com"
+    def test_raises_on_empty_hostname(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "")
+        with pytest.raises(InputError, match="must resolve to a non-empty string"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
+    def test_prefixed_hostname_accepted(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https://myapi.fabric.microsoft.com")
+        result = validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+        assert result == "https://myapi.fabric.microsoft.com"
 
-def test_accepts_private_link_url():
-    """Private Link format: https://{workspaceid}.z{xy}.w.api.fabric.microsoft.com"""
-    os.environ[ENV_VAR] = "https://abc12345-def0-1234-5678-abcdef012345.z42.w.api.fabric.microsoft.com"
-    result = validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-    assert result == "https://abc12345-def0-1234-5678-abcdef012345.z42.w.api.fabric.microsoft.com"
+    def test_workspace_id_pattern_accepted(self, monkeypatch):
+        url = "https://abcdef01234567890abcdef012345678.z01.w.api.fabric.microsoft.com"
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", url)
+        result = validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+        assert result == url
 
+    def test_dotted_prefix_hostname_accepted(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https://some.api.fabric.microsoft.com")
+        result = validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+        assert result == "https://some.api.fabric.microsoft.com"
 
-def test_strips_trailing_slash():
-    os.environ[ENV_VAR] = "https://api.fabric.microsoft.com/"
-    result = validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-    assert result == "https://api.fabric.microsoft.com"
+    def test_hostname_without_scheme_rejected(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "api.fabric.microsoft.com")
+        with pytest.raises(InputError, match="Invalid or missing scheme"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
+    def test_rejects_http_scheme(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "http://api.fabric.microsoft.com")
+        with pytest.raises(InputError, match="Invalid or missing scheme"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
-# --- Security: HTTPS enforcement ---
+    def test_rejects_ftp_scheme(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "ftp://api.fabric.microsoft.com")
+        with pytest.raises(InputError, match="Invalid or missing scheme"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
+    def test_raises_on_whitespace_only(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "   ")
+        with pytest.raises(InputError, match="must resolve to a non-empty string"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
 
-def test_rejects_http_scheme():
-    os.environ[ENV_VAR] = "http://api.fabric.microsoft.com"
-    with pytest.raises(InputError, match="must use HTTPS scheme"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
+    def test_strips_trailing_slash(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com/")
+        result = validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+        assert result == "https://api.fabric.microsoft.com"
 
-
-def test_rejects_ftp_scheme():
-    os.environ[ENV_VAR] = "ftp://api.fabric.microsoft.com"
-    with pytest.raises(InputError, match="must use HTTPS scheme"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-
-
-# --- Security: Hostname allowlist (SSRF prevention) ---
-
-
-def test_rejects_attacker_host():
-    os.environ[ENV_VAR] = "https://api.evil.com"
-    with pytest.raises(InputError, match="invalid hostname"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-
-
-def test_rejects_lookalike_host():
-    """Reject domains that embed valid names but aren't actually Microsoft."""
-    os.environ[ENV_VAR] = "https://fabric.microsoft.com.evil.com"
-    with pytest.raises(InputError, match="invalid hostname"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-
-
-def test_rejects_empty_hostname():
-    os.environ[ENV_VAR] = "https://"
-    with pytest.raises(InputError, match="invalid hostname"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-
-
-# --- Correctness: Path components ---
-
-
-def test_rejects_path_components():
-    os.environ[ENV_VAR] = "https://api.fabric.microsoft.com/v1/workspaces"
-    with pytest.raises(InputError, match="root URL without path components"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-
-
-# --- Basic data type check ---
-
-
-def test_rejects_empty_string():
-    os.environ[ENV_VAR] = ""
-    with pytest.raises(InputError, match="must resolve to a non-empty string"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
-
-
-def test_rejects_whitespace_only():
-    os.environ[ENV_VAR] = "   "
-    with pytest.raises(InputError, match="must resolve to a non-empty string"):
-        validate_api_url(ENV_VAR, "https://api.fabric.microsoft.com")
+    def test_rejects_url_with_no_authority(self, monkeypatch):
+        monkeypatch.setenv("TEST_HOSTNAME_VAR", "https:///")
+        with pytest.raises(InputError, match="Invalid hostname"):
+            validate_api_url_hostname("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")

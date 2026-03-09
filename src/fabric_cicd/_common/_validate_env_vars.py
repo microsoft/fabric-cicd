@@ -6,47 +6,47 @@
 import logging
 import os
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
 from fabric_cicd._common._exceptions import InputError
 
 logger = logging.getLogger(__name__)
 
-_VALID_API_HOSTNAME_REGEX = re.compile(
-    r"^([\w-]+\.)*"
-    r"(powerbi\.com"
-    r"|fabric\.microsoft\.com"
-    r")\Z"
-)
+
+# Define a regular expression for valid hostnames
+# Matches: any subdomain of [<word>]api.fabric.microsoft.com or [<word>]api.powerbi.com
+_VALID_HOSTNAME_REGEX = re.compile(r"^([\w-]+\.)*[\w-]*api\.(fabric\.microsoft\.com|powerbi\.com)\Z", re.IGNORECASE)
 
 
-def validate_api_url(env_var_name: str, default_value: str) -> str:
+def validate_api_url_hostname(env_var_name: str, default_value: str) -> str:
     """
-    Validates and returns the API root URL from an environment variable.
-    Ensures the URL uses HTTPS and targets a known Microsoft host.
+    Validates and returns the API URL from an environment variable.
+    Validates the scheme is https and the hostname matches allowed patterns.
 
     Args:
-        env_var_name: The name of the environment variable.
-        default_value: The default value if the environment variable is not set.
+        env_var_name: Name of the environment variable
+        default_value: Default value if environment variable is not set (full URL with https://)
 
     Returns:
-        The validated API root URL.
+        str: The original validated API URL value, or the default if env var is not set.
     """
     value = os.environ.get(env_var_name, default_value)
 
-    if not isinstance(value, str) or not value.strip():
+    if not value.strip():
         msg = f"Environment variable '{env_var_name}' must resolve to a non-empty string."
         raise InputError(msg, logger)
 
-    parsed = urlparse(value)
+    # Parse the URL using urlsplit
+    parsed = urlsplit(value)
 
     if parsed.scheme != "https":
-        msg = f"Environment variable '{env_var_name}' must use HTTPS scheme. Got: '{parsed.scheme}'"
+        msg = f"Invalid or missing scheme in environment variable {env_var_name}: '{value}'. URL must start with 'https://'"
         raise InputError(msg, logger)
 
     hostname = parsed.hostname or ""
-    if not _VALID_API_HOSTNAME_REGEX.match(hostname):
-        msg = f"Environment variable '{env_var_name}' contains an invalid hostname: '{hostname}'"
+
+    if not _VALID_HOSTNAME_REGEX.match(hostname):
+        msg = f"Invalid hostname in environment variable {env_var_name}: {hostname}"
         raise InputError(msg, logger)
 
     if parsed.path and parsed.path not in ("", "/"):
