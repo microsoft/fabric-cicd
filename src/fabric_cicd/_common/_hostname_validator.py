@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 # Define a regular expression for valid hostnames
 # Matches: any subdomain of [<word>]api.fabric.microsoft.com or [<word>]api.powerbi.com
-VALID_HOSTNAME_REGEX = re.compile(r"^([\w-]+\.)*[\w-]*api\.(fabric\.microsoft\.com|powerbi\.com)$")
+VALID_HOSTNAME_REGEX = re.compile(r"^([\w-]+\.)*[\w-]*api\.(fabric\.microsoft\.com|powerbi\.com)$", re.IGNORECASE)
 
 
 def validate_and_get_env_variable(env_var_name: str, default_value: str) -> str:

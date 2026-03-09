@@ -29,6 +29,19 @@ class TestValidHostnameRegex:
             "a.b.api.fabric.microsoft.com",
             "abcdef01234567890abcdef012345678.z01.w.api.fabric.microsoft.com",
             "abcdef01234567890abcdef012345678.z42.w.api.powerbi.com",
+            # Hyphen and underscore in labels
+            "staging-api.fabric.microsoft.com",
+            "staging-api.powerbi.com",
+            "my_org.api.fabric.microsoft.com",
+            # Deeply nested subdomains
+            "a.b.c.d.api.fabric.microsoft.com",
+            # Numeric subdomain label
+            "123.api.powerbi.com",
+            # Case insensitive
+            "API.fabric.microsoft.com",
+            "api.FABRIC.microsoft.com",
+            "api.fabric.MICROSOFT.com",
+            "Api.PowerBI.Com",
         ],
     )
     def test_valid_hostnames(self, hostname):
@@ -46,6 +59,20 @@ class TestValidHostnameRegex:
             "https://api.fabric.microsoft.com",
             "api.fabric.microsoft.com/path",
             "random.hostname.com",
+            # Label doesn't end with 'api'
+            "dfs.fabric.microsoft.com",
+            "management.fabric.microsoft.com",
+            "apix.fabric.microsoft.com",
+            "my-apix.fabric.microsoft.com",
+            # Trailing dot
+            "api.fabric.microsoft.com.",
+            # Leading dot
+            ".api.fabric.microsoft.com",
+            # Domain suffix spoofing
+            "api.fabric.microsoft.com.br",
+            "api.fabric.microsoft.community",
+            "api.notfabric.microsoft.com",
+            "api.fakepowerbi.com",
         ],
     )
     def test_invalid_hostnames(self, hostname):
