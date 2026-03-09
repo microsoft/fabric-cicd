@@ -24,7 +24,7 @@ def allow_localhost_http_for_integration(monkeypatch: pytest.MonkeyPatch):
     """
     Test-only override: allow http://localhost for mocked integration servers.
     """
-    real_validate = validate_env_vars.validate_api_url
+    real_validate = validate_env_vars.validate_api_url_hostname
 
     def _validate_api_url_test(env_var_name: str, default_value: str) -> str:
         value = os.environ.get(env_var_name, default_value)
@@ -36,7 +36,7 @@ def allow_localhost_http_for_integration(monkeypatch: pytest.MonkeyPatch):
 
         return real_validate(env_var_name, default_value)
 
-    monkeypatch.setattr(validate_env_vars, "validate_api_url", _validate_api_url_test)
+    monkeypatch.setattr(validate_env_vars, "validate_api_url_hostname", _validate_api_url_test)
     return
 
 
