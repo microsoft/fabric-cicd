@@ -12,7 +12,7 @@ from azure.core.credentials import TokenCredential
 import fabric_cicd._items as items
 from fabric_cicd import constants
 from fabric_cicd._common._config_utils import (
-    apply_config_overrides,
+    config_overrides_scope,
     extract_publish_settings,
     extract_unpublish_settings,
     extract_workspace_settings,
@@ -405,42 +405,41 @@ def deploy_with_config(
     unpublish_settings = extract_unpublish_settings(config, environment)
 
     # Apply feature flags and constants if specified
-    apply_config_overrides(config, environment)
-
-    # Create FabricWorkspace object with extracted settings
-    workspace = FabricWorkspace(
-        repository_directory=workspace_settings["repository_directory"],
-        item_type_in_scope=workspace_settings.get("item_types_in_scope"),
-        environment=environment,
-        workspace_id=workspace_settings.get("workspace_id"),
-        workspace_name=workspace_settings.get("workspace_name"),
-        token_credential=token_credential,
-        parameter_file_path=workspace_settings.get("parameter_file_path"),
-    )
-    # Execute deployment operations based on skip settings
-    if not publish_settings.get("skip", False):
-        publish_all_items(
-            workspace,
-            item_name_exclude_regex=publish_settings.get("exclude_regex"),
-            folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
-            folder_path_to_include=publish_settings.get("folder_path_to_include"),
-            items_to_include=publish_settings.get("items_to_include"),
-            shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+    with config_overrides_scope(config, environment):
+        # Create FabricWorkspace object with extracted settings
+        workspace = FabricWorkspace(
+            repository_directory=workspace_settings["repository_directory"],
+            item_type_in_scope=workspace_settings.get("item_types_in_scope"),
+            environment=environment,
+            workspace_id=workspace_settings.get("workspace_id"),
+            workspace_name=workspace_settings.get("workspace_name"),
+            token_credential=token_credential,
+            parameter_file_path=workspace_settings.get("parameter_file_path"),
         )
-    else:
-        logger.info(f"Skipping publish operation for environment '{environment}'")
+        # Execute deployment operations based on skip settings
+        if not publish_settings.get("skip", False):
+            publish_all_items(
+                workspace,
+                item_name_exclude_regex=publish_settings.get("exclude_regex"),
+                folder_path_exclude_regex=publish_settings.get("folder_exclude_regex"),
+                folder_path_to_include=publish_settings.get("folder_path_to_include"),
+                items_to_include=publish_settings.get("items_to_include"),
+                shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+            )
+        else:
+            logger.info(f"Skipping publish operation for environment '{environment}'")
 
-    if not unpublish_settings.get("skip", False):
-        unpublish_all_orphan_items(
-            workspace,
-            item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
-            items_to_include=unpublish_settings.get("items_to_include"),
+        if not unpublish_settings.get("skip", False):
+            unpublish_all_orphan_items(
+                workspace,
+                item_name_exclude_regex=unpublish_settings.get("exclude_regex", "^$"),
+                items_to_include=unpublish_settings.get("items_to_include"),
+            )
+        else:
+            logger.info(f"Skipping unpublish operation for environment '{environment}'")
+
+        logger.info("Config-based deployment completed successfully")
+        return DeploymentResult(
+            status=DeploymentStatus.COMPLETED,
+            message="Deployment completed successfully",
         )
-    else:
-        logger.info(f"Skipping unpublish operation for environment '{environment}'")
-
-    logger.info("Config-based deployment completed successfully")
-    return DeploymentResult(
-        status=DeploymentStatus.COMPLETED,
-        message="Deployment completed successfully",
-    )

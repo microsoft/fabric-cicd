@@ -302,8 +302,8 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `unpublish.exclude_regex`               | ❌       | Debug logged, setting skipped   |
 | `unpublish.items_to_include`            | ❌       | Debug logged, setting skipped   |
 | `unpublish.skip`                        | ❌       | Defaults to `False`             |
-| `features`                              | ❌       | Debug logged, setting skipped   |
-| `constants`                             | ❌       | Debug logged, setting skipped   |
+| `features`                              | ❌       | Warning logged, setting skipped |
+| `constants`                             | ❌       | Warning logged, setting skipped |
 
 ### Selective Environment Configuration
 

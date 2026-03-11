@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from fabric_cicd import DeploymentResult, DeploymentStatus, deploy_with_config
+from fabric_cicd import DeploymentResult, DeploymentStatus, constants, deploy_with_config
 from fabric_cicd._common._config_utils import (
-    apply_config_overrides,
+    config_overrides_scope,
     extract_publish_settings,
     extract_unpublish_settings,
     extract_workspace_settings,
@@ -372,35 +372,162 @@ class TestUnpublishSettingsExtraction:
 class TestConfigOverrides:
     """Test feature flags and constants overrides."""
 
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set())
-    def test_apply_feature_flags(self):
-        """Test applying feature flags from config."""
+    def test_feature_flags_applied_within_scope(self):
+        """Test feature flags are active inside config_overrides_scope."""
         foo = "enable_foo_feature"
         bar = "enable_bar_feature"
-
         config = {"features": [foo, bar]}
 
-        apply_config_overrides(config, "N/A")
+        original_flags = constants.FEATURE_FLAG.copy()
 
-        from fabric_cicd import constants
+        with config_overrides_scope(config, "N/A"):
+            assert foo in constants.FEATURE_FLAG
+            assert bar in constants.FEATURE_FLAG
 
-        assert foo in constants.FEATURE_FLAG
-        assert bar in constants.FEATURE_FLAG
+        # Verify flags are restored after exiting scope
+        assert original_flags == constants.FEATURE_FLAG
 
-    def test_apply_constants_overrides(self):
-        """Test applying constants overrides from config."""
+    def test_feature_flags_restored_after_scope(self):
+        """Test feature flags set by config do not persist after scope exits."""
+        config = {"features": ["enable_test_feature"]}
+
+        original_flags = constants.FEATURE_FLAG.copy()
+
+        with config_overrides_scope(config, "N/A"):
+            assert "enable_test_feature" in constants.FEATURE_FLAG
+
+        assert "enable_test_feature" not in constants.FEATURE_FLAG
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_constants_overrides_applied_within_scope(self):
+        """Test constants overrides are active inside config_overrides_scope."""
+        original_url = constants.DEFAULT_API_ROOT_URL
         config = {"constants": {"DEFAULT_API_ROOT_URL": "https://custom.api.com"}}
 
-        # This will log a warning since DEFAULT_API_ROOT_URL exists in constants
-        # but it's hard to mock the setattr behavior cleanly. Let's just test it doesn't crash.
-        apply_config_overrides(config, "N/A")
+        with config_overrides_scope(config, "N/A"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://custom.api.com"
 
-    def test_apply_no_overrides(self):
-        """Test applying config overrides when no overrides are specified."""
+        # Verify constant is restored after exiting scope
+        assert original_url == constants.DEFAULT_API_ROOT_URL
+
+    def test_constants_overrides_restored_after_scope(self):
+        """Test constants set by config do not persist after scope exits."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        config = {"constants": {"DEFAULT_API_ROOT_URL": "https://temporary.api.com"}}
+
+        with config_overrides_scope(config, "N/A"):
+            pass
+
+        assert original_url == constants.DEFAULT_API_ROOT_URL
+
+    def test_user_constants_preserved_across_scope(self):
+        """Test that constants set by user before scope are preserved after scope exits."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        constants.DEFAULT_API_ROOT_URL = "https://user-set.api.com"
+
+        config = {"constants": {"FABRIC_API_ROOT_URL": "https://config-set.fabric.com"}}
+        original_fabric_url = constants.FABRIC_API_ROOT_URL
+
+        with config_overrides_scope(config, "N/A"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://user-set.api.com"
+            assert constants.FABRIC_API_ROOT_URL == "https://config-set.fabric.com"
+
+        assert constants.DEFAULT_API_ROOT_URL == "https://user-set.api.com"
+        assert original_fabric_url == constants.FABRIC_API_ROOT_URL
+
+        # Clean up
+        constants.DEFAULT_API_ROOT_URL = original_url
+
+    def test_user_constant_same_key_restored_after_scope(self):
+        """Test that when user sets a constant and config overrides the same key, user value is restored."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        constants.DEFAULT_API_ROOT_URL = "https://user-set.api.com"
+
+        config = {"constants": {"DEFAULT_API_ROOT_URL": "https://config-override.api.com"}}
+
+        with config_overrides_scope(config, "N/A"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://config-override.api.com"
+
+        assert constants.DEFAULT_API_ROOT_URL == "https://user-set.api.com"
+
+        # Clean up
+        constants.DEFAULT_API_ROOT_URL = original_url
+
+    def test_no_overrides_does_not_error(self):
+        """Test config_overrides_scope works with empty config."""
+        original_flags = constants.FEATURE_FLAG.copy()
         config = {}
 
-        # Should not raise any errors
-        apply_config_overrides(config, "N/A")
+        with config_overrides_scope(config, "N/A"):
+            pass
+
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_overrides_restored_on_exception(self):
+        """Test that overrides are restored even when an exception occurs inside the scope."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        original_flags = constants.FEATURE_FLAG.copy()
+        config = {
+            "features": ["enable_test_feature"],
+            "constants": {"DEFAULT_API_ROOT_URL": "https://will-fail.api.com"},
+        }
+
+        msg = "deployment failed"
+        with pytest.raises(RuntimeError, match=msg), config_overrides_scope(config, "N/A"):
+            raise RuntimeError(msg)
+
+        assert original_url == constants.DEFAULT_API_ROOT_URL
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_user_flags_preserved_across_scope(self):
+        """Test that flags set by user before scope are preserved after scope exits."""
+        original_flags = constants.FEATURE_FLAG.copy()
+        constants.FEATURE_FLAG.add("user_set_flag")
+
+        config = {"features": ["config_set_flag"]}
+
+        with config_overrides_scope(config, "N/A"):
+            assert "user_set_flag" in constants.FEATURE_FLAG
+            assert "config_set_flag" in constants.FEATURE_FLAG
+
+        assert "user_set_flag" in constants.FEATURE_FLAG
+        assert "config_set_flag" not in constants.FEATURE_FLAG
+
+        # Clean up
+        constants.FEATURE_FLAG = original_flags
+
+    def test_environment_specific_feature_flags(self):
+        """Test environment-specific feature flags are resolved correctly."""
+        original_flags = constants.FEATURE_FLAG.copy()
+        config = {
+            "features": {
+                "dev": ["enable_dev_feature"],
+                "prod": ["enable_prod_feature"],
+            }
+        }
+
+        with config_overrides_scope(config, "dev"):
+            assert "enable_dev_feature" in constants.FEATURE_FLAG
+            assert "enable_prod_feature" not in constants.FEATURE_FLAG
+
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_environment_specific_constants(self):
+        """Test environment-specific constants overrides are resolved correctly."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        config = {
+            "constants": {
+                "DEFAULT_API_ROOT_URL": {
+                    "dev": "https://dev.api.com",
+                    "prod": "https://prod.api.com",
+                }
+            }
+        }
+
+        with config_overrides_scope(config, "dev"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://dev.api.com"
+
+        assert original_url == constants.DEFAULT_API_ROOT_URL
 
 
 class TestDeployWithConfig:
@@ -760,7 +887,8 @@ class TestConfigIntegration:
 
                 extract_publish_settings(config, test_env)
                 extract_unpublish_settings(config, test_env)
-                apply_config_overrides(config, test_env)
+                with config_overrides_scope(config, test_env):
+                    pass
 
     def test_config_validation_comprehensive(self, tmp_path):
         """Test comprehensive config validation with all sections."""

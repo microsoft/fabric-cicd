@@ -17,6 +17,30 @@ from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_
 logger = logging.getLogger(__name__)
 
 
+class _DuplicateKeyLoader(yaml.SafeLoader):
+    """YAML loader that raises an error on duplicate keys."""
+
+    pass
+
+
+def _check_duplicate_keys(loader: _DuplicateKeyLoader, node: yaml.nodes.MappingNode) -> dict:
+    """Reject duplicate keys during YAML parsing."""
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node)
+        if key in mapping:
+            msg = f"Duplicate key '{key}' found at line {key_node.start_mark.line + 1}"
+            raise yaml.YAMLError(msg)
+        mapping[key] = loader.construct_object(value_node)
+    return mapping
+
+
+_DuplicateKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _check_duplicate_keys,
+)
+
+
 class ConfigValidationError(InputError):
     """Specific exception for configuration validation errors."""
 
@@ -120,7 +144,7 @@ class ConfigValidator:
 
         try:
             with config_path.open(encoding="utf-8") as f:
-                config = yaml.safe_load(f)
+                config = yaml.load(f, Loader=_DuplicateKeyLoader)  # noqa: S506
         except yaml.YAMLError as e:
             self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["yaml_syntax"].format(e))
             return None
@@ -344,7 +368,7 @@ class ConfigValidator:
             if any(
                 field_name in section and isinstance(section[field_name], dict)
                 for section, field_name, _, _, _ in _get_config_fields(self.config)
-                if not (field_name == "constants" and _is_regular_constants_dict(section.get(field_name, {})))
+                if field_name != "constants"
             ):
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["no_env_with_mappings"])
             return
@@ -353,8 +377,16 @@ class ConfigValidator:
         for section, field_name, display_name, is_required, log_warning in _get_config_fields(self.config):
             if field_name in section:
                 field_value = section[field_name]
-                # Handle constants special case
-                if field_name == "constants" and _is_regular_constants_dict(field_value):
+                # Handle constants special case — check each constant's value individually
+                if field_name == "constants":
+                    if isinstance(field_value, dict):
+                        for const_key, const_val in field_value.items():
+                            if isinstance(const_val, dict) and self.environment not in const_val:
+                                available_envs = list(const_val.keys())
+                                logger.warning(
+                                    f"Environment '{self.environment}' not found in 'constants.{const_key}'. "
+                                    f"Available environments: {available_envs}. This constant will be skipped."
+                                )
                     continue
 
                 # If it's a dict (environment mapping), check if target environment exists
@@ -593,8 +625,8 @@ class ConfigValidator:
 
         for env_key, path_str in paths_to_resolve.items():
             try:
-                path = Path(path_str)
                 env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
+                path = Path(path_str)
 
                 if path.is_absolute():
                     resolved_path = path
@@ -652,13 +684,9 @@ class ConfigValidator:
                 if isinstance(field_value, str):
                     if section_name:
                         self.config[section_name][field_name] = str(resolved_path)
-                    else:
-                        self.config[field_name] = str(resolved_path)
                 else:
                     if section_name:
                         self.config[section_name][field_name][env_key] = str(resolved_path)
-                    else:
-                        self.config[field_name][env_key] = str(resolved_path)
 
             except (OSError, ValueError) as e:
                 self.errors.append(
@@ -975,11 +1003,6 @@ class ConfigValidator:
 
             # Validate each environment's features list
             for env, features_list in features.items():
-                if not features_list:
-                    self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section_env"].format("features", env)
-                    )
-                    continue
                 self._validate_features_list(features_list, f"features.{env}")
             return
 
@@ -1009,49 +1032,45 @@ class ConfigValidator:
             )
             return
 
-        # Check if all values are dictionaries (contains environment mapping)
-        if constants_section and all(isinstance(value, dict) for value in constants_section.values()):
-            # Validate environment mapping
-            if not self._validate_environment_mapping(constants_section, "constants", dict):
-                return
-
-            # Validate each environment's constants dictionary
-            for env, env_constants in constants_section.items():
-                if not env_constants:
-                    self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section_env"].format("constants", env)
-                    )
-                    continue
-                self._validate_constants_dict(env_constants, f"constants.{env}")
-        else:
-            # Simple constants dictionary
-            self._validate_constants_dict(constants_section, "constants")
-
-    def _validate_constants_dict(self, constants_dict: dict, context: str) -> None:
-        """Validate a constants dictionary with proper context for error messages."""
-        for key, value in constants_dict.items():
+        # Validate each constant key individually — values can be flat or per-key env mappings
+        for key, value in constants_section.items():
             if not isinstance(key, str) or not key.strip():
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_constant_key"].format(context, key)
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_constant_key"].format("constants", key)
                 )
                 continue
 
             # Validate that the constant exists in the constants module
             if not hasattr(constants, key):
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, context)
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, "constants")
                 )
-                continue
 
-            # Validate URL constants
-            if key in _URL_CONSTANTS:
-                if not isinstance(value, str):
-                    self.errors.append(f"'{key}' in '{context}' must be a string URL, got {type(value).__name__}")
-                    continue
-                try:
-                    validate_api_url(value, f"{context}.{key}")
-                except InputError as e:
-                    self.errors.append(str(e))
+            if isinstance(value, dict):
+                # Per-key environment mapping: { KEY: { dev: val, prod: val } }
+                for env, env_value in value.items():
+                    if not isinstance(env, str) or not env.strip():
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format(
+                                f"constants.{key}", type(env).__name__
+                            )
+                        )
+                        continue
+                    self._validate_single_constant(key, env_value, f"constants.{key}.{env}")
+            else:
+                # Flat value: { KEY: val }
+                self._validate_single_constant(key, value, "constants")
+
+    def _validate_single_constant(self, key: str, value: any, context: str) -> None:
+        """Validate a single constant value."""
+        if key in _URL_CONSTANTS:
+            if not isinstance(value, str):
+                self.errors.append(f"'{key}' in '{context}' must be a string URL, got {type(value).__name__}")
+                return
+            try:
+                validate_api_url(value, f"{context}.{key}")
+            except InputError as e:
+                self.errors.append(str(e))
 
 
 def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
@@ -1081,18 +1100,10 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
         (config.get("unpublish", {}), "exclude_regex", "unpublish.exclude_regex", False, False),
         (config.get("unpublish", {}), "items_to_include", "unpublish.items_to_include", False, False),
         (config.get("unpublish", {}), "skip", "unpublish.skip", False, False),
-        # Top-level sections - optional (debug if missing)
-        (config, "features", "features", False, False),
-        (config, "constants", "constants", False, False),
+        # Top-level sections - optional (warn if missing)
+        (config, "features", "features", False, True),
+        (config, "constants", "constants", False, True),
     ]
-
-
-def _is_regular_constants_dict(constants_value: dict) -> bool:
-    """Check if constants section is a regular dict (not environment mapping)."""
-    if not isinstance(constants_value, dict) or not constants_value:
-        return True
-    # Environment mapping if ALL values are dicts, regular dict otherwise
-    return not all(isinstance(value, dict) for value in constants_value.values())
 
 
 def _find_git_root(path: Path) -> Optional[Path]:
