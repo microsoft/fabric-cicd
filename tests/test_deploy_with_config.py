@@ -494,7 +494,8 @@ class TestConfigOverrides:
         assert "config_set_flag" not in constants.FEATURE_FLAG
 
         # Clean up
-        constants.FEATURE_FLAG = original_flags
+        constants.FEATURE_FLAG.clear()
+        constants.FEATURE_FLAG.update(original_flags)
 
     def test_environment_specific_feature_flags(self):
         """Test environment-specific feature flags are resolved correctly."""

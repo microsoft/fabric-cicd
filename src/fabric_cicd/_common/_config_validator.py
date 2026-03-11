@@ -28,7 +28,12 @@ def _check_duplicate_keys(loader: _DuplicateKeyLoader, node: yaml.nodes.MappingN
     mapping = {}
     for key_node, value_node in node.value:
         key = loader.construct_object(key_node)
-        if key in mapping:
+        try:
+            is_duplicate = key in mapping
+        except TypeError as e:
+            msg = f"Unhashable key {key!r} at line {key_node.start_mark.line + 1}. Only scalar keys (strings, numbers) are supported"
+            raise yaml.YAMLError(msg) from e
+        if is_duplicate:
             msg = f"Duplicate key '{key}' found at line {key_node.start_mark.line + 1}"
             raise yaml.YAMLError(msg)
         mapping[key] = loader.construct_object(value_node)
@@ -1059,16 +1064,16 @@ class ConfigValidator:
                     self._validate_single_constant(key, env_value, f"constants.{key}.{env}")
             else:
                 # Flat value: { KEY: val }
-                self._validate_single_constant(key, value, "constants")
+                self._validate_single_constant(key, value, f"constants.{key}")
 
     def _validate_single_constant(self, key: str, value: any, context: str) -> None:
         """Validate a single constant value."""
         if key in _URL_CONSTANTS:
             if not isinstance(value, str):
-                self.errors.append(f"'{key}' in '{context}' must be a string URL, got {type(value).__name__}")
+                self.errors.append(f"'{context}' must be a string URL, got {type(value).__name__}")
                 return
             try:
-                validate_api_url(value, f"{context}.{key}")
+                validate_api_url(value, context)
             except InputError as e:
                 self.errors.append(str(e))
 

@@ -582,7 +582,7 @@ class TestConfigValidator:
         self.validator._validate_constants_section(constants_dict)
 
         assert len(self.validator.errors) == 1
-        assert "'DEFAULT_API_ROOT_URL' in 'constants' must be a string URL, got int" in self.validator.errors[0]
+        assert "'constants.DEFAULT_API_ROOT_URL' must be a string URL, got int" in self.validator.errors[0]
 
     def test_validate_constants_dict_url_constant_invalid_hostname(self):
         """Test _validate_constants_section rejects URL with invalid hostname."""
@@ -1514,6 +1514,22 @@ class TestDuplicateKeyDetection:
             self.validator.validate_config_file(str(config_file), "dev")
 
         assert any("Duplicate key" in e for e in exc_info.value.validation_errors)
+
+    def test_unhashable_key_rejected(self, tmp_path):
+        """Test that unhashable YAML keys (e.g., sequences) are rejected."""
+        config_file = tmp_path / "config.yaml"
+        # YAML complex key syntax: a list used as a mapping key produces an unhashable type
+        config_file.write_text("? [a, b]\n: value\n")
+
+        self.validator.config_path = config_file
+        result = self.validator._validate_yaml_content(config_file)
+
+        assert result is None
+        assert len(self.validator.errors) == 1
+        error = self.validator.errors[0]
+        assert "Unhashable key" in error
+        assert "at line 1" in error
+        assert "Only scalar keys (strings, numbers) are supported" in error
 
 
 # Tests for utility functions
