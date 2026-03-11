@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.3.1](https://pypi.org/project/fabric-cicd/0.3.1) - March 12, 2026
+
+### 🔧 Bug Fix
+
+- Fix override behavior of feature flags and constants in config deployment by [shirasassoon](https://github.com/shirasassoon) ([#872](https://github.com/microsoft/fabric-cicd/issues/872))
+
 ## [v0.3.0](https://pypi.org/project/fabric-cicd/0.3.0) - March 09, 2026
 
 ### ✨ New Functionality

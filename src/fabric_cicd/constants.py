@@ -9,7 +9,7 @@ from enum import Enum
 from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
 
 # General
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
