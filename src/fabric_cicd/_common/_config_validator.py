@@ -17,35 +17,6 @@ from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_
 logger = logging.getLogger(__name__)
 
 
-class _DuplicateKeyLoader(yaml.SafeLoader):
-    """YAML loader that raises an error on duplicate keys."""
-
-    pass
-
-
-def _check_duplicate_keys(loader: _DuplicateKeyLoader, node: yaml.nodes.MappingNode) -> dict:
-    """Reject duplicate keys during YAML parsing."""
-    mapping = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node)
-        try:
-            is_duplicate = key in mapping
-        except TypeError as e:
-            msg = f"Unhashable key {key!r} at line {key_node.start_mark.line + 1}. Only scalar keys (strings, numbers) are supported"
-            raise yaml.YAMLError(msg) from e
-        if is_duplicate:
-            msg = f"Duplicate key '{key}' found at line {key_node.start_mark.line + 1}"
-            raise yaml.YAMLError(msg)
-        mapping[key] = loader.construct_object(value_node)
-    return mapping
-
-
-_DuplicateKeyLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-    _check_duplicate_keys,
-)
-
-
 class ConfigValidationError(InputError):
     """Specific exception for configuration validation errors."""
 
@@ -149,7 +120,7 @@ class ConfigValidator:
 
         try:
             with config_path.open(encoding="utf-8") as f:
-                config = yaml.load(f, Loader=_DuplicateKeyLoader)  # noqa: S506
+                config = yaml.safe_load(f)
         except yaml.YAMLError as e:
             self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["yaml_syntax"].format(e))
             return None
