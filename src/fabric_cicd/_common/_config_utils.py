@@ -190,8 +190,6 @@ def config_overrides_scope(config: dict, environment: str) -> Generator[None, No
         # Restore original state — guaranteed even if deployment raises
         constants.FEATURE_FLAG.clear()
         constants.FEATURE_FLAG.update(original_feature_flags)
-        logger.debug(f"Restored feature flags: {constants.FEATURE_FLAG}")
 
         for key, original_value in overridden_keys.items():
             setattr(constants, key, original_value)
-            logger.debug(f"Restored constant {key} = {original_value}")
