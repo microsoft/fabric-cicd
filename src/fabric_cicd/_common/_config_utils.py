@@ -152,7 +152,8 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
 @contextlib.contextmanager
 def config_overrides_scope(config: dict, environment: str) -> Generator[None, None, None]:
     """
-    Context manager that applies config overrides and guarantees cleanup.
+    Context manager that applies feature flags and constants
+    overrides from config  and guarantees cleanup.
 
     Feature flags and constants are restored to their pre-call values on exit,
     ensuring no state leaks between deployments.
