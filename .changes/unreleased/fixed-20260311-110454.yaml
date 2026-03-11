@@ -1,5 +1,5 @@
 kind: fixed
-body: Fix override behavior for feature flags and constants in config deployment
+body: Fix override behavior of feature flags and constants in config deployment
 time: 2026-03-11T11:04:54.7911345+02:00
 custom:
     Author: shirasassoon
