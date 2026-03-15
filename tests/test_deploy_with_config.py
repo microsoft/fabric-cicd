@@ -568,6 +568,45 @@ class TestConfigOverridesIntegration:
         # Verify feature flag was restored after scope exit
         assert "enable_response_collection" not in constants.FEATURE_FLAG
 
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_failure_with_partial_responses_via_config_features(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that partial responses are attached to exceptions when enable_response_collection is set via config."""
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+            "features": ["enable_response_collection"],
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        mock_unpublish.side_effect = RuntimeError("Unpublish failed")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        e = exc_info.value
+        assert hasattr(e, "responses")
+        assert e.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+
+        # Verify feature flag was restored after scope exit
+        assert "enable_response_collection" not in constants.FEATURE_FLAG
+
 
 class TestDeployWithConfig:
     """Test the main deploy_with_config function."""

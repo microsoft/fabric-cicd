@@ -355,7 +355,7 @@ def deploy_with_config(
         FileNotFoundError: If configuration file doesn't exist.
 
     Note:
-        On failure, the raised exception will have ``deployment_status`` (set to ``"failed"``)
+        On failure, the raised exception will have ``deployment_status`` (set to ``DeploymentStatus.FAILED``)
         and ``deployment_message`` (set to ``str(e)``) attributes attached. If the ``enable_response_collection``
         feature flag is enabled and some items were published before the failure, the exception will also have a
         ``responses`` attribute containing the collected API responses.
@@ -407,7 +407,7 @@ def deploy_with_config(
         ...         environment="prod"
         ...     )
         ... except Exception as e:
-        ...     print(e.deployment_status)   # "failed"
+        ...     print(e.deployment_status)   # DeploymentStatus.FAILED
         ...     print(e.deployment_message)  # Original error message
         ...     if hasattr(e, "responses"):
         ...         print(e.responses)  # Partial API responses collected before failure
@@ -470,13 +470,13 @@ def deploy_with_config(
 
     except Exception as e:
         try:
+            e.deployment_status = DeploymentStatus.FAILED
+            e.deployment_message = str(e)
             # Preserve partial results before workspace goes out of scope
             if workspace is not None:
                 partial_results = getattr(workspace, "responses", None)
                 if partial_results and responses_enabled:
                     e.responses = partial_results
-            e.deployment_status = DeploymentStatus.FAILED
-            e.deployment_message = str(e)
         except AttributeError:
             pass
         raise
