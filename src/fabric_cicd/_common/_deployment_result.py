@@ -19,15 +19,14 @@ class DeploymentStatus(str, Enum):
 
 @dataclass
 class DeploymentResult:
-    """Result of a config-based deployment operation.
+    """Structured result of a config-based deployment operation.
 
-    This class provides a structured way to return deployment results.
-    Currently only returned on successful completion; failures raise exceptions
-    with ``deployment_status`` (set to ``DeploymentStatus.FAILED``) and
-    ``deployment_message`` attributes attached.
+    Returned by ``deploy_with_config`` on success. On failure, an instance is
+    attached to the raised exception as ``e.deployment_result`` with ``status``
+    set to ``DeploymentStatus.FAILED``.
 
     Attributes:
-        status: The deployment status (DeploymentStatus.COMPLETED on success).
+        status: The deployment status.
         message: A human-readable message describing the result.
         responses: Optional dictionary of API response data from the deployment.
     """
