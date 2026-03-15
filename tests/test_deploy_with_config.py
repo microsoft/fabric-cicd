@@ -1236,18 +1236,47 @@ class TestGetConfigValue:
 class TestDeploymentResult:
     """Test DeploymentResult and DeploymentStatus types."""
 
-    def test_deployment_status_enum_values(self):
-        """Test DeploymentStatus enum has expected values."""
+    def test_deployment_status_completed_value(self):
+        """Test DeploymentStatus.COMPLETED has expected value."""
         assert DeploymentStatus.COMPLETED.value == "completed"
 
+    def test_deployment_status_failed_value(self):
+        """Test DeploymentStatus.FAILED has expected value."""
+        assert DeploymentStatus.FAILED.value == "failed"
+
+    def test_deployment_status_string_comparison(self):
+        """Test DeploymentStatus supports string comparison via str inheritance."""
+        assert DeploymentStatus.COMPLETED == "completed"
+        assert DeploymentStatus.FAILED == "failed"
+
     def test_deployment_result_structure(self):
-        """Test DeploymentResult structure."""
+        """Test DeploymentResult fields are set correctly."""
         result = DeploymentResult(
             status=DeploymentStatus.COMPLETED,
             message="Test message",
         )
         assert result.status == DeploymentStatus.COMPLETED
         assert result.message == "Test message"
+
+    def test_deployment_result_responses_defaults_to_none(self):
+        """Test DeploymentResult.responses defaults to None when not provided."""
+        result = DeploymentResult(
+            status=DeploymentStatus.COMPLETED,
+            message="Test message",
+        )
+        assert result.responses is None
+
+    def test_deployment_result_with_responses(self):
+        """Test DeploymentResult stores responses when provided."""
+        responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        result = DeploymentResult(
+            status=DeploymentStatus.FAILED,
+            message="Deployment failed",
+            responses=responses,
+        )
+        assert result.status == DeploymentStatus.FAILED
+        assert result.message == "Deployment failed"
+        assert result.responses == responses
 
 
 class TestDeployWithConfigReturnValue:
@@ -1333,49 +1362,6 @@ class TestDeployWithConfigReturnValue:
         # Verify that publish and unpublish are NOT called due to skip flags
         mock_publish.assert_not_called()
         mock_unpublish.assert_not_called()
-
-    @patch("fabric_cicd.publish.FabricWorkspace")
-    @patch("fabric_cicd.publish.publish_all_items")
-    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
-    def test_deploy_with_config_result_status_and_message(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
-        """Test that DeploymentResult has correct status and message attributes."""
-        # Mark unused mocks to avoid linting warnings
-        _ = mock_unpublish
-        _ = mock_publish
-
-        # Create the actual directory structure that the config references
-        test_repo_dir = tmp_path / "test" / "path"
-        test_repo_dir.mkdir(parents=True)
-
-        # Create test config file
-        config_data = {
-            "core": {
-                "workspace_id": {"dev": "99999999-9999-9999-9999-999999999999"},
-                "repository_directory": "test/path",
-            },
-        }
-        config_file = tmp_path / "config.yml"
-        with Path.open(config_file, "w") as f:
-            yaml.dump(config_data, f)
-
-        # Mock workspace instance
-        mock_workspace_instance = MagicMock()
-        mock_workspace.return_value = mock_workspace_instance
-
-        # Execute deployment
-        result = deploy_with_config(str(config_file), "dev")
-
-        # Test result status checks
-        assert result.status == DeploymentStatus.COMPLETED
-
-        # Test string representation for output
-        assert result.status.value == "completed"
-        assert isinstance(result.message, str)
-
-        # Test equality comparison
-        is_success = result.status == DeploymentStatus.COMPLETED
-        assert is_success is True
 
 
 class TestDeployWithConfigFailures:
