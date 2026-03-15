@@ -369,6 +369,7 @@ def deploy_with_config(
         ... )
         >>> print(result.status)  # DeploymentStatus.COMPLETED
         >>> print(result.message) # "Deployment completed successfully"
+        >>> print(result.responses) # API responses if collected and feature flag enabled
 
         With custom authentication
         >>> from fabric_cicd import deploy_with_config
@@ -406,11 +407,14 @@ def deploy_with_config(
         ...         config_file_path="workspace/config.yml",
         ...         environment="prod"
         ...     )
+        ...     print(result.status)  # DeploymentStatus.COMPLETED
+        ...     print(result.message) # "Deployment completed successfully"
+        ...     print(result.responses) # API responses if collected and feature flag enabled
         ... except Exception as e:
         ...     print(e.deployment_status)   # DeploymentStatus.FAILED
         ...     print(e.deployment_message)  # Original error message
         ...     if hasattr(e, "responses"):
-        ...         print(e.responses)  # Partial API responses collected before failure
+        ...         print(e.responses)  # Partial API responses collected before failure and if feature flag enabled
     """
     log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
@@ -473,9 +477,9 @@ def deploy_with_config(
             e.deployment_status = DeploymentStatus.FAILED
             e.deployment_message = str(e)
             # Preserve partial results before workspace goes out of scope
-            if workspace is not None:
+            if responses_enabled and workspace is not None:
                 partial_results = getattr(workspace, "responses", None)
-                if partial_results and responses_enabled:
+                if partial_results:
                     e.responses = partial_results
         except AttributeError:
             pass
