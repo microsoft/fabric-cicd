@@ -347,7 +347,7 @@ def deploy_with_config(
         DeploymentResult: A result object containing the deployment status, message, and
             responses (opt-in). The status will be DeploymentStatus.COMPLETED on success.
             The responses field contains API response data when the
-            ``enable_response_collection`` feature flag is enabled and responses were collected, 
+            ``enable_response_collection`` feature flag is enabled and responses were collected,
             otherwise None.
 
     Raises:
@@ -355,10 +355,10 @@ def deploy_with_config(
         FileNotFoundError: If configuration file doesn't exist.
 
     Note:
-        On failure, the raised exception will have ``deployment_status`` and ``deployment_message``
-        attributes attached. If the ``enable_response_collection`` feature flag is enabled and some
-        items were published before the failure, the exception will also have a ``responses``
-        attribute containing the collected API responses.
+        On failure, the raised exception will have ``deployment_status`` (set to ``"failed"``)
+        and ``deployment_message`` (set to ``str(e)``) attributes attached. If the ``enable_response_collection``
+        feature flag is enabled and some items were published before the failure, the exception will also have a
+        ``responses`` attribute containing the collected API responses.
 
     Examples:
         Basic usage
@@ -398,6 +398,7 @@ def deploy_with_config(
         ...         }
         ...     }
         ... )
+
         Handling deployment failures
         >>> from fabric_cicd import deploy_with_config
         >>> try:
@@ -406,8 +407,8 @@ def deploy_with_config(
         ...         environment="prod"
         ...     )
         ... except Exception as e:
-        ...     print(e.deployment_status)   # DeploymentStatus.FAILED
-        ...     print(e.deployment_message)  # "Deployment failed with error: ..."
+        ...     print(e.deployment_status)   # "failed"
+        ...     print(e.deployment_message)  # Original error message
         ...     if hasattr(e, "responses"):
         ...         print(e.responses)  # Partial API responses collected before failure
     """
@@ -432,10 +433,9 @@ def deploy_with_config(
 
         # Apply feature flags and constants if specified
         with config_overrides_scope(config, environment):
-            
             # Determine if response collection flag has been enabled in the config file
             responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
-            
+
             # Create FabricWorkspace object with extracted settings
             workspace = FabricWorkspace(
                 repository_directory=workspace_settings["repository_directory"],
@@ -469,13 +469,16 @@ def deploy_with_config(
                 logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
     except Exception as e:
-        # Preserve partial results before workspace goes out of scope
-        if workspace is not None:
-            partial_results = getattr(workspace, "responses", None)
-            if partial_results and responses_enabled:
-                e.responses = partial_results
-        e.deployment_status = DeploymentStatus.FAILED
-        e.deployment_message = "Deployment failed with error: " + str(e)
+        try:
+            # Preserve partial results before workspace goes out of scope
+            if workspace is not None:
+                partial_results = getattr(workspace, "responses", None)
+                if partial_results and responses_enabled:
+                    e.responses = partial_results
+            e.deployment_status = DeploymentStatus.FAILED
+            e.deployment_message = str(e)
+        except AttributeError:
+            pass
         raise
 
     logger.info("Config-based deployment completed successfully")

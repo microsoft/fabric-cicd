@@ -22,7 +22,9 @@ class DeploymentResult:
     """Result of a config-based deployment operation.
 
     This class provides a structured way to return deployment results.
-    Currently only returned on successful completion; failures raise exceptions.
+    Currently only returned on successful completion; failures raise exceptions
+    with ``deployment_status`` (set to ``DeploymentStatus.FAILED``) and
+    ``deployment_message`` attributes attached.
 
     Attributes:
         status: The deployment status (DeploymentStatus.COMPLETED on success).

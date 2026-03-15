@@ -531,6 +531,44 @@ class TestConfigOverrides:
         assert original_url == constants.DEFAULT_API_ROOT_URL
 
 
+class TestConfigOverridesIntegration:
+    """Integration tests for config_overrides_scope with deploy_with_config."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_response_collection_via_config_features(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that enable_response_collection set in config features enables response collection."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+            "features": ["enable_response_collection"],
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        result = deploy_with_config(str(config_file), "dev")
+
+        assert isinstance(result, DeploymentResult)
+        assert result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+
+        # Verify feature flag was restored after scope exit
+        assert "enable_response_collection" not in constants.FEATURE_FLAG
+
+
 class TestDeployWithConfig:
     """Test the main deploy_with_config function."""
 
@@ -1443,6 +1481,7 @@ class TestDeployWithConfigFailures:
         # Verify publish was called successfully before unpublish failed
         mock_publish.assert_called_once()
 
+
 class TestDeployWithConfigExceptionAttributes:
     """Test that deploy_with_config attaches deployment attributes to exceptions."""
 
@@ -1476,7 +1515,6 @@ class TestDeployWithConfigExceptionAttributes:
         assert hasattr(e, "deployment_status")
         assert e.deployment_status == DeploymentStatus.FAILED
         assert hasattr(e, "deployment_message")
-        assert "Deployment failed with error:" in e.deployment_message
         assert "Something broke" in e.deployment_message
 
     @patch("fabric_cicd.publish.FabricWorkspace")
@@ -1489,7 +1527,7 @@ class TestDeployWithConfigExceptionAttributes:
     def test_exception_has_partial_responses_when_enabled(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test that partial responses are attached to exceptions when response collection is enabled."""
         _ = mock_publish
-        
+
         test_repo_dir = tmp_path / "test" / "path"
         test_repo_dir.mkdir(parents=True)
 
@@ -1557,6 +1595,35 @@ class TestDeployWithConfigExceptionAttributes:
         assert hasattr(e, "deployment_status")
         assert e.deployment_status == DeploymentStatus.FAILED
         assert hasattr(e, "deployment_message")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_exception_with_slots_still_propagates(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that exceptions using __slots__ propagate even if attribute assignment fails."""
+        _ = mock_unpublish
+
+        class SlotsError(Exception):
+            __slots__ = ()
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_publish.side_effect = SlotsError("slots error")
+
+        with pytest.raises(SlotsError, match="slots error"):
+            deploy_with_config(str(config_file), "dev")
 
 
 class TestDeployWithConfigResponseCollection:
