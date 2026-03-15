@@ -355,9 +355,10 @@ def deploy_with_config(
         FileNotFoundError: If configuration file doesn't exist.
 
     Note:
-        On failure, the raised exception will have a ``deployment_result`` attribute containing a
-        ``DeploymentResult`` with ``status`` set to ``DeploymentStatus.FAILED``, ``message`` set to
-        ``str(e)``, and ``responses`` containing any partial API responses collected before the failure
+        On failure, the raised exception will have a ``deployment_result`` attribute
+        containing a ``DeploymentResult`` with ``status`` set to
+        ``DeploymentStatus.FAILED``, ``message`` set to the error description, and
+        ``responses`` containing any partial API responses collected before the failure
         (requires the ``enable_response_collection`` feature flag, otherwise None).
 
     Examples:
@@ -409,7 +410,7 @@ def deploy_with_config(
         ...     )
         ...     print(result.status)    # DeploymentStatus.COMPLETED
         ...     print(result.message)   # "Deployment completed successfully"
-        ...     print(result.responses) # API responses if collected and feature flag enabled
+        ...     print(result.responses) # API responses if collected (feature flag enabled via config file)
         ... except Exception as e:
         ...     print(e.deployment_result.status)    # DeploymentStatus.FAILED
         ...     print(e.deployment_result.message)   # Original error message
@@ -472,13 +473,10 @@ def deploy_with_config(
                 logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
     except Exception as e:
-        partial_results = None
-        if responses_enabled and workspace is not None:
-            partial_results = getattr(workspace, "responses", None) or None
         e.deployment_result = DeploymentResult(
             status=DeploymentStatus.FAILED,
             message=str(e),
-            responses=partial_results,
+            responses=_collect_responses(workspace, responses_enabled),
         )
         raise
 
@@ -486,5 +484,12 @@ def deploy_with_config(
     return DeploymentResult(
         status=DeploymentStatus.COMPLETED,
         message="Deployment completed successfully",
-        responses=(workspace.responses if responses_enabled and workspace.responses else None),
+        responses=_collect_responses(workspace, responses_enabled),
     )
+
+
+def _collect_responses(workspace: Optional[FabricWorkspace], responses_enabled: bool) -> Optional[dict]:
+    """Return collected API responses if available, otherwise None."""
+    if responses_enabled and workspace is not None and workspace.responses:
+        return workspace.responses
+    return None

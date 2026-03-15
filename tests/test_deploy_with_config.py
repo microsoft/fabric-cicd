@@ -1620,6 +1620,7 @@ class TestDeployWithConfigExceptionAttributes:
         assert hasattr(e, "deployment_result")
         assert e.deployment_result.status == DeploymentStatus.FAILED
         assert e.deployment_result.message is not None
+        assert e.deployment_result.responses is None
 
 
 class TestDeployWithConfigResponseCollection:
@@ -1692,3 +1693,41 @@ class TestDeployWithConfigResponseCollection:
 
         assert isinstance(result, DeploymentResult)
         assert result.responses is None
+
+
+class TestCollectResponses:
+    """Test the _collect_responses helper function."""
+
+    def test_returns_none_when_responses_disabled(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {"Notebook": {"nb1": {"body": {}}}}
+        assert _collect_responses(workspace, responses_enabled=False) is None
+
+    def test_returns_none_when_workspace_is_none(self):
+        from fabric_cicd.publish import _collect_responses
+
+        assert _collect_responses(None, responses_enabled=True) is None
+
+    def test_returns_none_when_responses_empty_dict(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {}
+        assert _collect_responses(workspace, responses_enabled=True) is None
+
+    def test_returns_responses_when_available(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+        result = _collect_responses(workspace, responses_enabled=True)
+        assert result == {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+
+    def test_returns_none_when_responses_is_none(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = None
+        assert _collect_responses(workspace, responses_enabled=True) is None
