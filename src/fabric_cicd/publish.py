@@ -351,8 +351,8 @@ def deploy_with_config(
             otherwise None.
 
     Raises:
-        InputError: If configuration file is invalid or environment not found.
-        FileNotFoundError: If configuration file doesn't exist.
+        InputError: If configuration is invalid, environment not found, or input validation fails.
+        ConfigValidationError: If configuration file is missing or fails structural validation.
 
     Note:
         On failure, the raised exception will have a ``deployment_result`` attribute
