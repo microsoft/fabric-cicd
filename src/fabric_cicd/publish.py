@@ -355,10 +355,10 @@ def deploy_with_config(
         FileNotFoundError: If configuration file doesn't exist.
 
     Note:
-        On failure, the raised exception will have ``deployment_status`` (set to ``DeploymentStatus.FAILED``)
-        and ``deployment_message`` (set to ``str(e)``) attributes attached. If the ``enable_response_collection``
-        feature flag is enabled and some items were published before the failure, the exception will also have a
-        ``responses`` attribute containing the collected API responses.
+        On failure, the raised exception will have a ``deployment_result`` attribute containing a
+        ``DeploymentResult`` with ``status`` set to ``DeploymentStatus.FAILED``, ``message`` set to
+        ``str(e)``, and ``responses`` containing any partial API responses collected before the failure
+        (requires the ``enable_response_collection`` feature flag, otherwise None).
 
     Examples:
         Basic usage
@@ -367,8 +367,8 @@ def deploy_with_config(
         ...     config_file_path="workspace/config.yml",
         ...     environment="prod"
         ... )
-        >>> print(result.status)  # DeploymentStatus.COMPLETED
-        >>> print(result.message) # "Deployment completed successfully"
+        >>> print(result.status)    # DeploymentStatus.COMPLETED
+        >>> print(result.message)   # "Deployment completed successfully"
         >>> print(result.responses) # API responses if collected and feature flag enabled
 
         With custom authentication
@@ -407,14 +407,13 @@ def deploy_with_config(
         ...         config_file_path="workspace/config.yml",
         ...         environment="prod"
         ...     )
-        ...     print(result.status)  # DeploymentStatus.COMPLETED
-        ...     print(result.message) # "Deployment completed successfully"
+        ...     print(result.status)    # DeploymentStatus.COMPLETED
+        ...     print(result.message)   # "Deployment completed successfully"
         ...     print(result.responses) # API responses if collected and feature flag enabled
         ... except Exception as e:
-        ...     print(e.deployment_status)   # DeploymentStatus.FAILED
-        ...     print(e.deployment_message)  # Original error message
-        ...     if hasattr(e, "responses"):
-        ...         print(e.responses)  # Partial API responses collected before failure and if feature flag enabled
+        ...     print(e.deployment_result.status)    # DeploymentStatus.FAILED
+        ...     print(e.deployment_result.message)   # Original error message
+        ...     print(e.deployment_result.responses) # Partial API responses or None
     """
     log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
@@ -473,16 +472,14 @@ def deploy_with_config(
                 logger.info(f"Skipping unpublish operation for environment '{environment}'")
 
     except Exception as e:
-        try:
-            e.deployment_status = DeploymentStatus.FAILED
-            e.deployment_message = str(e)
-            # Preserve partial results before workspace goes out of scope
-            if responses_enabled and workspace is not None:
-                partial_results = getattr(workspace, "responses", None)
-                if partial_results:
-                    e.responses = partial_results
-        except AttributeError:
-            pass
+        partial_results = None
+        if responses_enabled and workspace is not None:
+            partial_results = getattr(workspace, "responses", None) or None
+        e.deployment_result = DeploymentResult(
+            status=DeploymentStatus.FAILED,
+            message=str(e),
+            responses=partial_results,
+        )
         raise
 
     logger.info("Config-based deployment completed successfully")
