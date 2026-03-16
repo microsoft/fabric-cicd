@@ -4,7 +4,7 @@ description: "Validate pull requests for code conventions, naming conventions, l
 on:
     pull_request:
         branches: ["main"]
-        types: [opened, edited, synchronize, ready_for_review]
+        types: [opened, edited, synchronize, ready_for_review, labeled, unlabeled]
 
 permissions:
     contents: read
@@ -14,6 +14,7 @@ permissions:
 
 jobs:
     format_ruff:
+        if: ${{ github.event.action != 'labeled' && github.event.action != 'unlabeled' }}
         name: Code Formatted
         runs-on: ubuntu-latest
         steps:
@@ -39,6 +40,7 @@ jobs:
                     exit 1
                   fi
     lint_ruff:
+        if: ${{ github.event.action != 'labeled' && github.event.action != 'unlabeled' }}
         name: Code Linted
         runs-on: ubuntu-latest
         steps:
@@ -118,13 +120,19 @@ jobs:
                     fi
                   fi
 
-                  # 2. If title is version format, only constants.py and changelog.md should be changed
+                  # 2. If title is version format, constants.py, changelog.md, and .changes/v<version>.md must be included in changed files
+                  # Note: Additional files (e.g., removed unreleased change files) are allowed alongside the required files
                   if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
-                    EXPECTED_FILES="src/fabric_cicd/constants.py docs/changelog.md"
-                    SORTED_CHANGED=$(echo $CHANGED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
-                    SORTED_EXPECTED=$(echo $EXPECTED_FILES | tr ' ' '\n' | sort | tr '\n' ' ')
-                    if [ "$SORTED_CHANGED" != "$SORTED_EXPECTED" ]; then
-                      echo "❌ Only constants.py and changelog.md are allowed to be included in a PR that is titled vX.X.X."
+                    VERSION_NUMBER="${BASH_REMATCH[1]}"
+                    REQUIRED_FILES=("src/fabric_cicd/constants.py" "docs/changelog.md" ".changes/v${VERSION_NUMBER}.md")
+                    MISSING_FILES=()
+                    for file in "${REQUIRED_FILES[@]}"; do
+                      if ! echo "$CHANGED_FILES" | grep -Fqx "$file"; then
+                        MISSING_FILES+=("$file")
+                      fi
+                    done
+                    if [ ${#MISSING_FILES[@]} -ne 0 ]; then
+                      echo "❌ The following required files must be included in a PR titled vX.X.X: ${MISSING_FILES[*]}"
                       exit 1
                     fi
                   fi
@@ -178,7 +186,7 @@ jobs:
         name: Issue Linked
         runs-on: ubuntu-latest
         needs: [check-author-permissions, validate-version-bump]
-        if: needs.check-author-permissions.outputs.skip_validation == 'false' && needs.validate-version-bump.outputs.is_version_bump == 'false'
+        if: needs.check-author-permissions.outputs.skip_validation == 'false' && needs.validate-version-bump.outputs.is_version_bump == 'false' && !contains(github.event.pull_request.labels.*.name, 'skip changelog')
         permissions:
             pull-requests: read
             issues: read

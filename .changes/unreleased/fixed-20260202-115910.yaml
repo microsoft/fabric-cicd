@@ -1,8 +1,0 @@
-kind: fixed
-body: Improve environment-mapping behavior in optional config fields
-time: 2026-02-02T11:59:10.371508+02:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "716"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/716

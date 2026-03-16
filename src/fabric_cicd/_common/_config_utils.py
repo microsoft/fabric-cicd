@@ -3,8 +3,10 @@
 
 """Utilities for YAML-based deployment configuration."""
 
+import contextlib
 import logging
-from typing import Optional
+from collections.abc import Generator
+from typing import Optional, Union
 
 from fabric_cicd import constants
 from fabric_cicd._common._config_validator import ConfigValidator
@@ -27,7 +29,7 @@ def load_config_file(config_file_path: str, environment: str, config_override: O
     return validator.validate_config_file(config_file_path, environment, config_override)
 
 
-def get_config_value(config_section: dict, key: str, environment: str) -> str | list | bool | None:
+def get_config_value(config_section: dict, key: str, environment: str) -> Optional[Union[str, list, bool]]:
     """Extract a value from config, handling both single and environment-specific formats.
 
     Args:
@@ -113,6 +115,7 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
         settings_to_update = [
             "exclude_regex",
             "folder_exclude_regex",
+            "folder_path_to_include",
             "items_to_include",
             "shortcut_exclude_regex",
         ]
@@ -146,30 +149,47 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
     return settings
 
 
-def apply_config_overrides(config: dict, environment: str) -> None:
-    """Apply feature flags and constants overrides from config.
+@contextlib.contextmanager
+def config_overrides_scope(config: dict, environment: str) -> Generator[None, None, None]:
+    """
+    Context manager that applies feature flags and constants
+    overrides from config  and guarantees cleanup.
+
+    Feature flags and constants are restored to their pre-call values on exit,
+    ensuring no state leaks between deployments.
 
     Args:
         config: Configuration dictionary
         environment: Target environment for deployment
     """
-    if "features" in config:
-        features = config["features"]
-        features_list = features.get(environment, []) if isinstance(features, dict) else features
+    # Snapshot current state before any changes
+    original_feature_flags = constants.FEATURE_FLAG.copy()
+    overridden_keys = {}
 
-        for feature in features_list:
-            constants.FEATURE_FLAG.add(feature)
-            logger.info(f"Enabled feature flag: {feature}")
+    try:
+        # Set feature flags
+        if "features" in config:
+            features = config["features"]
+            features_list = features.get(environment, []) if isinstance(features, dict) else features
+            for feature in features_list:
+                constants.FEATURE_FLAG.add(feature)
+                logger.info(f"Enabled feature flag: {feature}")
 
-    if "constants" in config:
-        constants_section = config["constants"]
-        # Check if it's an environment mapping (all values are dicts)
-        if all(isinstance(v, dict) for v in constants_section.values()):
-            constants_dict = constants_section.get(environment, {})
-        else:
-            constants_dict = constants_section
+        # Apply constants overrides
+        if "constants" in config:
+            constants_section = config["constants"]
+            for key in list(constants_section.keys()):
+                value = get_config_value(constants_section, key, environment)
+                if value is not None and hasattr(constants, key):
+                    overridden_keys[key] = getattr(constants, key)
+                    setattr(constants, key, value)
+                    logger.warning(f"Override constant {key} = {value}")
+        yield
 
-        for key, value in constants_dict.items():
-            if hasattr(constants, key):
-                setattr(constants, key, value)
-                logger.warning(f"Override constant {key} = {value}")
+    finally:
+        # Restore original state — guaranteed even if deployment raises
+        constants.FEATURE_FLAG.clear()
+        constants.FEATURE_FLAG.update(original_feature_flags)
+
+        for key, original_value in overridden_keys.items():
+            setattr(constants, key, original_value)

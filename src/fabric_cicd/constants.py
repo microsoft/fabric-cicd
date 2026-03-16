@@ -6,8 +6,10 @@
 import os
 from enum import Enum
 
+from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
+
 # General
-VERSION = "0.1.34"
+VERSION = "0.3.1"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
@@ -33,6 +35,10 @@ class EnvVar(str, Enum):
     """Override base delay for item name conflict retries. Defaults to 30 seconds."""
     RETRY_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_MAX_DURATION_SECONDS"
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
+    PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
+    """Override max parallel workers for concurrent item publishing. Defaults to 8."""
+    VERSION_CHECK_DISABLED = "FABRIC_CICD_VERSION_CHECK_DISABLED"
+    """Set to '1', 'true', or 'yes' to skip version check at startup."""
 
 
 class ItemType(str, Enum):
@@ -123,10 +129,10 @@ class FeatureFlag(str, Enum):
     """Set to enable selective publishing/unpublishing of items."""
     ENABLE_EXCLUDE_FOLDER = "enable_exclude_folder"
     """Set to enable folder-based exclusion during publish operations."""
+    ENABLE_INCLUDE_FOLDER = "enable_include_folder"
+    """Set to enable folder-based inclusion during publish operations."""
     ENABLE_SHORTCUT_EXCLUDE = "enable_shortcut_exclude"
     """Set to enable selective publishing of shortcuts in a Lakehouse."""
-    ENABLE_CONFIG_DEPLOY = "enable_config_deploy"
-    """Set to enable config file-based deployment."""
     ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
     """Set to enable collection of API responses during publish operations."""
     DISABLE_PRINT_IDENTITY = "disable_print_identity"
@@ -155,16 +161,25 @@ UNPUBLISH_FLAG_MAPPING = {
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
 
 # API URLs
-DEFAULT_API_ROOT_URL = os.environ.get(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
-FABRIC_API_ROOT_URL = os.environ.get(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
+DEFAULT_API_ROOT_URL = validate_env_var_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
+FABRIC_API_ROOT_URL = validate_env_var_api_url(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
 
 # Retry Settings
 RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))
 RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.value, 30))
 RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
 
+# Parallel Settings
+_parallel_max_workers_raw = os.environ.get(EnvVar.PARALLEL_MAX_WORKERS.value)
+PARALLEL_MAX_WORKERS: int = (
+    int(_parallel_max_workers_raw) if _parallel_max_workers_raw and _parallel_max_workers_raw.isdigit() else 8
+)
+
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
+
+# Version Check
+VERSION_CHECK_DISABLED = os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "").lower() in VALID_ENABLE_FLAGS
 
 # Publish
 SHELL_ONLY_PUBLISH = [
@@ -189,6 +204,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
 # API Format Mapping for item types that require specific API formats
 API_FORMAT_MAPPING = {
     ItemType.SPARK_JOB_DEFINITION.value: "SparkJobDefinitionV2",
+    ItemType.NOTEBOOK.value: "ipynb",
 }
 
 # REGEX Constants
@@ -231,7 +247,6 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 
 # Parameter file validation messages
-INVALID_YAML = {"char": "Invalid characters found", "quote": "Unclosed quote: {}"}
 INVALID_REPLACE_VALUE_SPARK_POOL = {
     "missing key": "The '{}' environment dict in spark_pool must contain a 'type' and a 'name' key",
     "missing value": "The '{}' environment in spark_pool is missing a value for '{}' key",
@@ -245,9 +260,10 @@ PARAMETER_MSGS = {
     "found": f"Found {PARAMETER_FILE_NAME} file",
     "not found": "Parameter file not found with path: {}",
     "not set": "Parameter file path is not set",
-    "invalid content": INVALID_YAML,
+    "empty yaml": "YAML content is empty",
+    "duplicate key": "duplicate key(s) found: {}",
     "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
-    "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "{}",
+    "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "'{}'",
     "invalid structure": "Invalid parameter file structure",
     "valid structure": "Parameter file structure is valid",
     "invalid name": "Invalid parameter name '{}' found in the parameter file",
@@ -256,6 +272,7 @@ PARAMETER_MSGS = {
     "missing key": "{} is missing keys",
     "invalid key": "{} contains invalid keys",
     "valid keys": "{} contains valid keys",
+    "mixed format": "Parameter '{}' contains mixed format keys (legacy and new format cannot be combined)",
     "missing required value": "Missing value for '{}' key in {}",
     "valid required values": "Required values in {} are valid",
     "missing replace value": "{} is missing a replace value for '{}' environment'",
@@ -287,7 +304,7 @@ PARAMETER_MSGS = {
     "regex_ignored": "The provided is_regex value is not set to 'true', regex matching will be ignored.",
     "validation_complete": "Parameter file validation passed",
     "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
-    "duplicate_semantic_model": "Duplicate semantic model names found: {}. Multiple connections to the same semantic model are permitted. Ensure this is intentional.",
+    "duplicate_semantic_model": "Duplicate semantic model names found: {}. Each semantic model should only appear once in the configuration as only one connection can be bound per semantic model. Please remove duplicate entries to avoid unpredictable binding behavior.",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",
@@ -323,7 +340,14 @@ CONFIG_SECTIONS = {
     },
     "publish": {
         "type": dict,
-        "settings": ["exclude_regex", "folder_exclude_regex", "items_to_include", "shortcut_exclude_regex", "skip"],
+        "settings": [
+            "exclude_regex",
+            "folder_exclude_regex",
+            "folder_path_to_include",
+            "items_to_include",
+            "shortcut_exclude_regex",
+            "skip",
+        ],
     },
     "unpublish": {"type": dict, "settings": ["exclude_regex", "items_to_include", "skip"]},
     "features": {"type": (list, dict), "settings": []},
@@ -373,6 +397,7 @@ CONFIG_VALIDATION_MSGS = {
     # Field validation
     "field": {
         "string_or_dict": "'{}' must be either a string or environment mapping dictionary (e.g., {{dev: 'dev_value', prod: 'prod_value'}}), got type {}",
+        "list_or_dict": "'{}' must be either a list or environment mapping dictionary (e.g., {{dev: ['dev_value1', 'dev_value2'], prod: ['prod_value']}}), got type {}",
         "empty_value": "'{}' cannot be empty",
         "empty_list": "'{}' cannot be empty if specified",
         "invalid_guid": "'{}' must be a valid GUID format: {}",
@@ -394,15 +419,21 @@ CONFIG_VALIDATION_MSGS = {
     },
     # Operation section validation
     "operation": {
+        "unsupported_field": "'{}' field is not supported in '{}' section",
         "not_dict": "'{}' section must be a dictionary, got {}",
         "invalid_regex": "'{}' in {} is not a valid regex pattern: {}",
-        "items_list_type": "'{}[{}]' must be a string, got {}",
-        "items_list_empty": "'{}[{}]' cannot be empty",
+        "empty_string": "'{}' cannot be an empty string",
+        "empty_list": "'{}' cannot be an empty list",
+        "list_entry_type": "'{}[{}]' must be a string, got {}",
+        "list_entry_empty": "'{}[{}]' cannot be an empty string",
         "features_type": "'features' section must be either a list or environment mapping dictionary, got {}",
         "empty_section": "'{}' section cannot be empty if specified",
         "empty_section_env": "'{}.{}' cannot be empty if specified",
         "invalid_constant_key": "Constant key in '{}' must be a non-empty string, got: {}",
         "unknown_constant": "Unknown constant '{}' in '{}' - this constant does not exist in fabric_cicd.constants",
+        "folders_list_prefix": "'{}[{}]' entry must start with '/' (got '{}')",
+        "mutually_exclusive": "Cannot specify both '{}' and '{}'. Choose one filtering strategy.",
+        "mutually_exclusive_env": "Cannot specify both '{}' and '{}' for the same environment(s): {}. Choose one filtering strategy per environment.",
     },
     # Log messages
     "log": {

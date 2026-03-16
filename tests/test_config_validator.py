@@ -47,17 +47,10 @@ class TestConfigValidator:
             constants.CONFIG_VALIDATION_MSGS["file"]["not_found"].format("nonexistent.yaml") in self.validator.errors[0]
         )
 
-    def test_validate_file_existence_empty_path(self):
-        """Test _validate_file_existence with empty path."""
-        result = self.validator._validate_file_existence("")
-
-        assert result is None
-        assert len(self.validator.errors) == 1
-        assert constants.CONFIG_VALIDATION_MSGS["file"]["path_empty"] in self.validator.errors[0]
-
-    def test_validate_file_existence_none_path(self):
-        """Test _validate_file_existence with None path."""
-        result = self.validator._validate_file_existence(None)
+    @pytest.mark.parametrize("path_value", ["", None])
+    def test_validate_file_existence_empty_or_none_path(self, path_value):
+        """Test _validate_file_existence with empty or None path."""
+        result = self.validator._validate_file_existence(path_value)
 
         assert result is None
         assert len(self.validator.errors) == 1
@@ -70,6 +63,18 @@ class TestConfigValidator:
         assert result is None
         assert len(self.validator.errors) == 1
         assert constants.CONFIG_VALIDATION_MSGS["file"]["not_file"].format(str(tmp_path)) in self.validator.errors[0]
+
+    def test_validate_file_existence_invalid_path_os_error(self):
+        """Test _validate_file_existence with a path that triggers OSError."""
+        with patch("fabric_cicd._common._config_validator.Path.resolve", side_effect=OSError("bad path")):
+            result = self.validator._validate_file_existence("some_path")
+
+        assert result is None
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["file"]["invalid_path"].format("some_path", "bad path")
+            in self.validator.errors[0]
+        )
 
     def test_validate_yaml_content_valid_yaml(self, tmp_path):
         """Test _validate_yaml_content with valid YAML."""
@@ -96,6 +101,44 @@ class TestConfigValidator:
         # We can't test the exact error message as it includes the specific parse error
         assert constants.CONFIG_VALIDATION_MSGS["file"]["yaml_syntax"].split(":")[0] in self.validator.errors[0]
 
+    def test_validate_yaml_content_unicode_decode_error(self, tmp_path):
+        """Test _validate_yaml_content with file that triggers UnicodeDecodeError."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_bytes(b"\x80\x81\x82")  # Invalid UTF-8
+
+        self.validator.config_path = config_file
+        result = self.validator._validate_yaml_content(config_file)
+
+        assert result is None
+        assert len(self.validator.errors) == 1
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["encoding_error"].split(":")[0] in self.validator.errors[0]
+
+    def test_validate_yaml_content_permission_error(self, tmp_path):
+        """Test _validate_yaml_content with file that triggers PermissionError."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("valid: yaml")
+
+        self.validator.config_path = config_file
+        with patch("pathlib.Path.open", side_effect=PermissionError("access denied")):
+            result = self.validator._validate_yaml_content(config_file)
+
+        assert result is None
+        assert len(self.validator.errors) == 1
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["permission_denied"].split(":")[0] in self.validator.errors[0]
+
+    def test_validate_yaml_content_unexpected_error(self, tmp_path):
+        """Test _validate_yaml_content with file that triggers unexpected error."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("valid: yaml")
+
+        self.validator.config_path = config_file
+        with patch("pathlib.Path.open", side_effect=RuntimeError("unexpected")):
+            result = self.validator._validate_yaml_content(config_file)
+
+        assert result is None
+        assert len(self.validator.errors) == 1
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["unexpected_error"].split(":")[0] in self.validator.errors[0]
+
     def test_validate_yaml_content_non_dict_yaml(self, tmp_path):
         """Test _validate_yaml_content with non-dictionary YAML."""
         config_file = tmp_path / "config.yaml"
@@ -115,6 +158,18 @@ class TestConfigValidator:
         assert result is None
         assert self.validator.errors == []  # Error should already be added by file existence check
 
+    def test_validate_yaml_content_empty_file(self, tmp_path):
+        """Test _validate_yaml_content with empty file."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("")
+
+        self.validator.config_path = config_file
+        result = self.validator._validate_yaml_content(config_file)
+
+        assert result is None
+        assert len(self.validator.errors) == 1
+        assert constants.CONFIG_VALIDATION_MSGS["file"]["empty_file"] in self.validator.errors[0]
+
     def test_validate_config_structure_valid(self):
         """Test _validate_config_structure with valid config."""
         self.validator.config = {"core": {"workspace_id": "test-id"}}
@@ -123,25 +178,34 @@ class TestConfigValidator:
 
         assert self.validator.errors == []
 
-    def test_validate_config_structure_not_dict(self):
-        """Test _validate_config_structure with non-dictionary config."""
-        self.validator.config = ["not", "a", "dict"]
+    @pytest.mark.parametrize("config_value", [["not", "a", "dict"], None])
+    def test_validate_config_structure_non_dict_or_none(self, config_value):
+        """Test _validate_config_structure with non-dictionary or None config."""
+        self.validator.config = config_value
 
         self.validator._validate_config_structure()
 
-        # The structure validation doesn't add errors for non-dict configs
+        # The structure validation doesn't add errors for non-dict/None configs
         # as this is handled by YAML content validation
         assert self.validator.errors == []
 
-    def test_validate_config_structure_none(self):
-        """Test _validate_config_structure with None config."""
-        self.validator.config = None
+    def test_validate_config_structure_missing_core(self):
+        """Test _validate_config_structure with config missing 'core' section."""
+        self.validator.config = {"features": ["f1"]}
 
         self.validator._validate_config_structure()
 
-        # The structure validation doesn't add errors for None configs
-        # as this is handled by YAML content validation
-        assert self.validator.errors == []
+        assert len(self.validator.errors) == 1
+        assert constants.CONFIG_VALIDATION_MSGS["structure"]["missing_core"] in self.validator.errors[0]
+
+    def test_validate_config_structure_core_not_dict(self):
+        """Test _validate_config_structure with 'core' as non-dict."""
+        self.validator.config = {"core": "not a dict"}
+
+        self.validator._validate_config_structure()
+
+        assert len(self.validator.errors) == 1
+        assert constants.CONFIG_VALIDATION_MSGS["structure"]["core_not_dict"].format("str") in self.validator.errors[0]
 
     def test_validate_workspace_field_valid_string(self):
         """Test _validate_workspace_field with valid string."""
@@ -214,6 +278,18 @@ class TestConfigValidator:
         assert result is False
         assert self.validator.errors == []
 
+    def test_validate_workspace_field_empty_string(self):
+        """Test _validate_workspace_field with empty/whitespace string."""
+        core = {"workspace_id": "   "}
+
+        result = self.validator._validate_workspace_field(core, "workspace_id")
+
+        assert result is False
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format("workspace_id") in self.validator.errors[0]
+        )
+
     def test_validate_workspace_field_invalid_type(self):
         """Test _validate_workspace_field with invalid type."""
         core = {"workspace_id": 123}
@@ -283,6 +359,18 @@ class TestConfigValidator:
         assert len(self.validator.errors) == 1
         assert "value for environment 'dev' cannot be empty" in self.validator.errors[0]
 
+    def test_validate_repository_directory_empty_string(self):
+        """Test _validate_repository_directory with empty string value."""
+        core = {"repository_directory": "   "}
+
+        self.validator._validate_repository_directory(core)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format("repository_directory")
+            in self.validator.errors[0]
+        )
+
     def test_validate_repository_directory_valid_string(self):
         """Test _validate_repository_directory with valid string."""
         core = {"repository_directory": "/path/to/repo"}
@@ -308,6 +396,26 @@ class TestConfigValidator:
 
         assert len(self.validator.errors) == 1
         assert "must be either a string or environment mapping" in self.validator.errors[0]
+
+    def test_validate_repository_directory_valid_env_mapping(self):
+        """Test _validate_repository_directory with valid environment mapping."""
+        core = {"repository_directory": {"dev": "/dev/path", "prod": "/prod/path"}}
+
+        self.validator._validate_repository_directory(core)
+
+        assert self.validator.errors == []
+
+    def test_validate_repository_directory_invalid_env_mapping(self):
+        """Test _validate_repository_directory with invalid environment mapping."""
+        core = {"repository_directory": {"": "/dev/path"}}
+
+        self.validator._validate_repository_directory(core)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format("repository_directory", "str")
+            in self.validator.errors[0]
+        )
 
     def test_validate_item_types_valid_list(self):
         """Test _validate_item_types with valid item types."""
@@ -354,6 +462,18 @@ class TestConfigValidator:
         assert len(self.validator.errors) == 1
         assert "Invalid item type 'UnknownType' in environment 'dev'" in self.validator.errors[0]
 
+    def test_validate_item_types_in_scope_invalid_env_mapping(self):
+        """Test _validate_item_types_in_scope with invalid environment mapping."""
+        core = {"item_types_in_scope": {"": ["Notebook"]}}
+
+        self.validator._validate_item_types_in_scope(core)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format("item_types_in_scope", "str")
+            in self.validator.errors[0]
+        )
+
     def test_validate_regex_valid(self):
         """Test _validate_regex with valid regex."""
         self.validator._validate_regex("^test.*", "test_section")
@@ -366,46 +486,6 @@ class TestConfigValidator:
 
         assert len(self.validator.errors) == 1
         assert "is not a valid regex pattern" in self.validator.errors[0]
-
-    def test_validate_guid_format_valid(self):
-        """Test _validate_guid_format with valid GUID."""
-        from fabric_cicd._common._config_validator import _validate_guid_format
-
-        valid_guid = "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3b"
-
-        result = _validate_guid_format(valid_guid)
-
-        assert result is True
-
-    def test_validate_guid_format_valid_uppercase(self):
-        """Test _validate_guid_format with valid uppercase GUID."""
-        from fabric_cicd._common._config_validator import _validate_guid_format
-
-        valid_guid = "8B6E2C7A-4C1F-4E3A-9B2E-7D8F2E1A6C3B"
-
-        result = _validate_guid_format(valid_guid)
-
-        assert result is True
-
-    def test_validate_guid_format_invalid_format(self):
-        """Test _validate_guid_format with invalid GUID format."""
-        from fabric_cicd._common._config_validator import _validate_guid_format
-
-        invalid_guid = "invalid-guid-format"
-
-        result = _validate_guid_format(invalid_guid)
-
-        assert result is False
-
-    def test_validate_guid_format_invalid_length(self):
-        """Test _validate_guid_format with invalid GUID length."""
-        from fabric_cicd._common._config_validator import _validate_guid_format
-
-        invalid_guid = "8b6e2c7a-4c1f-4e3a-9b2e-7d8f2e1a6c3"  # Missing one character
-
-        result = _validate_guid_format(invalid_guid)
-
-        assert result is False
 
     def test_validate_items_list_valid(self):
         """Test _validate_items_list with valid items."""
@@ -431,7 +511,10 @@ class TestConfigValidator:
         self.validator._validate_items_list(items_list, "test_context")
 
         assert len(self.validator.errors) == 1
-        assert "'test_context[1]' cannot be empty" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format("test_context", 1)
+            in self.validator.errors[0]
+        )
 
     def test_validate_features_list_valid(self):
         """Test _validate_features_list with valid features."""
@@ -457,79 +540,92 @@ class TestConfigValidator:
         self.validator._validate_features_list(features_list, "test_context")
 
         assert len(self.validator.errors) == 1
-        assert "'test_context[1]' cannot be empty" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format("test_context", 1)
+            in self.validator.errors[0]
+        )
 
-    def test_validate_constants_dict_valid(self):
-        """Test _validate_constants_dict with valid constants."""
-        constants_dict = {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com"}
+    @pytest.mark.parametrize("key_value", [123, ""])
+    def test_validate_constants_dict_invalid_or_empty_key(self, key_value):
+        """Test _validate_constants_section with invalid or empty key."""
+        constants_dict = {key_value: "value"}
 
-        with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
-            self.validator._validate_constants_dict(constants_dict, "test_context")
-
-        assert self.validator.errors == []
-
-    def test_validate_constants_dict_invalid_key_type(self):
-        """Test _validate_constants_dict with invalid key type."""
-        constants_dict = {123: "value"}
-
-        self.validator._validate_constants_dict(constants_dict, "test_context")
+        self.validator._validate_constants_section(constants_dict)
 
         assert len(self.validator.errors) == 1
-        assert "Constant key in 'test_context' must be a non-empty string" in self.validator.errors[0]
-
-    def test_validate_constants_dict_empty_key(self):
-        """Test _validate_constants_dict with empty key."""
-        constants_dict = {"": "value"}
-
-        self.validator._validate_constants_dict(constants_dict, "test_context")
-
-        assert len(self.validator.errors) == 1
-        assert "Constant key in 'test_context' must be a non-empty string" in self.validator.errors[0]
+        assert "Constant key in 'constants' must be a non-empty string" in self.validator.errors[0]
 
     def test_validate_constants_dict_unknown_constant(self):
-        """Test _validate_constants_dict with unknown constant."""
+        """Test _validate_constants_section with unknown constant."""
         constants_dict = {"UNKNOWN_CONSTANT": "value"}
 
-        self.validator._validate_constants_dict(constants_dict, "test_context")
+        self.validator._validate_constants_section(constants_dict)
 
         assert len(self.validator.errors) == 1
         assert "Unknown constant 'UNKNOWN_CONSTANT'" in self.validator.errors[0]
 
     def test_validate_constants_dict_valid_various_types(self):
-        """Test _validate_constants_dict with valid constants of various types."""
+        """Test _validate_constants_section with valid constants of various types."""
         constants_dict = {
-            "DEFAULT_API_ROOT_URL": "https://api.example.com",  # string
-            "ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"],  # can override with different types
-            "FEATURE_FLAG": {"flag1", "flag2"},  # can override with different types
+            "DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com",
+            "ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"],
         }
 
-        self.validator._validate_constants_dict(constants_dict, "test_context")
+        self.validator._validate_constants_section(constants_dict)
 
         assert self.validator.errors == []
 
-    def test_validate_workspace_value_workspace_name_valid(self):
-        """Test _validate_workspace_value with valid workspace name."""
-        result = self.validator._validate_workspace_value("valid-workspace-name", "workspace", "workspace")
+    def test_validate_constants_dict_url_constant_non_string_type(self):
+        """Test _validate_constants_section rejects non-string URL constant."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": 12345}
 
-        assert result is True
-        assert self.validator.errors == []
+        self.validator._validate_constants_section(constants_dict)
 
-    def test_validate_workspace_value_workspace_id_valid_guid(self):
-        """Test _validate_workspace_value with valid workspace_id GUID."""
-        result = self.validator._validate_workspace_value(
-            "12345678-1234-1234-1234-123456789abc", "workspace_id", "workspace_id"
-        )
-
-        assert result is True
-        assert self.validator.errors == []
-
-    def test_validate_workspace_value_workspace_id_invalid_guid(self):
-        """Test _validate_workspace_value with invalid workspace_id GUID."""
-        result = self.validator._validate_workspace_value("invalid-guid", "workspace_id", "workspace_id")
-
-        assert result is False
         assert len(self.validator.errors) == 1
-        assert "must be a valid GUID format" in self.validator.errors[0]
+        assert "'constants.DEFAULT_API_ROOT_URL' must be a string URL, got int" in self.validator.errors[0]
+
+    def test_validate_constants_dict_url_constant_invalid_hostname(self):
+        """Test _validate_constants_section rejects URL with invalid hostname."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": "https://evil.example.com"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "invalid hostname" in self.validator.errors[0].lower()
+
+    def test_validate_constants_dict_url_constant_http_scheme(self):
+        """Test _validate_constants_section rejects URL with HTTP scheme."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": "http://api.fabric.microsoft.com"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "must use HTTPS scheme" in self.validator.errors[0]
+
+    def test_validate_constants_dict_url_constant_with_path(self):
+        """Test _validate_constants_section rejects URL with path components."""
+        constants_dict = {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com/v1"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "without path components" in self.validator.errors[0]
+
+    def test_validate_constants_dict_url_constant_valid_powerbi(self):
+        """Test _validate_constants_section accepts valid PowerBI URL constant."""
+        constants_dict = {"FABRIC_API_ROOT_URL": "https://api.powerbi.com"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert self.validator.errors == []
+
+    def test_validate_constants_dict_non_url_constant_skips_url_validation(self):
+        """Test _validate_constants_section skips URL validation for non-URL constants."""
+        constants_dict = {"ACCEPTED_ITEM_TYPES": ["Notebook", "DataPipeline"]}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert self.validator.errors == []
 
     def test_validate_item_types_in_scope_valid_list(self):
         """Test _validate_item_types_in_scope with valid list."""
@@ -682,6 +778,18 @@ class TestConfigValidator:
             in self.validator.errors[0]
         )
 
+    def test_validate_parameter_field_invalid_env_mapping(self):
+        """Test _validate_parameter_field with invalid environment mapping."""
+        core = {"parameter": {"": "param.yml"}}
+
+        self.validator._validate_parameter_field(core)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format("parameter", "str")
+            in self.validator.errors[0]
+        )
+
     def test_resolve_parameter_path_basic_functionality(self, tmp_path):
         """Test basic parameter path resolution functionality."""
         # Create parameter file
@@ -738,6 +846,49 @@ class TestConfigValidator:
         assert resolved_path.is_absolute()
         assert resolved_path.exists()
         assert resolved_path.is_file()
+
+    def test_resolve_path_field_git_repo_mismatch(self, tmp_path):
+        """Test _resolve_path_field detects different git repositories."""
+        test_dir = tmp_path / "test_dir"
+        test_dir.mkdir()
+
+        self.validator.config = {"test_section": {"test_field": str(test_dir)}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        with patch(
+            "fabric_cicd._common._config_validator._find_git_root",
+            side_effect=[Path("/repo1"), Path("/repo2")],
+        ):
+            self.validator._resolve_path_field(str(test_dir), "test_field", "test_section", "directory")
+
+        assert len(self.validator.errors) == 1
+        assert "same git repository" in self.validator.errors[0]
+
+    def test_resolve_path_field_file_type_but_is_directory(self, tmp_path):
+        """Test _resolve_path_field when expecting file but path is a directory."""
+        test_dir = tmp_path / "a_dir"
+        test_dir.mkdir()
+
+        self.validator.config = {"test_section": {"test_field": "a_dir"}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        self.validator._resolve_path_field("a_dir", "test_field", "test_section", "file")
+
+        assert len(self.validator.errors) == 1
+        assert "test_field path exists but is not a file" in self.validator.errors[0]
+
+    def test_resolve_path_field_os_error(self, tmp_path):
+        """Test _resolve_path_field with OSError during path resolution."""
+        self.validator.config = {"test_section": {"test_field": "some_path"}}
+        self.validator.config_path = tmp_path / "config.yml"
+
+        with patch.object(Path, "resolve", side_effect=OSError("bad path")):
+            self.validator._resolve_path_field("some_path", "test_field", "test_section", "directory")
+
+        assert len(self.validator.errors) == 1
+        assert "Invalid test_field path" in self.validator.errors[0]
+        assert "some_path" in self.validator.errors[0]
+        assert "bad path" in self.validator.errors[0]
 
     def test_resolve_path_field_environment_mapping(self, tmp_path):
         """Test _resolve_path_field with environment mapping."""
@@ -1272,13 +1423,13 @@ constants:
 
         config_override = {
             "core": {"workspace_id": "87654321-4321-4321-4321-123456789abc"},
-            "constants": {"DEFAULT_API_ROOT_URL": "https://api.override.com"},
+            "constants": {"DEFAULT_API_ROOT_URL": "https://api.powerbi.com"},
         }
 
         result = self.validator.validate_config_file(str(config_file), "DEV", config_override)
 
         assert result["core"]["workspace_id"] == "87654321-4321-4321-4321-123456789abc"
-        assert result["constants"]["DEFAULT_API_ROOT_URL"] == "https://api.override.com"
+        assert result["constants"]["DEFAULT_API_ROOT_URL"] == "https://api.powerbi.com"
 
     def test_validate_config_file_with_invalid_overrides_integration(self, tmp_path):
         """Integration test for validate_config_file with invalid overrides."""
@@ -1375,7 +1526,8 @@ class TestConfigValidatorUtilityFunctions:
             },
             "publish": {
                 "exclude_regex": ".*_test",
-                "folder_exclude_regex": "^temp/",
+                "folder_exclude_regex": "^/temp",
+                "folder_path_to_include": ["/subfolder"],
                 "shortcut_exclude_regex": "^shortcut_temp/",
                 "items_to_include": ["item1"],
                 "skip": False,
@@ -1388,7 +1540,7 @@ class TestConfigValidatorUtilityFunctions:
         fields = _get_config_fields(config)
 
         # Should return all fields from all sections
-        assert len(fields) == 15  # Updated count with folder_exclude_regex and shortcut_exclude_regex
+        assert len(fields) == 16  # Updated count with folder_exclude_regex and shortcut_exclude_regex
 
         # Check some specific fields
         field_names = [field[1] for field in fields]
@@ -1409,39 +1561,6 @@ class TestConfigValidatorUtilityFunctions:
 
             if field_name in ["item_types_in_scope", "parameter"]:
                 assert warn_if_missing is True, f"{field_name} should warn if missing"
-
-    def test_is_regular_constants_dict_regular(self):
-        """Test _is_regular_constants_dict with regular constants dictionary."""
-        from fabric_cicd._common._config_validator import _is_regular_constants_dict
-
-        regular_dict = {"API_URL": "https://api.example.com", "TIMEOUT": 30, "FEATURES": ["feat1", "feat2"]}
-
-        assert _is_regular_constants_dict(regular_dict) is True
-
-    def test_is_regular_constants_dict_environment_mapping(self):
-        """Test _is_regular_constants_dict with environment mapping."""
-        from fabric_cicd._common._config_validator import _is_regular_constants_dict
-
-        env_mapping = {"dev": {"API_URL": "https://dev.api.com"}, "prod": {"API_URL": "https://prod.api.com"}}
-
-        assert _is_regular_constants_dict(env_mapping) is False
-
-    def test_is_regular_constants_dict_mixed(self):
-        """Test _is_regular_constants_dict with mixed values."""
-        from fabric_cicd._common._config_validator import _is_regular_constants_dict
-
-        mixed_dict = {
-            "API_URL": "https://api.example.com",  # string value
-            "dev": {"TIMEOUT": 30},  # dict value (makes it NOT all dicts)
-        }
-
-        assert _is_regular_constants_dict(mixed_dict) is True
-
-    def test_is_regular_constants_dict_empty(self):
-        """Test _is_regular_constants_dict with empty dictionary."""
-        from fabric_cicd._common._config_validator import _is_regular_constants_dict
-
-        assert _is_regular_constants_dict({}) is True
 
 
 class TestConfigValidatorIntegration:
@@ -1527,7 +1646,7 @@ class TestConfigValidatorIntegration:
             },
             "constants": {
                 "UNKNOWN_CONSTANT": "some_value",  # Unknown constant
-                "DEFAULT_API_ROOT_URL": "https://api.example.com",  # Known constant with any type
+                "DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com",  # Valid URL constant
             },
         }
 
@@ -1595,7 +1714,7 @@ class TestConfigSectionValidation:
         with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
             self.validator._validate_config_sections()
 
-        assert self.validator.errors == []
+        assert self.validator.errors == ["'constants.DEFAULT_API_ROOT_URL' has invalid hostname: api.example.com"]
 
     def test_validate_config_sections_missing_workspace_identifier(self):
         """Test _validate_config_sections with missing workspace identifier."""
@@ -1635,40 +1754,84 @@ class TestOperationSectionValidation:
         assert len(self.validator.errors) == 1
         assert "'publish' section must be a dictionary" in self.validator.errors[0]
 
-    def test_validate_operation_section_empty_exclude_regex(self):
-        """Test _validate_operation_section with empty exclude_regex."""
-        section = {"exclude_regex": ""}
+    # --- Parametrized regex field tests ---
+
+    @pytest.mark.parametrize("regex_field", ["exclude_regex", "folder_exclude_regex", "shortcut_exclude_regex"])
+    def test_validate_operation_section_valid_regex_field(self, regex_field):
+        """Test _validate_operation_section with valid regex field."""
+        section = {regex_field: "^DONT_DEPLOY.*"}
 
         self.validator._validate_operation_section(section, "publish")
 
-        assert len(self.validator.errors) == 1
-        assert "'publish.exclude_regex' cannot be empty" in self.validator.errors[0]
+        assert self.validator.errors == []
 
-    def test_validate_operation_section_invalid_regex(self):
-        """Test _validate_operation_section with invalid regex."""
-        section = {"exclude_regex": "[invalid"}
+    @pytest.mark.parametrize("regex_field", ["exclude_regex", "folder_exclude_regex", "shortcut_exclude_regex"])
+    def test_validate_operation_section_invalid_regex_field(self, regex_field):
+        """Test _validate_operation_section with invalid regex field."""
+        section = {regex_field: "[invalid"}
 
         self.validator._validate_operation_section(section, "publish")
 
         assert len(self.validator.errors) == 1
         assert "is not a valid regex pattern" in self.validator.errors[0]
 
-    def test_validate_operation_section_exclude_regex_environment_mapping(self):
-        """Test _validate_operation_section with exclude_regex environment mapping."""
-        section = {"exclude_regex": {"dev": "^DEV_.*", "prod": "^PROD_.*"}}
+    @pytest.mark.parametrize(
+        ("regex_field", "empty_value"),
+        [
+            ("exclude_regex", ""),
+            ("folder_exclude_regex", "   "),
+            ("shortcut_exclude_regex", "  "),
+        ],
+    )
+    def test_validate_operation_section_empty_regex_field(self, regex_field, empty_value):
+        """Test _validate_operation_section with empty regex field."""
+        section = {regex_field: empty_value}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert "empty" in self.validator.errors[0].lower()
+
+    @pytest.mark.parametrize("regex_field", ["exclude_regex", "folder_exclude_regex", "shortcut_exclude_regex"])
+    def test_validate_operation_section_regex_field_invalid_type(self, regex_field):
+        """Test _validate_operation_section with regex field invalid type."""
+        section = {regex_field: 123}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert "must be either a string or environment mapping" in self.validator.errors[0]
+
+    @pytest.mark.parametrize("regex_field", ["exclude_regex", "folder_exclude_regex", "shortcut_exclude_regex"])
+    def test_validate_operation_section_regex_field_environment_mapping(self, regex_field):
+        """Test _validate_operation_section with regex field environment mapping."""
+        section = {regex_field: {"dev": "^DEV_.*", "prod": "^PROD_.*"}}
 
         self.validator._validate_operation_section(section, "publish")
 
         assert self.validator.errors == []
 
-    def test_validate_operation_section_exclude_regex_invalid_type(self):
-        """Test _validate_operation_section with exclude_regex invalid type."""
-        section = {"exclude_regex": 123}
-
+    @pytest.mark.parametrize("regex_field", ["exclude_regex", "folder_exclude_regex", "shortcut_exclude_regex"])
+    def test_validate_operation_section_regex_field_invalid_env_mapping(self, regex_field):
+        """Test regex field dict with invalid environment key causes early return."""
+        section = {regex_field: {123: "^pattern"}}
         self.validator._validate_operation_section(section, "publish")
-
         assert len(self.validator.errors) == 1
-        assert "must be either a string or environment mapping dictionary" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format(f"publish.{regex_field}", "int")
+            in self.validator.errors[0]
+        )
+
+    @pytest.mark.parametrize("regex_field", ["folder_exclude_regex", "shortcut_exclude_regex"])
+    def test_validate_operation_section_regex_field_rejected_in_unpublish(self, regex_field):
+        """Test publish-only regex fields are rejected in unpublish section."""
+        section = {regex_field: "^temp"}
+        self.validator._validate_operation_section(section, "unpublish")
+        assert len(self.validator.errors) == 1
+        assert regex_field in self.validator.errors[0]
+        assert "unpublish" in self.validator.errors[0]
+
+    # --- items_to_include tests ---
 
     def test_validate_operation_section_empty_items_to_include(self):
         """Test _validate_operation_section with empty items_to_include list."""
@@ -1677,15 +1840,28 @@ class TestOperationSectionValidation:
         self.validator._validate_operation_section(section, "publish")
 
         assert len(self.validator.errors) == 1
-        assert "'publish.items_to_include' cannot be empty if specified" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["empty_list"].format("publish.items_to_include")
+            in self.validator.errors[0]
+        )
 
-    def test_validate_operation_section_items_to_include_environment_mapping(self):
-        """Test _validate_operation_section with items_to_include environment mapping."""
-        section = {"items_to_include": {"dev": ["item1.Notebook"], "prod": ["item2.DataPipeline", "item3.Lakehouse"]}}
+    def test_validate_operation_section_items_to_include_valid_env_mapping(self):
+        """Test _validate_operation_section with valid items_to_include environment mapping."""
+        section = {"items_to_include": {"dev": ["item1.Notebook"], "prod": ["item2.DataPipeline"]}}
 
         self.validator._validate_operation_section(section, "publish")
 
         assert self.validator.errors == []
+
+    def test_validate_operation_section_items_to_include_invalid_env_mapping(self):
+        """Test items_to_include dict with invalid environment key causes early return."""
+        section = {"items_to_include": {123: ["item1"]}}
+        self.validator._validate_operation_section(section, "publish")
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format("publish.items_to_include", "int")
+            in self.validator.errors[0]
+        )
 
     def test_validate_operation_section_items_to_include_invalid_type(self):
         """Test _validate_operation_section with items_to_include invalid type."""
@@ -1694,7 +1870,12 @@ class TestOperationSectionValidation:
         self.validator._validate_operation_section(section, "publish")
 
         assert len(self.validator.errors) == 1
-        assert "must be either a list or environment mapping dictionary" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["field"]["list_or_dict"].format("publish.items_to_include", "str")
+            in self.validator.errors[0]
+        )
+
+    # --- skip tests ---
 
     def test_validate_operation_section_skip_boolean(self):
         """Test _validate_operation_section with skip as boolean."""
@@ -1726,69 +1907,276 @@ class TestOperationSectionValidation:
         )
         assert modified_msg in self.validator.errors[0]
 
-    def test_validate_operation_section_with_folder_exclude_regex(self):
-        """Test _validate_operation_section with folder_exclude_regex."""
-        section = {"folder_exclude_regex": "^DONT_DEPLOY_FOLDER/"}
+    def test_validate_operation_section_skip_invalid_env_mapping(self):
+        """Test skip dict with invalid environment key causes early return."""
+        section = {"skip": {123: True}}
+        self.validator._validate_operation_section(section, "publish")
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format("publish.skip", "int")
+            in self.validator.errors[0]
+        )
+
+    # --- folder_path_to_include tests ---
+
+    def test_validate_operation_section_folder_path_to_include_valid_list(self):
+        """Test _validate_operation_section with valid folder_path_to_include list."""
+        section = {"folder_path_to_include": ["/FolderA", "/FolderB"]}
 
         self.validator._validate_operation_section(section, "publish")
 
-        assert self.validator.errors == []
+        assert len(self.validator.errors) == 0
 
-    def test_validate_operation_section_with_invalid_folder_exclude_regex(self):
-        """Test _validate_operation_section with invalid folder_exclude_regex."""
-        section = {"folder_exclude_regex": "[invalid"}
+    def test_validate_operation_section_folder_path_to_include_valid_env_mapping(self):
+        """Test _validate_operation_section with valid folder_path_to_include environment mapping."""
+        section = {"folder_path_to_include": {"dev": ["/FolderA"], "prod": ["/FolderA", "/FolderB"]}}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 0
+
+    def test_validate_operation_section_folder_path_to_include_empty_list(self):
+        """Test _validate_operation_section with empty folder_path_to_include list."""
+        section = {"folder_path_to_include": []}
 
         self.validator._validate_operation_section(section, "publish")
 
         assert len(self.validator.errors) == 1
-        assert "is not a valid regex pattern" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["empty_list"].format("publish.folder_path_to_include")
+            in self.validator.errors[0]
+        )
 
-    def test_validate_operation_section_with_folder_exclude_regex_environment_mapping(self):
-        """Test _validate_operation_section with folder_exclude_regex environment mapping."""
-        section = {"folder_exclude_regex": {"dev": "^DEV_FOLDER/", "prod": "^PROD_FOLDER/"}}
-
-        self.validator._validate_operation_section(section, "publish")
-
-        assert self.validator.errors == []
-
-    def test_folder_exclude_regex_restricted_to_publish_section(self):
-        """Test that folder_exclude_regex is only allowed in the publish section."""
-        # Just test the requirement: folder_exclude_regex should only be allowed in publish
-        # This test doesn't directly test the implementation or error message
-
-        # Test that it's allowed in publish
-        section_publish = {"folder_exclude_regex": "^DONT_DEPLOY_FOLDER/"}
-        self.validator.errors = []  # Reset errors
-        self.validator._validate_operation_section(section_publish, "publish")
-        assert len(self.validator.errors) == 0  # Should be valid in publish
-
-        # We can't test the negative case (unpublish) directly due to missing error message key
-        # So we'll just document that the feature should be restricted to publish section
-
-    def test_validate_operation_section_with_shortcut_exclude_regex(self):
-        """Test _validate_operation_section with shortcut_exclude_regex."""
-        section = {"shortcut_exclude_regex": "^temp_.*"}
-
-        self.validator._validate_operation_section(section, "publish")
-
-        assert self.validator.errors == []
-
-    def test_validate_operation_section_with_invalid_shortcut_exclude_regex(self):
-        """Test _validate_operation_section with invalid shortcut_exclude_regex."""
-        section = {"shortcut_exclude_regex": "[invalid"}
+    def test_validate_operation_section_folder_path_to_include_invalid_type(self):
+        """Test _validate_operation_section with folder_path_to_include invalid type."""
+        section = {"folder_path_to_include": "not a list or dict"}
 
         self.validator._validate_operation_section(section, "publish")
 
         assert len(self.validator.errors) == 1
-        assert "is not a valid regex pattern" in self.validator.errors[0]
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["field"]["list_or_dict"].format("publish.folder_path_to_include", "str")
+            in self.validator.errors[0]
+        )
 
-    def test_validate_operation_section_with_shortcut_exclude_regex_environment_mapping(self):
-        """Test _validate_operation_section with shortcut_exclude_regex environment mapping."""
-        section = {"shortcut_exclude_regex": {"dev": "^dev_temp_.*", "prod": "^staging_.*"}}
+    def test_validate_operation_section_folder_path_to_include_unsupported_in_unpublish(self):
+        """Test _validate_operation_section with folder_path_to_include in unpublish section."""
+        section = {"folder_path_to_include": ["/FolderA"]}
+
+        self.validator._validate_operation_section(section, "unpublish")
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["unsupported_field"].format(
+                "folder_path_to_include", "unpublish"
+            )
+            in self.validator.errors[0]
+        )
+
+    def test_validate_operation_section_folder_path_to_include_entry_not_string(self):
+        """Test _validate_operation_section with non-string entry in folder_path_to_include."""
+        section = {"folder_path_to_include": ["/FolderA", 123, "/FolderB"]}
 
         self.validator._validate_operation_section(section, "publish")
 
-        assert self.validator.errors == []
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
+                "publish.folder_path_to_include", 1, "int"
+            )
+            in self.validator.errors[0]
+        )
+
+    def test_validate_operation_section_folder_path_to_include_empty_string_entry(self):
+        """Test _validate_operation_section with empty string entry in folder_path_to_include."""
+        section = {"folder_path_to_include": ["/FolderA", "", "/FolderB"]}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(
+                "publish.folder_path_to_include", 1
+            )
+            in self.validator.errors[0]
+        )
+
+    def test_validate_operation_section_folder_path_to_include_missing_prefix(self):
+        """Test _validate_operation_section with folder entry missing leading slash."""
+        section = {"folder_path_to_include": ["/FolderA", "FolderB"]}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["folders_list_prefix"].format(
+                "publish.folder_path_to_include", 1, "FolderB"
+            )
+            in self.validator.errors[0]
+        )
+
+    def test_validate_operation_section_folder_path_to_include_env_mapping_empty_list(self):
+        """Test _validate_operation_section with empty list in environment mapping for folder_path_to_include."""
+        section = {"folder_path_to_include": {"dev": ["/FolderA"], "prod": []}}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["empty_env_value"].format(
+                "publish.folder_path_to_include", "prod"
+            )
+            in self.validator.errors[0]
+        )
+
+    def test_validate_operation_section_folder_path_to_include_env_mapping_invalid_entry(self):
+        """Test _validate_operation_section with invalid entry in environment mapping for folder_path_to_include."""
+        section = {"folder_path_to_include": {"dev": ["/FolderA", "NoSlash"]}}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["folders_list_prefix"].format(
+                "publish.folder_path_to_include.dev", 1, "NoSlash"
+            )
+            in self.validator.errors[0]
+        )
+
+    def test_validate_operation_section_folder_path_to_include_nested_path(self):
+        """Test _validate_operation_section with nested folder paths in folder_path_to_include."""
+        section = {"folder_path_to_include": ["/FolderA/SubFolder", "/FolderB/Sub1/Sub2"]}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 0
+
+    def test_validate_operation_section_folder_path_to_include_whitespace_entry(self):
+        """Test _validate_operation_section with whitespace-only entry in folder_path_to_include."""
+        section = {"folder_path_to_include": ["/FolderA", "   "]}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(
+                "publish.folder_path_to_include", 1
+            )
+            in self.validator.errors[0]
+        )
+
+    # --- Mutual exclusivity tests ---
+
+    def test_validate_operation_section_mutually_exclusive_both_direct_values(self):
+        """Test that both folder_exclude_regex and folder_path_to_include as direct values raises error."""
+        section = {"folder_exclude_regex": "^/legacy", "folder_path_to_include": ["/subfolder"]}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        error_messages = " ".join(self.validator.errors)
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["mutually_exclusive"].format(
+                "publish.folder_exclude_regex", "publish.folder_path_to_include"
+            )
+            in error_messages
+        )
+
+    def test_validate_operation_section_mutually_exclusive_both_env_mapped_overlapping(self):
+        """Test that both fields with overlapping environment mappings raises error."""
+        self.validator.environment = "dev"
+        section = {
+            "folder_exclude_regex": {"dev": "^/legacy"},
+            "folder_path_to_include": {"dev": ["/subfolder"]},
+        }
+
+        self.validator._validate_operation_section(section, "publish")
+
+        error_messages = " ".join(self.validator.errors)
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["mutually_exclusive_env"].format(
+                "publish.folder_exclude_regex", "publish.folder_path_to_include", ["dev"]
+            )
+            in error_messages
+        )
+
+    def test_validate_operation_section_mutually_exclusive_both_env_mapped_no_overlap(self):
+        """Test that both fields with non-overlapping environment mappings is valid."""
+        self.validator.environment = "dev"
+        section = {
+            "folder_exclude_regex": {"dev": "^/legacy"},
+            "folder_path_to_include": {"prod": ["/subfolder"]},
+        }
+
+        self.validator._validate_operation_section(section, "publish")
+
+        # Filter errors to only mutual exclusivity errors
+        mutual_errors = [
+            e for e in self.validator.errors if "mutually exclusive" in e.lower() or "Cannot specify both" in e
+        ]
+        assert len(mutual_errors) == 0
+
+    def test_validate_operation_section_mutually_exclusive_direct_and_env_mapped_conflict(self):
+        """Test that direct value + env-mapped value conflicts when target env matches."""
+        self.validator.environment = "dev"
+        section = {
+            "folder_exclude_regex": "^/legacy",  # direct, applies to all
+            "folder_path_to_include": {"dev": ["/subfolder"]},  # env-mapped, applies to dev
+        }
+
+        self.validator._validate_operation_section(section, "publish")
+
+        error_messages = " ".join(self.validator.errors)
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["mutually_exclusive_env"].format(
+                "publish.folder_exclude_regex", "publish.folder_path_to_include", ["dev"]
+            )
+            in error_messages
+        )
+
+    def test_validate_operation_section_mutually_exclusive_direct_and_env_mapped_no_conflict(self):
+        """Test that direct value + env-mapped value is valid when target env doesn't match."""
+        self.validator.environment = "prod"
+        section = {
+            "folder_exclude_regex": "^/legacy",  # direct, applies to all
+            "folder_path_to_include": {"dev": ["/subfolder"]},  # env-mapped, only dev
+        }
+
+        self.validator._validate_operation_section(section, "publish")
+
+        # The direct value applies to prod, but folder_path_to_include doesn't apply to prod
+        mutual_errors = [
+            e for e in self.validator.errors if "mutually exclusive" in e.lower() or "Cannot specify both" in e
+        ]
+        assert len(mutual_errors) == 0
+
+    def test_validate_operation_section_mutually_exclusive_env_mapped_and_direct_conflict(self):
+        """Test that env-mapped value + direct value conflicts when target env matches."""
+        self.validator.environment = "dev"
+        section = {
+            "folder_exclude_regex": {"dev": "^/legacy"},  # env-mapped, applies to dev
+            "folder_path_to_include": ["/subfolder"],  # direct, applies to all
+        }
+
+        self.validator._validate_operation_section(section, "publish")
+
+        error_messages = " ".join(self.validator.errors)
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["mutually_exclusive_env"].format(
+                "publish.folder_exclude_regex", "publish.folder_path_to_include", ["dev"]
+            )
+            in error_messages
+        )
+
+    def test_validate_operation_section_mutually_exclusive_only_one_field_present(self):
+        """Test that having only one of the mutually exclusive fields is valid."""
+        section = {"folder_exclude_regex": "^/legacy"}
+
+        self.validator._validate_operation_section(section, "publish")
+
+        mutual_errors = [
+            e for e in self.validator.errors if "mutually exclusive" in e.lower() or "Cannot specify both" in e
+        ]
+        assert len(mutual_errors) == 0
 
 
 class TestFeaturesSectionValidation:
@@ -1832,6 +2220,18 @@ class TestFeaturesSectionValidation:
         assert len(self.validator.errors) == 1
         assert constants.CONFIG_VALIDATION_MSGS["operation"]["features_type"].format("str") in self.validator.errors[0]
 
+    def test_validate_features_section_env_mapping_empty_list_for_env(self):
+        """Test _validate_features_section with empty feature list for one environment."""
+        features = {"dev": ["feature1"], "prod": []}
+
+        self.validator._validate_features_section(features)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["empty_env_value"].format("features", "prod")
+            in self.validator.errors[0]
+        )
+
 
 class TestConstantsSectionValidation:
     """Tests for constants section validation."""
@@ -1842,7 +2242,7 @@ class TestConstantsSectionValidation:
 
     def test_validate_constants_section_dict(self):
         """Test _validate_constants_section with valid constants dictionary."""
-        constants_section = {"DEFAULT_API_ROOT_URL": "https://api.example.com"}
+        constants_section = {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com"}
 
         with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
             self.validator._validate_constants_section(constants_section)
@@ -1859,16 +2259,74 @@ class TestConstantsSectionValidation:
         assert "'constants' section must be a dictionary" in self.validator.errors[0]
 
     def test_validate_constants_section_environment_mapping(self):
-        """Test _validate_constants_section with environment mapping."""
+        """Test _validate_constants_section with per-key environment mapping."""
         constants_section = {
-            "dev": {"DEFAULT_API_ROOT_URL": "https://dev-api.example.com"},
-            "prod": {"DEFAULT_API_ROOT_URL": "https://prod-api.example.com"},
+            "DEFAULT_API_ROOT_URL": {
+                "dev": "https://api.fabric.microsoft.com",
+                "prod": "https://api.powerbi.com",
+            },
         }
 
-        with patch.object(constants, "DEFAULT_API_ROOT_URL", "original_value"):
-            self.validator._validate_constants_section(constants_section)
+        self.validator._validate_constants_section(constants_section)
 
         assert self.validator.errors == []
+
+    def test_validate_constants_section_rejects_env_at_top_format(self):
+        """Test _validate_constants_section rejects invalid env-at-top format."""
+        constants_section = {
+            "dev": {"DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com"},
+            "prod": {"DEFAULT_API_ROOT_URL": "https://api.powerbi.com"},
+        }
+
+        self.validator._validate_constants_section(constants_section)
+
+        assert len(self.validator.errors) == 2
+        assert "Unknown constant 'dev'" in self.validator.errors[0]
+        assert "Unknown constant 'prod'" in self.validator.errors[1]
+
+    def test_validate_constants_section_env_mapping_invalid_env_key(self):
+        """Test _validate_constants_section with invalid env key in per-key mapping."""
+        constants_section = {
+            "DEFAULT_API_ROOT_URL": {123: "https://api.fabric.microsoft.com"},
+        }
+
+        self.validator._validate_constants_section(constants_section)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format(
+                "constants.DEFAULT_API_ROOT_URL", "int"
+            )
+            in self.validator.errors[0]
+        )
+        assert "DEFAULT_API_ROOT_URL" in self.validator.errors[0]
+
+    def test_validate_constants_section_env_mapping_url_validation(self):
+        """Test _validate_constants_section validates URL in per-key env mapping."""
+        constants_section = {
+            "DEFAULT_API_ROOT_URL": {
+                "dev": "http://api.fabric.microsoft.com",  # HTTP, not HTTPS
+            },
+        }
+
+        self.validator._validate_constants_section(constants_section)
+
+        assert len(self.validator.errors) == 1
+        assert "must use HTTPS scheme" in self.validator.errors[0]
+        assert "DEFAULT_API_ROOT_URL" in self.validator.errors[0]
+
+    def test_validate_constants_section_env_mapping_non_string_url(self):
+        """Test _validate_constants_section rejects non-string URL in per-key env mapping."""
+        constants_section = {
+            "DEFAULT_API_ROOT_URL": {"dev": 12345},
+        }
+
+        self.validator._validate_constants_section(constants_section)
+
+        assert len(self.validator.errors) == 1
+        assert "must be a string URL" in self.validator.errors[0]
+        assert "DEFAULT_API_ROOT_URL" in self.validator.errors[0]
+        assert "int" in self.validator.errors[0]
 
 
 class TestEnvironmentMismatchValidation:
@@ -2008,3 +2466,83 @@ class TestEnvironmentMismatchValidation:
         error_text = " ".join(self.validator.errors)
         assert "workspace_id" in error_text
         assert "repository_directory" in error_text
+
+    def test_environment_exists_constants_per_key_env_missing(self):
+        """Test _validate_environment_exists logs debug when env missing from per-key constants."""
+        import logging
+
+        self.validator.config = {
+            "core": {
+                "workspace_id": "simple-id",
+                "repository_directory": "/path",
+            },
+            "constants": {
+                "DEFAULT_API_ROOT_URL": {
+                    "dev": "https://api.fabric.microsoft.com",
+                },
+            },
+        }
+        self.validator.environment = "prod"
+
+        with patch.object(logging.getLogger("fabric_cicd._common._config_validator"), "warning") as mock_warning:
+            self.validator._validate_environment_exists()
+
+        assert self.validator.errors == []
+        assert mock_warning.call_count == 1
+        assert "constants.DEFAULT_API_ROOT_URL" in mock_warning.call_args[0][0]
+
+    def test_environment_exists_constants_per_key_env_present(self):
+        """Test _validate_environment_exists passes when env exists in per-key constants."""
+        self.validator.config = {
+            "core": {
+                "workspace_id": {"dev": "dev-id"},
+                "repository_directory": "/path",
+            },
+            "constants": {
+                "DEFAULT_API_ROOT_URL": {
+                    "dev": "https://api.fabric.microsoft.com",
+                },
+            },
+        }
+        self.validator.environment = "dev"
+
+        self.validator._validate_environment_exists()
+
+        assert self.validator.errors == []
+
+    def test_environment_exists_constants_flat_value_no_env_check(self):
+        """Test _validate_environment_exists skips flat constants (no env mapping to check)."""
+        self.validator.config = {
+            "core": {
+                "workspace_id": "simple-id",
+                "repository_directory": "/path",
+            },
+            "constants": {
+                "DEFAULT_API_ROOT_URL": "https://api.fabric.microsoft.com",
+            },
+        }
+        self.validator.environment = "prod"
+
+        self.validator._validate_environment_exists()
+
+        assert self.validator.errors == []
+
+    def test_environment_na_with_constants_env_mapping_no_error(self):
+        """Test N/A environment does not flag constants per-key env mappings."""
+        self.validator.config = {
+            "core": {
+                "workspace_id": "simple-id",
+                "repository_directory": "/path",
+            },
+            "constants": {
+                "DEFAULT_API_ROOT_URL": {
+                    "dev": "https://api.fabric.microsoft.com",
+                },
+            },
+        }
+        self.validator.environment = "N/A"
+
+        self.validator._validate_environment_exists()
+
+        # Constants per-key dicts are excluded from the N/A check
+        assert self.validator.errors == []

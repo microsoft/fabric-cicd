@@ -1,13 +1,5 @@
 # About
 
-## Support
-
-This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issues) to track bugs, feature requests, and questions. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your [bug](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml.md), [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml), or [question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml) as a new Issue.
-
-### Microsoft Support Policy
-
-Support for this **PROJECT or PRODUCT** is limited to the resources listed above.
-
 ## Security
 
 {%
@@ -19,3 +11,23 @@ Support for this **PROJECT or PRODUCT** is limited to the resources listed above
 ## License
 
 {% include "../LICENSE" %}
+
+## Get help
+
+This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issues) to track bugs, feature requests, and questions. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your [bug](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml), [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml), or [question](https://github.com/microsoft/fabric-cicd/issues/new?template=4-question.yml) as a new issue.
+
+**Found a bug or have a suggestion?**
+
+- [Raise a GitHub issue](https://github.com/microsoft/fabric-cicd/issues)
+- [Submit ideas to Fabric Ideas Portal](https://ideas.fabric.microsoft.com/)
+
+**Need help using the fabric-cicd library?**
+
+- For debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](../docs/how_to/troubleshooting.md).
+- Connect with the community on [r/MicrosoftFabric](https://www.reddit.com/r/MicrosoftFabric/)
+- Join the [Microsoft Developer Community](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
+
+**Need enterprise assistance?**
+
+- Contact your Microsoft account manager or:
+- Open a ticket with the [Fabric Support Team](https://support.fabric.microsoft.com/)

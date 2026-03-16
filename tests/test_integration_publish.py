@@ -8,17 +8,40 @@ import importlib
 import os
 import shutil
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 from fixtures.credentials import DummyTokenCredential
 from fixtures.mock_fabric_server import MOCK_SERVER_PORT, MockFabricServer
 
 import fabric_cicd
+import fabric_cicd._common._validate_env_vars as validate_env_vars
 import fabric_cicd.constants
 
 
 @pytest.fixture
-def mock_fabric_api_server():
+def allow_localhost_http_for_integration(monkeypatch: pytest.MonkeyPatch):
+    """
+    Test-only override: allow http://localhost for mocked integration servers.
+    """
+    real_validate = validate_env_vars.validate_env_var_api_url
+
+    def _validate_api_url_test(env_var_name: str, default_value: str) -> str:
+        value = os.environ.get(env_var_name, default_value)
+        parsed = urlparse(value)
+        host = (parsed.hostname or "").lower()
+
+        if parsed.scheme == "http" and host in {"localhost", "127.0.0.1", "::1"}:
+            return value.rstrip("/")
+
+        return real_validate(env_var_name, default_value)
+
+    monkeypatch.setattr(validate_env_vars, "validate_env_var_api_url", _validate_api_url_test)
+    return
+
+
+@pytest.fixture
+def mock_fabric_api_server(allow_localhost_http_for_integration):  # noqa: ARG001
     """
     Start mock Fabric API server for the test.
 
@@ -48,6 +71,7 @@ def mock_fabric_api_server():
     os.environ["FABRIC_API_ROOT_URL"] = f"http://127.0.0.1:{MOCK_SERVER_PORT}"
     os.environ["FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS"] = "0"
 
+    # reload only after env is set and override fixture is active
     importlib.reload(fabric_cicd.constants)
 
     server.start()

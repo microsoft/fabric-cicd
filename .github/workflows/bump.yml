@@ -73,7 +73,7 @@ jobs:
                   fi
 
     bump-version:
-        name: Bump Version and Publish Docs
+        name: Bump Version
         needs: [validate-version-bump]
         if: |
             (github.event_name == 'workflow_dispatch') ||
@@ -232,33 +232,3 @@ jobs:
                         console.error('Failed to create release:', error);
                         throw error;
                       }
-
-            - name: Install Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.9"
-
-            - name: Install Requirements
-              run: |
-                  python -m pip install --upgrade pip
-                  python -m pip install uv
-
-            - name: Deploy GitHub Pages
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-              run: |
-                  git config user.name "fabric-cicd-release[bot]"
-                  git config user.email "fabric-cicd-release[bot]@users.noreply.github.com"
-                  git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
-                  uv sync
-
-                  VERSION="${{ steps.version-check.outputs.version_number }}"
-                  echo "Deploying docs for version: $VERSION"
-
-                  uv run mike deploy \
-                    --update-aliases \
-                    --branch gh-pages \
-                    --push \
-                    $VERSION \
-                    latest
-                  uv run mike set-default --push latest

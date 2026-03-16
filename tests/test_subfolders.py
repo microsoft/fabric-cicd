@@ -4,6 +4,7 @@
 """Test subfolder creation and modification in the fabric workspace."""
 
 import json
+import os
 import re
 from unittest.mock import MagicMock, patch
 
@@ -297,22 +298,33 @@ def test_deeply_nested_subfolders(tmp_path, patched_fabric_workspace, valid_work
     current_path = tmp_path
     folder_names = []
 
-    # Create 15 levels of nested folders
-    for i in range(15):
-        folder_name = f"Level{i + 1:02d}"
+    # Create 15 levels of nested folders (adjust depth for Windows if needed)
+    depth = 15
+    prefix = "Level"
+    if os.name == "nt":
+        depth = 8
+        prefix = "L"
+
+    for i in range(1, depth + 1):
+        folder_name = f"{prefix}{i:02d}"
         folder_names.append(folder_name)
         current_path = current_path / folder_name
 
     # Create an item in the deepest folder
-    create_platform_file(current_path / "DeepNotebook.Notebook", item_type="Notebook", item_name="Deep Notebook")
+    create_platform_file(
+        current_path / "DeepNotebook.Notebook",
+        item_type="Notebook",
+        item_name="Deep Notebook",
+    )
 
-    # Also create items at different levels to ensure intermediate folders are detected
     mid_level_path = tmp_path
-    for i in range(7):  # Create item at level 7
-        mid_level_path = mid_level_path / f"Level{i + 1:02d}"
+    for i in range(min(7, depth)):  # Create item at level 7
+        mid_level_path = mid_level_path / folder_names[i]
 
     create_platform_file(
-        mid_level_path / "MidLevelNotebook.Notebook", item_type="Notebook", item_name="Mid Level Notebook"
+        mid_level_path / "MidLevelNotebook.Notebook",
+        item_type="Notebook",
+        item_name="Mid Level Notebook",
     )
 
     workspace = patched_fabric_workspace(
@@ -326,7 +338,7 @@ def test_deeply_nested_subfolders(tmp_path, patched_fabric_workspace, valid_work
 
     # Verify all folder levels were detected
     expected_deep_path = "/" + "/".join(folder_names)
-    expected_mid_path = "/" + "/".join(folder_names[:7])
+    expected_mid_path = "/" + "/".join(folder_names[: min(7, depth)])
 
     assert expected_deep_path in workspace.repository_folders
     assert expected_mid_path in workspace.repository_folders
@@ -334,13 +346,11 @@ def test_deeply_nested_subfolders(tmp_path, patched_fabric_workspace, valid_work
     # Verify folder hierarchy ordering (parents before children)
     sorted_folders = sorted(workspace.repository_folders.keys(), key=lambda path: path.count("/"))
 
-    # Check that each level comes before deeper levels
-    for i in range(1, 15):
+    for i in range(1, depth):
         current_level_path = "/" + "/".join(folder_names[:i])
-        if current_level_path in workspace.repository_folders:
-            next_level_path = "/" + "/".join(folder_names[: i + 1])
-            if next_level_path in workspace.repository_folders:
-                assert sorted_folders.index(current_level_path) < sorted_folders.index(next_level_path)
+        next_level_path = "/" + "/".join(folder_names[: i + 1])
+        if current_level_path in workspace.repository_folders and next_level_path in workspace.repository_folders:
+            assert sorted_folders.index(current_level_path) < sorted_folders.index(next_level_path)
 
     # Verify no stack overflow or performance issues by checking reasonable execution time
     import time

@@ -1,0 +1,72 @@
+name: Publish Docs
+
+on:
+    workflow_run:
+        workflows: ["Bump Version"]
+        types: [completed]
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    publish-docs:
+        name: Publish Docs
+        runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+        steps:
+            - name: Generate GitHub App Token
+              id: app-token
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.APP_ID }}
+                  private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ steps.app-token.outputs.token }}
+
+            - name: Extract version
+              id: version-check
+              run: |
+                  CONSTANTS_VERSION=$(grep -oP '(?<=^VERSION = ").*(?=")' src/fabric_cicd/constants.py)
+                  echo "Version: $CONSTANTS_VERSION"
+
+                  if [ -z "$CONSTANTS_VERSION" ]; then
+                    echo "ERROR: Could not extract version from constants.py"
+                    exit 1
+                  fi
+
+                  echo "version_number=$CONSTANTS_VERSION" >> $GITHUB_OUTPUT
+
+            - name: Install Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.9"
+
+            - name: Install Requirements
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install uv
+
+            - name: Deploy GitHub Pages
+              env:
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: |
+                  git config user.name "fabric-cicd-release[bot]"
+                  git config user.email "fabric-cicd-release[bot]@users.noreply.github.com"
+                  git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
+                  uv sync
+
+                  VERSION="${{ steps.version-check.outputs.version_number }}"
+                  echo "Deploying docs for version: $VERSION"
+
+                  uv run mike deploy \
+                    --update-aliases \
+                    --branch gh-pages \
+                    --push \
+                    $VERSION \
+                    latest
+                  uv run mike set-default --push latest

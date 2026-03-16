@@ -1,5 +1,59 @@
 # Changelog
 
+## [v0.3.1](https://pypi.org/project/fabric-cicd/0.3.1) - March 12, 2026
+
+### 🔧 Bug Fix
+
+- Fix override behavior of feature flags and constants in config deployment by [shirasassoon](https://github.com/shirasassoon) ([#872](https://github.com/microsoft/fabric-cicd/issues/872))
+
+## [v0.3.0](https://pypi.org/project/fabric-cicd/0.3.0) - March 09, 2026
+
+### ✨ New Functionality
+
+- Support selective folder deployment using inclusion list by [shirasassoon](https://github.com/shirasassoon) ([#757](https://github.com/microsoft/fabric-cicd/issues/757))
+- Add FABRIC_CICD_VERSION_CHECK_DISABLED environment variable to disable version check on startup by [Ricapar](https://github.com/Ricapar) ([#811](https://github.com/microsoft/fabric-cicd/issues/811))
+- Add enhanced logging configuration options via public functions by [shirasassoon](https://github.com/shirasassoon) ([#842](https://github.com/microsoft/fabric-cicd/issues/842))
+- Add deployment support for Notebook items with `.ipynb` file format by [shirasassoon](https://github.com/shirasassoon) ([#850](https://github.com/microsoft/fabric-cicd/issues/850))
+
+### 🔧 Bug Fix
+
+- Add max workers soft cap with override and handle garbage response from Fabric Data Plane by [mdrakiburrahman](https://github.com/mdrakiburrahman) ([#827](https://github.com/microsoft/fabric-cicd/issues/827))
+- Fix parameter validation failure for item names with accented characters by [shirasassoon](https://github.com/shirasassoon) ([#818](https://github.com/microsoft/fabric-cicd/issues/818))
+- Exclude items with placeholder logical ID from duplicate logical ID check by [shirasassoon](https://github.com/shirasassoon) ([#843](https://github.com/microsoft/fabric-cicd/issues/843))
+
+### ⚡ Additional Optimizations
+
+- Add return value to deploy_with_config by [ayeshurun](https://github.com/ayeshurun) ([#851](https://github.com/microsoft/fabric-cicd/issues/851))
+- Add support for Python 3.13 in the library by [shirasassoon](https://github.com/shirasassoon) ([#855](https://github.com/microsoft/fabric-cicd/issues/855))
+
+### 📝 Documentation Update
+
+- Remove incorrect statement on support for parameter replacements in Platform files by [shirasassoon](https://github.com/shirasassoon) ([#839](https://github.com/microsoft/fabric-cicd/issues/839))
+
+## [v0.2.0](https://pypi.org/project/fabric-cicd/0.2.0) - February 16, 2026
+
+### ✨ New Functionality
+
+- Support parallelize deployments within a given item type by [mdrakiburrahman](https://github.com/mdrakiburrahman) ([#719](https://github.com/microsoft/fabric-cicd/issues/719))
+- Add a black-box REST API testing harness by [mdrakiburrahman](https://github.com/mdrakiburrahman) ([#738](https://github.com/microsoft/fabric-cicd/issues/738))
+- Change header print messages to info log by [mwc360](https://github.com/mwc360) ([#771](https://github.com/microsoft/fabric-cicd/issues/771))
+- Add support for semantic model binding per environment by [shirasassoon](https://github.com/shirasassoon) ([#689](https://github.com/microsoft/fabric-cicd/issues/689))
+
+### 🔧 Bug Fix
+
+- Remove OrgApp item type support by [shirasassoon](https://github.com/shirasassoon) ([#758](https://github.com/microsoft/fabric-cicd/issues/758))
+- Improve environment-mapping behavior in optional config fields by [shirasassoon](https://github.com/shirasassoon) ([#716](https://github.com/microsoft/fabric-cicd/issues/716))
+- Fix duplicate YAML key detection in parameter validation by [shirasassoon](https://github.com/shirasassoon) ([#752](https://github.com/microsoft/fabric-cicd/issues/752))
+- Add caching for item attribute lookups by [MiSchroe](https://github.com/MiSchroe) ([#704](https://github.com/microsoft/fabric-cicd/issues/704))
+
+### ⚡ Additional Optimizations
+
+- Enable configuration-based deployment without feature flags by [shirasassoon](https://github.com/shirasassoon) ([#805](https://github.com/microsoft/fabric-cicd/issues/805))
+
+### 📝 Documentation Update
+
+- Fix troubleshooting docs by [shirasassoon](https://github.com/shirasassoon) ([#747](https://github.com/microsoft/fabric-cicd/issues/747))
+
 ## [v0.1.34](https://pypi.org/project/fabric-cicd/0.1.34) - January 20, 2026
 
 ### ✨ New Functionality
@@ -128,7 +182,7 @@
 
 ### 🔧 Bug Fix
 
-- Fix traliing comma in report schema ([#534](https://github.com/microsoft/fabric-cicd/issues/534))
+- Fix trailing comma in report schema ([#534](https://github.com/microsoft/fabric-cicd/issues/534))
 
 ## [v0.1.26](https://pypi.org/project/fabric-cicd/0.1.26) - September 05, 2025
 
@@ -214,12 +268,12 @@
 
 ### 🔧 Bug Fix
 
-- Fix issue with lakehouse shortcuts publishing ([#379] (https://github.com/microsoft/fabric-cicd/issues/379))
+- Fix issue with lakehouse shortcuts publishing ([#379](https://github.com/microsoft/fabric-cicd/issues/379))
 - Add validation for empty logical IDs to prevent deployment corruption ([#86](https://github.com/microsoft/fabric-cicd/issues/86))
 - Fix SQL provision print statement ([#329](https://github.com/microsoft/fabric-cicd/issues/329))
 - Rename the error code for reserved item name per updated Microsoft Fabric API ([#388](https://github.com/microsoft/fabric-cicd/issues/388))
 - Fix lakehouse exclude_regex to exclude shortcut publishing ([#385](https://github.com/microsoft/fabric-cicd/issues/385))
-- Remove max retry limit to handle large deployments ([#299] (https://github.com/microsoft/fabric-cicd/issues/299))
+- Remove max retry limit to handle large deployments ([#299](https://github.com/microsoft/fabric-cicd/issues/299))
 
 ## [v0.1.22](https://pypi.org/project/fabric-cicd/0.1.22) - June 25, 2025
 

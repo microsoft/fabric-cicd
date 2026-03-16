@@ -6,12 +6,13 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import yaml
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,7 @@ class ConfigValidator:
 
         return True
 
-    def _merge_overrides(self, section: str, value: dict | list) -> None:
+    def _merge_overrides(self, section: str, value: Union[dict, list]) -> None:
         """Merge section and setting overrides into config file."""
         # Special handling for features and constants sections
         if section == "features":
@@ -343,7 +344,7 @@ class ConfigValidator:
             if any(
                 field_name in section and isinstance(section[field_name], dict)
                 for section, field_name, _, _, _ in _get_config_fields(self.config)
-                if not (field_name == "constants" and _is_regular_constants_dict(section.get(field_name, {})))
+                if field_name != "constants"
             ):
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["no_env_with_mappings"])
             return
@@ -352,8 +353,16 @@ class ConfigValidator:
         for section, field_name, display_name, is_required, log_warning in _get_config_fields(self.config):
             if field_name in section:
                 field_value = section[field_name]
-                # Handle constants special case
-                if field_name == "constants" and _is_regular_constants_dict(field_value):
+                # Handle constants special case — check each constant's value individually
+                if field_name == "constants":
+                    if isinstance(field_value, dict):
+                        for const_key, const_val in field_value.items():
+                            if isinstance(const_val, dict) and self.environment not in const_val:
+                                available_envs = list(const_val.keys())
+                                logger.warning(
+                                    f"Environment '{self.environment}' not found in 'constants.{const_key}'. "
+                                    f"Available environments: {available_envs}. This constant will be skipped."
+                                )
                     continue
 
                 # If it's a dict (environment mapping), check if target environment exists
@@ -569,7 +578,7 @@ class ConfigValidator:
             )
 
     def _resolve_path_field(
-        self, field_value: str | dict, field_name: str, section_name: str, path_type: str = "directory"
+        self, field_value: Union[str, dict], field_name: str, section_name: str, path_type: str = "directory"
     ) -> None:
         """Path resolution for configuration "path" fields (e.g, repository_directory, parameter)."""
         # Prepare paths for resolution
@@ -592,8 +601,8 @@ class ConfigValidator:
 
         for env_key, path_str in paths_to_resolve.items():
             try:
-                path = Path(path_str)
                 env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
+                path = Path(path_str)
 
                 if path.is_absolute():
                     resolved_path = path
@@ -651,13 +660,9 @@ class ConfigValidator:
                 if isinstance(field_value, str):
                     if section_name:
                         self.config[section_name][field_name] = str(resolved_path)
-                    else:
-                        self.config[field_name] = str(resolved_path)
                 else:
                     if section_name:
                         self.config[section_name][field_name][env_key] = str(resolved_path)
-                    else:
-                        self.config[field_name][env_key] = str(resolved_path)
 
             except (OSError, ValueError) as e:
                 self.errors.append(
@@ -690,13 +695,16 @@ class ConfigValidator:
         # Validate exclude_regex if present
         if "exclude_regex" in section:
             exclude_regex = section["exclude_regex"]
+
             if isinstance(exclude_regex, str):
                 if not exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(f"{section_name}.exclude_regex")
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(
+                            f"{section_name}.exclude_regex"
+                        )
                     )
                 else:
-                    self._validate_regex(exclude_regex, section_name)
+                    self._validate_regex(exclude_regex, f"{section_name}.exclude_regex")
 
             elif isinstance(exclude_regex, dict):
                 # Validate environment mapping
@@ -705,15 +713,8 @@ class ConfigValidator:
 
                 # Validate each environment's regex pattern
                 for env, regex_pattern in exclude_regex.items():
-                    if not regex_pattern.strip():
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
-                                f"{section_name}.exclude_regex.{env}"
-                            )
-                        )
-                        continue
-
                     self._validate_regex(regex_pattern, f"{section_name}.exclude_regex.{env}")
+
             else:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
@@ -728,7 +729,7 @@ class ConfigValidator:
             if isinstance(items, list):
                 if not items:
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_list"].format(
                             f"{section_name}.items_to_include"
                         )
                     )
@@ -742,18 +743,13 @@ class ConfigValidator:
 
                 # Validate each environment's items list
                 for env, items_list in items.items():
-                    if not items_list:
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_list"].format(
-                                f"{section_name}.items_to_include.{env}"
-                            )
-                        )
-                        continue
                     self._validate_items_list(items_list, f"{section_name}.items_to_include.{env}")
 
             else:
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["field"]["item_types_list_or_dict"].format(type(items).__name__)
+                    constants.CONFIG_VALIDATION_MSGS["field"]["list_or_dict"].format(
+                        f"{section_name}.items_to_include", type(items).__name__
+                    )
                 )
 
         # Validate folder_exclude_regex if present (publish only)
@@ -769,7 +765,7 @@ class ConfigValidator:
             if isinstance(folder_exclude_regex, str):
                 if not folder_exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(
                             f"{section_name}.folder_exclude_regex"
                         )
                     )
@@ -785,19 +781,48 @@ class ConfigValidator:
 
                 # Validate each environment's regex pattern
                 for env, regex_pattern in folder_exclude_regex.items():
-                    if not regex_pattern.strip():
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
-                                f"{section_name}.folder_exclude_regex.{env}"
-                            )
-                        )
-                        continue
-
                     self._validate_regex(regex_pattern, f"{section_name}.folder_exclude_regex.{env}")
+
             else:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
                         f"{section_name}.folder_exclude_regex", type(folder_exclude_regex).__name__
+                    )
+                )
+
+        # Validate folder_path_to_include if present (publish only)
+        if "folder_path_to_include" in section:
+            if section_name != "publish":
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unsupported_field"].format(
+                        "folder_path_to_include", section_name
+                    )
+                )
+
+            folders = section["folder_path_to_include"]
+            if isinstance(folders, list):
+                if not folders:
+                    self.errors.append(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_list"].format(
+                            f"{section_name}.folder_path_to_include"
+                        )
+                    )
+                else:
+                    self._validate_folders_list(folders, f"{section_name}.folder_path_to_include")
+
+            elif isinstance(folders, dict):
+                # Validate environment mapping
+                if not self._validate_environment_mapping(folders, f"{section_name}.folder_path_to_include", list):
+                    return
+
+                # Validate each environment's folders list
+                for env, folders_list in folders.items():
+                    self._validate_folders_list(folders_list, f"{section_name}.folder_path_to_include.{env}")
+
+            else:
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["list_or_dict"].format(
+                        f"{section_name}.folder_path_to_include", type(folders).__name__
                     )
                 )
 
@@ -812,7 +837,7 @@ class ConfigValidator:
             if isinstance(shortcut_exclude_regex, str):
                 if not shortcut_exclude_regex.strip():
                     self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
+                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(
                             f"{section_name}.shortcut_exclude_regex"
                         )
                     )
@@ -828,15 +853,8 @@ class ConfigValidator:
 
                 # Validate each environment's regex pattern
                 for env, regex_pattern in shortcut_exclude_regex.items():
-                    if not regex_pattern.strip():
-                        self.errors.append(
-                            constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format(
-                                f"{section_name}.shortcut_exclude_regex.{env}"
-                            )
-                        )
-                        continue
-
                     self._validate_regex(regex_pattern, f"{section_name}.shortcut_exclude_regex.{env}")
+
             else:
                 self.errors.append(
                     constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(
@@ -864,6 +882,11 @@ class ConfigValidator:
                     .replace("a string", "a boolean")
                 )
 
+        # Validate mutual exclusivity of folder filtering options
+        self._validate_mutually_exclusive_fields(
+            section, "folder_exclude_regex", "folder_path_to_include", section_name
+        )
+
     def _validate_regex(self, regex: str, section_name: str) -> None:
         """Validate regex value."""
         try:
@@ -878,12 +901,66 @@ class ConfigValidator:
         for i, item in enumerate(items_list):
             if not isinstance(item, str):
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_type"].format(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
                         context, i, type(item).__name__
                     )
                 )
             elif not item.strip():
-                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(context, i))
+
+    def _validate_folders_list(self, folders_list: list, context: str) -> None:
+        """Validate a list of folder paths with proper context for error messages."""
+        for i, folder in enumerate(folders_list):
+            if not isinstance(folder, str):
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
+                        context, i, type(folder).__name__
+                    )
+                )
+            elif not folder.strip():
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(context, i))
+            elif not folder.startswith("/"):
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["folders_list_prefix"].format(context, i, folder)
+                )
+
+    def _validate_mutually_exclusive_fields(self, section: dict, field1: str, field2: str, section_name: str) -> None:
+        """Validate that two fields are not both specified for the same environment."""
+        if field1 not in section or field2 not in section:
+            return
+
+        value1 = section[field1]
+        value2 = section[field2]
+
+        # Both are direct values (not environment-specific), throw error
+        if not isinstance(value1, dict) and not isinstance(value2, dict):
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["operation"]["mutually_exclusive"].format(
+                    f"{section_name}.{field1}", f"{section_name}.{field2}"
+                )
+            )
+            return
+
+        # Determine which environments each field contains (if they are environment mappings)
+        value1_envs = set(value1.keys()) if isinstance(value1, dict) else set()
+        value2_envs = set(value2.keys()) if isinstance(value2, dict) else set()
+
+        # Determine if it is a direct value
+        value1_is_direct = not isinstance(value1, dict)
+        value2_is_direct = not isinstance(value2, dict)
+
+        # Check if both fields would resolve for the target environment
+        value1_applies = value1_is_direct or self.environment in value1_envs
+        value2_applies = value2_is_direct or self.environment in value2_envs
+
+        if value1_applies and value2_applies:
+            self.errors.append(
+                constants.CONFIG_VALIDATION_MSGS["operation"]["mutually_exclusive_env"].format(
+                    f"{section_name}.{field1}",
+                    f"{section_name}.{field2}",
+                    [self.environment],
+                )
+            )
 
     def _validate_features_section(self, features: any) -> None:
         """Validate features section."""
@@ -902,11 +979,6 @@ class ConfigValidator:
 
             # Validate each environment's features list
             for env, features_list in features.items():
-                if not features_list:
-                    self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section_env"].format("features", env)
-                    )
-                    continue
                 self._validate_features_list(features_list, f"features.{env}")
             return
 
@@ -919,12 +991,12 @@ class ConfigValidator:
         for i, feature in enumerate(features_list):
             if not isinstance(feature, str):
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_type"].format(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_type"].format(
                         context, i, type(feature).__name__
                     )
                 )
             elif not feature.strip():
-                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["items_list_empty"].format(context, i))
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["list_entry_empty"].format(context, i))
 
     def _validate_constants_section(self, constants_section: any) -> None:
         """Validate constants section."""
@@ -936,38 +1008,45 @@ class ConfigValidator:
             )
             return
 
-        # Check if all values are dictionaries (contains environment mapping)
-        if constants_section and all(isinstance(value, dict) for value in constants_section.values()):
-            # Validate environment mapping
-            if not self._validate_environment_mapping(constants_section, "constants", dict):
-                return
-
-            # Validate each environment's constants dictionary
-            for env, env_constants in constants_section.items():
-                if not env_constants:
-                    self.errors.append(
-                        constants.CONFIG_VALIDATION_MSGS["operation"]["empty_section_env"].format("constants", env)
-                    )
-                    continue
-                self._validate_constants_dict(env_constants, f"constants.{env}")
-        else:
-            # Simple constants dictionary
-            self._validate_constants_dict(constants_section, "constants")
-
-    def _validate_constants_dict(self, constants_dict: dict, context: str) -> None:
-        """Validate a constants dictionary with proper context for error messages."""
-        for key, _ in constants_dict.items():
+        # Validate each constant key individually — values can be flat or per-key env mappings
+        for key, value in constants_section.items():
             if not isinstance(key, str) or not key.strip():
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_constant_key"].format(context, key)
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["invalid_constant_key"].format("constants", key)
                 )
                 continue
 
             # Validate that the constant exists in the constants module
             if not hasattr(constants, key):
                 self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, context)
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, "constants")
                 )
+
+            if isinstance(value, dict):
+                # Per-key environment mapping: { KEY: { dev: val, prod: val } }
+                for env, env_value in value.items():
+                    if not isinstance(env, str) or not env.strip():
+                        self.errors.append(
+                            constants.CONFIG_VALIDATION_MSGS["environment"]["invalid_env_key"].format(
+                                f"constants.{key}", type(env).__name__
+                            )
+                        )
+                        continue
+                    self._validate_single_constant(key, env_value, f"constants.{key}.{env}")
+            else:
+                # Flat value: { KEY: val }
+                self._validate_single_constant(key, value, f"constants.{key}")
+
+    def _validate_single_constant(self, key: str, value: any, context: str) -> None:
+        """Validate a single constant value."""
+        if key in _URL_CONSTANTS:
+            if not isinstance(value, str):
+                self.errors.append(f"'{context}' must be a string URL, got {type(value).__name__}")
+                return
+            try:
+                validate_api_url(value, context)
+            except InputError as e:
+                self.errors.append(str(e))
 
 
 def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
@@ -989,6 +1068,7 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
         # Publish section fields - optional (debug if missing)
         (config.get("publish", {}), "exclude_regex", "publish.exclude_regex", False, False),
         (config.get("publish", {}), "folder_exclude_regex", "publish.folder_exclude_regex", False, False),
+        (config.get("publish", {}), "folder_path_to_include", "publish.folder_path_to_include", False, False),
         (config.get("publish", {}), "shortcut_exclude_regex", "publish.shortcut_exclude_regex", False, False),
         (config.get("publish", {}), "items_to_include", "publish.items_to_include", False, False),
         (config.get("publish", {}), "skip", "publish.skip", False, False),
@@ -996,18 +1076,10 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
         (config.get("unpublish", {}), "exclude_regex", "unpublish.exclude_regex", False, False),
         (config.get("unpublish", {}), "items_to_include", "unpublish.items_to_include", False, False),
         (config.get("unpublish", {}), "skip", "unpublish.skip", False, False),
-        # Top-level sections - optional (debug if missing)
-        (config, "features", "features", False, False),
-        (config, "constants", "constants", False, False),
+        # Top-level sections - optional (warn if missing)
+        (config, "features", "features", False, True),
+        (config, "constants", "constants", False, True),
     ]
-
-
-def _is_regular_constants_dict(constants_value: dict) -> bool:
-    """Check if constants section is a regular dict (not environment mapping)."""
-    if not isinstance(constants_value, dict) or not constants_value:
-        return True
-    # Environment mapping if ALL values are dicts, regular dict otherwise
-    return not all(isinstance(value, dict) for value in constants_value.values())
 
 
 def _find_git_root(path: Path) -> Optional[Path]:

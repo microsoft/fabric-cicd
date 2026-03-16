@@ -3,7 +3,7 @@ name = "fabric-cicd"
 authors = [{ name = "Microsoft Corporation" }]
 description = "Microsoft Fabric CI/CD"
 readme = "README.md"
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.9,<3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 dynamic = ["version"]
@@ -13,12 +13,13 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "azure-identity>=1.19.0",
+    "azure-identity>=1.25.0",
     "dpath>=2.2.0",
     "filetype>=1.2.0",
-    "jsonpath-ng>=1.7.0",
+    "jsonpath-ng>=1.8.0",
     "packaging>=24.2",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",

@@ -9,16 +9,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from fabric_cicd import deploy_with_config
+from fabric_cicd import DeploymentResult, DeploymentStatus, constants, deploy_with_config
 from fabric_cicd._common._config_utils import (
-    apply_config_overrides,
+    config_overrides_scope,
     extract_publish_settings,
     extract_unpublish_settings,
     extract_workspace_settings,
     load_config_file,
 )
 from fabric_cicd._common._config_validator import ConfigValidationError
-from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._common._exceptions import InputError, PublishError
 
 
 class TestConfigFileLoading:
@@ -372,35 +372,163 @@ class TestUnpublishSettingsExtraction:
 class TestConfigOverrides:
     """Test feature flags and constants overrides."""
 
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set())
-    def test_apply_feature_flags(self):
-        """Test applying feature flags from config."""
+    def test_feature_flags_applied_within_scope(self):
+        """Test feature flags are active inside config_overrides_scope."""
         foo = "enable_foo_feature"
         bar = "enable_bar_feature"
-
         config = {"features": [foo, bar]}
 
-        apply_config_overrides(config, "N/A")
+        original_flags = constants.FEATURE_FLAG.copy()
 
-        from fabric_cicd import constants
+        with config_overrides_scope(config, "N/A"):
+            assert foo in constants.FEATURE_FLAG
+            assert bar in constants.FEATURE_FLAG
 
-        assert foo in constants.FEATURE_FLAG
-        assert bar in constants.FEATURE_FLAG
+        # Verify flags are restored after exiting scope
+        assert original_flags == constants.FEATURE_FLAG
 
-    def test_apply_constants_overrides(self):
-        """Test applying constants overrides from config."""
+    def test_feature_flags_restored_after_scope(self):
+        """Test feature flags set by config do not persist after scope exits."""
+        config = {"features": ["enable_test_feature"]}
+
+        original_flags = constants.FEATURE_FLAG.copy()
+
+        with config_overrides_scope(config, "N/A"):
+            assert "enable_test_feature" in constants.FEATURE_FLAG
+
+        assert "enable_test_feature" not in constants.FEATURE_FLAG
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_constants_overrides_applied_within_scope(self):
+        """Test constants overrides are active inside config_overrides_scope."""
+        original_url = constants.DEFAULT_API_ROOT_URL
         config = {"constants": {"DEFAULT_API_ROOT_URL": "https://custom.api.com"}}
 
-        # This will log a warning since DEFAULT_API_ROOT_URL exists in constants
-        # but it's hard to mock the setattr behavior cleanly. Let's just test it doesn't crash.
-        apply_config_overrides(config, "N/A")
+        with config_overrides_scope(config, "N/A"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://custom.api.com"
 
-    def test_apply_no_overrides(self):
-        """Test applying config overrides when no overrides are specified."""
+        # Verify constant is restored after exiting scope
+        assert original_url == constants.DEFAULT_API_ROOT_URL
+
+    def test_constants_overrides_restored_after_scope(self):
+        """Test constants set by config do not persist after scope exits."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        config = {"constants": {"DEFAULT_API_ROOT_URL": "https://temporary.api.com"}}
+
+        with config_overrides_scope(config, "N/A"):
+            pass
+
+        assert original_url == constants.DEFAULT_API_ROOT_URL
+
+    def test_user_constants_preserved_across_scope(self):
+        """Test that constants set by user before scope are preserved after scope exits."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        constants.DEFAULT_API_ROOT_URL = "https://user-set.api.com"
+
+        config = {"constants": {"FABRIC_API_ROOT_URL": "https://config-set.fabric.com"}}
+        original_fabric_url = constants.FABRIC_API_ROOT_URL
+
+        with config_overrides_scope(config, "N/A"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://user-set.api.com"
+            assert constants.FABRIC_API_ROOT_URL == "https://config-set.fabric.com"
+
+        assert constants.DEFAULT_API_ROOT_URL == "https://user-set.api.com"
+        assert original_fabric_url == constants.FABRIC_API_ROOT_URL
+
+        # Clean up
+        constants.DEFAULT_API_ROOT_URL = original_url
+
+    def test_user_constant_same_key_restored_after_scope(self):
+        """Test that when user sets a constant and config overrides the same key, user value is restored."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        constants.DEFAULT_API_ROOT_URL = "https://user-set.api.com"
+
+        config = {"constants": {"DEFAULT_API_ROOT_URL": "https://config-override.api.com"}}
+
+        with config_overrides_scope(config, "N/A"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://config-override.api.com"
+
+        assert constants.DEFAULT_API_ROOT_URL == "https://user-set.api.com"
+
+        # Clean up
+        constants.DEFAULT_API_ROOT_URL = original_url
+
+    def test_no_overrides_does_not_error(self):
+        """Test config_overrides_scope works with empty config."""
+        original_flags = constants.FEATURE_FLAG.copy()
         config = {}
 
-        # Should not raise any errors
-        apply_config_overrides(config, "N/A")
+        with config_overrides_scope(config, "N/A"):
+            pass
+
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_overrides_restored_on_exception(self):
+        """Test that overrides are restored even when an exception occurs inside the scope."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        original_flags = constants.FEATURE_FLAG.copy()
+        config = {
+            "features": ["enable_test_feature"],
+            "constants": {"DEFAULT_API_ROOT_URL": "https://will-fail.api.com"},
+        }
+
+        msg = "deployment failed"
+        with pytest.raises(RuntimeError, match=msg), config_overrides_scope(config, "N/A"):
+            raise RuntimeError(msg)
+
+        assert original_url == constants.DEFAULT_API_ROOT_URL
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_user_flags_preserved_across_scope(self):
+        """Test that flags set by user before scope are preserved after scope exits."""
+        original_flags = constants.FEATURE_FLAG.copy()
+        constants.FEATURE_FLAG.add("user_set_flag")
+
+        config = {"features": ["config_set_flag"]}
+
+        with config_overrides_scope(config, "N/A"):
+            assert "user_set_flag" in constants.FEATURE_FLAG
+            assert "config_set_flag" in constants.FEATURE_FLAG
+
+        assert "user_set_flag" in constants.FEATURE_FLAG
+        assert "config_set_flag" not in constants.FEATURE_FLAG
+
+        # Clean up
+        constants.FEATURE_FLAG.clear()
+        constants.FEATURE_FLAG.update(original_flags)
+
+    def test_environment_specific_feature_flags(self):
+        """Test environment-specific feature flags are resolved correctly."""
+        original_flags = constants.FEATURE_FLAG.copy()
+        config = {
+            "features": {
+                "dev": ["enable_dev_feature"],
+                "prod": ["enable_prod_feature"],
+            }
+        }
+
+        with config_overrides_scope(config, "dev"):
+            assert "enable_dev_feature" in constants.FEATURE_FLAG
+            assert "enable_prod_feature" not in constants.FEATURE_FLAG
+
+        assert original_flags == constants.FEATURE_FLAG
+
+    def test_environment_specific_constants(self):
+        """Test environment-specific constants overrides are resolved correctly."""
+        original_url = constants.DEFAULT_API_ROOT_URL
+        config = {
+            "constants": {
+                "DEFAULT_API_ROOT_URL": {
+                    "dev": "https://dev.api.com",
+                    "prod": "https://prod.api.com",
+                }
+            }
+        }
+
+        with config_overrides_scope(config, "dev"):
+            assert constants.DEFAULT_API_ROOT_URL == "https://dev.api.com"
+
+        assert original_url == constants.DEFAULT_API_ROOT_URL
 
 
 class TestDeployWithConfig:
@@ -409,7 +537,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_full_deployment(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test full deployment with config file."""
         # Create the actual directory structure that the config references
@@ -459,6 +586,7 @@ class TestDeployWithConfig:
             mock_workspace_instance,
             item_name_exclude_regex="^DONT_DEPLOY.*",
             folder_path_exclude_regex=None,
+            folder_path_to_include=None,
             items_to_include=None,
             shortcut_exclude_regex=None,
         )
@@ -471,7 +599,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_skip_operations(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with skip flags enabled."""
         # Create the actual directory structure that the config references
@@ -509,7 +636,6 @@ class TestDeployWithConfig:
         mock_publish.assert_not_called()
         mock_unpublish.assert_not_called()
 
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_missing_file(self):
         """Test deployment with missing config file."""
         with pytest.raises(ConfigValidationError, match="Configuration file not found"):
@@ -518,7 +644,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_with_token_credential(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with custom token credential."""
         # Mark unused mocks to avoid linting warnings
@@ -562,7 +687,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_with_config_override(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with config override."""
         # Create the actual directory structure that the config references
@@ -609,7 +733,6 @@ class TestDeployWithConfig:
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
     def test_deploy_with_config_shortcut_exclude_regex(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
         """Test deployment with shortcut_exclude_regex in config."""
         # Create the actual directory structure that the config references
@@ -643,11 +766,93 @@ class TestDeployWithConfig:
             mock_workspace_instance,
             item_name_exclude_regex=None,
             folder_path_exclude_regex=None,
+            folder_path_to_include=None,
             items_to_include=None,
             shortcut_exclude_regex="^temp_.*",
         )
         # Verify unpublish was also called (but without shortcut_exclude_regex since it's publish-only)
         mock_unpublish.assert_called_once()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_folder_path_to_include_passed_to_publish(self, _mock_unpublish, mock_publish, mock_workspace, tmp_path):  # noqa: PT019
+        """Test that folder_path_to_include from config is passed to publish_all_items."""
+        test_repo_dir = tmp_path / "repo"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": "11111111-1111-1111-1111-111111111111",
+                "repository_directory": str(test_repo_dir),
+            },
+            "publish": {
+                "folder_path_to_include": ["/my/folder/path"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        deploy_with_config(str(config_file), "dev")
+
+        call_args = mock_publish.call_args[1]
+        assert call_args["folder_path_to_include"] == ["/my/folder/path"]
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_folder_path_to_include_defaults_to_none(self, _mock_unpublish, mock_publish, mock_workspace, tmp_path):  # noqa: PT019
+        """Test that folder_path_to_include defaults to None when not specified."""
+        test_repo_dir = tmp_path / "repo"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": "11111111-1111-1111-1111-111111111111",
+                "repository_directory": str(test_repo_dir),
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        deploy_with_config(str(config_file), "dev")
+
+        call_args = mock_publish.call_args[1]
+        assert call_args["folder_path_to_include"] is None
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_folder_path_to_include_environment_specific(self, _mock_unpublish, mock_publish, mock_workspace, tmp_path):  # noqa: PT019
+        """Test that folder_path_to_include resolves environment-specific values."""
+        test_repo_dir = tmp_path / "repo"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {
+                    "dev": "11111111-1111-1111-1111-111111111111",
+                    "prod": "22222222-2222-2222-2222-222222222222",
+                },
+                "repository_directory": str(test_repo_dir),
+            },
+            "publish": {
+                "folder_path_to_include": {"dev": ["/dev/folder"], "prod": ["/prod/folder"]},
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        deploy_with_config(str(config_file), "dev")
+
+        call_args = mock_publish.call_args[1]
+        assert call_args["folder_path_to_include"] == ["/dev/folder"]
 
 
 class TestConfigIntegration:
@@ -683,7 +888,8 @@ class TestConfigIntegration:
 
                 extract_publish_settings(config, test_env)
                 extract_unpublish_settings(config, test_env)
-                apply_config_overrides(config, test_env)
+                with config_overrides_scope(config, test_env):
+                    pass
 
     def test_config_validation_comprehensive(self, tmp_path):
         """Test comprehensive config validation with all sections."""
@@ -745,33 +951,33 @@ class TestConfigUtilsExtractSettings:
         """Test extracting publish settings with folder_exclude_regex."""
         config = {
             "publish": {
-                "folder_exclude_regex": "^DONT_DEPLOY_FOLDER/",
+                "folder_exclude_regex": "^/DONT_DEPLOY_FOLDER",
             }
         }
 
         settings = extract_publish_settings(config, "dev")
-        assert settings["folder_exclude_regex"] == "^DONT_DEPLOY_FOLDER/"
+        assert settings["folder_exclude_regex"] == "^/DONT_DEPLOY_FOLDER"
 
     def test_extract_publish_settings_with_environment_specific_folder_exclude_regex(self):
         """Test extracting publish settings with environment-specific folder_exclude_regex."""
         config = {
             "publish": {
-                "folder_exclude_regex": {"dev": "^DEV_FOLDER/", "prod": "^PROD_FOLDER/"},
+                "folder_exclude_regex": {"dev": "^/DEV_FOLDER", "prod": "^/PROD_FOLDER"},
             }
         }
 
         settings = extract_publish_settings(config, "dev")
-        assert settings["folder_exclude_regex"] == "^DEV_FOLDER/"
+        assert settings["folder_exclude_regex"] == "^/DEV_FOLDER"
 
         settings = extract_publish_settings(config, "prod")
-        assert settings["folder_exclude_regex"] == "^PROD_FOLDER/"
+        assert settings["folder_exclude_regex"] == "^/PROD_FOLDER"
 
     def test_extract_publish_settings_missing_environment_skips_setting(self):
         """Test that missing environment in optional publish settings skips the setting."""
         config = {
             "publish": {
                 "exclude_regex": {"dev": "^DEV.*"},  # Only dev defined
-                "folder_exclude_regex": {"dev": "^DEV_FOLDER/"},  # Only dev defined
+                "folder_exclude_regex": {"dev": "^/DEV_FOLDER"},  # Only dev defined
             }
         }
 
@@ -861,6 +1067,42 @@ class TestConfigUtilsExtractSettings:
         settings = extract_publish_settings(config, "prod")
         assert "items_to_include" not in settings
 
+    def test_extract_publish_settings_folder_path_to_include_list(self):
+        """Test extract_publish_settings returns folder_path_to_include as a list."""
+        config = {
+            "publish": {
+                "folder_path_to_include": ["/my/folder/path"],
+            },
+        }
+        result = extract_publish_settings(config, "dev")
+        assert result["folder_path_to_include"] == ["/my/folder/path"]
+
+    def test_extract_publish_settings_folder_path_to_include_env_specific(self):
+        """Test extract_publish_settings resolves folder_path_to_include per environment."""
+        config = {
+            "publish": {
+                "folder_path_to_include": {"dev": ["/dev/folder"], "prod": ["/prod/folder"]},
+            },
+        }
+        result = extract_publish_settings(config, "dev")
+        assert result["folder_path_to_include"] == ["/dev/folder"]
+
+    def test_extract_publish_settings_folder_path_to_include_missing(self):
+        """Test extract_publish_settings defaults folder_path_to_include to None."""
+        config = {
+            "publish": {
+                "exclude_regex": "^SKIP.*",
+            },
+        }
+        settings = extract_publish_settings(config, "dev")
+        assert "folder_path_to_include" not in settings
+
+    def test_extract_publish_settings_no_publish_section_folder_path_to_include(self):
+        """Test extract_publish_settings defaults folder_path_to_include to None when no publish section."""
+        config = {}
+        settings = extract_publish_settings(config, "dev")
+        assert "folder_path_to_include" not in settings
+
 
 class TestGetConfigValue:
     """Test the get_config_value utility function."""
@@ -912,3 +1154,291 @@ class TestGetConfigValue:
         config = {"key": True}
         result = get_config_value(config, "key", "dev")
         assert result is True
+
+
+class TestDeploymentResult:
+    """Test DeploymentResult and DeploymentStatus types."""
+
+    def test_deployment_status_enum_values(self):
+        """Test DeploymentStatus enum has expected values."""
+        assert DeploymentStatus.COMPLETED.value == "completed"
+
+    def test_deployment_result_structure(self):
+        """Test DeploymentResult structure."""
+        result = DeploymentResult(
+            status=DeploymentStatus.COMPLETED,
+            message="Test message",
+        )
+        assert result.status == DeploymentStatus.COMPLETED
+        assert result.message == "Test message"
+
+
+class TestDeployWithConfigReturnValue:
+    """Test deploy_with_config returns DeploymentResult."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_returns_deployment_result(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that deploy_with_config returns a DeploymentResult on success."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify result is a DeploymentResult
+        assert isinstance(result, DeploymentResult)
+        assert result.status == DeploymentStatus.COMPLETED
+        assert "completed successfully" in result.message
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_returns_completed_when_skipping_operations(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that deploy_with_config returns COMPLETED status even when skipping operations."""
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file with skip flags
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "88888888-8888-8888-8888-888888888888"},
+                "repository_directory": "test/path",
+            },
+            "publish": {
+                "skip": {"dev": True},
+            },
+            "unpublish": {
+                "skip": {"dev": True},
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Verify result is a DeploymentResult with COMPLETED status
+        assert isinstance(result, DeploymentResult)
+        assert result.status == DeploymentStatus.COMPLETED
+
+        # Verify that publish and unpublish are NOT called due to skip flags
+        mock_publish.assert_not_called()
+        mock_unpublish.assert_not_called()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
+    def test_deploy_with_config_result_status_and_message(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that DeploymentResult has correct status and message attributes."""
+        # Mark unused mocks to avoid linting warnings
+        _ = mock_unpublish
+        _ = mock_publish
+
+        # Create the actual directory structure that the config references
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        # Create test config file
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "99999999-9999-9999-9999-999999999999"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        # Mock workspace instance
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        # Execute deployment
+        result = deploy_with_config(str(config_file), "dev")
+
+        # Test result status checks
+        assert result.status == DeploymentStatus.COMPLETED
+
+        # Test string representation for output
+        assert result.status.value == "completed"
+        assert isinstance(result.message, str)
+
+        # Test equality comparison
+        is_success = result.status == DeploymentStatus.COMPLETED
+        assert is_success is True
+
+
+class TestDeployWithConfigFailures:
+    """Test deploy_with_config raises exceptions properly on failure."""
+
+    def test_deploy_with_config_invalid_yaml_raises_input_error(self, tmp_path):
+        """Test that deploy_with_config raises InputError for invalid YAML syntax."""
+        config_file = tmp_path / "invalid.yml"
+        config_file.write_text("invalid: yaml: content: [")
+
+        with pytest.raises(InputError, match="Invalid YAML syntax"):
+            deploy_with_config(str(config_file), "dev")
+
+    def test_deploy_with_config_missing_core_raises_config_validation_error(self, tmp_path):
+        """Test that deploy_with_config raises ConfigValidationError when core section is missing."""
+        config_data = {"publish": {"skip": True}}
+        config_file = tmp_path / "no_core.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(ConfigValidationError, match="must contain a 'core' section"):
+            deploy_with_config(str(config_file), "dev")
+
+    def test_deploy_with_config_missing_environment_raises_config_validation_error(self, tmp_path):
+        """Test that deploy_with_config raises ConfigValidationError when environment is not in workspace mappings."""
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "12345678-1234-1234-1234-123456789abc"},
+                "repository_directory": "test/path",
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(ConfigValidationError, match="Environment 'prod' not found"):
+            deploy_with_config(str(config_file), "prod")
+
+    def test_deploy_with_config_missing_workspace_id_raises_config_validation_error(self, tmp_path):
+        """Test that deploy_with_config raises ConfigValidationError when workspace_id is missing."""
+        config_data = {
+            "core": {
+                "repository_directory": "test/path",
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(ConfigValidationError, match="must specify either 'workspace_id' or 'workspace'"):
+            deploy_with_config(str(config_file), "dev")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_publish_error_propagates(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that PublishError from publish_all_items propagates through deploy_with_config."""
+        _ = mock_unpublish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_publish.side_effect = PublishError(
+            errors=[("FailedNotebook", RuntimeError("API call failed"))],
+            logger=MagicMock(),
+        )
+
+        with pytest.raises(PublishError, match="Failed to publish 1 item"):
+            deploy_with_config(str(config_file), "dev")
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_workspace_creation_error_propagates(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that exceptions from FabricWorkspace constructor propagate through deploy_with_config."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.side_effect = Exception("Workspace initialization failed")
+
+        with pytest.raises(Exception, match="Workspace initialization failed"):
+            deploy_with_config(str(config_file), "dev")
+
+        mock_publish.assert_not_called()
+        mock_unpublish.assert_not_called()
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_unpublish_error_propagates(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that exceptions from unpublish_all_orphan_items propagate and publish was already called."""
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_unpublish.side_effect = RuntimeError("Unpublish operation failed")
+
+        with pytest.raises(RuntimeError, match="Unpublish operation failed"):
+            deploy_with_config(str(config_file), "dev")
+
+        # Verify publish was called successfully before unpublish failed
+        mock_publish.assert_called_once()
