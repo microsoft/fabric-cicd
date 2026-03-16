@@ -17,7 +17,24 @@ from fabric_cicd.fabric_workspace import FabricWorkspace, constants
 def mock_endpoint():
     """Mock FabricEndpoint to avoid real API calls."""
     mock = MagicMock()
-    mock.invoke.return_value = {"body": {"value": []}}
+
+    def mock_invoke(method, url, body=None, **_kwargs):
+        if method == "POST" and url.endswith("/items"):
+            return {
+                "body": {
+                    "id": "mock-item-id-12345",
+                    "workspaceId": "mock-workspace-id",
+                    "displayName": body.get("displayName", "Test Item") if body else "Test Item",
+                    "type": body.get("type", "Unknown") if body else "Unknown",
+                }
+            }
+        if method == "POST" and "updateDefinition" in url:
+            return {"body": {"message": "Definition updated successfully"}}
+        if method == "PATCH" and "items/" in url:
+            return {"body": {"message": "Item metadata updated successfully"}}
+        return {"body": {"value": []}}
+
+    mock.invoke.side_effect = mock_invoke
     mock.upn_auth = True
     return mock
 
@@ -1560,3 +1577,83 @@ def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_
     assert workspace.repository_items["Notebook"]["Exported Notebook"].logical_id == constants.DEFAULT_GUID
     assert workspace.repository_items["Notebook"]["Git Notebook"].logical_id == unique_logical_id
     assert workspace.repository_items["DataPipeline"]["Exported Pipeline"].logical_id == constants.DEFAULT_GUID
+
+def test_publish_variable_library_only_calls_replace_parameters(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """Test that Variable Library items only have _replace_parameters called, not logical ID or workspace ID replacement."""
+    workspace = patched_fabric_workspace(valid_workspace_id, str(temp_workspace_dir))
+
+    mock_file = MagicMock()
+    mock_file.relative_path = "valueSets/Default.json"
+    mock_file.type = "text"
+    mock_file.file_path = Path("valueSets/Default.json")
+    mock_file.contents = '{"key": "value", "workspace": "00000000-0000-0000-0000-000000000000"}'
+    mock_file.base64_payload = {"path": "valueSets/Default.json", "payloadType": "InlineBase64"}
+
+    mock_item = MagicMock()
+    mock_item.guid = None
+    mock_item.folder_id = ""
+    mock_item.folder_path = ""
+    mock_item.description = ""
+    mock_item.logical_id = "test-logical-id"
+    mock_item.item_files = [mock_file]
+    mock_item.skip_publish = False
+    mock_item.type = "VariableLibrary"
+    mock_item.name = "TestVars"
+
+    workspace.repository_items = {"VariableLibrary": {"TestVars": mock_item}}
+    workspace.deployed_items = {}
+
+    with (
+        patch.object(workspace, "_replace_logical_ids", wraps=workspace._replace_logical_ids) as mock_logical,
+        patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents) as mock_params,
+        patch.object(workspace, "_replace_workspace_ids", wraps=workspace._replace_workspace_ids) as mock_ws,
+    ):
+        workspace._publish_item(item_name="TestVars", item_type="VariableLibrary")
+
+        # _replace_parameters should be called
+        mock_params.assert_called_once()
+        # _replace_logical_ids and _replace_workspace_ids should NOT be called
+        mock_logical.assert_not_called()
+        mock_ws.assert_not_called()
+
+
+def test_publish_non_variable_library_calls_all_replacements(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """Test that non-Variable Library items still go through the full replacement pipeline."""
+    workspace = patched_fabric_workspace(valid_workspace_id, str(temp_workspace_dir))
+
+    mock_file = MagicMock()
+    mock_file.relative_path = "notebook-content.py"
+    mock_file.type = "text"
+    mock_file.file_path = Path("notebook-content.py")
+    mock_file.contents = "print('hello')"
+    mock_file.base64_payload = {"path": "notebook-content.py", "payloadType": "InlineBase64"}
+
+    mock_item = MagicMock()
+    mock_item.guid = None
+    mock_item.folder_id = ""
+    mock_item.folder_path = ""
+    mock_item.description = ""
+    mock_item.logical_id = "test-logical-id"
+    mock_item.item_files = [mock_file]
+    mock_item.skip_publish = False
+    mock_item.type = "Notebook"
+    mock_item.name = "TestNotebook"
+
+    workspace.repository_items = {"Notebook": {"TestNotebook": mock_item}}
+    workspace.deployed_items = {}
+
+    with (
+        patch.object(workspace, "_replace_logical_ids", side_effect=lambda x: x) as mock_logical,
+        patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents) as mock_params,
+        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda x: x) as mock_ws,
+    ):
+        workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
+
+        # All three replacement methods should be called
+        mock_logical.assert_called_once()
+        mock_params.assert_called_once()
+        mock_ws.assert_called_once()

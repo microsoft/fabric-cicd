@@ -1,0 +1,8 @@
+kind: fixed
+body: Prevent unintended GUID replacements in Variable Library item files during publish
+time: 2026-03-16T15:36:30.7161217+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "884"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/884
