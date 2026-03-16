@@ -16,7 +16,7 @@ import fabric_cicd.publish as publish
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._items._notebook import NotebookPublisher
-from fabric_cicd.constants import API_FORMAT_MAPPING, ItemType
+from fabric_cicd.constants import API_FORMAT_MAPPING, EXCLUDE_PATH_REGEX_MAPPING, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 # =============================================================================
@@ -749,9 +749,11 @@ class TestNotebookPublisher:
         publisher.publish_one("test_notebook", item)
 
         expected_api_format = API_FORMAT_MAPPING.get(ItemType.NOTEBOOK.value)
+        expected_exclude_path = EXCLUDE_PATH_REGEX_MAPPING.get(ItemType.NOTEBOOK.value)
         mock_workspace._publish_item.assert_called_once_with(
             item_name="test_notebook",
             item_type=ItemType.NOTEBOOK.value,
+            exclude_path=expected_exclude_path,
             api_format=expected_api_format,
         )
 
@@ -761,9 +763,11 @@ class TestNotebookPublisher:
 
         publisher.publish_one("test_notebook", item)
 
+        expected_exclude_path = EXCLUDE_PATH_REGEX_MAPPING.get(ItemType.NOTEBOOK.value)
         mock_workspace._publish_item.assert_called_once_with(
             item_name="test_notebook",
             item_type=ItemType.NOTEBOOK.value,
+            exclude_path=expected_exclude_path,
         )
 
     def test_publish_mixed_files_with_ipynb(self, publisher, mock_workspace):
@@ -779,10 +783,42 @@ class TestNotebookPublisher:
         publisher.publish_one("test_notebook", mock_item)
 
         expected_api_format = API_FORMAT_MAPPING.get(ItemType.NOTEBOOK.value)
+        expected_exclude_path = EXCLUDE_PATH_REGEX_MAPPING.get(ItemType.NOTEBOOK.value)
         mock_workspace._publish_item.assert_called_once_with(
             item_name="test_notebook",
             item_type=ItemType.NOTEBOOK.value,
+            exclude_path=expected_exclude_path,
             api_format=expected_api_format,
+        )
+
+    def test_notebook_settings_json_excluded_from_publish(self, publisher, mock_workspace):
+        """Test that notebook-settings.json is excluded from the publish payload.
+
+        Fixes: https://github.com/microsoft/fabric-cicd/issues/869
+        When a .py notebook contains a notebook-settings.json file, the Fabric API
+        py-to-ipynb converter cannot handle .json files and raises an error. The
+        exclude_path pattern for Notebook items ensures this file is always filtered out.
+        """
+        mock_file_py = MagicMock()
+        mock_file_py.file_path = Path("notebook-content.py")
+        mock_file_settings = MagicMock()
+        mock_file_settings.file_path = Path("notebook-settings.json")
+
+        mock_item = MagicMock()
+        mock_item.item_files = [mock_file_py, mock_file_settings]
+
+        publisher.publish_one("test_notebook", mock_item)
+
+        expected_exclude_path = EXCLUDE_PATH_REGEX_MAPPING.get(ItemType.NOTEBOOK.value)
+        # Verify the exclude_path is passed and matches notebook-settings.json
+        assert expected_exclude_path is not None
+        import re
+
+        assert re.match(expected_exclude_path, "notebook-settings.json") is not None
+        mock_workspace._publish_item.assert_called_once_with(
+            item_name="test_notebook",
+            item_type=ItemType.NOTEBOOK.value,
+            exclude_path=expected_exclude_path,
         )
 
     def test_item_type_is_notebook(self, publisher):

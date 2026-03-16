@@ -5,7 +5,7 @@
 
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
-from fabric_cicd.constants import API_FORMAT_MAPPING, ItemType
+from fabric_cicd.constants import API_FORMAT_MAPPING, EXCLUDE_PATH_REGEX_MAPPING, ItemType
 
 
 class NotebookPublisher(ItemPublisher):
@@ -26,5 +26,6 @@ class NotebookPublisher(ItemPublisher):
         self.fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=self.item_type,
+            exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
             **kwargs,
         )
