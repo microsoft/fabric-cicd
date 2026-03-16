@@ -1,0 +1,8 @@
+kind: added
+body: Improve transparency of `deploy_with_config` function in success and failure scenarios
+time: 2026-03-12T11:38:03.0656028+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "695"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/695

@@ -531,6 +531,83 @@ class TestConfigOverrides:
         assert original_url == constants.DEFAULT_API_ROOT_URL
 
 
+class TestConfigOverridesIntegration:
+    """Integration tests for config_overrides_scope with deploy_with_config."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_response_collection_via_config_features(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that enable_response_collection set in config features enables response collection."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+            "features": ["enable_response_collection"],
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        result = deploy_with_config(str(config_file), "dev")
+
+        assert isinstance(result, DeploymentResult)
+        assert result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+
+        # Verify feature flag was restored after scope exit
+        assert "enable_response_collection" not in constants.FEATURE_FLAG
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_failure_with_partial_responses_via_config_features(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that partial responses are attached to exceptions when enable_response_collection is set via config."""
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+            "features": ["enable_response_collection"],
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        mock_unpublish.side_effect = RuntimeError("Unpublish failed")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        e = exc_info.value
+        assert hasattr(e, "deployment_result")
+        assert e.deployment_result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+
+        # Verify feature flag was restored after scope exit
+        assert "enable_response_collection" not in constants.FEATURE_FLAG
+
+
 class TestDeployWithConfig:
     """Test the main deploy_with_config function."""
 
@@ -1159,18 +1236,47 @@ class TestGetConfigValue:
 class TestDeploymentResult:
     """Test DeploymentResult and DeploymentStatus types."""
 
-    def test_deployment_status_enum_values(self):
-        """Test DeploymentStatus enum has expected values."""
+    def test_deployment_status_completed_value(self):
+        """Test DeploymentStatus.COMPLETED has expected value."""
         assert DeploymentStatus.COMPLETED.value == "completed"
 
+    def test_deployment_status_failed_value(self):
+        """Test DeploymentStatus.FAILED has expected value."""
+        assert DeploymentStatus.FAILED.value == "failed"
+
+    def test_deployment_status_string_comparison(self):
+        """Test DeploymentStatus supports string comparison via str inheritance."""
+        assert DeploymentStatus.COMPLETED == "completed"
+        assert DeploymentStatus.FAILED == "failed"
+
     def test_deployment_result_structure(self):
-        """Test DeploymentResult structure."""
+        """Test DeploymentResult fields are set correctly."""
         result = DeploymentResult(
             status=DeploymentStatus.COMPLETED,
             message="Test message",
         )
         assert result.status == DeploymentStatus.COMPLETED
         assert result.message == "Test message"
+
+    def test_deployment_result_responses_defaults_to_none(self):
+        """Test DeploymentResult.responses defaults to None when not provided."""
+        result = DeploymentResult(
+            status=DeploymentStatus.COMPLETED,
+            message="Test message",
+        )
+        assert result.responses is None
+
+    def test_deployment_result_with_responses(self):
+        """Test DeploymentResult stores responses when provided."""
+        responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        result = DeploymentResult(
+            status=DeploymentStatus.FAILED,
+            message="Deployment failed",
+            responses=responses,
+        )
+        assert result.status == DeploymentStatus.FAILED
+        assert result.message == "Deployment failed"
+        assert result.responses == responses
 
 
 class TestDeployWithConfigReturnValue:
@@ -1256,49 +1362,6 @@ class TestDeployWithConfigReturnValue:
         # Verify that publish and unpublish are NOT called due to skip flags
         mock_publish.assert_not_called()
         mock_unpublish.assert_not_called()
-
-    @patch("fabric_cicd.publish.FabricWorkspace")
-    @patch("fabric_cicd.publish.publish_all_items")
-    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
-    @patch("fabric_cicd.constants.FEATURE_FLAG", set(["enable_experimental_features", "enable_config_deploy"]))
-    def test_deploy_with_config_result_status_and_message(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
-        """Test that DeploymentResult has correct status and message attributes."""
-        # Mark unused mocks to avoid linting warnings
-        _ = mock_unpublish
-        _ = mock_publish
-
-        # Create the actual directory structure that the config references
-        test_repo_dir = tmp_path / "test" / "path"
-        test_repo_dir.mkdir(parents=True)
-
-        # Create test config file
-        config_data = {
-            "core": {
-                "workspace_id": {"dev": "99999999-9999-9999-9999-999999999999"},
-                "repository_directory": "test/path",
-            },
-        }
-        config_file = tmp_path / "config.yml"
-        with Path.open(config_file, "w") as f:
-            yaml.dump(config_data, f)
-
-        # Mock workspace instance
-        mock_workspace_instance = MagicMock()
-        mock_workspace.return_value = mock_workspace_instance
-
-        # Execute deployment
-        result = deploy_with_config(str(config_file), "dev")
-
-        # Test result status checks
-        assert result.status == DeploymentStatus.COMPLETED
-
-        # Test string representation for output
-        assert result.status.value == "completed"
-        assert isinstance(result.message, str)
-
-        # Test equality comparison
-        is_success = result.status == DeploymentStatus.COMPLETED
-        assert is_success is True
 
 
 class TestDeployWithConfigFailures:
@@ -1442,3 +1505,229 @@ class TestDeployWithConfigFailures:
 
         # Verify publish was called successfully before unpublish failed
         mock_publish.assert_called_once()
+
+
+class TestDeployWithConfigExceptionAttributes:
+    """Test that deploy_with_config attaches deployment attributes to exceptions."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_exception_has_deployment_status_and_message(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that raised exceptions have deployment_status and deployment_message attributes."""
+        _ = mock_unpublish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_publish.side_effect = RuntimeError("Something broke")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        e = exc_info.value
+        assert hasattr(e, "deployment_result")
+        assert e.deployment_result.status == DeploymentStatus.FAILED
+        assert "Something broke" in e.deployment_result.message
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch(
+        "fabric_cicd.constants.FEATURE_FLAG",
+        set(["enable_experimental_features", "enable_config_deploy", "enable_response_collection"]),
+    )
+    def test_exception_has_partial_responses_when_enabled(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that partial responses are attached to exceptions when response collection is enabled."""
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        mock_unpublish.side_effect = RuntimeError("Unpublish failed")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        e = exc_info.value
+        assert hasattr(e, "deployment_result")
+        assert e.deployment_result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_exception_no_responses_when_flag_disabled(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that responses are not attached to exceptions when response collection is disabled."""
+        _ = mock_unpublish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace.return_value = MagicMock()
+        mock_publish.side_effect = RuntimeError("Publish failed")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        e = exc_info.value
+        assert hasattr(e, "deployment_result")
+        assert e.deployment_result.responses is None
+
+    def test_pre_workspace_failure_has_deployment_attributes(self, tmp_path):
+        """Test that failures before workspace creation still have deployment attributes."""
+        config_file = tmp_path / "invalid.yml"
+        config_file.write_text("invalid: yaml: content: [")
+
+        with pytest.raises(InputError) as exc_info:
+            deploy_with_config(str(config_file), "dev")
+
+        e = exc_info.value
+        assert hasattr(e, "deployment_result")
+        assert e.deployment_result.status == DeploymentStatus.FAILED
+        assert e.deployment_result.message is not None
+        assert e.deployment_result.responses is None
+
+
+class TestDeployWithConfigResponseCollection:
+    """Test deploy_with_config response collection integration."""
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch(
+        "fabric_cicd.constants.FEATURE_FLAG",
+        set(["enable_experimental_features", "enable_config_deploy", "enable_response_collection"]),
+    )
+    def test_result_responses_is_dict_when_enabled(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that result.responses is a dict (not string) when response collection is enabled."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        result = deploy_with_config(str(config_file), "dev")
+
+        assert isinstance(result, DeploymentResult)
+        assert isinstance(result.responses, dict)
+        assert result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch(
+        "fabric_cicd.constants.FEATURE_FLAG",
+        set(["enable_experimental_features", "enable_config_deploy"]),
+    )
+    def test_result_responses_is_none_when_disabled(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
+        """Test that result.responses is None when response collection is not enabled."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace.return_value = mock_workspace_instance
+
+        result = deploy_with_config(str(config_file), "dev")
+
+        assert isinstance(result, DeploymentResult)
+        assert result.responses is None
+
+
+class TestCollectResponses:
+    """Test the _collect_responses helper function."""
+
+    def test_returns_none_when_responses_disabled(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {"Notebook": {"nb1": {"body": {}}}}
+        assert _collect_responses(workspace, responses_enabled=False) is None
+
+    def test_returns_none_when_workspace_is_none(self):
+        from fabric_cicd.publish import _collect_responses
+
+        assert _collect_responses(None, responses_enabled=True) is None
+
+    def test_returns_none_when_responses_empty_dict(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {}
+        assert _collect_responses(workspace, responses_enabled=True) is None
+
+    def test_returns_responses_when_available(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+        result = _collect_responses(workspace, responses_enabled=True)
+        assert result == {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+
+    def test_returns_none_when_responses_is_none(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = None
+        assert _collect_responses(workspace, responses_enabled=True) is None
