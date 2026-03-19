@@ -188,8 +188,8 @@ def test_check_valid_yaml_content_with_invalid_yaml():
 
 def test_check_valid_yaml_content_with_empty_string():
     """Test check_valid_yaml_content with empty string."""
-    # Empty string is valid YAML (represents null/empty document)
-    assert check_valid_yaml_content("") is True
+    # Empty string parses as None, not a structured YAML mapping/sequence
+    assert check_valid_yaml_content("") is False
 
 
 def test_check_valid_yaml_content_with_spark_compute_structure():
@@ -245,3 +245,48 @@ number: 123
 """
     assert check_valid_yaml_content(yaml_only_content) is True
     assert check_valid_json_content(yaml_only_content) is False
+
+
+def test_check_valid_yaml_content_with_notebook_py_content():
+    """Test that notebook .py files with # comments are not treated as valid YAML."""
+    notebook_content = """# Fabric notebook source
+
+# METADATA ********************
+
+# META {
+# META   "kernel_info": {
+# META     "name": "synapse_pyspark"
+# META   }
+# META }
+
+# CELL ********************
+
+print("hello world")
+"""
+    assert check_valid_yaml_content(notebook_content) is False
+
+
+def test_check_valid_yaml_content_with_kql_content():
+    """Test that KQL script files are not treated as valid YAML."""
+    kql_content = """// KQL script
+// Use management commands to configure your database items.
+
+.create-merge table YellowTaxi (vendorID:string, tpepPickupDateTime:datetime)
+.create-or-alter table YellowTaxi ingestion json mapping 'YellowTaxi_mapping'
+"""
+    assert check_valid_yaml_content(kql_content) is False
+
+
+def test_check_valid_yaml_content_with_plain_python_content():
+    """Test that plain Python files (e.g., SparkJobDefinition) are not treated as valid YAML."""
+    python_content = """from pyspark.sql import SparkSession
+import logging
+
+logger = logging.getLogger(__name__)
+
+if __name__ == "__main__":
+    spark = SparkSession.builder.appName("test").getOrCreate()
+    df = spark.read.format("delta").load("Tables/my_table")
+    df.show()
+"""
+    assert check_valid_yaml_content(python_content) is False
