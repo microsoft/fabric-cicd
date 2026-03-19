@@ -1578,6 +1578,7 @@ def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_
     assert workspace.repository_items["Notebook"]["Git Notebook"].logical_id == unique_logical_id
     assert workspace.repository_items["DataPipeline"]["Exported Pipeline"].logical_id == constants.DEFAULT_GUID
 
+
 def test_publish_variable_library_only_calls_replace_parameters(
     temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
 ):
