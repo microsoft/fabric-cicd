@@ -355,11 +355,21 @@ class ItemPublisher(Publisher):
         Get the items to publish for this item type.
 
         Returns:
-            Dictionary mapping item names to Item objects.
+            Dictionary mapping item names to Item objects, pre-filtered by
+            items_to_include when set so that only relevant items are iterated.
 
         Subclasses can override to filter or transform the items.
         """
-        return self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+        all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+        items_to_include = self.fabric_workspace_obj.items_to_include
+        if not items_to_include:
+            return all_items
+        normalized_include_set = {i.lower() for i in items_to_include}
+        return {
+            name: item
+            for name, item in all_items.items()
+            if f"{name}.{self.item_type}".lower() in normalized_include_set
+        }
 
     def get_unpublish_order(self, items_to_unpublish: list[str]) -> list[str]:
         """

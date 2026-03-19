@@ -100,6 +100,40 @@ Shortcuts are items associated with Lakehouse items and can be selectively publi
 
 **Note:** This feature can be applied along with the other selective deployment features — please be cautious when using to avoid unexpected results.
 
+## Git-Based Change Detection
+
+`get_changed_items()` is a public utility function that uses `git diff` to detect which Fabric items have been added, modified, or renamed relative to a given git reference. It returns a list of strings in `"item_name.item_type"` format that can be passed directly to `items_to_include` in `publish_all_items()`.
+
+This function **does not require any feature flags** because it is a standalone utility — the filtering decision stays with the caller.
+
+**Important:** If `get_changed_items()` returns an empty list (no changes detected), do not call `publish_all_items()` without an explicit `items_to_include` list, as this would default to a full deployment. Always guard against the empty-list case:
+
+```python
+from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
+
+workspace = FabricWorkspace(
+    workspace_id="your-workspace-id",
+    repository_directory="/path/to/repo",
+    item_type_in_scope=["Notebook", "DataPipeline"]
+)
+
+changed = get_changed_items(workspace.repository_directory)
+
+if changed:
+    # Requires enable_experimental_features and enable_items_to_include flags
+    publish_all_items(workspace, items_to_include=changed)
+else:
+    print("No changed items detected — skipping deployment.")
+```
+
+To compare against a branch or a specific commit instead of the previous commit, pass a custom `git_compare_ref`:
+
+```python
+changed = get_changed_items(workspace.repository_directory, git_compare_ref="main")
+```
+
+**Note:** `get_changed_items()` returns only items that were **modified or added** (i.e., candidates for publishing). It does not return deleted items. Passing `items_to_include` to `publish_all_items()` requires enabling the `enable_experimental_features` and `enable_items_to_include` feature flags.
+
 ## Debugging
 
 If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal. The logs can also be found in the `fabric_cicd.error.log` file.
