@@ -783,9 +783,8 @@ class FabricWorkspace:
 
             # Store response if responses are being tracked
             if self.unpublish_responses is not None and api_response:
-                if item_type not in self.unpublish_responses:
-                    self.unpublish_responses[item_type] = {}
-                self.unpublish_responses[item_type][item_name] = api_response
+                self.unpublish_responses.setdefault(item_type, {})[item_name] = api_response
+
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}")
 
