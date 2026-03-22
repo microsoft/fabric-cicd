@@ -61,7 +61,7 @@ Before proceeding, confirm all of the following. If any gate fails, **stop** —
 
 1. The item type must be supported in source control / Git integration. See [supported item types for Git integration](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/item-definition-overview).
 2. The Fabric API must support deployment for the item type — either full definition deployment or shell-only creation (like Lakehouse/Warehouse). Search the [Fabric REST API docs](https://learn.microsoft.com/en-us/rest/api/fabric/) to confirm.
-3. The Fabric API must support service principal (SPN) authentication for the item type's deployment operations. fabric-cicd is primarily used in CI/CD pipelines where SPN is the standard authentication method.
+3. The Fabric API must support service principal (SPN) authentication for the item type's deployment operations. fabric-cicd is primarily used in CI/CD pipelines where SPN is the standard authentication method. Check the item type's page in the [Fabric REST API docs](https://learn.microsoft.com/en-us/rest/api/fabric/) — supported authentication types are listed per API operation.
 
 **Exceptions:** Gates 1 and 3 may be excepted on a case-by-case basis with fabric-cicd team approval — for example, Notebook `.ipynb` format is supported despite not being source-controlled (gate 1 exception). Gate 2 (API deployment support) has no exceptions. Any approved exception must be documented as a known limitation in `docs/how_to/item_types.md`.
 
@@ -70,6 +70,8 @@ Before proceeding, confirm all of the following. If any gate fails, **stop** —
 ## Integration Checklist
 
 Every new item type requires changes across multiple files in a specific order. Walk the contributor through each step:
+
+> **Note:** These steps cover all known integration patterns. A new item type may introduce requirements not covered here — such as new API behaviors, custom authentication flows, or novel deployment patterns. If you encounter something that doesn't fit the steps below, **stop and ask the requestor** rather than improvising.
 
 ### Step 1 — Register the Item Type in Constants
 
