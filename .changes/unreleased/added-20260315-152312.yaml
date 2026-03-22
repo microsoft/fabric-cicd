@@ -1,0 +1,8 @@
+kind: added
+body: Extend API response collection to unpublish operations
+time: 2026-03-15T15:23:12.619996+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "877"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/877

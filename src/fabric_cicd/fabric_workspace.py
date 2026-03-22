@@ -133,6 +133,7 @@ class FabricWorkspace:
         self.shortcut_exclude_regex = None
         self.items_to_include = None
         self.responses = None
+        self.unpublish_responses = None
         self.repository_folders = {}
         self.repository_items = {}
         self.deployed_folders = {}
@@ -777,8 +778,13 @@ class FabricWorkspace:
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
-            self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
+            api_response = self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
             logger.info(f"{constants.INDENT}Unpublished {item_type} '{item_name}'")
+
+            # Store response if responses are being tracked
+            if self.unpublish_responses is not None and api_response:
+                self.unpublish_responses.setdefault(item_type, {})[item_name] = api_response
+
         except Exception as e:
             logger.warning(f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}")
 
