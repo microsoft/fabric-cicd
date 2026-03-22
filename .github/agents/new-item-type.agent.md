@@ -201,7 +201,10 @@ Update the `ItemPublisher.create()` factory method — add an import for the new
 
 **Directory:** `tests/`
 
-Create or update test files for the new item type. Key test files: `tests/test_publish.py`, `tests/test_integration_publish.py`, `tests/test_fabric_workspace.py`. See `tests/fixtures/` for test data patterns.
+Create or update test files for the new item type:
+
+- **Unit tests:** Add tests in `tests/test_publish.py` using the `create_test_item()` helper to create item data inline. For publisher-specific behavior, see `tests/test_environment_publish.py` as an example.
+- **Integration tests:** Add the item type to `sample/workspace/` and to the `item_types_to_deploy` list in `tests/test_integration_publish.py`. The HTTP trace (`tests/fixtures/http_trace.json.gz`) must be regenerated against a real Fabric workspace — see `tests/fixtures/README.md`. This step requires human intervention.
 
 **Rules:**
 
@@ -235,7 +238,7 @@ If helpful, add sample workspace item files showing the expected directory struc
 
 ## Patterns and Reference Examples
 
-Use this table to determine which steps apply and which existing publishers to study. Patterns are additive — a single item type may combine multiple rows. Read the example files for implementation details.
+Use this table to determine which additional steps apply and which existing publishers to study. Patterns are additive — a single item type may combine multiple rows. Steps 5 (documentation) and 6 (optional samples) apply to all patterns. Read the example files for implementation details.
 
 | Pattern                          | Steps Required  | Example Files                                       | Key Details                                                                       |
 | -------------------------------- | --------------- | --------------------------------------------------- | --------------------------------------------------------------------------------- |
