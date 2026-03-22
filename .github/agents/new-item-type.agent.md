@@ -3,15 +3,13 @@ name: New Item Type
 description: Guide and assist with onboarding a new Microsoft Fabric item type into fabric-cicd
 argument-hint: Tell me which Fabric item type you want to add (e.g., "Add support for Ontology")
 tools:
-    [
-        "runInTerminal",
-        "terminalLastCommand",
-        "search",
-        "fetch",
-        "readFile",
-        "editFiles",
-        "createFile",
-    ]
+    - runInTerminal
+    - terminalLastCommand
+    - search
+    - fetch
+    - readFile
+    - editFiles
+    - createFile
 ---
 
 # New Item Type Onboarding Agent
@@ -203,7 +201,7 @@ Update the `ItemPublisher.create()` factory method — add an import for the new
 
 **Directory:** `tests/`
 
-Create or update test files to cover the new item type. Follow existing test patterns in `tests/`.
+Create or update test files for the new item type. Key test files: `tests/test_publish.py`, `tests/test_integration_publish.py`, `tests/test_fabric_workspace.py`. See `tests/fixtures/` for test data patterns.
 
 **Rules:**
 
@@ -271,6 +269,7 @@ After completing all steps, verify:
 - [ ] Import works: `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"`
 - [ ] All tests pass: `uv run pytest -v`
 - [ ] Formatting and linting pass: `uv run ruff format` and `uv run ruff check`
+- [ ] PR title follows the required format (see `copilot-instructions.md` — e.g., "Closes #123 - Add support for NewType")
 
 ---
 
