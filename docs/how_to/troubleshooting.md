@@ -10,7 +10,7 @@ fabric-cicd includes a debug logging feature that provides detailed visibility i
 
 **Default Behavior:**
 
-- Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings and errors
+- Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings, and errors
 - The `fabric_cicd.error.log` file will contain the same lines printed to the console along with stack traces for any errors
 
 **Enabling Debug Logging:**
@@ -129,7 +129,12 @@ Traceback (most recent call last):
 
 **Solution**:
 
-1. Verify you're logged in with Azure CLI or Az.Accounts PowerShell module:
+1. Use explicit credential methods: fabric-cicd **requires explicit authentication**. Choose the appropriate method for your scenario:
+    - Local development: Use `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
+    - CI/CD pipelines: Use `ManagedIdentityCredential` for Azure-hosted runners or `ClientSecretCredential` for service principals
+    - Fabric Notebooks: Authentication is handled automatically within the Fabric runtime
+
+2. Verify authentication setup:
     ```bash
     az login
     ```
@@ -137,8 +142,11 @@ Traceback (most recent call last):
     ```powershell
     Connect-AzAccount
     ```
-2. Check that your account has appropriate permissions on the target workspace
-3. If using Service Principal authentication, verify client ID, secret, and tenant ID are correct
+3. Check permissions: ensure your account has appropriate permissions on the target workspace
+
+4. For Service Principal authentication: verify client ID, secret, and tenant ID are correct
+
+5. See detailed examples: refer to [authentication examples](../example/authentication.md) for platform-specific implementation guidance
 
 #### Item Deployment Failures
 
@@ -184,13 +192,13 @@ The `devtools/` directory contains pre-built scripts to help test and validate d
 
 **Key Configuration Options**:
 
-| Configuration          | Description                                                        | Required |
-| ---------------------- | ------------------------------------------------------------------ | -------- |
-| `workspace_id`         | Target Fabric workspace ID                                         | Yes      |
-| `environment`          | Target environment (used for parameterization)                     | No       |
-| `repository_directory` | Path to Fabric workspace items files (absolute or relative path)   | Yes      |
-| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)    | No       |
-| `token_credential`     | Service Principal credentials (defaults to DefaultAzureCredential) | No       |
+| Configuration          | Description                                                      | Required |
+| ---------------------- | ---------------------------------------------------------------- | -------- |
+| `workspace_id`         | Target Fabric workspace ID                                       | Yes      |
+| `environment`          | Target environment (used for parameterization)                   | No       |
+| `repository_directory` | Path to Fabric workspace items files (absolute or relative path) | Yes      |
+| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)  | No       |
+| `token_credential`     | Explicit credential method (`AzureCliCredential`, etc.)          | Yes      |
 
 **Quick Start**:
 
@@ -216,13 +224,27 @@ repository_directory = "sample/workspace"
 # Deploy only specific item types
 item_type_in_scope = ["Environment", "Notebook", "DataPipeline"]
 
-# Use Service Principal authentication
+# Authentication examples - choose one:
+
+# For local development with Azure CLI
+from azure.identity import AzureCliCredential
+token_credential = AzureCliCredential()
+
+# For local development with Azure PowerShell
+from azure.identity import AzurePowerShellCredential
+token_credential = AzurePowerShellCredential()
+
+# For CI/CD with Service Principal
 from azure.identity import ClientSecretCredential
 token_credential = ClientSecretCredential(
     client_id="your-client-id",
     client_secret="your-client-secret",
     tenant_id="your-tenant-id"
 )
+
+# For Azure-hosted runners with Managed Identity
+from azure.identity import ManagedIdentityCredential
+token_credential = ManagedIdentityCredential()
 
 # Override constant value
 constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
@@ -238,7 +260,7 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 | ------------------ | ----------------------------------------------------------------------------------- | -------- |
 | `config_file`      | Path to your `config.yml` file                                                      | Yes      |
 | `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
-| `token_credential` | Service Principal credentials (defaults to DefaultAzureCredential)                  | No       |
+| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)                             | Yes      |
 | `config_override`  | Dictionary to override configuration values within `config.yml`                     | No       |
 
 **Quick Start**:
@@ -285,7 +307,7 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 | `api_url`          | Full API endpoint URL                                               | Yes      |
 | `method`           | HTTP method (GET, POST, DELETE, PATCH)                              | Yes      |
 | `body`             | Request payload (for POST/PATCH)                                    | Varies   |
-| `token_credential` | Service Principal credentials (defaults to DefaultAzureCredential)  | No       |
+| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)             | Yes      |
 | other              | View `invoke()` in `FabricEndpoint` class for additional parameters | No       |
 
 **Quick Start**:
@@ -318,6 +340,7 @@ If you're still experiencing issues after following this guide:
 
 ## Additional Resources
 
+- [Authentication Examples](../example/authentication.md) - Comprehensive authentication implementation examples
 - [Contribution Guide](https://github.com/microsoft/fabric-cicd/blob/main/CONTRIBUTING.md) - Setup instructions and PR requirements
 - [Feature Flags](optional_feature.md#feature-flags) - Available feature flags for advanced scenarios
 - [Getting Started](getting_started.md) - Basic installation and authentication

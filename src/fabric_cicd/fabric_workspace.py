@@ -104,7 +104,8 @@ class FabricWorkspace:
             if _is_fabric_runtime():
                 token_credential = _generate_fabric_credential()
             else:
-                # if credential is not defined, use DefaultAzureCredential
+                logger.warning("DefaultAzureCredential fallback is deprecated and will be removed in the next release.")
+                logger.warning("Please provide an explicit token_credential.")
                 from azure.identity import DefaultAzureCredential
 
                 token_credential = DefaultAzureCredential()
