@@ -44,6 +44,7 @@ from fabric_cicd import FabricWorkspace
 token_credential = AzureCliCredential()
 workspace = FabricWorkspace(
     workspace_id="your-id",
+    repository_directory="/path/to/workspace/items",
     token_credential=token_credential
 )
 ```
@@ -58,8 +59,9 @@ from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan
 
 # Initialize workspace
 token_credential = AzureCliCredential()
+# Initialize workspace (supports either workspace_id OR workspace_name)
 workspace = FabricWorkspace(
-    workspace_id="your-workspace-id",
+    workspace_id="your-workspace-id",  # Alternative: workspace_name="your-workspace-name"
     environment="DEV",
     repository_directory="/path/to/workspace/items",
     item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
@@ -78,13 +80,15 @@ unpublish_all_orphan_items(workspace)
 Alternative: `deploy_with_config()` centralizes deployment settings in YAML.
 
 ```python
+from azure.identity import AzureCliCredential
 from fabric_cicd import deploy_with_config
-result = deploy_with_config(config_file_path="config.yml", environment="dev")
+token_credential = AzureCliCredential()
+result = deploy_with_config(config_file_path="config.yml", environment="dev", token_credential=token_credential)
 ```
 
 **Implementation files:**
 
-- Entry point: `deploy_with_config()` in `src/fabric_cicd/publish.py`
+- Entry points: `deploy_with_config()`, `publish_all_items()`, `unpublish_all_orphan_items()` in `src/fabric_cicd/publish.py`
 - Config utilities: `src/fabric_cicd/_common/_config_utils.py` (loading, extraction)
 - Config validation: `src/fabric_cicd/_common/_config_validator.py`
 - Documentation: `docs/how_to/config_deployment.md`
@@ -96,6 +100,7 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 /
 ├── .github/workflows/    # CI/CD pipelines (test.yml, validate.yml, bump.yml)
 ├── docs/                # Documentation source files
+├── docs/example/        # CI/CD scenario patterns (Azure DevOps, GitHub Actions, local development)
 ├── sample/              # Example workspace structure and items
 ├── src/fabric_cicd/     # Main library source code
 ├── tests/               # Test files
@@ -171,6 +176,7 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 - **Import errors**: Use `uv run python` prefix to ensure virtual environment
 - **Test pollution**: Azure credentials interfering - ensure proper mocking
 - **Setup failures**: Run `uv sync --dev` if modules missing
+- **Formatting issues**: Run `uv run ruff format` to auto-fix most issues
 - **CI failures**: Missing format/lint step in validation workflow
 
 **Authentication Strategy for Agents:**
@@ -187,6 +193,7 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 - `src/fabric_cicd/fabric_workspace.py` - Main workspace management class
 - `src/fabric_cicd/publish.py` - Main deployment entry points
 - `src/fabric_cicd/_items/` - Publisher classes for all item types
+- `src/fabric_cicd/_common/` - Config utilities, validation, and exceptions
 
 **Configuration Files:**
 
