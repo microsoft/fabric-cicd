@@ -6,7 +6,7 @@
 import sys
 from pathlib import Path
 
-from azure.identity import ClientSecretCredential
+from azure.identity import AzureCliCredential, AzurePowerShellCredential, ClientSecretCredential
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
@@ -18,6 +18,12 @@ from fabric_cicd import append_feature_flag, change_log_level, deploy_with_confi
 
 # In this example, the config file sits within the root/sample/workspace directory
 config_file = str(root_directory / "sample" / "workspace" / "config.yml")
+
+# Azure CLI auth - comment out to use a different auth method
+token_credential = AzureCliCredential()
+
+# Uncomment to use PowerShell auth
+# token_credential = AzurePowerShellCredential()
 
 # Uncomment to use SPN auth
 # client_id = "your-client-id"
@@ -31,8 +37,8 @@ deploy_with_config(
     config_file_path=config_file,
     # Comment out if environment is not needed
     environment="dev",
-    # Uncomment to use SPN auth
-    # token_credential=token_credential,
+    # Explicit token credential required for auth (choose one of the options above)
+    token_credential=token_credential,
     # Uncomment to override specific config values (pass in a dictionary of override values)
     # config_override=config_override_dict
 )
