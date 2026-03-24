@@ -13,9 +13,9 @@ Always reference these instructions first and fallback to search or bash command
 | Setup        | `pip install uv && uv sync --dev` (NEVER CANCEL)                                         | 120+s   |
 | Test         | `uv run pytest -v` (NEVER CANCEL)                                                        | 120+s   |
 | Import check | `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"` | 30s     |
-| Format       | `uv run ruff format` (Apply formatting fixes)                                            | 60s     |
+| Format       | `uv run ruff format` (Fix formatting issues)                                             | 60s     |
 | Lint check   | `uv run ruff check` (Check for linting issues)                                           | 60s     |
-| Format check | `uv run ruff format --check` (Check if formatting needed)                                | 60s     |
+| Format check | `uv run ruff format --check` (Verify formatting is correct)                              | 60s     |
 | Docs build   | `uv run mkdocs build --clean` (Build documentation)                                      | 60s     |
 | Docs serve   | `uv run mkdocs serve` (Start local documentation server)                                 | 60s     |
 
@@ -23,7 +23,7 @@ Always reference these instructions first and fallback to search or bash command
 
 1. Import check → 2. Run tests → 3. Format code → 4. Check linting → 5. Commit
 
-**Critical**: NEVER cancel build/test commands. CI (.github/workflows/validate.yml) will fail if validation workflow incomplete.
+**Critical**: NEVER cancel build/test commands. CI (`.github/workflows/validate.yml`) will fail if validation workflow incomplete.
 
 ## Authentication
 
@@ -41,10 +41,10 @@ Must provide explicit `token_credential` parameter to `FabricWorkspace`.
 from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace
 
-credential = AzureCliCredential()
+token_credential = AzureCliCredential()
 workspace = FabricWorkspace(
     workspace_id="your-id",
-    token_credential=credential
+    token_credential=token_credential
 )
 ```
 
@@ -57,13 +57,13 @@ from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 # Initialize workspace
-credential = AzureCliCredential()
+token_credential = AzureCliCredential()
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     environment="DEV",
     repository_directory="/path/to/workspace/items",
     item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
-    token_credential=credential
+    token_credential=token_credential
 )
 
 # Deploy items
@@ -118,13 +118,19 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 
 - **Adding constants**: Add to `ItemType` enum + `SERIAL_ITEM_PUBLISH_ORDER`
 - **Adding publisher**: Extend `ItemPublisher` + register in `_base_publisher.py` factory
-- **Testing**: Always mock external calls to prevent test pollution, use `requests_mock` for Azure APIs, and `tmpdir` for files
 
-### Core Files Requiring Tests
+### Testing Guidelines
 
-- `src/fabric_cicd/constants.py` - Version and configuration constants
-- `src/fabric_cicd/fabric_workspace.py` - Main workspace management class
-- Any new publisher classes in `src/fabric_cicd/_items/`
+**Always add/update tests for:**
+
+- New functionality or features
+- Bug fixes that change behavior
+- Core logic changes in any module
+- Publisher classes and deployment logic
+- Configuration and validation logic
+- API integrations and external calls
+
+**Testing approach**: Mock all external dependencies, use `requests_mock` for Azure APIs, `tmpdir` for file operations. Focus on testing business logic, error handling, and integration points.
 
 ### Files to Avoid Modifying
 
@@ -173,10 +179,20 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 2. For publish operations: Use `AzureCliCredential()` (If `CredentialUnavailableError` occurs, user needs to run `az login` first)
 3. Context: Import check works without auth, but publish operations require credentials
 
-## Key Files Reference
+## Key Files to Monitor
+
+**Core System Files:**
 
 - `src/fabric_cicd/constants.py` - Version and configuration constants
 - `src/fabric_cicd/fabric_workspace.py` - Main workspace management class
+- `src/fabric_cicd/publish.py` - Main deployment entry points
+- `src/fabric_cicd/_items/` - Publisher classes for all item types
+
+**Configuration Files:**
+
 - `pyproject.toml` - Project dependencies and configuration
-- `sample/workspace/` - Example Microsoft Fabric item structures
 - `sample/workspace/parameter.yml` - Environment-specific parameter template
+
+**Project Structure:**
+
+- `sample/workspace/` - Example Microsoft Fabric item structures
