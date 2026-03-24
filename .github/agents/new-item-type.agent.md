@@ -14,17 +14,7 @@ tools:
 
 # New Item Type Onboarding Agent
 
-You are an expert at onboarding new Microsoft Fabric item types into the `fabric-cicd` Python library. You guide contributors through every integration point, generate the correct code, and validate completeness.
-
-> **Important:** If you are unsure about any detail — such as whether the item type supports definitions, has unique deployment requirements, depends on other item types, or requires parameterization — **always ask the requestor for clarification before proceeding**. Do not guess or assume. It is better to pause and confirm than to generate incorrect code.
-
-## When to Use This Agent
-
-Use this agent when you need to:
-
-- Add support for a brand-new Fabric item type (e.g., `Ontology`, `Map`)
-- Understand what files need to change to register a new item type
-- Generate the boilerplate code for a new item type end-to-end
+> **Important:** If you are unsure about any detail — such as whether the item type supports definitions, has unique deployment requirements, depends on other item types, or requires parameterization — **always ask the requestor for clarification before proceeding**. List the specific unknowns and ask the requestor to confirm each one before continuing.
 
 ## Prerequisites
 
@@ -34,11 +24,11 @@ Before starting, gather the following information about the new item type:
 
 | Information                                                | Example           | Required |
 | ---------------------------------------------------------- | ----------------- | -------- |
-| **Display name** (PascalCase, as used by Fabric API)       | `CopyJob`         | ✅       |
-| **Supported in source control / Git integration**          | Yes / No          | ✅       |
-| **Fabric API supports deployment** (create/update via API) | Yes / No          | ✅       |
-| **Deployment type** (full definition or shell-only)        | Full / Shell-only | ✅       |
-| **Supports service principal (SPN) authentication**        | Yes / No          | ✅       |
+| **Display name** (PascalCase, as used by Fabric API)       | `CopyJob`         | Yes      |
+| **Supported in source control / Git integration**          | Yes / No          | Yes      |
+| **Fabric API supports deployment** (create/update via API) | Yes / No          | Yes      |
+| **Deployment type** (full definition or shell-only)        | Full / Shell-only | Yes      |
+| **Supports service principal (SPN) authentication**        | Yes / No          | Yes      |
 
 ### Additional Details (gather when relevant to the item type)
 
@@ -62,6 +52,32 @@ Before proceeding, confirm all of the following. If any gate fails, **stop** —
 3. The Fabric API must support service principal (SPN) authentication for the item type's deployment operations. fabric-cicd is primarily used in CI/CD pipelines where SPN is the standard authentication method. Check the item type's page in the [Fabric REST API docs](https://learn.microsoft.com/en-us/rest/api/fabric/) — supported authentication types are listed per API operation.
 
 **Exceptions:** Gates 1 and 3 may be excepted on a case-by-case basis with fabric-cicd team approval — for example, Notebook `.ipynb` format is supported despite not being source-controlled (gate 1 exception). Gate 2 (API deployment support) has no exceptions. Any approved exception must be documented as a known limitation in `docs/how_to/item_types.md`.
+
+---
+
+## Safety Rules
+
+- **Never hardcode secrets, tokens, or credentials** in publisher code or tests
+- **Use deterministic test data** — no real tenant IDs, workspace IDs, or user emails
+- **Follow existing patterns** — consistency is more important than cleverness
+- **Validate all assumptions** — if unsure about API behavior, ask the requestor
+- **Run the full validation suite** before considering the task complete:
+    - `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"`
+    - `uv run pytest -v`
+    - `uv run ruff format`
+    - `uv run ruff check`
+
+---
+
+## Workflow Phases
+
+This process has distinct phases that must be completed sequentially:
+
+1. **Information Gathering**: Complete ALL prerequisites and eligibility gates above
+2. **Validation**: Confirm all eligibility gates pass — if any gate fails, STOP
+3. **Implementation**: Only after phases 1-2 are complete, proceed to the Integration Checklist
+
+**Critical**: Do not begin Step 1 of the Integration Checklist until you have gathered all required information and confirmed eligibility gates pass.
 
 ---
 
@@ -238,41 +254,49 @@ If helpful, add sample workspace item files showing the expected directory struc
 
 ## Patterns and Reference Examples
 
-Use this table to determine which additional steps apply and which existing publishers to study. Patterns are additive — a single item type may combine multiple rows. Steps 5 (documentation) and 6 (optional samples) apply to all patterns. Read the example files for implementation details.
+**Default workflow**: All item types require steps 1a, 1b, 2, 3, 4, 5, 6. Use this table to determine which optional steps (1c, 1d, 1e, 1f, 1g) to skip based on your item type's characteristics. Read the example files for implementation details.
 
-| Pattern                          | Steps Required  | Example Files                                       | Key Details                                                                       |
-| -------------------------------- | --------------- | --------------------------------------------------- | --------------------------------------------------------------------------------- |
-| **Simple** (no special behavior) | 1a–1b, 2, 3, 4  | `_graphqlapi.py`, `_copyjob.py`                     | Default publish behavior, no overrides needed                                     |
-| **Exclude paths**                | + 1d            | `_dataagent.py`, `_eventhouse.py`                   | Override `publish_one()` to pass `exclude_path`                                   |
-| **API format**                   | + 1e            | `_notebook.py`                                      | Override `publish_one()` to pass `api_format`                                     |
-| **Custom file processing**       | (override only) | `_report.py`, `_kqldashboard.py`, `_kqlqueryset.py` | Define `func_process_file` callback, pass to `_publish_item()`                    |
-| **Shell-only** (metadata only)   | + 1c            | `_warehouse.py`, `_lakehouse.py`                    | May need creation payload logic in `publish_one()`                                |
-| **Destructive unpublish**        | + 1f            | `_lakehouse.py`, `_eventhouse.py`                   | Add new `FeatureFlag` enum member                                                 |
-| **Intra-type dependencies**      | + 1g            | `_datapipeline.py`, `_dataflowgen2.py`              | Set `has_dependency_tracking`, `ParallelConfig`, override `get_unpublish_order()` |
-| **Post-publish actions**         | (override only) | `_semanticmodel.py`                                 | Override `post_publish_all()`                                                     |
-| **Async publish check**          | (override only) | `_environment.py`                                   | Set `has_async_publish_check = True`, override `post_publish_all_check()`         |
+| Pattern                          | Skip Steps         | Example Files                                       | Key Details                                                                                    |
+| -------------------------------- | ------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Simple** (no special behavior) | 1c, 1d, 1e, 1f, 1g | `_graphqlapi.py`, `_copyjob.py`                     | Default publish behavior, no overrides needed                                                  |
+| **Exclude paths**                | 1c, 1e, 1f, 1g     | `_dataagent.py`, `_eventhouse.py`                   | Override `publish_one()` to pass `exclude_path` — do step 1d                                   |
+| **API format**                   | 1c, 1d, 1f, 1g     | `_notebook.py`                                      | Override `publish_one()` to pass `api_format` — do step 1e                                     |
+| **Custom file processing**       | 1c, 1d, 1e, 1f, 1g | `_report.py`, `_kqldashboard.py`, `_kqlqueryset.py` | Define `func_process_file` callback, pass to `_publish_item()`                                 |
+| **Shell-only** (metadata only)   | 1d, 1e, 1f, 1g     | `_warehouse.py`, `_lakehouse.py`                    | May need creation payload logic in `publish_one()` — do step 1c                                |
+| **Destructive unpublish**        | 1c, 1d, 1e, 1g     | `_lakehouse.py`, `_eventhouse.py`                   | Add new `FeatureFlag` enum member — do step 1f                                                 |
+| **Intra-type dependencies**      | 1c, 1d, 1e, 1f     | `_datapipeline.py`, `_dataflowgen2.py`              | Set `has_dependency_tracking`, `ParallelConfig`, override `get_unpublish_order()` — do step 1g |
+| **Post-publish actions**         | 1c, 1d, 1e, 1f, 1g | `_semanticmodel.py`                                 | Override `post_publish_all()`                                                                  |
+| **Async publish check**          | 1c, 1d, 1e, 1f, 1g | `_environment.py`                                   | Set `has_async_publish_check = True`, override `post_publish_all_check()`                      |
+
+**Combined patterns**: If your item type needs multiple patterns, skip only steps that appear in ALL applicable Skip Steps columns.
+
+**Example combinations:**
+
+- **Shell-only + Destructive unpublish**: Skip 1d, 1e, 1g (common to both) — do steps 1a, 1b, 1c, 1f, 2, 3, 4, 5, 6
+- **Exclude paths + API format**: Skip 1c, 1f, 1g (common to both) — do steps 1a, 1b, 1d, 1e, 2, 3, 4, 5, 6
 
 ---
 
 ## Validation Checklist
 
-After completing all steps, verify:
+After completing all steps, run these verification commands:
 
-- [ ] `ItemType.NEW_TYPE` exists in the enum (Step 1a)
-- [ ] `SERIAL_ITEM_PUBLISH_ORDER` includes the new type in the correct dependency position (Step 1b)
-- [ ] `SHELL_ONLY_PUBLISH` includes the new type if it has no definition deployment (Step 1c)
-- [ ] `EXCLUDE_PATH_REGEX_MAPPING` includes the new type if certain file paths within the item should be excluded during publish (Step 1d)
-- [ ] `API_FORMAT_MAPPING` includes the new type if a specific API format is needed (Step 1e)
-- [ ] `UNPUBLISH_FLAG_MAPPING` and `FeatureFlag` include the new type if unpublish is destructive (Step 1f)
-- [ ] `ITEM_TYPE_TO_FILE` includes the new type if using `_manage_dependencies.py` for intra-type dependency ordering (Step 1g)
-- [ ] Publisher class exists in `src/fabric_cicd/_items/` with correct `item_type` attribute (Step 2)
-- [ ] Publisher is registered in `ItemPublisher.create()` factory in `_base_publisher.py` (Step 3)
-- [ ] Tests exist and pass for the new item type (Step 4)
-- [ ] `docs/how_to/item_types.md` has a section for the new item type (Step 5b)
-- [ ] Import works: `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"`
-- [ ] All tests pass: `uv run pytest -v`
-- [ ] Formatting and linting pass: `uv run ruff format` and `uv run ruff check`
-- [ ] PR title follows the required format (see `copilot-instructions.md` — e.g., "Closes #123 - Add support for NewType")
+- [ ] `grep -n "NEW_TYPE.*=" src/fabric_cicd/constants.py` - verify enum member exists (Step 1a)
+- [ ] `grep -A 20 "SERIAL_ITEM_PUBLISH_ORDER" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify in publish order (Step 1b)
+- [ ] `grep -A 10 "SHELL_ONLY_PUBLISH" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify shell-only if applicable (Step 1c)
+- [ ] `grep -A 10 "EXCLUDE_PATH_REGEX_MAPPING" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify exclude paths if applicable (Step 1d)
+- [ ] `grep -A 10 "API_FORMAT_MAPPING" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify API format if applicable (Step 1e)
+- [ ] `grep -A 10 "UNPUBLISH_FLAG_MAPPING" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify unpublish flag if applicable (Step 1f)
+- [ ] `grep -A 10 "ITEM_TYPE_TO_FILE" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify dependency file mapping if applicable (Step 1g)
+- [ ] `find src/fabric_cicd/_items/ -name "_newtype.py" -exec grep -l "item_type.*NEW_TYPE" {} \;` - verify publisher class exists with correct item_type (Step 2)
+- [ ] `grep -n "NEW_TYPE" src/fabric_cicd/_items/_base_publisher.py` - verify factory registration (Step 3)
+- [ ] `find tests/ -name "*.py" -exec grep -l "NEW_TYPE\|NewType" {} \;` - verify tests exist for new item type (Step 4)
+- [ ] `grep -n "NEW_TYPE\|NewType" docs/how_to/item_types.md` - verify documentation section exists (Step 5b)
+- [ ] `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"` - verify import works
+- [ ] `uv run pytest -v` - verify all tests pass
+- [ ] `uv run ruff format` - verify formatting passes
+- [ ] `uv run ruff check` - verify linting passes
+- [ ] PR title follows required format: "Closes #123 - Add support for NewType" (see `copilot-instructions.md`)
 
 ---
 
@@ -293,15 +317,3 @@ After completing all steps, verify:
 | `sample/workspace/`                              | Example workspace item structures                               |
 
 ---
-
-## Safety Rules
-
-- **Never hardcode secrets, tokens, or credentials** in publisher code or tests
-- **Use deterministic test data** — no real tenant IDs, workspace IDs, or user emails
-- **Follow existing patterns** — consistency is more important than cleverness
-- **Validate all assumptions** — if unsure about API behavior, ask the requestor
-- **Run the full validation suite** before considering the task complete:
-    - `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"`
-    - `uv run pytest -v`
-    - `uv run ruff format`
-    - `uv run ruff check`
