@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix YAML content check to reject notebook and other non-YAML files during `key_value_replace` parameterization, preventing file corruption
+time: 2026-03-19T11:36:04.309303+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "890"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/890

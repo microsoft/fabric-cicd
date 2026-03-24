@@ -58,7 +58,8 @@ def publish_all_items(
         shortcut_exclude_regex: Regex pattern to exclude specific shortcuts from being published in lakehouses.
 
     Returns:
-        Dict containing all API responses if the "enable_response_collection" feature flag is enabled and responses were collected, otherwise None.
+        Dict containing all API responses if the ``enable_response_collection`` feature flag is enabled
+        and at least one response was collected; otherwise, None.
 
     folder_path_exclude_regex:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective deployments are
@@ -162,7 +163,7 @@ def publish_all_items(
         >>> responses = publish_all_items(workspace)
         >>> # Access all responses
         >>> print(responses)
-        >>> # Access individual item responses
+        >>> # Access individual item response (dict with "header", "body", "status_code" keys)
         >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
 
         With get_changed_items (deploy only git-changed items)
@@ -177,9 +178,10 @@ def publish_all_items(
         ...     publish_all_items(workspace, items_to_include=changed)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
 
     # Initialize response collection if feature flag is enabled
-    if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG:
+    if responses_enabled:
         fabric_workspace_obj.responses = {}
 
     # Check if workspace has assigned capacity, if not, exit
@@ -247,25 +249,25 @@ def publish_all_items(
         publisher.post_publish_all_check()
 
     # Return response data if feature flag is enabled and responses were collected
-    return (
-        fabric_workspace_obj.responses
-        if FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG and fabric_workspace_obj.responses
-        else None
-    )
+    return fabric_workspace_obj.responses if responses_enabled and fabric_workspace_obj.responses else None
 
 
 def unpublish_all_orphan_items(
     fabric_workspace_obj: FabricWorkspace,
     item_name_exclude_regex: str = "^$",
     items_to_include: Optional[list[str]] = None,
-) -> None:
+) -> Optional[dict]:
     """
     Unpublishes all orphaned items not present in the repository except for those matching the exclude regex.
 
     Args:
-        fabric_workspace_obj: The FabricWorkspace object containing the items to be published.
+        fabric_workspace_obj: The FabricWorkspace object containing the items to be unpublished.
         item_name_exclude_regex: Regex pattern to exclude specific items from being unpublished. Default is '^$' which will exclude nothing.
         items_to_include: List of items in the format "item_name.item_type" that should be unpublished.
+
+    Returns:
+        Dict containing all collected API responses if the ``enable_response_collection`` feature flag is enabled
+        and at least one response was collected; otherwise, None.
 
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing is not recommended due to item dependencies.
@@ -280,7 +282,7 @@ def unpublish_all_orphan_items(
         ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
         ... )
         >>> publish_all_items(workspace)
-        >>> unpublish_orphaned_items(workspace)
+        >>> unpublish_all_orphan_items(workspace)
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
@@ -291,7 +293,7 @@ def unpublish_all_orphan_items(
         ... )
         >>> publish_all_items(workspace)
         >>> exclude_regex = ".*_do_not_delete"
-        >>> unpublish_orphaned_items(workspace, item_name_exclude_regex=exclude_regex)
+        >>> unpublish_all_orphan_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, append_feature_flag
@@ -310,6 +312,12 @@ def unpublish_all_orphan_items(
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
     validate_items_to_include(items_to_include, operation=constants.OperationType.UNPUBLISH)
+
+    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
+
+    # Initialize response collection if feature flag is enabled
+    if responses_enabled:
+        fabric_workspace_obj.unpublish_responses = {}
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
@@ -339,6 +347,13 @@ def unpublish_all_orphan_items(
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         fabric_workspace_obj._unpublish_folders()
 
+    # Return response data if feature flag is enabled and responses were collected
+    return (
+        fabric_workspace_obj.unpublish_responses
+        if responses_enabled and fabric_workspace_obj.unpublish_responses
+        else None
+    )
+
 
 def deploy_with_config(
     config_file_path: str,
@@ -362,7 +377,8 @@ def deploy_with_config(
     Returns:
         DeploymentResult: A result object containing the deployment status, message, and
             responses (opt-in). The status will be DeploymentStatus.COMPLETED on success.
-            The responses field contains API response data when the
+            The responses field contains a dictionary with ``"publish"`` and/or ``"unpublish"``
+            keys mapping to their respective API response data when the
             ``enable_response_collection`` feature flag is enabled and responses were collected,
             otherwise None.
 
@@ -386,7 +402,7 @@ def deploy_with_config(
         ... )
         >>> print(result.status)    # DeploymentStatus.COMPLETED
         >>> print(result.message)   # "Deployment completed successfully"
-        >>> print(result.responses) # API responses if collected and feature flag enabled
+        >>> print(result.responses) # {"publish": {...}, "unpublish": {...}} or None
 
         With custom authentication
         >>> from fabric_cicd import deploy_with_config
@@ -426,7 +442,7 @@ def deploy_with_config(
         ...     )
         ...     print(result.status)    # DeploymentStatus.COMPLETED
         ...     print(result.message)   # "Deployment completed successfully"
-        ...     print(result.responses) # API responses if collected (feature flag enabled via config file)
+        ...     print(result.responses) # {"publish": {...}, "unpublish": {...}} or None
         ... except Exception as e:
         ...     print(e.deployment_result.status)    # DeploymentStatus.FAILED
         ...     print(e.deployment_result.message)   # Original error message

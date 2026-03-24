@@ -558,12 +558,13 @@ class TestConfigOverridesIntegration:
 
         mock_workspace_instance = MagicMock()
         mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace_instance.unpublish_responses = None
         mock_workspace.return_value = mock_workspace_instance
 
         result = deploy_with_config(str(config_file), "dev")
 
         assert isinstance(result, DeploymentResult)
-        assert result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        assert result.responses == {"publish": {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}}
 
         # Verify feature flag was restored after scope exit
         assert "enable_response_collection" not in constants.FEATURE_FLAG
@@ -593,6 +594,7 @@ class TestConfigOverridesIntegration:
 
         mock_workspace_instance = MagicMock()
         mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace_instance.unpublish_responses = None
         mock_workspace.return_value = mock_workspace_instance
 
         mock_unpublish.side_effect = RuntimeError("Unpublish failed")
@@ -602,7 +604,7 @@ class TestConfigOverridesIntegration:
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
-        assert e.deployment_result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        assert e.deployment_result.responses == {"publish": {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}}
 
         # Verify feature flag was restored after scope exit
         assert "enable_response_collection" not in constants.FEATURE_FLAG
@@ -1567,6 +1569,7 @@ class TestDeployWithConfigExceptionAttributes:
 
         mock_workspace_instance = MagicMock()
         mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace_instance.unpublish_responses = None
         mock_workspace.return_value = mock_workspace_instance
 
         mock_unpublish.side_effect = RuntimeError("Unpublish failed")
@@ -1576,7 +1579,7 @@ class TestDeployWithConfigExceptionAttributes:
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
-        assert e.deployment_result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        assert e.deployment_result.responses == {"publish": {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}}
 
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
@@ -1653,13 +1656,54 @@ class TestDeployWithConfigResponseCollection:
 
         mock_workspace_instance = MagicMock()
         mock_workspace_instance.responses = {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        mock_workspace_instance.unpublish_responses = None
         mock_workspace.return_value = mock_workspace_instance
 
         result = deploy_with_config(str(config_file), "dev")
 
         assert isinstance(result, DeploymentResult)
         assert isinstance(result.responses, dict)
-        assert result.responses == {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}
+        assert result.responses == {"publish": {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}}
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    @patch(
+        "fabric_cicd.constants.FEATURE_FLAG",
+        set(["enable_experimental_features", "enable_config_deploy", "enable_response_collection"]),
+    )
+    def test_result_responses_contains_both_publish_and_unpublish(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path
+    ):
+        """Test that result.responses contains both publish and unpublish keys when both are collected."""
+        _ = mock_unpublish
+        _ = mock_publish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+        mock_workspace_instance.unpublish_responses = {"Notebook": {"nb2": {"body": {"id": "456"}}}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        result = deploy_with_config(str(config_file), "dev")
+
+        assert isinstance(result, DeploymentResult)
+        assert result.responses == {
+            "publish": {"Notebook": {"nb1": {"body": {"id": "123"}}}},
+            "unpublish": {"Notebook": {"nb2": {"body": {"id": "456"}}}},
+        }
 
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
@@ -1710,24 +1754,64 @@ class TestCollectResponses:
 
         assert _collect_responses(None, responses_enabled=True) is None
 
-    def test_returns_none_when_responses_empty_dict(self):
+    def test_returns_none_when_both_responses_empty_dict(self):
         from fabric_cicd.publish import _collect_responses
 
         workspace = MagicMock()
         workspace.responses = {}
+        workspace.unpublish_responses = {}
         assert _collect_responses(workspace, responses_enabled=True) is None
 
-    def test_returns_responses_when_available(self):
-        from fabric_cicd.publish import _collect_responses
-
-        workspace = MagicMock()
-        workspace.responses = {"Notebook": {"nb1": {"body": {"id": "123"}}}}
-        result = _collect_responses(workspace, responses_enabled=True)
-        assert result == {"Notebook": {"nb1": {"body": {"id": "123"}}}}
-
-    def test_returns_none_when_responses_is_none(self):
+    def test_returns_none_when_both_responses_none(self):
         from fabric_cicd.publish import _collect_responses
 
         workspace = MagicMock()
         workspace.responses = None
+        workspace.unpublish_responses = None
         assert _collect_responses(workspace, responses_enabled=True) is None
+
+    def test_returns_none_when_responses_empty_and_unpublish_none(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {}
+        workspace.unpublish_responses = None
+        assert _collect_responses(workspace, responses_enabled=True) is None
+
+    def test_returns_none_when_responses_none_and_unpublish_empty(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = None
+        workspace.unpublish_responses = {}
+        assert _collect_responses(workspace, responses_enabled=True) is None
+
+    def test_returns_publish_only_when_publish_available(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+        workspace.unpublish_responses = None
+        result = _collect_responses(workspace, responses_enabled=True)
+        assert result == {"publish": {"Notebook": {"nb1": {"body": {"id": "123"}}}}}
+
+    def test_returns_unpublish_only_when_unpublish_available(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = None
+        workspace.unpublish_responses = {"Notebook": {"nb1": {"body": {"id": "456"}}}}
+        result = _collect_responses(workspace, responses_enabled=True)
+        assert result == {"unpublish": {"Notebook": {"nb1": {"body": {"id": "456"}}}}}
+
+    def test_returns_both_when_both_available(self):
+        from fabric_cicd.publish import _collect_responses
+
+        workspace = MagicMock()
+        workspace.responses = {"Notebook": {"nb1": {"body": {"id": "123"}}}}
+        workspace.unpublish_responses = {"Notebook": {"nb2": {"body": {"id": "456"}}}}
+        result = _collect_responses(workspace, responses_enabled=True)
+        assert result == {
+            "publish": {"Notebook": {"nb1": {"body": {"id": "123"}}}},
+            "unpublish": {"Notebook": {"nb2": {"body": {"id": "456"}}}},
+        }
