@@ -148,16 +148,16 @@ def check_valid_json_content(content: str) -> bool:
 
 def check_valid_yaml_content(content: str) -> bool:
     """
-    Check if the given string content is valid YAML.
+    Check if the given string content is valid structured YAML (mapping or sequence).
 
     Args:
         content: The string content to validate as YAML.
 
     Returns:
-        bool: True if the content is valid YAML, False otherwise.
+        bool: True if the content parses as a YAML mapping or sequence, False otherwise.
     """
     try:
-        yaml.safe_load(content)
-        return True
+        result = yaml.safe_load(content)
+        return isinstance(result, (dict, list))
     except yaml.YAMLError:
         return False

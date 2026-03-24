@@ -147,13 +147,6 @@ spark_pool:
 
 Semantic model binding automatically connects semantic models to the appropriate data source connection (e.g., cloud or gateway/on-premises) after deployment, ensuring your models can refresh data in the target environment.
 
-**Important:** 
-
-- The legacy `gateway_binding` parameter is deprecated and will be removed in a future release.
-- The legacy `semantic_model_binding` parameter format is deprecated and will be removed in a future release. Please migrate to the recommended format below.
-
-**Recommended format:**
-
 ```yaml
 semantic_model_binding:
     # Default connection for all models not explicitly listed
@@ -174,18 +167,6 @@ semantic_model_binding:
         - semantic_model_name: ["<semantic_model_name1>", "<semantic_model_name2>", ...]
           connection_id:
               _ALL_: <connection_guid>
-```
-
-**Legacy format:**
-
-```yaml
-# Legacy format:
-semantic_model_binding:
-    - connection_id: <connection_guid>
-      # Required field: value must be a string or a list of strings
-      semantic_model_name: "<semantic_model_name>"
-      # OR
-      semantic_model_name: ["<semantic_model_name1>","<semantic_model_name2>", ...]
 ```
 
 **Notes:**

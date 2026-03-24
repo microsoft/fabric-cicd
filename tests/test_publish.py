@@ -101,19 +101,6 @@ def create_test_item(base_path: Path, folder: Optional[str], name: str, item_typ
     return item_dir
 
 
-@pytest.fixture
-def patched_workspace(mock_endpoint):
-    """Context manager to patch FabricWorkspace dependencies."""
-    with (
-        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
-        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
-        patch.object(
-            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
-        ),
-    ):
-        yield
-
-
 # =============================================================================
 # Basic Publishing Tests
 # =============================================================================
@@ -313,6 +300,190 @@ def test_unpublish_with_feature_flags_enabled(mock_endpoint, temp_workspace_dir,
         constants.FEATURE_FLAG.update(original_flags)
 
 
+def test_unpublish_orphan_item_is_deleted(mock_endpoint, temp_workspace_dir):
+    """Test that unpublish_all_orphan_items deletes an orphaned item not in the repository."""
+    create_test_item(temp_workspace_dir, None, "KeepMe", "Notebook", "keep-me-id")
+
+    orphan_deployed = {
+        "Notebook": {
+            "KeepMe": MagicMock(guid="keep-guid"),
+            "OrphanNotebook": MagicMock(guid="orphan-guid-123"),
+        }
+    }
+    orphan_repo = {"Notebook": {"KeepMe": MagicMock()}}
+
+    unpublish_calls = []
+
+    def track_unpublish(_self, item_name, item_type):
+        unpublish_calls.append((item_name, item_type))
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_deployed_items",
+            new=lambda self: setattr(self, "deployed_items", orphan_deployed),
+        ),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_repository_items",
+            new=lambda self: setattr(self, "repository_items", orphan_repo),
+        ),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch.object(FabricWorkspace, "_unpublish_folders", new=lambda _: None),
+        patch.object(FabricWorkspace, "_unpublish_item", new=track_unpublish),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+        publish.unpublish_all_orphan_items(workspace)
+
+        assert len(unpublish_calls) == 1
+        assert unpublish_calls[0] == ("OrphanNotebook", "Notebook")
+
+
+def test_unpublish_orphan_excluded_by_regex(mock_endpoint, temp_workspace_dir):
+    """Test that orphaned items matching the exclude regex are NOT unpublished."""
+    create_test_item(temp_workspace_dir, None, "KeepMe", "Notebook", "keep-me-id")
+
+    orphan_deployed = {
+        "Notebook": {
+            "KeepMe": MagicMock(guid="keep-guid"),
+            "ProtectedOrphan": MagicMock(guid="protected-guid"),
+            "DeleteMe": MagicMock(guid="delete-guid"),
+        }
+    }
+    orphan_repo = {"Notebook": {"KeepMe": MagicMock()}}
+
+    unpublish_calls = []
+
+    def track_unpublish(_self, item_name, item_type):
+        unpublish_calls.append((item_name, item_type))
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_deployed_items",
+            new=lambda self: setattr(self, "deployed_items", orphan_deployed),
+        ),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_repository_items",
+            new=lambda self: setattr(self, "repository_items", orphan_repo),
+        ),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch.object(FabricWorkspace, "_unpublish_folders", new=lambda _: None),
+        patch.object(FabricWorkspace, "_unpublish_item", new=track_unpublish),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+        publish.unpublish_all_orphan_items(workspace, item_name_exclude_regex=r"^Protected.*")
+
+        assert ("DeleteMe", "Notebook") in unpublish_calls
+        assert ("ProtectedOrphan", "Notebook") not in unpublish_calls
+
+
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_unpublish_orphan_filtered_by_items_to_include(mock_endpoint, temp_workspace_dir):
+    """Test that items_to_include limits which orphaned items are unpublished."""
+    create_test_item(temp_workspace_dir, None, "KeepMe", "Notebook", "keep-me-id")
+
+    orphan_deployed = {
+        "Notebook": {
+            "KeepMe": MagicMock(guid="keep-guid"),
+            "TargetOrphan": MagicMock(guid="target-guid"),
+            "OtherOrphan": MagicMock(guid="other-guid"),
+        }
+    }
+    orphan_repo = {"Notebook": {"KeepMe": MagicMock()}}
+
+    unpublish_calls = []
+
+    def track_unpublish(_self, item_name, item_type):
+        unpublish_calls.append((item_name, item_type))
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_deployed_items",
+            new=lambda self: setattr(self, "deployed_items", orphan_deployed),
+        ),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_repository_items",
+            new=lambda self: setattr(self, "repository_items", orphan_repo),
+        ),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch.object(FabricWorkspace, "_unpublish_folders", new=lambda _: None),
+        patch.object(FabricWorkspace, "_unpublish_item", new=track_unpublish),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+        publish.unpublish_all_orphan_items(workspace, items_to_include=["TargetOrphan.Notebook"])
+
+        assert ("TargetOrphan", "Notebook") in unpublish_calls
+        assert ("OtherOrphan", "Notebook") not in unpublish_calls
+
+
+def test_unpublish_no_orphans_no_deletion(mock_endpoint, temp_workspace_dir):
+    """Test that unpublish_all_orphan_items does not call _unpublish_item when there are no orphans."""
+    create_test_item(temp_workspace_dir, None, "MyNotebook", "Notebook", "my-notebook-id")
+
+    matching_items = {"Notebook": {"MyNotebook": MagicMock(guid="my-guid")}}
+
+    unpublish_calls = []
+
+    def track_unpublish(_self, item_name, item_type):
+        unpublish_calls.append((item_name, item_type))
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_deployed_items",
+            new=lambda self: setattr(self, "deployed_items", matching_items),
+        ),
+        patch.object(
+            FabricWorkspace,
+            "_refresh_repository_items",
+            new=lambda self: setattr(self, "repository_items", matching_items),
+        ),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch.object(FabricWorkspace, "_unpublish_folders", new=lambda _: None),
+        patch.object(FabricWorkspace, "_unpublish_item", new=track_unpublish),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+        )
+
+        publish.unpublish_all_orphan_items(workspace)
+
+        assert len(unpublish_calls) == 0
+
+
 # =============================================================================
 # Publishing Order Tests
 # =============================================================================
@@ -455,34 +626,6 @@ def test_item_name_exclusion_still_works(mock_endpoint, temp_workspace_dir):
 
         assert workspace.repository_items["Notebook"]["DoNotPublish"].skip_publish is True
         assert workspace.repository_items["Notebook"]["TestNotebook"].skip_publish is False
-
-
-@pytest.mark.usefixtures("experimental_feature_flags")
-def test_legacy_folder_exclusion_example(mock_endpoint, temp_workspace_dir):
-    """Test the specific use case mentioned in the issue: excluding items in a 'legacy' folder."""
-    create_test_item(temp_workspace_dir, "legacy", "FabricNotebook", "Notebook", "legacy-notebook-id")
-    create_test_item(temp_workspace_dir, "legacy", "Model", "SemanticModel", "legacy-model-id")
-    create_test_item(temp_workspace_dir, None, "CurrentNotebook", "Notebook", "current-notebook-id")
-
-    with (
-        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
-        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
-        patch.object(
-            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
-        ),
-    ):
-        workspace = FabricWorkspace(
-            workspace_id="12345678-1234-5678-abcd-1234567890ab",
-            repository_directory=str(temp_workspace_dir),
-            item_type_in_scope=["Notebook", "SemanticModel"],
-        )
-
-        exclude_regex = r"^/legacy"
-        publish.publish_all_items(workspace, folder_path_exclude_regex=exclude_regex)
-
-        assert workspace.repository_items["Notebook"]["FabricNotebook"].skip_publish is True
-        assert workspace.repository_items["SemanticModel"]["Model"].skip_publish is True
-        assert workspace.repository_items["Notebook"]["CurrentNotebook"].skip_publish is False
 
 
 # =============================================================================
