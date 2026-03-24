@@ -36,7 +36,7 @@ workspace = FabricWorkspace(
 )
 ```
 
-See the [Authentication Examples](../example/authentication.md) for common implementation patterns.
+See the [Authentication Examples](../example/authentication.md) for specific implementation patterns.
 
 ## Directory Structure
 
