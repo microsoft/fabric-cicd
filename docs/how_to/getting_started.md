@@ -43,19 +43,17 @@ See the [Authentication Examples](../example/authentication.md) for common imple
 This library deploys from a directory containing files and directories committed via the Fabric Source Control UI. Ensure the `repository_directory` includes only these committed items, with the exception of the `parameter.yml` file.
 
 ```
-
 /<your-directory>
-/<item-name>.<item-type>
-...
-/<item-name>.<item-type>
-...
-/<workspace-subfolder>
-/<item-name>.<item-type>
-...
-/<item-name>.<item-type>
-...
-/parameter.yml
-
+    /<item-name>.<item-type>
+        ...
+    /<item-name>.<item-type>
+        ...
+    /<workspace-subfolder>
+        /<item-name>.<item-type>
+            ...
+        /<item-name>.<item-type>
+            ...
+    /parameter.yml
 ```
 
 ## GIT Flow
@@ -69,7 +67,3 @@ The flow pictured below is the hero scenario for this library and is the recomme
 - Each deployment is a full deployment and does not consider commit diffs
 
 ![GIT Flow](../config/assets/git_flow.png)
-
-```
-
-```
