@@ -6,18 +6,24 @@ Always reference these instructions first and fallback to search or bash command
 
 ## Quick Command Reference
 
+**Prerequisites**: Requires Python 3.9+
+
 | Task         | Command                                                                                  | Timeout |
 | ------------ | ---------------------------------------------------------------------------------------- | ------- |
-| Setup        | `pip install uv && uv sync --dev`                                                        | 120s    |
-| Test         | `uv run pytest -v`                                                                       | 120s    |
+| Setup        | `pip install uv && uv sync --dev` (NEVER CANCEL)                                         | 120+s   |
+| Test         | `uv run pytest -v` (NEVER CANCEL)                                                        | 120+s   |
 | Import check | `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"` | 30s     |
-| Format       | `uv run ruff format`                                                                     | 60s     |
-| Lint check   | `uv run ruff check`                                                                      | 60s     |
-| Format check | `uv run ruff format --check`                                                             | 60s     |
-| Docs build   | `uv run mkdocs build --clean`                                                            | 60s     |
-| Docs serve   | `uv run mkdocs serve`                                                                    | 60s     |
+| Format       | `uv run ruff format` (Apply formatting fixes)                                            | 60s     |
+| Lint check   | `uv run ruff check` (Check for linting issues)                                           | 60s     |
+| Format check | `uv run ruff format --check` (Check if formatting needed)                                | 60s     |
+| Docs build   | `uv run mkdocs build --clean` (Build documentation)                                      | 60s     |
+| Docs serve   | `uv run mkdocs serve` (Start local documentation server)                                 | 60s     |
 
-**Important**: Never cancel build/test commands. Run import check, tests, format, and lint before committing or CI (.github/workflows/validate.yml) will fail.
+**Mandatory Validation (ALWAYS):**
+
+1. Import check → 2. Run tests → 3. Format code → 4. Check linting → 5. Commit
+
+**Critical**: NEVER cancel build/test commands. CI (.github/workflows/validate.yml) will fail if validation workflow incomplete.
 
 ## Authentication
 
@@ -47,16 +53,17 @@ workspace = FabricWorkspace(
 ### Programmatic API
 
 ```python
+from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 # Initialize workspace
-token_credential = AzureCliCredential()
+credential = AzureCliCredential()
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     environment="DEV",
     repository_directory="/path/to/workspace/items",
     item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
-    token_credential=token_credential # from Authenication section
+    token_credential=credential
 )
 
 # Deploy items
@@ -99,7 +106,31 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 └── uv.lock            # Dependency lock file
 ```
 
-## Development Info
+## Development Guidelines
+
+### Core Concepts
+
+- **Publisher Classes**: Handle deployment logic for each Fabric item type in `src/fabric_cicd/_items/`
+- **Serial Publishing**: Items deploy in dependency order via `SERIAL_ITEM_PUBLISH_ORDER`
+- **Parameterization**: YAML-based environment-specific value replacement
+
+### Common Development Patterns
+
+- **Adding constants**: Add to `ItemType` enum + `SERIAL_ITEM_PUBLISH_ORDER`
+- **Adding publisher**: Extend `ItemPublisher` + register in `_base_publisher.py` factory
+- **Testing**: Always mock external calls to prevent test pollution, use `requests_mock` for Azure APIs, and `tmpdir` for files
+
+### Core Files Requiring Tests
+
+- `src/fabric_cicd/constants.py` - Version and configuration constants
+- `src/fabric_cicd/fabric_workspace.py` - Main workspace management class
+- Any new publisher classes in `src/fabric_cicd/_items/`
+
+### Files to Avoid Modifying
+
+- `coverage_report/`, `site/`, `htmlcov/` - Auto-generated
+- `uv.lock` - Managed by uv
+- `.github/workflows/` - Affects CI validation
 
 ### Dependencies & Testing
 
@@ -127,14 +158,22 @@ result = deploy_with_config(config_file_path="config.yml", environment="dev")
 - Pass all tests
 - All PRs must be linked to valid GitHub issue
 
-## Troubleshooting
+## Agent Troubleshooting
 
-- **Import errors**: Use `uv run python` instead of direct `python` to ensure virtual environment
-- **Test failures**: Check if Azure credentials are interfering with mocked tests
-- **Formatting issues**: Run `uv run ruff format` to auto-fix most issues
-- **CI failures**: Usually due to missing `ruff format` or failing tests
+**Common Failures:**
 
-## Key Files
+- **Import errors**: Use `uv run python` prefix to ensure virtual environment
+- **Test pollution**: Azure credentials interfering - ensure proper mocking
+- **Setup failures**: Run `uv sync --dev` if modules missing
+- **CI failures**: Missing format/lint step in validation workflow
+
+**Authentication Strategy for Agents:**
+
+1. For testing/imports: No auth needed
+2. For publish operations: Use `AzureCliCredential()` (If `CredentialUnavailableError` occurs, user needs to run `az login` first)
+3. Context: Import check works without auth, but publish operations require credentials
+
+## Key Files Reference
 
 - `src/fabric_cicd/constants.py` - Version and configuration constants
 - `src/fabric_cicd/fabric_workspace.py` - Main workspace management class
