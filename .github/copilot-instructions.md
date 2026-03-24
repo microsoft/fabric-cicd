@@ -57,7 +57,6 @@ workspace = FabricWorkspace(
 from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
-# Initialize workspace
 token_credential = AzureCliCredential()
 # Initialize workspace (supports either workspace_id OR workspace_name)
 workspace = FabricWorkspace(
@@ -83,7 +82,11 @@ Alternative: `deploy_with_config()` centralizes deployment settings in YAML.
 from azure.identity import AzureCliCredential
 from fabric_cicd import deploy_with_config
 token_credential = AzureCliCredential()
-result = deploy_with_config(config_file_path="config.yml", environment="dev", token_credential=token_credential)
+result = deploy_with_config(
+    config_file_path="config.yml",
+    environment="dev",
+    token_credential=token_credential
+)
 ```
 
 **Implementation files:**
