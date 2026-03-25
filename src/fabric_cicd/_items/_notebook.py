@@ -17,6 +17,10 @@ class NotebookPublisher(ItemPublisher):
         """Publish a Notebook item."""
         is_ipynb = any(file.file_path.suffix == ".ipynb" for file in item.item_files)
 
+        # Sort files to ensure consistent payload order for Fabric API notebook processing
+        # Fabric API expects content file (.py/.ipynb) to be processed before settings file (.json) when both are present
+        item.item_files.sort(key=lambda f: f.file_path.name)
+
         kwargs = {}
         if is_ipynb:
             api_format = API_FORMAT_MAPPING.get(self.item_type)
