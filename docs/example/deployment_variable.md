@@ -125,7 +125,7 @@ Leverage the following when you have specific values that you need to define per
     ```python
     '''
     Determines variables based on the branch that originated the build
-    Uses Azure CLI credential with GitHub secrets
+    Uses Azure CLI credential (requires az login in GitHub Actions workflow)
     '''
 
     import os

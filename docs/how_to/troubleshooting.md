@@ -130,9 +130,11 @@ Traceback (most recent call last):
 **Solution**:
 
 1. Use explicit credential methods: fabric-cicd **requires explicit authentication**. Choose the appropriate method for your scenario:
-    - Local development: Use `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
-    - CI/CD pipelines: Use `ManagedIdentityCredential` for Azure-hosted runners or `ClientSecretCredential` for service principals
-    - Fabric Notebooks: Authentication is handled automatically within the Fabric runtime
+    - Local development: `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
+    - CI/CD pipelines with platform auth: `AzureCliCredential` or `AzurePowerShellCredential` (requires a prior login step in the workflow, e.g., `azure/login` or AzCLI task)
+    - CI/CD pipelines with service principals: `ClientSecretCredential` (requires client ID, secret, and tenant ID)
+    - CI/CD pipelines with managed identity: `ManagedIdentityCredential` (requires Azure-hosted self-hosted runners)
+    - Fabric Notebooks: Authentication is handled automatically within the Fabric runtime (no explicit credential required unless overriding with a specific identity)
 
 2. Verify authentication setup:
     ```bash

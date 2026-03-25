@@ -1,6 +1,6 @@
 # Authentication Examples
 
-The following are authentication flows for fabric-cicd using explicit credential providers. fabric-cicd supports any [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential) implementation. The authentication methods described here are common patterns, but not exhaustive. These examples provide starting points that should be adapted for your specific environment and security requirements.
+The following are the most common authentication flows for fabric-cicd. However, because fabric-cicd supports any [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential), there are multiple authentication methods available beyond the ones described here. These examples provide starting points that should be adapted for your specific environment and security requirements.
 
 > **⚠️ DEPRECATION NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential`) authentication method is deprecated and will be removed in a future release. Please migrate to one of the explicit credential methods described below.
 
@@ -103,8 +103,8 @@ This approach utilizes the CLI credential flow, meaning it only refers to the au
 
     ```python
     '''
-    Use Azure CLI with service principal stored in GitHub Secrets
-    Requires: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID in repository secrets
+    Log in with Azure CLI (az login) prior to execution
+    Requires: azure/login workflow step in GitHub Actions
     '''
 
     import os
@@ -237,8 +237,8 @@ This approach utilizes the AZ PowerShell credential flow, meaning it only refers
 
     ```python
     '''
-    Use Azure PowerShell with service principal stored in GitHub Secrets
-    Requires: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID in repository secrets
+    Log in with Azure PowerShell (Connect-AzAccount) prior to execution
+    Requires: azure/powershell workflow step in GitHub Actions
     '''
 
     import os

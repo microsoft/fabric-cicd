@@ -12,14 +12,13 @@ pip install fabric-cicd
 
 > **⚠️ DEPRECATION NOTICE**: The `DefaultAzureCredential` fallback is deprecated and will be removed in a future release. Please provide an explicit `token_credential` parameter.
 
-- **Required**: You must provide your own credential object that aligns with the `TokenCredential` class from `azure.identity`. For more details, see the [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential) documentation.
-- **Exception**: When running in Fabric Notebook runtime, authentication is handled automatically through the user session context and therefore explicit credential is not required.
+- You must provide your own credential object that aligns with the `TokenCredential` class (from `azure.identity`). For more details, see the [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential) documentation.
+- When running in Fabric Notebook runtime, authentication is handled automatically through the user session context and therefore an explicit credential is not required in this scenario.
 
 **Recommended Authentication Methods:**
 
 - For local development: `AzureCliCredential` or `AzurePowerShellCredential` (user authentication)
-- For production deployments: `ClientSecretCredential` (service principal) or `ManagedIdentityCredential` (managed identity)
-- For CI/CD pipelines: `AzureCliCredential`/`AzurePowerShellCredential` (platform authentication) or `ClientSecretCredential` (service principal)
+- For CI/CD pipelines: `AzureCliCredential`/`AzurePowerShellCredential` (platform authentication), `ClientSecretCredential` (service principal), or `ManagedIdentityCredential` (self-hosted agents)
 
 **Basic Example:**
 
@@ -27,12 +26,14 @@ pip install fabric-cicd
 from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace
 
+token_credential = AzureCliCredential()
+
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     environment="your-target-environment",
     repository_directory="your-repository-directory",
-    item_type_in_scope=["Notebook", "DataPipeline", "Environment"]
-    token_credential=AzureCliCredential(),
+    item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
+    token_credential=token_credential,
 )
 ```
 
