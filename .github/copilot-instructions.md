@@ -97,6 +97,22 @@ result = deploy_with_config(
 - Documentation: `docs/how_to/config_deployment.md`
 - Tests: `tests/test_deploy_with_config.py`, `tests/test_config_validator.py`
 
+### Public API Exports
+
+Only import from the top-level package (`src/fabric_cicd/__init__.py`). Do not import internal modules directly.
+
+**Exported symbols:**
+
+- `FabricWorkspace` - Main workspace management class
+- `publish_all_items` - Deploy all items in scope
+- `unpublish_all_orphan_items` - Remove orphaned items
+- `deploy_with_config` - Config-based deployment
+- `DeploymentResult`, `DeploymentStatus` - Deployment result types
+- `ItemType` - Enum of supported Fabric item types
+- `FeatureFlag` - Enum of feature flags
+- `append_feature_flag` - Add feature flags programmatically
+- `change_log_level`, `configure_external_file_logging`, `disable_file_logging` - Logging utilities
+
 ## Project Structure
 
 ```
@@ -122,10 +138,17 @@ result = deploy_with_config(
 - **Serial Publishing**: Items deploy in dependency order via `SERIAL_ITEM_PUBLISH_ORDER`
 - **Parameterization**: YAML-based environment-specific value replacement
 
+### Supported Item Types
+
+Valid values for `item_type_in_scope` are defined in the `ItemType` enum in `src/fabric_cicd/constants.py`. Always reference that file for the current list — do not hard-code item type strings without verifying them against the enum.
+
+The publish/unpublish dependency order is defined in `SERIAL_ITEM_PUBLISH_ORDER` in the same file.
+
 ### Common Development Patterns
 
-- **Adding constants**: Add to `ItemType` enum + `SERIAL_ITEM_PUBLISH_ORDER`
+- **Adding constants**: Add to `ItemType` enum + `SERIAL_ITEM_PUBLISH_ORDER` in `src/fabric_cicd/constants.py`
 - **Adding publisher**: Extend `ItemPublisher` + register in `_base_publisher.py` factory
+- **Adding public exports**: Update `__all__` in `src/fabric_cicd/__init__.py`
 
 ### Testing Guidelines
 
@@ -139,6 +162,8 @@ result = deploy_with_config(
 - API integrations and external calls
 
 **Testing approach**: Mock all external dependencies, use `requests_mock` for Azure APIs, `tmpdir` for file operations. Focus on testing business logic, error handling, and integration points.
+
+**Test file naming**: Follow the conventions in the `tests/` directory. Review existing test files to match the naming pattern before creating new ones.
 
 ### Files to Avoid Modifying
 
@@ -159,6 +184,8 @@ result = deploy_with_config(
 
 ## Pull Request Requirements
 
+**Base branch:** Always target `main` unless otherwise specified.
+
 **Title format:** "Fixes #123 - Short Description" where #123 is the issue number
 
 - Use "Fixes" for bug fixes, "Closes" for features, "Resolves" for other changes
@@ -171,6 +198,14 @@ result = deploy_with_config(
 - Pass ruff formatting and linting checks
 - Pass all tests
 - All PRs must be linked to valid GitHub issue
+
+## Do Not
+
+- Do not modify `uv.lock` manually — it is managed by `uv`
+- Do not import from internal modules (e.g., `fabric_cicd._items`) — only use the public API from `fabric_cicd`
+- Do not add `print()` statements — use the standard `logging` module
+- Do not create PRs without a linked GitHub issue
+- Do not modify `.github/workflows/` files unless explicitly required
 
 ## Agent Troubleshooting
 
