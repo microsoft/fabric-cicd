@@ -19,7 +19,14 @@ class NotebookPublisher(ItemPublisher):
 
         # Sort files to ensure consistent payload order for Fabric API notebook processing
         # Fabric API expects content file (.py/.ipynb) to be processed before settings file (.json) when both are present
-        item.item_files.sort(key=lambda f: f.file_path.name)
+        def _sort_key(f) -> tuple[int, str]:
+            if f.file_path.name == ".platform":
+                return (0, f.file_path.name)
+            if f.file_path.suffix == ".json":
+                return (2, f.file_path.name)
+            return (1, f.file_path.name)
+
+        item.item_files.sort(key=_sort_key)
 
         kwargs = {}
         if is_ipynb:
