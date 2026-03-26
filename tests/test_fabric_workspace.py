@@ -925,6 +925,51 @@ def test_parameter_file_path_none(temp_workspace_dir, patched_fabric_workspace, 
     assert workspace.parameter_file_path is None
 
 
+def test_parameter_yml_not_auto_discovered_when_path_is_none(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """When parameter_file_path is None (no explicit path provided), a parameter.yml
+    present in the repository directory must NOT be auto-discovered or applied.
+    The user must explicitly pass parameter_file_path for parameterization to be used.
+    The Parameter class must not be instantiated at all in this case."""
+    # Create a parameter.yml in the repo directory — it must NOT be picked up
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text("find_replace:\n  - find_value: 'secret_value'\n    replace_value:\n      DEV: 'replaced'\n")
+    assert param_file.exists()  # Confirm file exists so the test is meaningful
+
+    # Parameter is imported lazily inside _refresh_parameter_file, so patch at its module path
+    with patch("fabric_cicd._parameter._parameter.Parameter") as mock_parameter_cls:
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            # parameter_file_path intentionally not provided (None)
+        )
+
+    # Parameter class must never be instantiated when no path is provided
+    mock_parameter_cls.assert_not_called()
+    # environment_parameter must be empty — no parameterization applied
+    assert workspace.environment_parameter == {}
+
+
+def test_parameter_yml_loaded_when_explicit_path_provided(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """When parameter_file_path is explicitly provided, the parameter file IS loaded
+    and parameterization IS applied."""
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text("find_replace:\n  - find_value: 'secret_value'\n    replace_value:\n      DEV: 'replaced'\n")
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=str(param_file),
+        environment="DEV",
+    )
+
+    # Parameterization must be populated — the explicit file was loaded
+    assert "find_replace" in workspace.environment_parameter
+
+
 def test_parameter_file_path_with_environment(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that FabricWorkspace works with both parameter_file_path and environment."""
     param_file = temp_workspace_dir / "dev_parameters.yml"

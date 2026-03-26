@@ -69,7 +69,7 @@ class Parameter:
             item_type_in_scope: Item types that should be deployed for a given workspace.
             environment: The environment to be used for parameterization.
             parameter_file_name: The name of the parameter file, default is "parameter.yml".
-            parameter_file_path: The path to the parameter file, if not using the default.
+            parameter_file_path: The path to the parameter file.
         """
         # Set class variables
         self.repository_directory = repository_directory
@@ -114,12 +114,6 @@ class Parameter:
 
                 except (TypeError, ValueError) as e:
                     logger.error(f"Error setting parameter file path: {e}")
-                    is_param_path = False
-
-            # Otherwise, resolve with default path
-            if not is_param_path:
-                self.parameter_file_path = Path(self.repository_directory, self.parameter_file_name).resolve()
-                logger.debug(constants.PARAMETER_MSGS["using_default_param_file_path"].format(self.parameter_file_path))
 
         except Exception as e:
             logger.error(f"Unexpected error setting parameter file path: {e}")

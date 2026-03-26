@@ -267,6 +267,34 @@ class TestWorkspaceSettingsExtraction:
         settings = extract_workspace_settings(config, "dev")
         assert "parameter_file_path" not in settings
 
+    def test_parameter_file_not_auto_discovered_when_field_omitted(self, tmp_path):
+        """When 'parameter' field is omitted from config, a parameter.yml present in the
+        repository directory must NOT be auto-discovered or applied during deployment.
+        The user must explicitly define the 'parameter' field to enable parameterization."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+
+        # Create a parameter.yml that must NOT be picked up
+        param_file = repo_dir / "parameter.yml"
+        param_file.write_text(
+            "find_replace:\n  - find_value: 'secret_value'\n    replace_value:\n      dev: 'replaced'\n"
+        )
+
+        config = {
+            "core": {
+                "workspace_id": "33333333-3333-3333-3333-333333333333",
+                "repository_directory": str(repo_dir),
+                # 'parameter' field intentionally omitted
+            }
+        }
+
+        settings = extract_workspace_settings(config, "dev")
+
+        # parameter_file_path must be absent — not set to the default parameter.yml
+        assert "parameter_file_path" not in settings
+        # Confirm the file actually exists so this test is meaningful
+        assert param_file.exists()
+
 
 class TestPublishSettingsExtraction:
     """Test publish settings extraction from config."""
