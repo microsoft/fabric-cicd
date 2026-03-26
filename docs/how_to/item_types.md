@@ -127,6 +127,11 @@
 - **Resources** are not source controlled and will not be deployed.
 - **Note:** Both `.py` and `.ipynb` formats are supported. Git-integrated Notebooks only support `.py`, while Notebooks exported via the Get Item Definition API support both formats.
 
+## Ontology
+
+- **Parameterization:**
+    - The `find_replace` section in the `parameter.yml` file can be used to update any references within the Ontology definition files.
+
 ## Real-Time Dashboard
 
 - **Parameterization:**
