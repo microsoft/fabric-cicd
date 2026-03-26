@@ -165,7 +165,12 @@ class FabricWorkspace:
             self._refresh_parameter_file()
         else:
             self.environment_parameter = {}
-            logger.info("Parameterization skipped: 'parameter' field not defined in config.")
+            logger.info(
+                "Parameterization skipped: no parameter file configured/provided "
+                "(environment=%s, parameter_file_path=%s).",
+                self.environment,
+                self.parameter_file_path,
+            )
 
     @property
     def base_api_url(self) -> str:

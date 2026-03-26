@@ -473,9 +473,9 @@ def deploy_with_config(
             # Determine if response collection flag has been enabled in the config file
             responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
 
-            # When 'parameter' is absent from the config file, parameter_file_path is None
-            # and parameterization must be skipped entirely — any parameter.yml that happens
-            # to exist in the repository must NOT be auto-discovered.
+            # When no parameter file is configured or resolved for this environment,
+            # parameter_file_path is None and parameterization must be skipped entirely —
+            # any parameter.yml that happens to exist in the repository must NOT be auto-discovered.
             skip_parameterization = workspace_settings.get("parameter_file_path") is None
 
             # Create FabricWorkspace object with extracted settings
