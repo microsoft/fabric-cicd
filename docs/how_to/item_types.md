@@ -130,7 +130,8 @@
 ## Ontology
 
 - **Parameterization:**
-    - The referenced items in the ontology definition will always point to the original items unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - Referenced items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
 
 ## Real-Time Dashboard
 
