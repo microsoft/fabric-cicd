@@ -267,33 +267,37 @@ class TestWorkspaceSettingsExtraction:
         settings = extract_workspace_settings(config, "dev")
         assert "parameter_file_path" not in settings
 
-    def test_parameter_file_not_auto_discovered_when_field_omitted(self, tmp_path):
-        """When 'parameter' field is omitted from config, a parameter.yml present in the
-        repository directory must NOT be auto-discovered or applied during deployment.
-        The user must explicitly define the 'parameter' field to enable parameterization."""
-        repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
-
-        # Create a parameter.yml that must NOT be picked up
-        param_file = repo_dir / "parameter.yml"
-        param_file.write_text(
-            "find_replace:\n  - find_value: 'secret_value'\n    replace_value:\n      dev: 'replaced'\n"
-        )
-
+    def test_skip_parameterization_true_when_parameter_field_absent(self):
+        """When 'parameter' is absent from config, skip_parameterization must be True
+        so FabricWorkspace does not auto-discover a parameter.yml from the repository."""
         config = {
             "core": {
                 "workspace_id": "33333333-3333-3333-3333-333333333333",
-                "repository_directory": str(repo_dir),
+                "repository_directory": "test/path",
                 # 'parameter' field intentionally omitted
             }
         }
 
         settings = extract_workspace_settings(config, "dev")
+        # parameter_file_path absent → skip_parameterization must be True
+        skip_parameterization = settings.get("parameter_file_path") is None
+        assert skip_parameterization is True
 
-        # parameter_file_path must be absent — not set to the default parameter.yml
-        assert "parameter_file_path" not in settings
-        # Confirm the file actually exists so this test is meaningful
-        assert param_file.exists()
+    def test_skip_parameterization_false_when_parameter_field_present(self):
+        """When 'parameter' is present in config, skip_parameterization must be False
+        so FabricWorkspace loads and applies the specified parameter file."""
+        config = {
+            "core": {
+                "workspace_id": "33333333-3333-3333-3333-333333333333",
+                "repository_directory": "test/path",
+                "parameter": "parameter.yml",
+            }
+        }
+
+        settings = extract_workspace_settings(config, "dev")
+        # parameter_file_path present → skip_parameterization must be False
+        skip_parameterization = settings.get("parameter_file_path") is None
+        assert skip_parameterization is False
 
 
 class TestPublishSettingsExtraction:

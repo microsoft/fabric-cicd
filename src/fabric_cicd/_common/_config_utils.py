@@ -99,12 +99,7 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
 
     # Optional settings - validation logs warning if value not found for target environment
     update_setting(settings, core, "item_types_in_scope", environment)
-
-    # Parameter field: only set if explicitly defined in config.
-    # When omitted, parameterization must not be applied - the absence of
-    # "parameter_file_path" in settings signals that parameterization is disabled.
-    if "parameter" in core:
-        update_setting(settings, core, "parameter", environment, output_key="parameter_file_path")
+    update_setting(settings, core, "parameter", environment, output_key="parameter_file_path")
 
     return settings
 

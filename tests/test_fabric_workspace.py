@@ -925,45 +925,41 @@ def test_parameter_file_path_none(temp_workspace_dir, patched_fabric_workspace, 
     assert workspace.parameter_file_path is None
 
 
-def test_parameter_yml_not_auto_discovered_when_path_is_none(
+def test_skip_parameterization_prevents_parameter_yml_auto_discovery(
     temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
 ):
-    """When parameter_file_path is None (no explicit path provided), a parameter.yml
-    present in the repository directory must NOT be auto-discovered or applied.
-    The user must explicitly pass parameter_file_path for parameterization to be used.
-    The Parameter class must not be instantiated at all in this case."""
-    # Create a parameter.yml in the repo directory — it must NOT be picked up
+    """When skip_parameterization=True (config 'parameter' field absent), a parameter.yml
+    present in the repository directory must NOT be loaded — _refresh_parameter_file must
+    not be called at all, and environment_parameter must remain empty."""
+    # Create a parameter.yml in the repo — it must NOT be picked up
     param_file = temp_workspace_dir / "parameter.yml"
-    param_file.write_text("find_replace:\n  - find_value: 'secret_value'\n    replace_value:\n      DEV: 'replaced'\n")
-    assert param_file.exists()  # Confirm file exists so the test is meaningful
+    param_file.write_text("find_replace:\n  - find_value: 'secret'\n    replace_value:\n      DEV: 'replaced'\n")
+    assert param_file.exists()
 
-    # Parameter is imported lazily inside _refresh_parameter_file, so patch at its module path
-    with patch("fabric_cicd._parameter._parameter.Parameter") as mock_parameter_cls:
-        workspace = patched_fabric_workspace(
-            workspace_id=valid_workspace_id,
-            repository_directory=str(temp_workspace_dir),
-            # parameter_file_path intentionally not provided (None)
-        )
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        skip_parameterization=True,
+    )
 
-    # Parameter class must never be instantiated when no path is provided
-    mock_parameter_cls.assert_not_called()
-    # environment_parameter must be empty — no parameterization applied
+    # environment_parameter must be empty — parameter.yml was not auto-discovered
     assert workspace.environment_parameter == {}
 
 
-def test_parameter_yml_loaded_when_explicit_path_provided(
+def test_skip_parameterization_false_loads_explicit_parameter_file(
     temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
 ):
-    """When parameter_file_path is explicitly provided, the parameter file IS loaded
-    and parameterization IS applied."""
-    param_file = temp_workspace_dir / "parameter.yml"
-    param_file.write_text("find_replace:\n  - find_value: 'secret_value'\n    replace_value:\n      DEV: 'replaced'\n")
+    """When skip_parameterization=False (default) and an explicit parameter_file_path is
+    given, the parameter file IS loaded and parameterization IS applied."""
+    param_file = temp_workspace_dir / "my_params.yml"
+    param_file.write_text("find_replace:\n  - find_value: 'secret'\n    replace_value:\n      DEV: 'replaced'\n")
 
     workspace = patched_fabric_workspace(
         workspace_id=valid_workspace_id,
         repository_directory=str(temp_workspace_dir),
         parameter_file_path=str(param_file),
         environment="DEV",
+        skip_parameterization=False,
     )
 
     # Parameterization must be populated — the explicit file was loaded

@@ -158,8 +158,14 @@ class FabricWorkspace:
             )
             raise InputError(msg, logger)
 
-        # Initialize dictionaries to store repository and deployed items
-        self._refresh_parameter_file()
+        # Initialize parameter file — skipped when config-based deployment omits the
+        # 'parameter' field, ensuring repository parameter.yml is not auto-discovered.
+        skip_parameterization = kwargs.get("skip_parameterization", False)
+        if not skip_parameterization:
+            self._refresh_parameter_file()
+        else:
+            self.environment_parameter = {}
+            logger.info("Parameterization skipped: 'parameter' field not defined in config.")
 
     @property
     def base_api_url(self) -> str:
@@ -242,31 +248,25 @@ class FabricWorkspace:
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
+        from fabric_cicd._parameter._parameter import Parameter
+
         log_header(logger, "Validating Parameter File")
 
-        # Initialize the parameter dict
+        # Initialize the parameter dict and Parameter object
         self.environment_parameter = {}
-
-        # Only validate and load the parameter file when an explicit path is provided.
-        # When parameter_file_path is None, parameterization is disabled.
-        if self.parameter_file_path is not None:
-            from fabric_cicd._parameter._parameter import Parameter
-
-            parameter_obj = Parameter(
-                repository_directory=self.repository_directory,
-                item_type_in_scope=self.item_type_in_scope,
-                environment=self.environment,
-                parameter_file_name=constants.PARAMETER_FILE_NAME,
-                parameter_file_path=self.parameter_file_path,
-            )
-            is_valid = parameter_obj._validate_parameter_file()
-            if is_valid:
-                self.environment_parameter = parameter_obj.environment_parameter
-            else:
-                msg = "Deployment terminated due to an invalid parameter file"
-                raise ParameterFileError(msg, logger)
+        parameter_obj = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+            parameter_file_name=constants.PARAMETER_FILE_NAME,
+            parameter_file_path=self.parameter_file_path,
+        )
+        is_valid = parameter_obj._validate_parameter_file()
+        if is_valid:
+            self.environment_parameter = parameter_obj.environment_parameter
         else:
-            logger.info("No parameter file path provided — parameterization skipped.")
+            msg = "Deployment terminated due to an invalid parameter file"
+            raise ParameterFileError(msg, logger)
 
     def _refresh_repository_items(self) -> None:
         """Refreshes the repository_items dictionary by scanning the repository directory."""
