@@ -105,7 +105,7 @@ class FabricWorkspace:
                 token_credential = _generate_fabric_credential()
             else:
                 logger.warning(
-                    "DefaultAzureCredential fallback is deprecated and will be removed in a future release. "
+                    "DeprecationWarning: DefaultAzureCredential fallback is deprecated and will be removed in a future release. "
                     "Please pass the token_credential explicitly (e.g., AzureCliCredential(), etc.)"
                 )
                 # TODO: Remove DefaultAzureCredential fallback logic

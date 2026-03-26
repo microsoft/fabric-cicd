@@ -4,7 +4,10 @@ The following are the most common authentication flows for fabric-cicd. However,
 
 > **⚠️ DEPRECATION NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential`) authentication method is deprecated and will be removed in a future release. Please migrate to one of the explicit credential methods described below.
 
-**Note:** Explicit `token_credential` parameter is required for all scenarios except Fabric Notebook runtime, which handles authentication automatically.
+**Notes:**
+
+- Explicit `token_credential` parameter is used for all scenarios except Fabric Notebook runtime, which handles authentication automatically.
+- Avoid hardcoding credentials. Use environment variables or secret management services. SPN + Secret auth can also be achieved via `az login --service-principal` or `Connect-AzAccount -ServicePrincipal` in the CLI/PowerShell flows below.
 
 ## CLI Credential
 
@@ -394,43 +397,41 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
     repo_ref = "main"
     workspace_directory = "your-workspace-directory"
 
-    # Create a temporary directory for cloning
-    temp_dir = tempfile.mkdtemp(prefix="cloned_repo_")
-    print(f"Created temporary directory: {temp_dir}")
+    # Use context manager for automatic cleanup (even on exceptions)
+    with tempfile.TemporaryDirectory(prefix="cloned_repo_") as temp_dir:
+        print(f"Created temporary directory: {temp_dir}")
 
-    # Clone the repository
-    print(f"Cloning {repo_url} (ref: {repo_ref})...")
-    result = subprocess.run(
-        ["git", "clone", "--branch", repo_ref, "--single-branch", repo_url, temp_dir],
-        capture_output=True,
-        text=True
-    )
+        # Clone the repository
+        print(f"Cloning {repo_url} (ref: {repo_ref})...")
+        result = subprocess.run(
+            ["git", "clone", "--branch", repo_ref, "--single-branch", repo_url, temp_dir],
+            capture_output=True,
+            text=True
+        )
 
-    if result.returncode != 0:
-        raise Exception(f"Git clone failed: {result.stderr}")
+        if result.returncode != 0:
+            raise Exception(f"Git clone failed: {result.stderr}")
 
-    workspace_root = os.path.join(temp_dir, workspace_directory)
+        workspace_root = os.path.join(temp_dir, workspace_directory)
 
-    # Deploy workspace items from cloned repository
-    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+        # Deploy workspace items from cloned repository
+        item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
 
-    # Initialize FabricWorkspace - no token_credential needed
-    target_workspace = FabricWorkspace(
-        workspace_id=workspace_id,
-        environment=environment,
-        repository_directory=workspace_root,
-        item_type_in_scope=item_type_in_scope
-    )
+        # Initialize FabricWorkspace - no token_credential needed
+        target_workspace = FabricWorkspace(
+            workspace_id=workspace_id,
+            environment=environment,
+            repository_directory=workspace_root,
+            item_type_in_scope=item_type_in_scope
+        )
 
-    # Publish all items defined in item_type_in_scope
-    publish_all_items(target_workspace)
+        # Publish all items defined in item_type_in_scope
+        publish_all_items(target_workspace)
 
-    # Unpublish all items defined in item_type_in_scope not found in repository
-    unpublish_all_orphan_items(target_workspace)
+        # Unpublish all items defined in item_type_in_scope not found in repository
+        unpublish_all_orphan_items(target_workspace)
 
-    # Cleanup temporary directory
-    import shutil
-    shutil.rmtree(temp_dir)
+    # Directory automatically cleaned up here
     print("Cleaned up temporary directory")
     ```
 
@@ -442,6 +443,8 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
     Only needed for specific identity requirements
     '''
 
+    import tempfile
+    import subprocess
     import os
     from azure.identity import ClientSecretCredential
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
@@ -449,10 +452,11 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
     # Sample configuration values
     workspace_id = "your-workspace-id"
     environment = "your-environment"
-    repository_directory = "/path/to/your-workspace-directory"
-    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+    repo_url = "https://github.com/your-org/your-repo.git"
+    repo_ref = "main"
+    workspace_directory = "your-workspace-directory"
 
-    # Use explicit service principal (overrides automatic authentication)
+    # Uses explicit service principal (overrides automatic authentication)
     client_id = os.getenv("CLIENT_ID")
     client_secret = os.getenv("CLIENT_SECRET")
     tenant_id = os.getenv("TENANT_ID")
@@ -462,18 +466,41 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
         tenant_id=tenant_id
     )
 
-    # Initialize with explicit credential
-    target_workspace = FabricWorkspace(
-        workspace_id=workspace_id,
-        environment=environment,
-        repository_directory=repository_directory,
-        item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
-    )
+    # Use context manager for automatic cleanup (even on exceptions)
+    with tempfile.TemporaryDirectory(prefix="cloned_repo_") as temp_dir:
+        print(f"Created temporary directory: {temp_dir}")
 
-    # Publish all items defined in item_type_in_scope
-    publish_all_items(target_workspace)
+        # Clone the repository
+        print(f"Cloning {repo_url} (ref: {repo_ref})...")
+        result = subprocess.run(
+            ["git", "clone", "--branch", repo_ref, "--single-branch", repo_url, temp_dir],
+            capture_output=True,
+            text=True
+        )
 
-    # Unpublish all items defined in item_type_in_scope not found in repository
-    unpublish_all_orphan_items(target_workspace)
+        if result.returncode != 0:
+            raise Exception(f"Git clone failed: {result.stderr}")
+
+        workspace_root = os.path.join(temp_dir, workspace_directory)
+
+        # Deploy workspace items from cloned repository
+        item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+
+        # Initialize with explicit credential
+        target_workspace = FabricWorkspace(
+            workspace_id=workspace_id,
+            environment=environment,
+            repository_directory=workspace_root,
+            item_type_in_scope=item_type_in_scope,
+            token_credential=token_credential,
+        )
+
+        # Publish all items defined in item_type_in_scope
+        publish_all_items(target_workspace)
+
+        # Unpublish all items defined in item_type_in_scope not found in repository
+        unpublish_all_orphan_items(target_workspace)
+
+    # Directory automatically cleaned up here
+    print("Cleaned up temporary directory")
     ```

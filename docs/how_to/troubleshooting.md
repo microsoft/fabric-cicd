@@ -129,7 +129,7 @@ Traceback (most recent call last):
 
 **Solution**:
 
-1. Use explicit credential methods: fabric-cicd **requires explicit authentication**. Choose the appropriate method for your scenario:
+1. Explicit authentication is **strongly recommended** as `DefaultAzureCredential` fallback is deprecated and will be removed. Choose the appropriate method for your scenario:
     - Local development: `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
     - CI/CD pipelines with platform auth: `AzureCliCredential` or `AzurePowerShellCredential` (requires a prior login step in the workflow, e.g., `azure/login` or AzCLI task)
     - CI/CD pipelines with service principals: `ClientSecretCredential` (requires client ID, secret, and tenant ID)
@@ -194,13 +194,13 @@ The `devtools/` directory contains pre-built scripts to help test and validate d
 
 **Key Configuration Options**:
 
-| Configuration          | Description                                                      | Required |
-| ---------------------- | ---------------------------------------------------------------- | -------- |
-| `workspace_id`         | Target Fabric workspace ID                                       | Yes      |
-| `environment`          | Target environment (used for parameterization)                   | No       |
-| `repository_directory` | Path to Fabric workspace items files (absolute or relative path) | Yes      |
-| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)  | No       |
-| `token_credential`     | Explicit credential method (`AzureCliCredential`, etc.)          | Yes      |
+| Configuration          | Description                                                      | Required                                                         |
+| ---------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `workspace_id`         | Target Fabric workspace ID                                       | Yes                                                              |
+| `environment`          | Target environment (used for parameterization)                   | No                                                               |
+| `repository_directory` | Path to Fabric workspace items files (absolute or relative path) | Yes                                                              |
+| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)  | No                                                               |
+| `token_credential`     | Explicit credential method (`AzureCliCredential`, etc.)          | No (default credential fallback is deprecated; will be required) |
 
 **Quick Start**:
 
@@ -258,12 +258,12 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 
 **Key Configuration Options**:
 
-| Configuration      | Description                                                                         | Required |
-| ------------------ | ----------------------------------------------------------------------------------- | -------- |
-| `config_file`      | Path to your `config.yml` file                                                      | Yes      |
-| `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
-| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)                             | Yes      |
-| `config_override`  | Dictionary to override configuration values within `config.yml`                     | No       |
+| Configuration      | Description                                                                         | Required                                                         |
+| ------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `config_file`      | Path to your `config.yml` file                                                      | Yes                                                              |
+| `environment`      | Target environment (used for parameterization and environment-based configurations) | No                                                               |
+| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)                             | No (default credential fallback is deprecated; will be required) |
+| `config_override`  | Dictionary to override configuration values within `config.yml`                     | No                                                               |
 
 **Quick Start**:
 
