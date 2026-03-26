@@ -456,10 +456,13 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
     repo_ref = "main"
     workspace_directory = "your-workspace-directory"
 
-    # Uses explicit service principal (overrides automatic authentication)
-    client_id = os.getenv("CLIENT_ID")
-    client_secret = os.getenv("CLIENT_SECRET")
-    tenant_id = os.getenv("TENANT_ID")
+    # Use explicit SPN auth (overrides automatic authentication)
+    # Retrieve secrets from Azure Key Vault using notebookutils
+    key_vault_url = "https://your-keyvault.vault.azure.net/"
+    client_id = notebookutils.credentials.getSecret(key_vault_url, "client-id")
+    client_secret = notebookutils.credentials.getSecret(key_vault_url, "client-secret")
+    tenant_id = notebookutils.credentials.getSecret(key_vault_url, "tenant-id")
+
     token_credential = ClientSecretCredential(
         client_id=client_id,
         client_secret=client_secret,
