@@ -17,6 +17,16 @@ class NotebookPublisher(ItemPublisher):
         """Publish a Notebook item."""
         is_ipynb = any(file.file_path.suffix == ".ipynb" for file in item.item_files)
 
+        # Sort files to ensure consistent payload order for Fabric API notebook processing
+        # Fabric API expects content file (.py) to be processed before settings file (.json) when both are present
+        def _sort_key(f: Item) -> tuple[int, str]:
+            # .ipynb included for completeness; in practice, .json settings only exist with .py notebooks (git integrated format)
+            priority = {".platform": 0, ".py": 1, ".ipynb": 1, ".json": 3}
+            # Account for other file types that may be added later to the notebook item and assign to priority 2
+            return (priority.get(f.file_path.name, priority.get(f.file_path.suffix, 2)), f.file_path.name)
+
+        item.item_files.sort(key=_sort_key)
+
         kwargs = {}
         if is_ipynb:
             api_format = API_FORMAT_MAPPING.get(self.item_type)
