@@ -931,3 +931,43 @@ class TestNotebookPublisher:
     def test_item_type_is_notebook(self, publisher):
         """Test that item_type is correctly set to Notebook."""
         assert publisher.item_type == ItemType.NOTEBOOK.value
+
+    def test_files_sorted_same_stem_content_before_settings(self, publisher):
+        """Test content file precedes settings even when filenames share the same stem."""
+        mock_platform = MagicMock()
+        mock_platform.file_path = Path(".platform")
+        mock_settings = MagicMock()
+        mock_settings.file_path = Path("notebook-settings.json")
+        mock_content = MagicMock()
+        mock_content.file_path = Path("notebook-content.py")
+
+        mock_item = MagicMock()
+        mock_item.item_files = [mock_settings, mock_content, mock_platform]
+
+        publisher.publish_one("test_notebook", mock_item)
+
+        assert mock_item.item_files[0].file_path.name == ".platform"
+        assert mock_item.item_files[1].file_path.name == "notebook-content.py"
+        assert mock_item.item_files[2].file_path.name == "notebook-settings.json"
+
+    def test_files_sorted_with_unknown_extension(self, publisher):
+        """Test that unknown file extensions get default priority (2) between content and settings."""
+        mock_platform = MagicMock()
+        mock_platform.file_path = Path(".platform")
+        mock_settings = MagicMock()
+        mock_settings.file_path = Path("notebook.json")
+        mock_content = MagicMock()
+        mock_content.file_path = Path("notebook.py")
+        mock_other = MagicMock()
+        mock_other.file_path = Path("readme.md")  # Unknown extension
+
+        mock_item = MagicMock()
+        mock_item.item_files = [mock_settings, mock_other, mock_content, mock_platform]
+
+        publisher.publish_one("test_notebook", mock_item)
+
+        # Expected order: .platform (0), notebook.py (1), readme.md (2), notebook.json (3)
+        assert mock_item.item_files[0].file_path.name == ".platform"
+        assert mock_item.item_files[1].file_path.name == "notebook.py"
+        assert mock_item.item_files[2].file_path.name == "readme.md"
+        assert mock_item.item_files[3].file_path.name == "notebook.json"
