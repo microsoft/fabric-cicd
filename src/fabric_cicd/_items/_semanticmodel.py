@@ -7,9 +7,10 @@ import logging
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._te2_deploy import te2_deploy_fallback
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._parameter._utils import process_environment_key
-from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -262,36 +263,102 @@ class SemanticModelPublisher(ItemPublisher):
 
     item_type = ItemType.SEMANTIC_MODEL.value
 
+    def __init__(self, fabric_workspace_obj: FabricWorkspace) -> None:
+        super().__init__(fabric_workspace_obj)
+        self._workspace_name = None
+        self._purged_models = set()
+
+    def _get_workspace_name(self) -> str:
+        """Resolve and cache the workspace display name for XMLA endpoint."""
+        if self._workspace_name is None:
+            response = self.fabric_workspace_obj.endpoint.invoke(
+                method="GET",
+                url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.fabric_workspace_obj.workspace_id}",
+            )
+            self._workspace_name = response["body"]["displayName"]
+        return self._workspace_name
+
+    def _refresh_purged_models(self) -> None:
+        """Refresh semantic models that were purged during XMLA fallback deployment."""
+        refresh_config = self.fabric_workspace_obj.environment_parameter.get("semantic_model_refresh", {})
+        refresh_body = refresh_config.get("refresh_body", {"type": "Automatic"})
+
+        models = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+        for model_name in self._purged_models:
+            item_obj = models.get(model_name)
+            if not item_obj or not item_obj.guid:
+                continue
+
+            logger.info(f"Refreshing purged semantic model '{model_name}'")
+            try:
+                # https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset
+                refresh_url = (
+                    f"{constants.DEFAULT_API_ROOT_URL}"
+                    f"/v1.0/myorg/groups/{self.fabric_workspace_obj.workspace_id}"
+                    f"/datasets/{item_obj.guid}/refreshes"
+                )
+                self.fabric_workspace_obj.endpoint.invoke(
+                    method="POST",
+                    url=refresh_url,
+                    body=refresh_body,
+                )
+                logger.info(f"Refresh triggered for semantic model '{model_name}'")
+            except Exception as e:
+                logger.error(f"Failed to refresh semantic model '{model_name}': {e}")
+
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Semantic Model item."""
-        self.fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=self.item_type, exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type)
-        )
+        try:
+            self.fabric_workspace_obj._publish_item(
+                item_name=item_name,
+                item_type=self.item_type,
+                exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
+            )
+        except Exception as e:
+            if "PurgeRequired" not in str(e):
+                raise
+
+            if FeatureFlag.ENABLE_SEMANTIC_MODEL_XMLA_FALLBACK.value not in constants.FEATURE_FLAG:
+                raise
+
+            logger.warning(
+                f"Deployment of '{item_name}' failed with PurgeRequired. "
+                f"Falling back to XMLA deployment via Tabular Editor."
+            )
+
+            te2_deploy_fallback(
+                workspace_name=self._get_workspace_name(),
+                item_name=item_name,
+                item_path=str(_item.path),
+            )
+
+            self._purged_models.add(item_name)
 
     def post_publish_all(self) -> None:
-        """Bind semantic models to connections after all models are published."""
+        """Bind semantic models to connections and refresh purged models after publish."""
         semantic_model_binding = self.fabric_workspace_obj.environment_parameter.get("semantic_model_binding", {})
-        if not semantic_model_binding:
-            return
+        if semantic_model_binding:
+            environment = self.fabric_workspace_obj.environment
 
-        # Build connection mapping from semantic_model_binding parameter (support legacy or new formats)
-        environment = self.fabric_workspace_obj.environment
+            if isinstance(semantic_model_binding, list):
+                binding_mapping = build_binding_mapping_legacy(self.fabric_workspace_obj, semantic_model_binding)
+            elif isinstance(semantic_model_binding, dict):
+                binding_mapping = build_binding_mapping(self.fabric_workspace_obj, semantic_model_binding, environment)
+            else:
+                logger.warning(
+                    f"Invalid 'semantic_model_binding' type: {type(semantic_model_binding).__name__}. "
+                    "Expected list or dict. Skipping semantic model binding."
+                )
+                binding_mapping = {}
 
-        if isinstance(semantic_model_binding, list):
-            binding_mapping = build_binding_mapping_legacy(self.fabric_workspace_obj, semantic_model_binding)
-        elif isinstance(semantic_model_binding, dict):
-            binding_mapping = build_binding_mapping(self.fabric_workspace_obj, semantic_model_binding, environment)
-        else:
-            logger.warning(
-                f"Invalid 'semantic_model_binding' type: {type(semantic_model_binding).__name__}. "
-                "Expected list or dict. Skipping semantic model binding."
-            )
-            return
+            if binding_mapping:
+                connections = get_connections(self.fabric_workspace_obj)
+                bind_semanticmodel_to_connection(
+                    fabric_workspace_obj=self.fabric_workspace_obj,
+                    connections=connections,
+                    connection_details=binding_mapping,
+                )
 
-        if binding_mapping:
-            connections = get_connections(self.fabric_workspace_obj)
-            bind_semanticmodel_to_connection(
-                fabric_workspace_obj=self.fabric_workspace_obj,
-                connections=connections,
-                connection_details=binding_mapping,
-            )
+        # Refresh only models that were purged and redeployed via TE2 fallback
+        if self._purged_models:
+            self._refresh_purged_models()
