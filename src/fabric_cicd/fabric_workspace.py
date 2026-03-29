@@ -104,6 +104,7 @@ class FabricWorkspace:
             if _is_fabric_runtime():
                 token_credential = _generate_fabric_credential()
             else:
+                # if credential is not defined, use DefaultAzureCredential
                 from azure.identity import DefaultAzureCredential
 
                 token_credential = DefaultAzureCredential()
