@@ -267,7 +267,6 @@ class TestWorkspaceSettingsExtraction:
         settings = extract_workspace_settings(config, "dev")
         assert "parameter_file_path" not in settings
 
-
 class TestPublishSettingsExtraction:
     """Test publish settings extraction from config."""
 
