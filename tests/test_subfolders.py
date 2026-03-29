@@ -9,6 +9,7 @@ import re
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fixtures.credentials import DummyTokenCredential
 
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -110,6 +111,7 @@ def patched_fabric_workspace(mock_endpoint):
                 workspace_id=workspace_id,
                 repository_directory=repository_directory,
                 item_type_in_scope=item_type_in_scope,
+                token_credential=DummyTokenCredential(),
                 **kwargs,
             )
 
@@ -268,6 +270,7 @@ def test_item_folder_association(repository_with_subfolders, valid_workspace_id)
             workspace_id=valid_workspace_id,
             repository_directory=str(repository_with_subfolders),
             item_type_in_scope=["Notebook", "DataPipeline"],
+            token_credential=DummyTokenCredential(),
         )
 
         # Call methods in the intended order to populate folder structures
