@@ -129,9 +129,10 @@ Traceback (most recent call last):
 
 **Solution**:
 
-1. Explicit authentication is **strongly recommended** as `DefaultAzureCredential` fallback is deprecated and will be removed. Choose the appropriate method for your scenario:
+1. Explicit authentication is **strongly recommended** as `DefaultAzureCredential` fallback is deprecated and will be removed. fabric-cicd accepts any [`TokenCredential`](https://learn.microsoft.com/en-us/python/api/azure-core/azure.core.credentials.tokencredential) — choose the appropriate one for your scenario:
     - Local development: `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
     - CI/CD pipelines with platform auth: `AzureCliCredential` or `AzurePowerShellCredential` (requires a prior login step in the workflow, e.g., `azure/login` or AzCLI task)
+    - CI/CD pipelines with OIDC / workload identity federation: `WorkloadIdentityCredential` (secretless; recommended for GitHub Actions and Azure DevOps with federated credentials)
     - CI/CD pipelines with service principals: `ClientSecretCredential` (requires client ID, secret, and tenant ID)
     - CI/CD pipelines with managed identity: `ManagedIdentityCredential` (requires Azure-hosted self-hosted runners)
     - Fabric Notebooks: Authentication is handled automatically within the Fabric runtime (no explicit credential required unless overriding with a specific identity)
