@@ -256,7 +256,7 @@ Leverage the following when you want to pass in variables outside of the python 
     workspace_id = args.workspace_id
     environment = args.environment
     repository_directory = args.repository_directory
-    item_type_in_scope = args.items_in_scope.split(",")
+    item_type_in_scope = args.items_in_scope.split(",") if args.items_in_scope else ["Notebook", "DataPipeline", "Environment"]
 
     # Initialize the FabricWorkspace object with the required parameters
     target_workspace = FabricWorkspace(
