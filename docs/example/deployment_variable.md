@@ -247,9 +247,9 @@ Leverage the following when you want to pass in variables outside of the python 
     # Accept parsed arguments
     parser = argparse.ArgumentParser(description='Process deployment arguments.')
     parser.add_argument('--workspace_id', type=str, required=True)
-    parser.add_argument('--environment', type=str, required=True)
+    parser.add_argument('--environment', type=str)
     parser.add_argument('--repository_directory', type=str, required=True)
-    parser.add_argument('--items_in_scope', type=str, required=True)
+    parser.add_argument('--items_in_scope', type=str)
     args = parser.parse_args()
 
     # Sample values for FabricWorkspace parameters
