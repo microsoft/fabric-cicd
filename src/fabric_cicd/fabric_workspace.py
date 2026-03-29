@@ -166,10 +166,8 @@ class FabricWorkspace:
         else:
             self.environment_parameter = {}
             logger.info(
-                "Parameterization skipped: no parameter file configured/provided "
-                "(environment=%s, parameter_file_path=%s).",
+                "Parameterization skipped: no parameter file configured/provided (environment=%s).",
                 self.environment,
-                self.parameter_file_path,
             )
 
     @property
