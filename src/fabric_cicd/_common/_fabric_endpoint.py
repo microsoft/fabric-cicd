@@ -153,7 +153,7 @@ class FabricEndpoint:
         if (
             self.aad_token is None
             or self.aad_token_expiration is None
-            or self.aad_token_expiration < datetime.datetime.utcnow()
+            or self.aad_token_expiration < datetime.datetime.now(datetime.timezone.utc)
         ):
             resource_url = "https://api.fabric.microsoft.com/.default"
 
@@ -174,7 +174,7 @@ class FabricEndpoint:
                 oid = decoded_token.get("oid")
 
                 if expiration:
-                    self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration)
+                    self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration, tz=datetime.timezone.utc)
                 else:
                     msg = "Token does not contain expiration claim."
                     raise TokenError(msg, logger)

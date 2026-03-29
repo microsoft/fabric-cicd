@@ -122,7 +122,7 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
     mock_token_credential.get_token.return_value.token = generate_mock_jwt()
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
 
-    endpoint.aad_token_expiration = datetime.datetime.utcnow() - datetime.timedelta(seconds=1)
+    endpoint.aad_token_expiration = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
     endpoint._refresh_token = Mock()
     monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *_, **__: "")
 
