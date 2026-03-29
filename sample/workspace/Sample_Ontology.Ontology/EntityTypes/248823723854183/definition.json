@@ -1,0 +1,13 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/ontology/entityType/1.0.0/schema.json",
+  "id": "248823723854183",
+  "namespace": "usertypes",
+  "baseEntityTypeId": null,
+  "name": "Test",
+  "entityIdParts": [],
+  "displayNamePropertyId": null,
+  "namespaceType": "Custom",
+  "visibility": "Visible",
+  "properties": [],
+  "timeseriesProperties": []
+}

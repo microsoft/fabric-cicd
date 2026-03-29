@@ -127,6 +127,12 @@
 - **Resources** are not source controlled and will not be deployed.
 - **Note:** Both `.py` and `.ipynb` formats are supported. Git-integrated Notebooks only support `.py`, while Notebooks exported via the Get Item Definition API support both formats.
 
+## Ontology
+
+- **Parameterization:**
+    - Referenced items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
+
 ## Real-Time Dashboard
 
 - **Parameterization:**
