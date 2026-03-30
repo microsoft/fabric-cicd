@@ -39,8 +39,8 @@ The Fabric REST API docs follow a predictable URL pattern. Use these steps to di
 
 2. **Fetch that page and confirm deployment operations exist (Gate 2):**
     - Full definition support: Look for **"Get [Item] Definition"** and **"Update [Item] Definition"** operations in the Operations table.
-    - Shell-only support: At minimum a **"Create [Item]"** operation must exist.
-    - If neither exists, Gate 2 fails.
+    - Shell-only support: If the documentation explicitly states that item definition is not supported (e.g., Warehouse's Create page states "This API does not support item definition") and the item has **"Create [Item]"** and **"Update [Item]"** operations, the item is shell-only. **Important:** There can be nuances with definition support — always present your findings to the requestor and ask them to confirm whether the item should be categorized as full definition or shell-only before proceeding.
+    - If neither Create nor definition operations exist, Gate 2 fails.
 
 3. **Construct the Create endpoint URL to check SPN support (Gate 3):**
    `https://learn.microsoft.com/en-us/rest/api/fabric/{itemtype-lowercase}/items/create-{item-type-kebab-case}`
@@ -49,7 +49,7 @@ The Fabric REST API docs follow a predictable URL pattern. Use these steps to di
 
 4. **Fetch the Create endpoint page and find the "Microsoft Entra supported identities" section.** Confirm the table shows **"Service principal and Managed identities: Yes"**. If it shows "No" or the section is missing, Gate 3 fails.
 
-**Important:** You MUST fetch the actual API pages listed above. Do not guess or assume gate results based on the item type name alone. If a URL returns a 404, try alternate kebab-case patterns (e.g., `graphqlapi` instead of `graph-q-l-api`), or fall back to fetching the [Fabric REST API root](https://learn.microsoft.com/en-us/rest/api/fabric/) and navigating to the item type's section.
+**Important:** You MUST fetch the actual API pages listed above. Do not guess or assume gate results based on the item type name alone. If a URL returns a 404, try alternate kebab-case patterns (e.g., `graphqlapi` instead of `graph-q-l-api`), or fall back to fetching the [Fabric REST API root](https://learn.microsoft.com/en-us/rest/api/fabric/) and navigating to the item type's section. If the documentation is still inaccessible, ask the requestor to provide the relevant API page details.
 
 **Exceptions:** Gates 1 and 3 may be excepted on a case-by-case basis with fabric-cicd team approval — for example, Notebook `.ipynb` format is supported despite not being source-controlled (gate 1 exception). Gate 2 (API deployment support) has no exceptions. Any approved exception must be documented as a known limitation in `docs/how_to/item_types.md`.
 
@@ -57,18 +57,14 @@ The Fabric REST API docs follow a predictable URL pattern. Use these steps to di
 
 After the eligibility gates pass, you **must** ask the requestor about **every row** in this table and record the answer before starting implementation. Do not skip any row or assume the answer is "no."
 
-| Question to ask the requestor                                                                                       | Example                                             | Affects     |
-| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------- |
-| Is the deployment type full definition or shell-only?                                                               | Full / Shell-only                                   | Step 1c     |
-| Does the API use a non-standard definition format?                                                                  | `ipynb`, `SparkJobDefinitionV2`                     | Step 1e     |
-| Does the item need custom deployment logic (creation payload, post-publish binding, async provisioning)?            | Lakehouse creation payload, Environment async check | Step 2      |
-| Do definition files need item-type-specific content rewrites beyond generic parameterization?                       | Rewrite cross-item refs, inject deployed values     | Step 2      |
-| Which existing item types must deploy **before** this one? Which existing types depend on this one deploying first? | Eventhouse → KQLDatabase, SemanticModel → Report    | Step 1b     |
-| Does deleting this item destroy user data?                                                                          | Lakehouse, Eventhouse                               | Step 1f     |
-| Should certain file paths within the item folder be skipped during publish?                                         | `.pbi/`, `.children/`                               | Step 1d     |
-| Can items of this type reference each other?                                                                        | Pipeline invokes another pipeline                   | Steps 1g, 2 |
-| Does the definition need runtime properties from already-deployed items?                                            | SQL endpoint URI, query service URI, connection ID  | Step 2      |
-| Does the item need a dedicated `parameter.yml` key beyond `find_replace` / `key_value_replace`?                     | `spark_pool`, `semantic_model_binding`              | Step 2      |
+| Question to ask the requestor                                                                                                                                                                                                                                     | Example                                                                                                      | Affects     |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------- |
+| Which existing item types must deploy **before** this one? Which existing types depend on this one deploying first?                                                                                                                                               | Eventhouse → KQLDatabase, SemanticModel → Report                                                             | Step 1b     |
+| Should certain file paths within the item folder be skipped during publish?                                                                                                                                                                                       | `.pbi/`, `.children/`                                                                                        | Step 1d     |
+| Does the API use a non-standard definition format? If yes, provide the exact format string and instructions for how it should be handled.                                                                                                                         | `ipynb`, `SparkJobDefinitionV2` (rare)                                                                       | Step 1e     |
+| Does deleting this item destroy user data?                                                                                                                                                                                                                        | Lakehouse, Eventhouse                                                                                        | Step 1f     |
+| Can items of this type reference each other?                                                                                                                                                                                                                      | Pipeline invokes another pipeline                                                                            | Steps 1g, 2 |
+| Does the item need custom deployment logic (creation payload, post-publish binding, async provisioning, content rewrites for cross-item references, runtime attributes from deployed items, or dedicated parameterization keys)? If yes, describe what is needed. | Lakehouse creation payload, Environment async check, KQL items need query service URI, SemanticModel binding | Step 2      |
 
 ---
 
@@ -198,7 +194,7 @@ If the new item's definition contains references to other item types that need r
 
 | Pattern                          | When to use                                                                  | Example                               | Key mechanism                                                                                                                          |
 | -------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Property attribute lookup**    | Needs a runtime property (SQL endpoint, query URI) from an upstream item     | `_kqlqueryset.py`, `_kqldashboard.py` | `pre_publish_all()` → `_refresh_deployed_items()`, then look up `workspace_obj.deployed_items[upstream_type]` in `func_process_file()` |
+| **Property attribute lookup**    | Needs a runtime attribute (SQL endpoint, query URI) from an upstream item    | `_kqlqueryset.py`, `_kqldashboard.py` | `pre_publish_all()` → `_refresh_deployed_items()`, then look up `workspace_obj.deployed_items[upstream_type]` in `func_process_file()` |
 | **Path-to-ID resolution**        | Definition contains a relative path to another item type                     | `_report.py`                          | `workspace_obj._convert_path_to_id(upstream_type, path)` in `func_process_file()`                                                      |
 | **ID-to-name resolution**        | Definition contains GUIDs referencing another item type                      | `_datapipeline.py`                    | `workspace_obj._convert_id_to_name(item_type, guid, lookup_type)`                                                                      |
 | **Parameterization (automatic)** | Reference handled by `find_replace` / `key_value_replace` in `parameter.yml` | Most simple items                     | No publisher code needed                                                                                                               |
