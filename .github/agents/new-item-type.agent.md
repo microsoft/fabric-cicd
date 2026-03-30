@@ -42,12 +42,11 @@ The Fabric REST API docs follow a predictable URL pattern. Use these steps to di
     - Shell-only support: If the documentation explicitly states that item definition is not supported (e.g., Warehouse's Create page states "This API does not support item definition") and the item has **"Create [Item]"** and **"Update [Item]"** operations, the item is shell-only. **Important:** There can be nuances with definition support — always present your findings to the requestor and ask them to confirm whether the item should be categorized as full definition or shell-only before proceeding.
     - If neither Create nor definition operations exist, Gate 2 fails.
 
-3. **Construct the Create endpoint URL to check SPN support (Gate 3):**
+3. **Fetch the Create endpoint page to check SPN support (Gate 3):**
    `https://learn.microsoft.com/en-us/rest/api/fabric/{itemtype-lowercase}/items/create-{item-type-kebab-case}`
    where `{item-type-kebab-case}` inserts hyphens between PascalCase words and lowercases everything.
     - Examples: `SnowflakeDatabase` → `create-snowflake-database`, `DataPipeline` → `create-data-pipeline`, `KQLDatabase` → `create-kql-database`
-
-4. **Fetch the Create endpoint page and find the "Microsoft Entra supported identities" section.** Confirm the table shows **"Service principal and Managed identities: Yes"**. If it shows "No" or the section is missing, Gate 3 fails.
+    - Find the **"Microsoft Entra supported identities"** section and confirm the table shows **"Service principal and Managed identities: Yes"**. If it shows "No" or the section is missing, Gate 3 fails.
 
 **Important:** You MUST fetch the actual API pages listed above. Do not guess or assume gate results based on the item type name alone. If a URL returns a 404, try alternate kebab-case patterns (e.g., `graphqlapi` instead of `graph-q-l-api`), or fall back to fetching the [Fabric REST API root](https://learn.microsoft.com/en-us/rest/api/fabric/) and navigating to the item type's section. If the documentation is still inaccessible, ask the requestor to provide the relevant API page details.
 
@@ -57,14 +56,14 @@ The Fabric REST API docs follow a predictable URL pattern. Use these steps to di
 
 After the eligibility gates pass, you **must** ask the requestor about **every row** in this table and record the answer before starting implementation. Do not skip any row or assume the answer is "no."
 
-| Question to ask the requestor                                                                                                                                                                                                                                     | Example                                                                                                      | Affects     |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------- |
-| Which existing item types must deploy **before** this one? Which existing types depend on this one deploying first?                                                                                                                                               | Eventhouse → KQLDatabase, SemanticModel → Report                                                             | Step 1b     |
-| Should certain file paths within the item folder be skipped during publish?                                                                                                                                                                                       | `.pbi/`, `.children/`                                                                                        | Step 1d     |
-| Does the API use a non-standard definition format? If yes, provide the exact format string and instructions for how it should be handled.                                                                                                                         | `ipynb`, `SparkJobDefinitionV2` (rare)                                                                       | Step 1e     |
-| Does deleting this item destroy user data?                                                                                                                                                                                                                        | Lakehouse, Eventhouse                                                                                        | Step 1f     |
-| Can items of this type reference each other?                                                                                                                                                                                                                      | Pipeline invokes another pipeline                                                                            | Steps 1g, 2 |
-| Does the item need custom deployment logic (creation payload, post-publish binding, async provisioning, content rewrites for cross-item references, runtime attributes from deployed items, or dedicated parameterization keys)? If yes, describe what is needed. | Lakehouse creation payload, Environment async check, KQL items need query service URI, SemanticModel binding | Step 2      |
+| Question to ask the requestor                                                                                                             | Example                                                                                                                                          | Affects     |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Which existing item types must deploy **before** this one? Which existing types depend on this one deploying first?                       | Eventhouse → KQLDatabase, SemanticModel → Report                                                                                                 | Step 1b     |
+| Should certain file paths within the item folder be skipped during publish?                                                               | `.pbi/`, `.children/`                                                                                                                            | Step 1d     |
+| Does the API use a non-standard definition format? If yes, provide the exact format string and instructions for how it should be handled. | `ipynb`, `SparkJobDefinitionV2`                                                                                                                  | Step 1e     |
+| Does deleting this item destroy user data?                                                                                                | Lakehouse, Eventhouse                                                                                                                            | Step 1f     |
+| Can items of this type reference each other?                                                                                              | Data Pipeline invokes another Data Pipeline                                                                                                      | Steps 1g, 2 |
+| Does the item need custom deployment logic, dependency resolution, or special parameterization? If yes, describe what is needed.          | Lakehouse creation payload, Environment async check, KQL items need query service URI (via dynamic replacement), SemanticModel binding parameter | Step 2      |
 
 ---
 
@@ -108,29 +107,18 @@ Choose the correct position based on the item's dependencies. Items that other i
 
 ##### How to determine the correct position
 
+> **How items reference each other:** In Fabric definition files, items reference other items via either **logical IDs** (workspace-agnostic GUIDs assigned by Git integration — automatically replaced by fabric-cicd) or **item IDs** (environment-specific GUIDs that differ per workspace — must be resolved via parameterization in `parameter.yml`). When reviewing definition files to identify dependencies, look for both types of references.
+
 1. **Read the current `SERIAL_ITEM_PUBLISH_ORDER`** in `constants.py` to see the latest order.
-2. **Identify upstream dependencies** — types the new item depends on. Check definition files for references (GUIDs, paths, connection strings) and ask the requestor. The new item must go **after** the highest-numbered upstream dependency.
+2. **Identify upstream dependencies** — types the new item depends on. Check definition files for references (logical IDs, item IDs, paths, connection strings) and ask the requestor. The new item must go **after** the highest-numbered upstream dependency.
 3. **Identify downstream dependents** — existing types that will depend on the new item. The new item must go **before** the lowest-numbered downstream dependent.
 4. Place the new item anywhere in the valid range between those two bounds. If there is no gap, renumber existing entries to make room.
 5. If the new item has **no dependencies in either direction**, place it at the end of the order.
 6. **When in doubt, ask the requestor** — do not guess dependency relationships.
 
-##### Existing inter-type dependency map
-
-Use this map to understand **why** existing items are ordered as they are, so you can identify where dependencies exist for the new item type:
-
-| Upstream (publishes first)        | Downstream (publishes after)               | Relationship                                      |
-| --------------------------------- | ------------------------------------------ | ------------------------------------------------- |
-| Lakehouse, Warehouse, SQLDatabase | Notebook, SparkJobDefinition, DataPipeline | Storage endpoints referenced via parameterization |
-| Eventhouse                        | KQLDatabase, KQLQueryset, KQLDashboard     | KQL items reference Eventhouse query service URI  |
-| SemanticModel                     | Report                                     | Reports reference SemanticModel via relative path |
-| Environment                       | Notebook, SparkJobDefinition               | Runtime configuration reference                   |
-| VariableLibrary, MirroredDatabase | Most other types                           | Foundational items, rarely depend on others       |
-| (most other types)                | DataPipeline, Dataflow, CopyJob            | Orchestration items publish last                  |
-
 #### 1c. Optionally add to `SHELL_ONLY_PUBLISH`
 
-If the API does **not** support item definition and only supports metadata (shell) deployment — like Lakehouse, Warehouse, SQL Database, ML Experiment.
+If the API does **not** support item definition and only supports metadata (shell) deployment — like Warehouse, ML Experiment, etc.
 
 #### 1d. Optionally add to `EXCLUDE_PATH_REGEX_MAPPING`
 
