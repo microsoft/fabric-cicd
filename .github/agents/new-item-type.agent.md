@@ -176,19 +176,6 @@ For more complex items, you can override these methods from `ItemPublisher`:
 | `post_publish_all()`            | Post-publish actions                    | e.g., Semantic Model connection binding                  |
 | `post_publish_all_check()`      | Async publish state verification        | **Must also set `has_async_publish_check = True`**       |
 
-#### Inter-Type Dependency Handling
-
-If the new item's definition contains references to other item types that need resolving at deploy time, implement one of these patterns:
-
-| Pattern                          | When to use                                                                  | Example                               | Key mechanism                                                                                                                          |
-| -------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Property attribute lookup**    | Needs a runtime attribute (SQL endpoint, query URI) from an upstream item    | `_kqlqueryset.py`, `_kqldashboard.py` | `pre_publish_all()` → `_refresh_deployed_items()`, then look up `workspace_obj.deployed_items[upstream_type]` in `func_process_file()` |
-| **Path-to-ID resolution**        | Definition contains a relative path to another item type                     | `_report.py`                          | `workspace_obj._convert_path_to_id(upstream_type, path)` in `func_process_file()`                                                      |
-| **ID-to-name resolution**        | Definition contains GUIDs referencing another item type                      | `_datapipeline.py`                    | `workspace_obj._convert_id_to_name(item_type, guid, lookup_type)`                                                                      |
-| **Parameterization (automatic)** | Reference handled by `find_replace` / `key_value_replace` in `parameter.yml` | Most simple items                     | No publisher code needed                                                                                                               |
-
-If the new item is an **upstream dependency** (other existing items will reference it), check whether you need to add it to `PROPERTY_PATH_ATTR_MAPPING` in `constants.py` and whether existing downstream publishers need updates. Ask the requestor.
-
 #### Intra-Type Dependency Ordering (DAG)
 
 If items of the same type can reference each other (e.g., a pipeline invoking another pipeline, a dataflow sourcing from another dataflow), publish and unpublish order must respect those internal dependencies. This requires:
