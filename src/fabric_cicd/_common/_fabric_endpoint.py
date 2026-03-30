@@ -174,6 +174,7 @@ class FabricEndpoint:
                 oid = decoded_token.get("oid")
 
                 if expiration:
+                    # Must be timezone-aware (UTC) to match the timezone-aware datetime used in comparison
                     self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration, tz=datetime.timezone.utc)
                 else:
                     msg = "Token does not contain expiration claim."
