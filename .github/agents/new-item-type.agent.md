@@ -254,7 +254,7 @@ Add a new section for the item type following the existing pattern.
 
 Encourage the requestor to:
 
-1. **Add a sample item** to `sample/workspace/` by exporting an instance of the item type from a Fabric workspace connected to Git. The exported folder should follow the naming convention `{DisplayName}.{ItemType}/`.
+1. **Add a sample item** to `sample/workspace/` by exporting an instance of the item type from a Fabric workspace connected to Git. The exported folder should follow the naming convention `{ItemName}.{ItemType}/` (e.g., `Hello Copy Job.CopyJob/`).
 2. **Add the item type** to `item_type_in_scope` in `devtools/debug_local.py` and run a sample deployment against a real workspace to validate end-to-end behavior.
 3. **Add the item type** to `item_types_to_deploy` in `tests/test_integration_publish.py`. The HTTP trace (`tests/fixtures/http_trace.json.gz`) must also be regenerated against a real workspace — this is a manual step.
 
