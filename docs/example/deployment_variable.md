@@ -1,6 +1,10 @@
 # Deployment Variable Examples
 
-A key concept in CI/CD is defining environment-specific deployment variables. The following are examples on how to inject variables from outside of the python script to handle values that are environment specific, or common accross other tooling.
+A key concept in CI/CD is defining environment-specific deployment variables. The following are examples of how to inject variables from outside of the python script to handle values that are environment-specific, or common across other tooling. These examples provide starting points that should be adapted for your specific environment and security requirements.
+
+> **⚠️ DEPRECATION NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential`) authentication method is deprecated and will be removed in a future release. All examples below use explicit credential methods.
+
+**Note:** All examples below use the `AzureCliCredential` token for demonstration purposes. You can substitute this with other explicit credential methods based on your environment.
 
 ## Branch Based
 
@@ -9,12 +13,15 @@ Leverage the following when you have specific values that you need to define per
 === "Local"
 
     ```python
-    '''Leverages Default Credential Flow for authentication. Determines variables based on locally checked out branch.'''
+    '''Determines variables based on locally checked out branch'''
 
     from pathlib import Path
-
     import git  # Depends on pip install gitpython
+    from azure.identity import AzureCliCredential
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+    # Use Azure CLI credential to authenticate
+    token_credential = AzureCliCredential()
 
     # Assumes your script is one level down from root
     root_directory = Path(__file__).resolve().parent
@@ -43,6 +50,7 @@ Leverage the following when you have specific values that you need to define per
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
+        token_credential=token_credential,
     )
 
     # Publish all items defined in item_type_in_scope
@@ -50,18 +58,20 @@ Leverage the following when you have specific values that you need to define per
 
     # Unpublish all items defined in item_type_in_scope not found in repository
     unpublish_all_orphan_items(target_workspace)
-
     ```
 
 === "Azure DevOps"
 
     ```python
-    '''Leverages Default Credential Flow for authentication. Determines variables based on the branch that originated the build.'''
+    '''
+    Determines variables based on the branch that originated the build
+    Uses Azure CLI credential with service connection
+    '''
 
     import sys
     import os
     from pathlib import Path
-
+    from azure.identity import AzureCliCredential
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, change_log_level
 
     # Force unbuffered output like `python -u`
@@ -71,6 +81,9 @@ Leverage the following when you have specific values that you need to define per
     # Enable debugging if defined in Azure DevOps pipeline
     if os.getenv("SYSTEM_DEBUG", "false").lower() == "true":
         change_log_level("DEBUG")
+
+    # Use Azure CLI credential to authenticate
+    token_credential = AzureCliCredential()
 
     # Assumes your script is one level down from root
     root_directory = Path(__file__).resolve().parent
@@ -91,13 +104,13 @@ Leverage the following when you have specific values that you need to define per
     repository_directory = str(root_directory / "your-workspace-directory")
     item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
 
-
     # Initialize the FabricWorkspace object with the required parameters
     target_workspace = FabricWorkspace(
         workspace_id=workspace_id,
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
+        token_credential=token_credential,
     )
 
     # Publish all items defined in item_type_in_scope
@@ -110,7 +123,53 @@ Leverage the following when you have specific values that you need to define per
 === "GitHub"
 
     ```python
-    '''Unconfirmed example at this time, however, the Azure DevOps example is a good starting point'''
+    '''
+    Determines variables based on the branch that originated the build
+    Uses Azure CLI credential (requires az login in GitHub Actions workflow)
+    '''
+
+    import os
+    from pathlib import Path
+    from azure.identity import AzureCliCredential
+    from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+    # Use Azure CLI credential to authenticate
+    token_credential = AzureCliCredential()
+
+    # GitHub Actions sets GITHUB_WORKSPACE automatically
+    root_directory = Path(os.getenv("GITHUB_WORKSPACE", ".")).resolve()
+
+    # Get branch from GitHub environment variable
+    branch = os.getenv("GITHUB_REF_NAME")
+
+    # The defined environment values should match the names found in the parameter.yml file
+    if branch == "dev":
+        workspace_id = "dev-workspace-id"
+        environment = "DEV"
+    elif branch == "main":
+        workspace_id = "prod-workspace-id"
+        environment = "PROD"
+    else:
+        raise ValueError("Invalid branch to deploy from")
+
+    # Sample values for FabricWorkspace parameters
+    repository_directory = str(root_directory / "your-workspace-directory")
+    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
+
+    # Initialize the FabricWorkspace object with the required parameters
+    target_workspace = FabricWorkspace(
+        workspace_id=workspace_id,
+        environment=environment,
+        repository_directory=repository_directory,
+        item_type_in_scope=item_type_in_scope,
+        token_credential=token_credential,
+    )
+
+    # Publish all items defined in item_type_in_scope
+    publish_all_items(target_workspace)
+
+    # Unpublish all items defined in item_type_in_scope not found in repository
+    unpublish_all_orphan_items(target_workspace)
     ```
 
 ## Passed Arguments
@@ -120,17 +179,20 @@ Leverage the following when you want to pass in variables outside of the python 
 === "Local"
 
     ```python
-    '''Leverages Default Credential Flow for authentication. Accepts parameters passed into Python during execution.'''
+    '''Accepts parameters passed into Python during execution'''
 
     import argparse
-
+    from azure.identity import AzureCliCredential
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
+    # Use Azure CLI credential to authenticate
+    token_credential = AzureCliCredential()
+
     # Accept parsed arguments
-    parser = argparse.ArgumentParser(description='Process Azure Pipeline arguments.')
-    parser.add_argument('--workspace_id', type=str)
+    parser = argparse.ArgumentParser(description='Process deployment arguments.')
+    parser.add_argument('--workspace_id', type=str, required=True)
     parser.add_argument('--environment', type=str)
-    parser.add_argument('--repository_directory', type=str)
+    parser.add_argument('--repository_directory', type=str, required=True)
     parser.add_argument('--items_in_scope', type=str)
     args = parser.parse_args()
 
@@ -138,7 +200,7 @@ Leverage the following when you want to pass in variables outside of the python 
     workspace_id = args.workspace_id
     environment = args.environment
     repository_directory = args.repository_directory
-    item_type_in_scope = args.items_in_scope.split(",")
+    item_type_in_scope = args.items_in_scope.split(",") if args.items_in_scope else ["Notebook", "DataPipeline", "Environment"]
 
     # Initialize the FabricWorkspace object with the required parameters
     target_workspace = FabricWorkspace(
@@ -146,6 +208,7 @@ Leverage the following when you want to pass in variables outside of the python 
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
+        token_credential=token_credential,
     )
 
     # Publish all items defined in item_type_in_scope
@@ -153,18 +216,21 @@ Leverage the following when you want to pass in variables outside of the python 
 
     # Unpublish all items defined in item_type_in_scope not found in repository
     unpublish_all_orphan_items(target_workspace)
-
     ```
 
 === "Azure DevOps"
 
     ```python
-    '''Leverages Default Credential Flow for authentication. Accepts parameters passed into Python during execution.'''
+    '''
+    Accepts parameters passed into Python during execution
+    Uses Azure CLI credential with service connection
+    '''
 
     import sys
     import os
+    import argparse
     from pathlib import Path
-
+    from azure.identity import AzureCliCredential
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, change_log_level
 
     # Force unbuffered output like `python -u`
@@ -175,11 +241,14 @@ Leverage the following when you want to pass in variables outside of the python 
     if os.getenv("SYSTEM_DEBUG", "false").lower() == "true":
         change_log_level("DEBUG")
 
+    # Use Azure CLI credential to authenticate
+    token_credential = AzureCliCredential()
+
     # Accept parsed arguments
-    parser = argparse.ArgumentParser(description='Process Azure Pipeline arguments.')
-    parser.add_argument('--workspace_id', type=str)
+    parser = argparse.ArgumentParser(description='Process deployment arguments.')
+    parser.add_argument('--workspace_id', type=str, required=True)
     parser.add_argument('--environment', type=str)
-    parser.add_argument('--repository_directory', type=str)
+    parser.add_argument('--repository_directory', type=str, required=True)
     parser.add_argument('--items_in_scope', type=str)
     args = parser.parse_args()
 
@@ -187,7 +256,7 @@ Leverage the following when you want to pass in variables outside of the python 
     workspace_id = args.workspace_id
     environment = args.environment
     repository_directory = args.repository_directory
-    item_type_in_scope = args.items_in_scope.split(",")
+    item_type_in_scope = args.items_in_scope.split(",") if args.items_in_scope else ["Notebook", "DataPipeline", "Environment"]
 
     # Initialize the FabricWorkspace object with the required parameters
     target_workspace = FabricWorkspace(
@@ -195,6 +264,7 @@ Leverage the following when you want to pass in variables outside of the python 
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
+        token_credential=token_credential,
     )
 
     # Publish all items defined in item_type_in_scope

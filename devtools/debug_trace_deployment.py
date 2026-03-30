@@ -9,6 +9,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from azure.identity import AzureCliCredential
+
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
 
@@ -27,7 +29,6 @@ def main():
         raise ValueError(msg)
 
     environment = "PPE"
-
     repository_directory = str(root_directory / "sample" / "workspace")
     item_type_in_scope = [
         "Dataflow",
@@ -49,6 +50,7 @@ def main():
         "VariableLibrary",
         "Warehouse",
     ]
+    token_credential = AzureCliCredential()
     for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
         fabric_cicd.append_feature_flag(flag)
     target_workspace = fabric_cicd.FabricWorkspace(
@@ -56,6 +58,7 @@ def main():
         environment=environment,
         repository_directory=str(repository_directory),
         item_type_in_scope=item_type_in_scope,
+        token_credential=token_credential,
     )
     fabric_cicd.publish_all_items(target_workspace)
 

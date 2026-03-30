@@ -24,7 +24,7 @@ def set_publish_order(
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        item_type: Type of item to order (e.g., 'DataPipeline', 'Dataflow').
+        item_type: Type of item to order (e.g., 'DataPipeline').
         find_referenced_items_func: Function to find referenced items in content.
     """
     # Get all items of the given type from the repository
@@ -32,7 +32,7 @@ def set_publish_order(
 
     # Construct the unsorted_dict with an item and its associated file content
     unsorted_dict = {}
-    # Set the file name based on the item type (e.g., 'pipeline-content.json' for DataPipeline, 'mashup.pq' for Dataflow)
+    # Set the file name based on the item type (e.g., 'pipeline-content.json' for DataPipeline)
     file_name = constants.ITEM_TYPE_TO_FILE[item_type]
 
     for item_name, item_details in items.items():
@@ -58,7 +58,7 @@ def set_unpublish_order(
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        item_type: Type of item to order (e.g., 'DataPipeline', 'Dataflow').
+        item_type: Type of item to order (e.g., 'DataPipeline').
         unpublish_list: List of items to unpublish.
         find_referenced_items_func: Function to find referenced items in content.
     """
