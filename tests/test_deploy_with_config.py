@@ -952,10 +952,10 @@ class TestDeployWithConfig:
         config_file = tmp_path / "config.yml"
         config_file.write_text(yaml.dump(config_data))
 
-        with patch("fabric_cicd.publish.FabricWorkspace") as MockWS:
+        with patch("fabric_cicd.publish.FabricWorkspace") as mock_fabric_ws:
             mock_ws = MagicMock()
             mock_ws.environment_parameter = {}
-            MockWS.return_value = mock_ws
+            mock_fabric_ws.return_value = mock_ws
 
             # Call deploy_with_config and verify skip_parameterization=True was passed
             # (mock publish/unpublish to avoid real API calls)
@@ -966,7 +966,7 @@ class TestDeployWithConfig:
                 deploy_with_config(str(config_file), "dev", token_credential=MagicMock())
 
             # Assert FabricWorkspace was constructed with skip_parameterization=True
-            call_kwargs = MockWS.call_args[1]
+            call_kwargs = mock_fabric_ws.call_args[1]
             assert call_kwargs.get("skip_parameterization") is True
 
     def test_deploy_with_config_loads_parameter_when_field_present(self, tmp_path):
@@ -988,9 +988,9 @@ class TestDeployWithConfig:
         parameter_file = tmp_path / "my-params.yml"
         parameter_file.write_text("find_replace:\n  - find_value: 'old'\n    replace_value:\n      dev: 'new'\n")
 
-        with patch("fabric_cicd.publish.FabricWorkspace") as MockWS:
+        with patch("fabric_cicd.publish.FabricWorkspace") as mock_fabric_ws:
             mock_ws = MagicMock()
-            MockWS.return_value = mock_ws
+            mock_fabric_ws.return_value = mock_ws
 
             with (
                 patch("fabric_cicd.publish.publish_all_items"),
@@ -998,7 +998,7 @@ class TestDeployWithConfig:
             ):
                 deploy_with_config(str(config_file), "dev", token_credential=MagicMock())
 
-            call_kwargs = MockWS.call_args[1]
+            call_kwargs = mock_fabric_ws.call_args[1]
             assert call_kwargs.get("skip_parameterization") is False
 
 class TestConfigIntegration:
