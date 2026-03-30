@@ -932,6 +932,74 @@ class TestDeployWithConfig:
         call_args = mock_publish.call_args[1]
         assert call_args["folder_path_to_include"] == ["/dev/folder"]
 
+    def test_deploy_with_config_skips_parameterization_when_parameter_absent(self, tmp_path):
+        """Integration: deploy_with_config must not auto-discover parameter.yml
+        when the 'parameter' field is absent from the config file."""
+        # Set up repo directory WITH a parameter.yml that would be auto-discovered
+        repo_dir = tmp_path / "workspace"
+        repo_dir.mkdir()
+        (repo_dir / "parameter.yml").write_text(
+            "find_replace:\n  - find_value: 'old'\n    replace_value:\n      dev: 'new'\n"
+        )
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "11111111-1111-1111-1111-111111111111"},
+                "repository_directory": str(repo_dir),
+                # 'parameter' intentionally omitted
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(yaml.dump(config_data))
+
+        with patch("fabric_cicd.publish.FabricWorkspace") as MockWS:
+            mock_ws = MagicMock()
+            mock_ws.environment_parameter = {}
+            MockWS.return_value = mock_ws
+
+            # Call deploy_with_config and verify skip_parameterization=True was passed
+            # (mock publish/unpublish to avoid real API calls)
+            with (
+                patch("fabric_cicd.publish.publish_all_items"),
+                patch("fabric_cicd.publish.unpublish_all_orphan_items"),
+            ):
+                deploy_with_config(str(config_file), "dev", token_credential=MagicMock())
+
+            # Assert FabricWorkspace was constructed with skip_parameterization=True
+            call_kwargs = MockWS.call_args[1]
+            assert call_kwargs.get("skip_parameterization") is True
+
+    def test_deploy_with_config_loads_parameter_when_field_present(self, tmp_path):
+        """Integration: deploy_with_config must pass skip_parameterization=False
+        when the 'parameter' field IS present in config."""
+        repo_dir = tmp_path / "workspace"
+        repo_dir.mkdir()
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "11111111-1111-1111-1111-111111111111"},
+                "repository_directory": str(repo_dir),
+                "parameter": "my-params.yml",
+            }
+        }
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(yaml.dump(config_data))
+
+        parameter_file = tmp_path / "my-params.yml"
+        parameter_file.write_text("find_replace:\n  - find_value: 'old'\n    replace_value:\n      dev: 'new'\n")
+
+        with patch("fabric_cicd.publish.FabricWorkspace") as MockWS:
+            mock_ws = MagicMock()
+            MockWS.return_value = mock_ws
+
+            with (
+                patch("fabric_cicd.publish.publish_all_items"),
+                patch("fabric_cicd.publish.unpublish_all_orphan_items"),
+            ):
+                deploy_with_config(str(config_file), "dev", token_credential=MagicMock())
+
+            call_kwargs = MockWS.call_args[1]
+            assert call_kwargs.get("skip_parameterization") is False
 
 class TestConfigIntegration:
     """Integration tests for config functionality."""
