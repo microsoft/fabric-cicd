@@ -155,6 +155,7 @@ def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(workspace)
