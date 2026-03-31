@@ -1,0 +1,9 @@
+// KQL script
+// Use management commands in this script to configure your database items, such as tables, functions, materialized views, and more.
+
+
+.create-merge table FreezerTelemetry (timestamp:datetime, storeId:string, freezerId:string, temperatureC:real, humidityPct:real, doorOpen:long) 
+.create-or-alter table FreezerTelemetry ingestion csv mapping 'FreezerTelemetry_mapping'
+```
+[{"Properties":{"Ordinal":"0"},"column":"timestamp","datatype":""},{"Properties":{"Ordinal":"1"},"column":"storeId","datatype":""},{"Properties":{"Ordinal":"2"},"column":"freezerId","datatype":""},{"Properties":{"Ordinal":"3"},"column":"temperatureC","datatype":""},{"Properties":{"Ordinal":"4"},"column":"humidityPct","datatype":""},{"Properties":{"Ordinal":"5"},"column":"doorOpen","datatype":""}]
+```
