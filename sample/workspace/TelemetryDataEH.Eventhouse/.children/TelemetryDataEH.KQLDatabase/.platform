@@ -1,11 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Ontology",
-    "displayName": "Sample_Ontology"
+    "type": "KQLDatabase",
+    "displayName": "TelemetryDataEH",
+    "description": "TelemetryDataEH"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "58e0ef65-ca86-8796-415e-b334b6ee6a3a"
+    "logicalId": "65341627-8b62-85ef-49a4-65cc214b4411"
   }
 }
