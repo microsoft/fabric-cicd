@@ -18,40 +18,52 @@ tools:
 
 ## Prerequisites
 
-Before starting, gather the following information about the new item type:
-
-### Core Information (always gather before starting)
-
-| Information                                                | Example           | Required |
-| ---------------------------------------------------------- | ----------------- | -------- |
-| **Display name** (PascalCase, as used by Fabric API)       | `CopyJob`         | Yes      |
-| **Supported in source control / Git integration**          | Yes / No          | Yes      |
-| **Fabric API supports deployment** (create/update via API) | Yes / No          | Yes      |
-| **Deployment type** (full definition or shell-only)        | Full / Shell-only | Yes      |
-| **Supports service principal (SPN) authentication**        | Yes / No          | Yes      |
-
-### Additional Details (gather when relevant to the item type)
-
-| Information                                     | Example                                             | Detail                                                                             |
-| ----------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Alternate Definition format**                 | `ipynb`, `SparkJobDefinitionV2`                     | If the item uses a non-standard API format                                         |
-| **Custom deployment logic**                     | Creation payload, post-publish binding, async check | If the item needs special handling beyond standard publish                         |
-| **Custom file content transformation**          | Rewrite cross-item refs, inject deployed values     | If file contents need item-type-specific changes the generic pipeline can't handle |
-| **Dependencies on other item types**            | Eventhouse → KQLDatabase                            | If the item depends on another item type existing first                            |
-| **Destructive unpublish** (data loss on delete) | Lakehouse, Eventhouse                               | If deleting the item destroys user data                                            |
-| **Exclude paths during publish**                | `.pbi/`, `.children/`                               | If certain files within the item folder should be skipped                          |
-| **Intra-type dependencies**                     | Pipeline invokes another pipeline                   | If items of this type can reference each other                                     |
-| **Specialized parameterization**                | `spark_pool`, `semantic_model_binding`              | If the item needs a dedicated `parameter.yml` key beyond generic find/replace      |
+Before starting, you need only the **display name** (PascalCase, as used by the Fabric API — e.g., `CopyJob`, `SnowflakeDatabase`). The eligibility gates below will determine the remaining core details.
 
 ### Eligibility Gates
 
 Before proceeding, confirm all of the following. If any gate fails, **stop** — the item type cannot be onboarded.
 
-1. The item type must be supported in source control / Git integration. See [supported item types for Git integration](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/item-definition-overview).
-2. The Fabric API must support deployment for the item type — either full definition deployment or shell-only creation (like Lakehouse/Warehouse). Search the [Fabric REST API docs](https://learn.microsoft.com/en-us/rest/api/fabric/) to confirm.
-3. The Fabric API must support service principal (SPN) authentication for the item type's deployment operations. fabric-cicd is primarily used in CI/CD pipelines where SPN is the standard authentication method. Check the item type's page in the [Fabric REST API docs](https://learn.microsoft.com/en-us/rest/api/fabric/) — supported authentication types are listed per API operation.
+1. The item type must be supported in source control / Git integration. Fetch the [item definition overview](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/item-definition-overview) page and check if the item type appears in the **"Definition Details for Supported Item Types"** list.
+2. The Fabric API must support deployment for the item type — either full definition deployment or shell-only creation (like Lakehouse/Warehouse). Verify using the steps in **"How to verify gates 2 and 3"** below.
+3. The Fabric API must support service principal (SPN) authentication for the item type's deployment operations. fabric-cicd is primarily used in CI/CD pipelines where SPN is the standard authentication method. Verify using the steps in **"How to verify gates 2 and 3"** below.
+
+#### How to verify gates 2 and 3
+
+The Fabric REST API docs follow a predictable URL pattern. Use these steps to directly navigate to the right pages instead of searching the generic API root:
+
+1. **Construct the item type's API items page URL:**
+   `https://learn.microsoft.com/en-us/rest/api/fabric/{itemtype-lowercase}/items`
+   where `{itemtype-lowercase}` is the PascalCase item type name lowercased with no separators.
+    - Examples: `SnowflakeDatabase` → `snowflakedatabase`, `DataPipeline` → `datapipeline`, `KQLDatabase` → `kqldatabase`
+
+2. **Fetch that page and confirm deployment operations exist (Gate 2):**
+    - Full definition support: Look for **"Get [Item] Definition"** and **"Update [Item] Definition"** operations in the Operations table.
+    - Shell-only support: If the documentation explicitly states that item definition is not supported (e.g., Warehouse's Create page states "This API does not support item definition") and the item has **"Create [Item]"** and **"Update [Item]"** operations, the item is shell-only. **Important:** There can be nuances with definition support — always present your findings to the requestor and ask them to confirm whether the item should be categorized as full definition or shell-only before proceeding.
+    - If neither Create nor definition operations exist, Gate 2 fails.
+
+3. **Fetch the Create endpoint page to check SPN support (Gate 3):**
+   `https://learn.microsoft.com/en-us/rest/api/fabric/{itemtype-lowercase}/items/create-{item-type-kebab-case}`
+   where `{item-type-kebab-case}` inserts hyphens between PascalCase words and lowercases everything.
+    - Examples: `SnowflakeDatabase` → `create-snowflake-database`, `DataPipeline` → `create-data-pipeline`, `KQLDatabase` → `create-kql-database`
+    - Find the **"Microsoft Entra supported identities"** section and confirm the table shows **"Service principal and Managed identities: Yes"**. If it shows "No" or the section is missing, Gate 3 fails.
+
+**Important:** You MUST fetch the actual API pages listed above. Do not guess or assume gate results based on the item type name alone. If a URL returns a 404, try alternate kebab-case patterns (e.g., `graphqlapi` instead of `graph-q-l-api`), or fall back to fetching the [Fabric REST API root](https://learn.microsoft.com/en-us/rest/api/fabric/) and navigating to the item type's section. If the documentation is still inaccessible, ask the requestor to provide the relevant API page details.
 
 **Exceptions:** Gates 1 and 3 may be excepted on a case-by-case basis with fabric-cicd team approval — for example, Notebook `.ipynb` format is supported despite not being source-controlled (gate 1 exception). Gate 2 (API deployment support) has no exceptions. Any approved exception must be documented as a known limitation in `docs/how_to/item_types.md`.
+
+### Additional Details (Required)
+
+After the eligibility gates pass, you **must** ask the requestor about **every row** in this table and record the answer before starting implementation. Do not skip any row or assume the answer is "no."
+
+| Question to ask the requestor                                                                                                             | Example                                                                                                                                          | Affects     |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Which existing item types must deploy **before** this one? Which existing types depend on this one deploying first?                       | Eventhouse → KQLDatabase, SemanticModel → Report                                                                                                 | Step 1b     |
+| Should certain file paths within the item folder be skipped during publish?                                                               | `.pbi/`, `.children/`                                                                                                                            | Step 1d     |
+| Does the API use a non-standard definition format? If yes, provide the exact format string and instructions for how it should be handled. | `ipynb`, `SparkJobDefinitionV2`                                                                                                                  | Step 1e     |
+| Does deleting this item destroy user data?                                                                                                | Lakehouse, Eventhouse                                                                                                                            | Step 1f     |
+| Can items of this type reference each other?                                                                                              | Data Pipeline invokes another Data Pipeline                                                                                                      | Steps 1g, 2 |
+| Does the item need custom deployment logic, dependency resolution, or special parameterization? If yes, describe what is needed.          | Lakehouse creation payload, Environment async check, KQL items need query service URI (via dynamic replacement), SemanticModel binding parameter | Step 2      |
 
 ---
 
@@ -61,31 +73,12 @@ Before proceeding, confirm all of the following. If any gate fails, **stop** —
 - **Use deterministic test data** — no real tenant IDs, workspace IDs, or user emails
 - **Follow existing patterns** — consistency is more important than cleverness
 - **Validate all assumptions** — if unsure about API behavior, ask the requestor
-- **Run the full validation suite** before considering the task complete:
-    - `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"`
-    - `uv run pytest -v`
-    - `uv run ruff format`
-    - `uv run ruff check`
-
----
-
-## Workflow Phases
-
-This process has distinct phases that must be completed sequentially:
-
-1. **Information Gathering**: Complete ALL prerequisites and eligibility gates above
-2. **Validation**: Confirm all eligibility gates pass — if any gate fails, STOP
-3. **Implementation**: Only after phases 1-2 are complete, proceed to the Integration Checklist
-
-**Critical**: Do not begin Step 1 of the Integration Checklist until you have gathered all required information and confirmed eligibility gates pass.
 
 ---
 
 ## Integration Checklist
 
-Every new item type requires changes across multiple files in a specific order. Walk the contributor through each step:
-
-> **Note:** These steps cover all known integration patterns. A new item type may introduce requirements not covered here — such as new API behaviors, custom authentication flows, or novel deployment patterns. If you encounter something that doesn't fit the steps below, **stop and ask the requestor** rather than improvising.
+Once eligibility gates pass and additional details are gathered, proceed through these steps in order. If you encounter something that doesn't fit the steps below, **stop and ask the requestor** rather than improvising.
 
 ### Step 1 — Register the Item Type in Constants
 
@@ -112,9 +105,20 @@ class ItemType(str, Enum):
 
 Choose the correct position based on the item's dependencies. Items that other items depend on must come **earlier** in the order. The unpublish order is automatically the reverse.
 
+##### How to determine the correct position
+
+> **How items reference each other:** In Fabric definition files, items reference other items via either **logical IDs** (workspace-agnostic GUIDs assigned by Git integration — automatically replaced by fabric-cicd) or **item IDs** (environment-specific GUIDs that differ per workspace — must be resolved via parameterization in `parameter.yml`). When reviewing definition files to identify dependencies, look for both types of references.
+
+1. **Read the current `SERIAL_ITEM_PUBLISH_ORDER`** in `constants.py` to see the latest order.
+2. **Identify upstream dependencies** — types the new item depends on. Check definition files for references (logical IDs, item IDs, paths, connection strings) and ask the requestor. The new item must go **after** the highest-numbered upstream dependency.
+3. **Identify downstream dependents** — existing types that will depend on the new item. The new item must go **before** the lowest-numbered downstream dependent.
+4. Place the new item anywhere in the valid range between those two bounds. If there is no gap, renumber existing entries to make room.
+5. If the new item has **no dependencies in either direction**, place it at the end of the order.
+6. **When in doubt, ask the requestor** — do not guess dependency relationships.
+
 #### 1c. Optionally add to `SHELL_ONLY_PUBLISH`
 
-If the API does **not** support item definition and only supports metadata (shell) deployment — like Lakehouse, Warehouse, SQL Database, ML Experiment.
+If the API does **not** support item definition and only supports metadata (shell) deployment — like Warehouse, ML Experiment, etc.
 
 #### 1d. Optionally add to `EXCLUDE_PATH_REGEX_MAPPING`
 
@@ -244,11 +248,15 @@ Add a new section for the item type following the existing pattern.
 
 ---
 
-### Step 6 — Sample Files (Optional)
+### Step 6 — Sample Files and Deployment Validation
 
-**Directory:** `sample/workspace/`
+**Do not create sample files yourself.** Sample items must come from a real Fabric workspace exported via Git integration — the agent cannot generate valid definition files.
 
-If helpful, add sample workspace item files showing the expected directory structure for the new item type.
+Encourage the requestor to:
+
+1. **Add a sample item** to `sample/workspace/` by exporting an instance of the item type from a Fabric workspace connected to Git. The exported folder should follow the naming convention `{ItemName}.{ItemType}/` (e.g., `Hello Copy Job.CopyJob/`).
+2. **Add the item type** to `item_type_in_scope` in `devtools/debug_local.py` and run a sample deployment against a real workspace to validate end-to-end behavior.
+3. **Add the item type** to `item_types_to_deploy` in `tests/test_integration_publish.py`. The HTTP trace (`tests/fixtures/http_trace.json.gz`) must also be regenerated against a real workspace — this is a manual step.
 
 ---
 
@@ -270,33 +278,20 @@ If helpful, add sample workspace item files showing the expected directory struc
 
 **Combined patterns**: If your item type needs multiple patterns, skip only steps that appear in ALL applicable Skip Steps columns.
 
-**Example combinations:**
-
-- **Shell-only + Destructive unpublish**: Skip 1d, 1e, 1g (common to both) — do steps 1a, 1b, 1c, 1f, 2, 3, 4, 5, 6
-- **Exclude paths + API format**: Skip 1c, 1f, 1g (common to both) — do steps 1a, 1b, 1d, 1e, 2, 3, 4, 5, 6
-
 ---
 
-## Validation Checklist
+## Final Validation
 
-After completing all steps, run these verification commands:
+After completing all steps, run the mandatory validation suite:
 
-- [ ] `grep -n "NEW_TYPE.*=" src/fabric_cicd/constants.py` - verify enum member exists (Step 1a)
-- [ ] `grep -A 20 "SERIAL_ITEM_PUBLISH_ORDER" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify in publish order (Step 1b)
-- [ ] `grep -A 10 "SHELL_ONLY_PUBLISH" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify shell-only if applicable (Step 1c)
-- [ ] `grep -A 10 "EXCLUDE_PATH_REGEX_MAPPING" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify exclude paths if applicable (Step 1d)
-- [ ] `grep -A 10 "API_FORMAT_MAPPING" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify API format if applicable (Step 1e)
-- [ ] `grep -A 10 "UNPUBLISH_FLAG_MAPPING" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify unpublish flag if applicable (Step 1f)
-- [ ] `grep -A 10 "ITEM_TYPE_TO_FILE" src/fabric_cicd/constants.py | grep "NEW_TYPE"` - verify dependency file mapping if applicable (Step 1g)
-- [ ] `find src/fabric_cicd/_items/ -name "_newtype.py" -exec grep -l "item_type.*NEW_TYPE" {} \;` - verify publisher class exists with correct item_type (Step 2)
-- [ ] `grep -n "NEW_TYPE" src/fabric_cicd/_items/_base_publisher.py` - verify factory registration (Step 3)
-- [ ] `find tests/ -name "*.py" -exec grep -l "NEW_TYPE\|NewType" {} \;` - verify tests exist for new item type (Step 4)
-- [ ] `grep -n "NEW_TYPE\|NewType" docs/how_to/item_types.md` - verify documentation section exists (Step 5b)
-- [ ] `uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"` - verify import works
-- [ ] `uv run pytest -v` - verify all tests pass
-- [ ] `uv run ruff format` - verify formatting passes
-- [ ] `uv run ruff check` - verify linting passes
-- [ ] PR title follows required format: "Closes #123 - Add support for NewType" (see `copilot-instructions.md`)
+```
+uv run python -c "from fabric_cicd import FabricWorkspace; print('Import successful')"
+uv run pytest -v
+uv run ruff format
+uv run ruff check
+```
+
+All four must pass before the task is complete.
 
 ---
 
@@ -315,5 +310,3 @@ After completing all steps, run these verification commands:
 | `docs/how_to/item_types.md`                      | Per-item-type documentation                                     |
 | `docs/config/pre-build/update_item_types.py`     | Auto-generates supported item types list from enum              |
 | `sample/workspace/`                              | Example workspace item structures                               |
-
----

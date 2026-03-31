@@ -157,8 +157,17 @@ class FabricWorkspace:
             )
             raise InputError(msg, logger)
 
-        # Initialize dictionaries to store repository and deployed items
-        self._refresh_parameter_file()
+        # Initialize parameter file — skipped when config-based deployment omits the
+        # 'parameter' field, ensuring repository parameter.yml is not auto-discovered.
+        skip_parameterization = kwargs.get("skip_parameterization", False)
+        if not skip_parameterization:
+            self._refresh_parameter_file()
+        else:
+            self.environment_parameter = {}
+            logger.info(
+                "Parameterization skipped: no parameter file configured/provided (environment=%s).",
+                self.environment,
+            )
 
     @property
     def base_api_url(self) -> str:
