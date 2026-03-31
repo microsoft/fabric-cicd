@@ -35,7 +35,7 @@ class FabricWorkspace:
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
-        token_credential: TokenCredential = None,
+        token_credential: Optional[TokenCredential] = None,
         **kwargs,
     ) -> None:
         """
@@ -47,7 +47,7 @@ class FabricWorkspace:
             repository_directory: Local directory path of the repository where items are to be deployed from.
             item_type_in_scope: Item types that should be deployed for a given workspace. If omitted, defaults to all available item types.
             environment: The environment to be used for parameterization.
-            token_credential: The token credential to use for API requests.
+            token_credential: The token credential to use for API requests (e.g., AzureCliCredential, ClientSecretCredential).
             kwargs: Additional keyword arguments.
 
         Examples:
@@ -102,12 +102,11 @@ class FabricWorkspace:
 
         if token_credential is None:
             if _is_fabric_runtime():
-                token_credential = _generate_fabric_credential()
+                token_credential = validate_token_credential(_generate_fabric_credential())
+                logger.debug("Running in Fabric runtime - using generated Fabric credential for authentication.")
             else:
-                # if credential is not defined, use DefaultAzureCredential
-                from azure.identity import DefaultAzureCredential
-
-                token_credential = DefaultAzureCredential()
+                msg = "A TokenCredential is required to authenticate API requests. Please pass a 'token_credential' (e.g., AzureCliCredential, ClientSecretCredential)."
+                raise InputError(msg, logger)
         else:
             token_credential = validate_token_credential(token_credential)
 
@@ -158,8 +157,17 @@ class FabricWorkspace:
             )
             raise InputError(msg, logger)
 
-        # Initialize dictionaries to store repository and deployed items
-        self._refresh_parameter_file()
+        # Initialize parameter file — skipped when config-based deployment omits the
+        # 'parameter' field, ensuring repository parameter.yml is not auto-discovered.
+        skip_parameterization = kwargs.get("skip_parameterization", False)
+        if not skip_parameterization:
+            self._refresh_parameter_file()
+        else:
+            self.environment_parameter = {}
+            logger.info(
+                "Parameterization skipped: no parameter file configured/provided (environment=%s).",
+                self.environment,
+            )
 
     @property
     def base_api_url(self) -> str:

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
+from fixtures.credentials import DummyTokenCredential
 
 from fabric_cicd.fabric_workspace import FabricWorkspace, constants
 
@@ -120,6 +121,7 @@ def patched_fabric_workspace(mock_endpoint):
                 workspace_id=workspace_id,
                 repository_directory=repository_directory,
                 item_type_in_scope=item_type_in_scope,
+                token_credential=DummyTokenCredential(),
                 **kwargs,
             )
             # Call refresh methods to populate workspace data
@@ -925,6 +927,47 @@ def test_parameter_file_path_none(temp_workspace_dir, patched_fabric_workspace, 
     assert workspace.parameter_file_path is None
 
 
+def test_skip_parameterization_prevents_parameter_yml_auto_discovery(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """When skip_parameterization=True (config 'parameter' field absent), a parameter.yml
+    present in the repository directory must NOT be loaded — _refresh_parameter_file must
+    not be called at all, and environment_parameter must remain empty."""
+    # Create a parameter.yml in the repo — it must NOT be picked up
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text("find_replace:\n  - find_value: 'secret'\n    replace_value:\n      DEV: 'replaced'\n")
+    assert param_file.exists()
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        skip_parameterization=True,
+    )
+
+    # environment_parameter must be empty — parameter.yml was not auto-discovered
+    assert workspace.environment_parameter == {}
+
+
+def test_skip_parameterization_false_loads_explicit_parameter_file(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """When skip_parameterization=False (default) and an explicit parameter_file_path is
+    given, the parameter file IS loaded and parameterization IS applied."""
+    param_file = temp_workspace_dir / "my_params.yml"
+    param_file.write_text("find_replace:\n  - find_value: 'secret'\n    replace_value:\n      DEV: 'replaced'\n")
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(temp_workspace_dir),
+        parameter_file_path=str(param_file),
+        environment="DEV",
+        skip_parameterization=False,
+    )
+
+    # Parameterization must be populated — the explicit file was loaded
+    assert "find_replace" in workspace.environment_parameter
+
+
 def test_parameter_file_path_with_environment(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that FabricWorkspace works with both parameter_file_path and environment."""
     param_file = temp_workspace_dir / "dev_parameters.yml"
@@ -1007,6 +1050,32 @@ def test_parameter_file_path_invalid_type_rejected(temp_workspace_dir, patched_f
     assert not workspace.environment_parameter
 
 
+def test_no_token_credential_outside_fabric_runtime_raises_error(temp_workspace_dir, valid_workspace_id):
+    """Test that constructing FabricWorkspace without token_credential outside Fabric runtime raises InputError."""
+    from fabric_cicd._common._exceptions import InputError
+
+    # Create a simple platform file so directory validation passes
+    notebook_dir = temp_workspace_dir / "Test Notebook"
+    notebook_dir.mkdir()
+    platform_file = notebook_dir / ".platform"
+    platform_content = {
+        "metadata": {"type": "Notebook", "displayName": "Test Notebook"},
+        "config": {"logicalId": "12345678-1234-5678-abcd-1234567890ab"},
+    }
+    with platform_file.open("w", encoding="utf-8") as f:
+        json.dump(platform_content, f)
+
+    with patch("fabric_cicd.fabric_workspace._is_fabric_runtime", return_value=False):
+        with pytest.raises(InputError) as exc_info:
+            FabricWorkspace(
+                workspace_id=valid_workspace_id,
+                repository_directory=str(temp_workspace_dir),
+            )
+
+        assert "TokenCredential is required" in str(exc_info.value)
+        assert "token_credential" in str(exc_info.value)
+
+
 def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id):
     """Test that passing base_api_url as kwarg raises an error."""
     from fabric_cicd._common._exceptions import InputError
@@ -1031,6 +1100,7 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
                 workspace_id=valid_workspace_id,
                 repository_directory=str(temp_workspace_dir),
                 base_api_url="https://custom.api.url",
+                token_credential=DummyTokenCredential(),
             )
 
         # Verify the error message contains the expected text
@@ -1577,6 +1647,7 @@ def test_mix_of_default_and_non_default_logical_ids(temp_workspace_dir, patched_
     assert workspace.repository_items["Notebook"]["Exported Notebook"].logical_id == constants.DEFAULT_GUID
     assert workspace.repository_items["Notebook"]["Git Notebook"].logical_id == unique_logical_id
     assert workspace.repository_items["DataPipeline"]["Exported Pipeline"].logical_id == constants.DEFAULT_GUID
+
 
 def test_publish_variable_library_only_calls_replace_parameters(
     temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
