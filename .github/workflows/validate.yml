@@ -154,6 +154,13 @@ jobs:
                       const prAuthor = context.payload.pull_request.user.login;
                       const repo = context.repo;
 
+                      // Skip validation for dependabot
+                      if (prAuthor === 'dependabot[bot]') {
+                        console.log('✅ Dependabot PR detected. Skipping linked issue validation.');
+                        core.setOutput('skip_validation', 'true');
+                        return;
+                      }
+
                       console.log(`Checking collaborator role for PR author: ${prAuthor}`);
 
                       try {
