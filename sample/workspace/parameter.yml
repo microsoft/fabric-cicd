@@ -137,3 +137,14 @@ semantic_model_binding:
           connection_id:
             PPE: "f96870d5-5f86-49ad-bf41-5967fd7c1c6d"
             PROD: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+
+# Configures the refresh body sent to the Power BI Refresh API for semantic models
+# that were purged and redeployed via the XMLA fallback (enable_semantic_model_xmla_fallback).
+# If omitted, defaults to {"type": "Automatic"}.
+semantic_model_refresh:
+  refresh_body:
+    type: "Full"
+    commitMode: "transactional"
+    objects:
+      - table: "Sales"
+        partition: "Current Year"

@@ -137,6 +137,8 @@ class FeatureFlag(str, Enum):
     """Set to enable collection of API responses during publish operations."""
     DISABLE_PRINT_IDENTITY = "disable_print_identity"
     """Set to disable printing the executing identity name."""
+    ENABLE_SEMANTIC_MODEL_XMLA_FALLBACK = "enable_semantic_model_xmla_fallback"
+    """Set to enable falling back to XMLA endpoint for Semantic Model deployments when API deployment fails."""
 
 
 class OperationType(str, Enum):
@@ -242,7 +244,7 @@ PROPERTY_PATH_ATTR_MAPPING = {
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
 # Parameters to validate
-PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
+PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding", "semantic_model_refresh"]
 
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 

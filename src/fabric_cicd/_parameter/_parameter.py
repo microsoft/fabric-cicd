@@ -48,6 +48,10 @@ class Parameter:
             "minimum": set(),
             "maximum": {"connection_id", "semantic_model_name", "default", "models"},
         },
+        "semantic_model_refresh": {
+            "minimum": set(),
+            "maximum": {"refresh_body"},
+        },
         "extend": {"minimum": set(), "maximum": set()},
     }
 
@@ -335,6 +339,7 @@ class Parameter:
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
+            ("semantic_model_refresh parameter", self._validate_semantic_model_refresh_parameter),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -352,6 +357,7 @@ class Parameter:
                         "key_value_replace parameter",
                         "spark_pool parameter",
                         "semantic_model_binding parameter",
+                        "semantic_model_refresh parameter",
                     )
                     and msg == "parameter not found"
                 ):
@@ -403,7 +409,7 @@ class Parameter:
 
     def _validate_parameter_names(self) -> tuple[bool, str]:
         """Validate the parameter names in the parameter dictionary."""
-        params = list(self.PARAMETER_KEYS.keys())[:6]
+        params = list(self.PARAMETER_KEYS.keys())[:7]
         for param in self.environment_parameter:
             if param not in params:
                 return False, constants.PARAMETER_MSGS["invalid name"].format(param)
@@ -681,6 +687,32 @@ class Parameter:
         duplicates = {n for n in names if names.count(n) > 1}
         if duplicates:
             logger.warning(constants.PARAMETER_MSGS["duplicate_semantic_model"].format(", ".join(sorted(duplicates))))
+
+    def _validate_semantic_model_refresh_parameter(self) -> tuple[bool, str]:
+        """Validate the semantic_model_refresh parameter structure."""
+        param_name = "semantic_model_refresh"
+
+        if param_name not in self.environment_parameter:
+            logger.debug(constants.PARAMETER_MSGS["param_not_found"].format(param_name))
+            return False, "parameter not found"
+
+        param_value = self.environment_parameter[param_name]
+
+        # Validate keys against PARAMETER_KEYS maximum set
+        allowed_keys = self.PARAMETER_KEYS[param_name]["maximum"]
+        invalid_keys = set(param_value.keys()) - allowed_keys
+        if invalid_keys:
+            return False, constants.PARAMETER_MSGS["invalid key"].format(param_name)
+
+        # Validate refresh_body is a dict if present
+        if "refresh_body" in param_value:
+            refresh_body = param_value["refresh_body"]
+            if not isinstance(refresh_body, dict):
+                return False, constants.PARAMETER_MSGS["invalid data type"].format(
+                    "refresh_body", "dictionary", param_name
+                )
+
+        return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
     def _validate_parameter_keys(self, param_name: str, param_keys: list) -> tuple[bool, str]:
         """Validate the keys in the parameter."""

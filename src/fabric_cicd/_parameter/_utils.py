@@ -510,6 +510,9 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
         if param_name == "semantic_model_binding":
             is_valid, _ = _check_semantic_model_binding_structure(param_dict.get(param_name))
             return is_valid
+        # semantic_model_refresh is always a dict, not a list
+        if param_name == "semantic_model_refresh":
+            return isinstance(param_dict.get(param_name), dict)
         return _check_parameter_structure(param_dict.get(param_name))
 
     # Get only parameters that exist in param_dict
@@ -525,6 +528,10 @@ def is_valid_structure(param_dict: dict, param_name: Optional[str] = None) -> bo
         if name == "semantic_model_binding":
             is_valid, _ = _check_semantic_model_binding_structure(param_dict.get(name))
             if not is_valid:
+                return False
+            # Special case for semantic_model_refresh (dict, not list)
+        elif name == "semantic_model_refresh":
+            if not isinstance(param_dict.get(name), dict):
                 return False
         elif not _check_parameter_structure(param_dict.get(name)):
             return False
