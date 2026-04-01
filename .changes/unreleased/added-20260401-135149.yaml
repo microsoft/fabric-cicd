@@ -1,0 +1,8 @@
+kind: added
+body: Add feature flag for shortcut smart diff publishing
+time: 2026-04-01T13:51:49.2071983+02:00
+custom:
+    Author: bckstrm
+    AuthorLink: https://github.com/bckstrm
+    Issue: "904"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/904
