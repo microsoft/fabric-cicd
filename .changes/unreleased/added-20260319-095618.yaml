@@ -1,0 +1,9 @@
+kind: added
+body: Add `get_changed_items()` utility function to detect Fabric items changed via git diff for use with selective deployment
+time: 2026-03-19T09:56:18.0000000+00:00
+custom:
+    Author: vipulb91
+    AuthorLink: https://github.com/vipulb91
+    Issue: "865"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/865
+
