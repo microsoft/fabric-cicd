@@ -97,7 +97,7 @@ def test_unpublish_item_without_hard_delete_flag(test_workspace, mock_endpoint):
 
     assert len(mock_endpoint.delete_urls) == 1
     delete_url = mock_endpoint.delete_urls[0]
-    assert delete_url.endswith(f"/items/{item_guid}")
+    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}"
     assert "hardDelete" not in delete_url
 
 
