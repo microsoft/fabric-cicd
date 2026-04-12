@@ -786,8 +786,9 @@ class FabricWorkspace:
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
-            hard_delete = FeatureFlag.ENABLE_HARD_DELETE.value in constants.FEATURE_FLAG
-            delete_url = f"{self.base_api_url}/items/{item_guid}" + ("?hardDelete=true" if hard_delete else "")
+            # Apply hard delete if the feature flag is enabled, otherwise defaults to soft deleting (moves the item to the recycle bin)
+            is_hard_delete = FeatureFlag.ENABLE_HARD_DELETE.value in constants.FEATURE_FLAG
+            delete_url = f"{self.base_api_url}/items/{item_guid}?hardDelete={is_hard_delete}"
             api_response = self.endpoint.invoke(method="DELETE", url=delete_url)
             logger.info(f"{constants.INDENT}Unpublished {item_type} '{item_name}'")
 
