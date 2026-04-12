@@ -42,6 +42,7 @@ def main():
         "MirroredDatabase",
         "MLExperiment",
         "Notebook",
+        "Ontology",
         "Reflex",
         "Report",
         "SemanticModel",
