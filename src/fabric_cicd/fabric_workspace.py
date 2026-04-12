@@ -797,7 +797,14 @@ class FabricWorkspace:
                 self.unpublish_responses.setdefault(item_type, {})[item_name] = api_response
 
         except Exception as e:
-            logger.warning(f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}")
+            msg = f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}"
+            if not hard_delete:
+                msg += (
+                    f" Consider enabling the '{FeatureFlag.ENABLE_HARD_DELETE.value}' feature flag"
+                    " to perform a permanent deletion, which bypasses the recycle bin"
+                    " and may resolve this issue (requires workspace Admin role)."
+                )
+            logger.warning(msg)
 
     def _refresh_deployed_folders(self) -> None:
         """
