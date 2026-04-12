@@ -12,6 +12,7 @@ import pytest
 from fixtures.credentials import DummyTokenCredential
 
 import fabric_cicd.constants as constants
+from fabric_cicd.constants import FeatureFlag
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 
@@ -81,13 +82,13 @@ def test_workspace(mock_endpoint):
 @pytest.fixture(autouse=True)
 def _clear_feature_flags():
     """Clear feature flags before and after each test to avoid state leakage."""
-    constants.FEATURE_FLAG.discard("enable_hard_delete")
+    constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_HARD_DELETE.value)
     yield
-    constants.FEATURE_FLAG.discard("enable_hard_delete")
+    constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_HARD_DELETE.value)
 
 
 def test_unpublish_item_without_hard_delete_flag(test_workspace, mock_endpoint):
-    """Test that _unpublish_item uses DELETE URL with hardDelete=False when flag is not set."""
+    """Test that _unpublish_item uses a plain DELETE URL when flag is not set."""
     item_guid = "mock-guid-123"
     test_workspace.deployed_items = {"Notebook": {"TestNotebook": MagicMock(guid=item_guid)}}
 
@@ -97,7 +98,8 @@ def test_unpublish_item_without_hard_delete_flag(test_workspace, mock_endpoint):
 
     assert len(mock_endpoint.delete_urls) == 1
     delete_url = mock_endpoint.delete_urls[0]
-    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}?hardDelete=False"
+    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}"
+    assert "hardDelete=True" not in delete_url
 
 
 def test_unpublish_item_with_hard_delete_flag(test_workspace, mock_endpoint):
@@ -105,7 +107,7 @@ def test_unpublish_item_with_hard_delete_flag(test_workspace, mock_endpoint):
     item_guid = "mock-guid-456"
     test_workspace.deployed_items = {"Notebook": {"TestNotebook": MagicMock(guid=item_guid)}}
 
-    constants.FEATURE_FLAG.add("enable_hard_delete")
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_HARD_DELETE.value)
     mock_endpoint.delete_urls.clear()
 
     test_workspace._unpublish_item(item_name="TestNotebook", item_type="Notebook")
@@ -122,7 +124,7 @@ def test_hard_delete_flag_via_append_feature_flag(test_workspace, mock_endpoint)
     item_guid = "mock-guid-789"
     test_workspace.deployed_items = {"Notebook": {"TestNotebook": MagicMock(guid=item_guid)}}
 
-    append_feature_flag("enable_hard_delete")
+    append_feature_flag(FeatureFlag.ENABLE_HARD_DELETE.value)
     mock_endpoint.delete_urls.clear()
 
     test_workspace._unpublish_item(item_name="TestNotebook", item_type="Notebook")
