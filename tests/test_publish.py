@@ -138,6 +138,33 @@ def test_publish_only_existing_item_types(mock_endpoint, temp_workspace_dir):
         mock_env_cls.assert_not_called()
 
 
+def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes Ontology items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestOntology", "Ontology", "test-ontology-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._ontology.OntologyPublisher") as mock_ontology_cls,
+    ):
+        mock_ontology_instance = mock_ontology_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "Ontology" in workspace.repository_items
+        mock_ontology_cls.assert_called_once_with(workspace)
+        mock_ontology_instance.publish_all.assert_called_once()
+
+
 def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint, temp_workspace_dir):
     """Test that when item_type_in_scope is None (default), all available item types are included."""
     with (
