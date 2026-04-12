@@ -258,6 +258,8 @@ def _handle_response(
                     attempt=iteration_count - 1,
                     base_delay=0.5,
                     response_retry_after=retry_after,
+                    max_duration=max_duration,
+                    start_time=start_time,
                     prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
