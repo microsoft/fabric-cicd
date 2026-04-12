@@ -87,7 +87,7 @@ def _clear_feature_flags():
 
 
 def test_unpublish_item_without_hard_delete_flag(test_workspace, mock_endpoint):
-    """Test that _unpublish_item uses a plain DELETE URL when flag is not set."""
+    """Test that _unpublish_item uses DELETE URL with hardDelete=False when flag is not set."""
     item_guid = "mock-guid-123"
     test_workspace.deployed_items = {"Notebook": {"TestNotebook": MagicMock(guid=item_guid)}}
 
@@ -97,12 +97,11 @@ def test_unpublish_item_without_hard_delete_flag(test_workspace, mock_endpoint):
 
     assert len(mock_endpoint.delete_urls) == 1
     delete_url = mock_endpoint.delete_urls[0]
-    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}"
-    assert "hardDelete" not in delete_url
+    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}?hardDelete=False"
 
 
 def test_unpublish_item_with_hard_delete_flag(test_workspace, mock_endpoint):
-    """Test that _unpublish_item appends ?hardDelete=true when flag is set."""
+    """Test that _unpublish_item appends ?hardDelete=True when flag is set."""
     item_guid = "mock-guid-456"
     test_workspace.deployed_items = {"Notebook": {"TestNotebook": MagicMock(guid=item_guid)}}
 
@@ -113,7 +112,7 @@ def test_unpublish_item_with_hard_delete_flag(test_workspace, mock_endpoint):
 
     assert len(mock_endpoint.delete_urls) == 1
     delete_url = mock_endpoint.delete_urls[0]
-    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}?hardDelete=true"
+    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}?hardDelete=True"
 
 
 def test_hard_delete_flag_via_append_feature_flag(test_workspace, mock_endpoint):
@@ -129,4 +128,4 @@ def test_hard_delete_flag_via_append_feature_flag(test_workspace, mock_endpoint)
     test_workspace._unpublish_item(item_name="TestNotebook", item_type="Notebook")
 
     assert len(mock_endpoint.delete_urls) == 1
-    assert "hardDelete=true" in mock_endpoint.delete_urls[0]
+    assert "hardDelete=True" in mock_endpoint.delete_urls[0]
