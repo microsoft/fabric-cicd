@@ -786,7 +786,9 @@ class FabricWorkspace:
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
-            api_response = self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
+            hard_delete = FeatureFlag.ENABLE_HARD_DELETE.value in constants.FEATURE_FLAG
+            delete_url = f"{self.base_api_url}/items/{item_guid}" + ("?hardDelete=true" if hard_delete else "")
+            api_response = self.endpoint.invoke(method="DELETE", url=delete_url)
             logger.info(f"{constants.INDENT}Unpublished {item_type} '{item_name}'")
 
             # Store response if responses are being tracked
