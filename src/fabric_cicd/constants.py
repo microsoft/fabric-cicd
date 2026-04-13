@@ -61,6 +61,7 @@ class ItemType(str, Enum):
     ML_EXPERIMENT = "MLExperiment"
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
     NOTEBOOK = "Notebook"
+    ONTOLOGY = "Ontology"
     REFLEX = "Reflex"
     REPORT = "Report"
     SEMANTIC_MODEL = "SemanticModel"
@@ -99,6 +100,7 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     23: ItemType.MOUNTED_DATA_FACTORY,
     24: ItemType.DATA_AGENT,
     25: ItemType.ML_EXPERIMENT,
+    26: ItemType.ONTOLOGY,
 }
 
 
@@ -135,6 +137,8 @@ class FeatureFlag(str, Enum):
     """Set to enable selective publishing of shortcuts in a Lakehouse."""
     ENABLE_RESPONSE_COLLECTION = "enable_response_collection"
     """Set to enable collection of API responses during publish operations."""
+    ENABLE_HARD_DELETE = "enable_hard_delete"
+    """Set to enable hard deletion of items, bypassing the workspace recycle bin."""
 
 
 class OperationType(str, Enum):

@@ -118,6 +118,7 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
         "MirroredDatabase",
         "MLExperiment",
         "Notebook",
+        "Ontology",
         "Reflex",
         "Report",
         "SemanticModel",

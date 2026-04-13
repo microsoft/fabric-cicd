@@ -784,7 +784,10 @@ class FabricWorkspace:
         # Delete the item from the workspace
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
         try:
-            api_response = self.endpoint.invoke(method="DELETE", url=f"{self.base_api_url}/items/{item_guid}")
+            # Apply hard delete if the feature flag is enabled, otherwise defaults to soft deleting (moves the item to the recycle bin)
+            hard_delete = FeatureFlag.ENABLE_HARD_DELETE.value in constants.FEATURE_FLAG
+            delete_url = f"{self.base_api_url}/items/{item_guid}" + ("?hardDelete=true" if hard_delete else "")
+            api_response = self.endpoint.invoke(method="DELETE", url=delete_url)
             logger.info(f"{constants.INDENT}Unpublished {item_type} '{item_name}'")
 
             # Store response if responses are being tracked
@@ -792,7 +795,14 @@ class FabricWorkspace:
                 self.unpublish_responses.setdefault(item_type, {})[item_name] = api_response
 
         except Exception as e:
-            logger.warning(f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}")
+            msg = f"Failed to unpublish {item_type} '{item_name}'. Raw exception: {e}"
+            if not hard_delete:
+                msg += (
+                    f" Consider enabling the '{FeatureFlag.ENABLE_HARD_DELETE.value}' feature flag"
+                    " to perform a permanent deletion, which bypasses the recycle bin"
+                    " and may resolve this issue (requires workspace Admin role)."
+                )
+            logger.warning(msg)
 
     def _refresh_deployed_folders(self) -> None:
         """
