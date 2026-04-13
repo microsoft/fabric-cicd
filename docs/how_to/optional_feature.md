@@ -109,7 +109,10 @@ This function **does not require any feature flags** because it is a standalone 
 **Important:** If `get_changed_items()` returns an empty list (no changes detected), do not call `publish_all_items()` without an explicit `items_to_include` list, as this would default to a full deployment. Always guard against the empty-list case:
 
 ```python
-from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
+from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items, append_feature_flag
+
+append_feature_flag("enable_experimental_features")
+append_feature_flag("enable_items_to_include")
 
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
@@ -121,7 +124,6 @@ workspace = FabricWorkspace(
 changed = get_changed_items(workspace.repository_directory)
 
 if changed:
-    # Requires enable_experimental_features and enable_items_to_include flags
     publish_all_items(workspace, items_to_include=changed)
 else:
     print("No changed items detected — skipping deployment.")
