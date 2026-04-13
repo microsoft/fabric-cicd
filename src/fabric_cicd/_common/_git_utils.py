@@ -103,6 +103,9 @@ def _resolve_changed_items(
         Both lists are empty when the git root cannot be found or git fails.
     """
     from fabric_cicd._common._config_validator import _find_git_root
+    from fabric_cicd._common._validate_input import validate_git_compare_ref
+
+    validate_git_compare_ref(git_compare_ref)
 
     git_root = _find_git_root(repository_directory)
     if git_root is None:
