@@ -49,6 +49,7 @@ item_type_in_scope = [
     "Reflex",
     "Eventstream",
     "SparkJobDefinition",
+    "Ontology",
 ]
 
 # Azure CLI auth - comment out to use a different auth method
