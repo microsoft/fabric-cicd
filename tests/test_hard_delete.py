@@ -99,7 +99,7 @@ def test_unpublish_item_without_hard_delete_flag(test_workspace, mock_endpoint):
     assert len(mock_endpoint.delete_urls) == 1
     delete_url = mock_endpoint.delete_urls[0]
     assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}"
-    assert "hardDelete=True" not in delete_url
+    assert "hardDelete=true" not in delete_url
 
 
 def test_unpublish_item_with_hard_delete_flag(test_workspace, mock_endpoint):
@@ -114,7 +114,7 @@ def test_unpublish_item_with_hard_delete_flag(test_workspace, mock_endpoint):
 
     assert len(mock_endpoint.delete_urls) == 1
     delete_url = mock_endpoint.delete_urls[0]
-    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}?hardDelete=True"
+    assert delete_url == f"{test_workspace.base_api_url}/items/{item_guid}?hardDelete=true"
 
 
 def test_hard_delete_flag_via_append_feature_flag(test_workspace, mock_endpoint):
@@ -130,4 +130,4 @@ def test_hard_delete_flag_via_append_feature_flag(test_workspace, mock_endpoint)
     test_workspace._unpublish_item(item_name="TestNotebook", item_type="Notebook")
 
     assert len(mock_endpoint.delete_urls) == 1
-    assert "hardDelete=True" in mock_endpoint.delete_urls[0]
+    assert "hardDelete=true" in mock_endpoint.delete_urls[0]

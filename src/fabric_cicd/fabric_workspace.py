@@ -788,7 +788,7 @@ class FabricWorkspace:
         try:
             # Apply hard delete if the feature flag is enabled, otherwise defaults to soft deleting (moves the item to the recycle bin)
             hard_delete = FeatureFlag.ENABLE_HARD_DELETE.value in constants.FEATURE_FLAG
-            delete_url = f"{self.base_api_url}/items/{item_guid}" + ("?hardDelete=True" if hard_delete else "")
+            delete_url = f"{self.base_api_url}/items/{item_guid}" + ("?hardDelete=true" if hard_delete else "")
             api_response = self.endpoint.invoke(method="DELETE", url=delete_url)
             logger.info(f"{constants.INDENT}Unpublished {item_type} '{item_name}'")
 
