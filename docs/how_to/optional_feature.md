@@ -114,7 +114,8 @@ from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     repository_directory="/path/to/repo",
-    item_type_in_scope=["Notebook", "DataPipeline"]
+    item_type_in_scope=["Notebook", "DataPipeline"],
+    token_credential=token_credential,
 )
 
 changed = get_changed_items(workspace.repository_directory)
