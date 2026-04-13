@@ -9,10 +9,11 @@ import sys
 import fabric_cicd.constants as constants
 from fabric_cicd._common._check_utils import check_version
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
+from fabric_cicd._common._git_utils import get_changed_items
 from fabric_cicd._common._logging import configure_logger, exception_handler, get_file_handler
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
-from fabric_cicd.publish import deploy_with_config, get_changed_items, publish_all_items, unpublish_all_orphan_items
+from fabric_cicd.publish import deploy_with_config, publish_all_items, unpublish_all_orphan_items
 
 logger = logging.getLogger(__name__)
 

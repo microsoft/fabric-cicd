@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fixtures.credentials import DummyTokenCredential
 
+import fabric_cicd._common._git_utils as git_utils
 import fabric_cicd.publish as publish
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
@@ -1039,7 +1040,7 @@ class TestGetChangedItems:
             mock_run.return_value.stdout = diff_output
             mock_run.return_value.returncode = 0
 
-            result = publish.get_changed_items(tmp_path)
+            result = git_utils.get_changed_items(tmp_path)
 
         assert result == ["MyNotebook.Notebook"]
 
@@ -1054,7 +1055,7 @@ class TestGetChangedItems:
             mock_run.return_value.stdout = ""
             mock_run.return_value.returncode = 0
 
-            result = publish.get_changed_items(tmp_path)
+            result = git_utils.get_changed_items(tmp_path)
 
         assert result == []
 
@@ -1063,7 +1064,7 @@ class TestGetChangedItems:
         git_root_patch = "fabric_cicd._common._config_validator._find_git_root"
 
         with patch(git_root_patch, return_value=None):
-            result = publish.get_changed_items(tmp_path)
+            result = git_utils.get_changed_items(tmp_path)
 
         assert result == []
 
@@ -1077,7 +1078,7 @@ class TestGetChangedItems:
             patch(git_root_patch, return_value=tmp_path),
             patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git", stderr="bad ref")),
         ):
-            result = publish.get_changed_items(tmp_path)
+            result = git_utils.get_changed_items(tmp_path)
 
         assert result == []
 
@@ -1092,7 +1093,7 @@ class TestGetChangedItems:
             mock_run.return_value.stdout = ""
             mock_run.return_value.returncode = 0
 
-            publish.get_changed_items(tmp_path, git_compare_ref="main")
+            git_utils.get_changed_items(tmp_path, git_compare_ref="main")
 
         call_args = mock_run.call_args[0][0]
         assert "main" in call_args
@@ -1116,6 +1117,6 @@ class TestGetChangedItems:
             # Use a subdirectory as the repository_directory so "other_repo" is out of scope
             repo_subdir = tmp_path / "my_workspace"
             repo_subdir.mkdir()
-            result = publish.get_changed_items(repo_subdir)
+            result = git_utils.get_changed_items(repo_subdir)
 
         assert result == []
