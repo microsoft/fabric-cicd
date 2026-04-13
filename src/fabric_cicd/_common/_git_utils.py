@@ -119,6 +119,7 @@ def _resolve_changed_items(
             capture_output=True,
             text=True,
             check=True,
+            timeout=30,
         )
     except subprocess.CalledProcessError as exc:
         logger.warning(f"get_changed_items: 'git diff' failed ({exc.stderr.strip()}) — returning empty list.")
@@ -163,6 +164,7 @@ def _resolve_changed_items(
                         capture_output=True,
                         text=True,
                         check=True,
+                        timeout=30,
                     )
                     data = json.loads(show_result.stdout)
                     metadata = data.get("metadata", {})
