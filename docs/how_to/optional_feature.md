@@ -24,6 +24,7 @@ For scenarios that aren't supported by default, fabric-cicd offers feature flags
 | `enable_shortcut_exclude`                 | Set to enable selective publishing of shortcuts in a Lakehouse                    | ☑️           |
 | `enable_response_collection`              | Set to enable collection of API responses during publish and unpublish operations |              |
 | `continue_on_shortcut_failure`            | Set to allow deployment to continue even when shortcuts fail to publish           |              |
+| `enable_hard_delete`                      | Set to enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. | |
 
 <span class="md-h3-nonanchor">Example</span>
 
