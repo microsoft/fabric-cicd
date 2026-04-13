@@ -6,7 +6,7 @@ The following are the most common authentication flows for fabric-cicd. However,
 
 **Notes:**
 
-- Fabric Notebook users should provide an explicit `token_credential` using `notebookutils.credentials.getToken()`.
+- Fabric Notebook users must provide an explicit `token_credential`. See [Fabric Notebook Authentication](#fabric-notebook-authentication) for options.
 - Avoid hardcoding credentials. Use environment variables or secret management services. SPN + Secret auth can also be achieved via `az login --service-principal` or `Connect-AzAccount -ServicePrincipal` in the CLI/PowerShell flows below.
 
 ## CLI Credential
