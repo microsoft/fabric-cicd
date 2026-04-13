@@ -43,6 +43,58 @@ def _find_platform_item(file_path: Path, repo_root: Path) -> Optional[tuple[str,
     return None
 
 
+def _resolve_git_diff_path(
+    file_path_str: str,
+    git_root: Path,
+    repository_directory: Path,
+) -> Optional[Path]:
+    """
+    Resolve and validate a file path from git diff output.
+
+    Follows the same resolve → boundary-check → reject contract as
+    ``_resolve_file_path`` in ``_parameter/_utils.py``, adapted for
+    paths that are relative to a git root with containment checked
+    against a (potentially different) repository subdirectory.
+
+    Args:
+        file_path_str: Relative path string from git diff output.
+        git_root: Resolved absolute path of the git repository root.
+        repository_directory: Resolved absolute path of the configured
+            repository directory (may be a subdirectory of git_root).
+
+    Returns:
+        Resolved absolute Path if valid and within boundary, None otherwise.
+    """
+    raw_path = Path(file_path_str)
+
+    # Reject absolute paths — git diff should only produce relative paths
+    if raw_path.is_absolute():
+        logger.debug(f"get_changed_items: skipping absolute path '{file_path_str}'")
+        return None
+
+    # Reject traversal sequences before resolution (mirrors _validate_wildcard_syntax)
+    if ".." in raw_path.parts:
+        logger.debug(f"get_changed_items: skipping path with traversal '{file_path_str}'")
+        return None
+
+    # Reject null bytes
+    if "\x00" in file_path_str:
+        logger.debug("get_changed_items: skipping path with null bytes")
+        return None
+
+    # Step 1: Resolve relative to git root (analogous to _resolve_file_path Step 1)
+    resolved_path = (git_root / file_path_str).resolve()
+
+    # Step 2: Boundary check against repository_directory (analogous to _resolve_file_path Step 2)
+    try:
+        resolved_path.relative_to(repository_directory)
+    except ValueError:
+        return None
+
+    # Note: No Step 3 (existence check) — deleted files won't exist on disk
+    return resolved_path
+
+
 def get_changed_items(
     repository_directory: Path,
     git_compare_ref: str = "HEAD~1",
@@ -131,6 +183,9 @@ def _resolve_changed_items(
     changed_items: set[str] = set()
     deleted_items: set[str] = set()
 
+    git_root_resolved = git_root.resolve()
+    repo_dir_resolved = repository_directory.resolve()
+
     for line in result.stdout.splitlines():
         line = line.strip()
         if not line:
@@ -147,12 +202,8 @@ def _resolve_changed_items(
         else:
             continue
 
-        abs_path = git_root / file_path_str
-
-        # Only consider files inside the configured repository directory
-        try:
-            abs_path.relative_to(repository_directory)
-        except ValueError:
+        abs_path = _resolve_git_diff_path(file_path_str, git_root_resolved, repo_dir_resolved)
+        if abs_path is None:
             continue
 
         if status == "D":
@@ -160,7 +211,7 @@ def _resolve_changed_items(
                 try:
                     show_result = subprocess.run(
                         ["git", "show", f"{git_compare_ref}:{file_path_str}"],
-                        cwd=str(git_root),
+                        cwd=str(git_root_resolved),
                         capture_output=True,
                         text=True,
                         check=True,
@@ -175,7 +226,7 @@ def _resolve_changed_items(
                 except Exception as exc:
                     logger.debug(f"get_changed_items: could not read deleted .platform '{file_path_str}': {exc}")
         else:
-            item_info = _find_platform_item(abs_path, repository_directory)
+            item_info = _find_platform_item(abs_path, repo_dir_resolved)
             if item_info:
                 changed_items.add(f"{item_info[0]}.{item_info[1]}")
 
