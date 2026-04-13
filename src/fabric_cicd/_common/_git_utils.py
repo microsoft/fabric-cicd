@@ -123,6 +123,9 @@ def _resolve_changed_items(
     except subprocess.CalledProcessError as exc:
         logger.warning(f"get_changed_items: 'git diff' failed ({exc.stderr.strip()}) — returning empty list.")
         return [], []
+    except subprocess.TimeoutExpired:
+        logger.warning("get_changed_items: 'git diff' timed out — returning empty list.")
+        return [], []
 
     changed_items: set[str] = set()
     deleted_items: set[str] = set()
