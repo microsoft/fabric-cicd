@@ -139,6 +139,8 @@ class FeatureFlag(str, Enum):
     """Set to enable collection of API responses during publish operations."""
     DISABLE_PRINT_IDENTITY = "disable_print_identity"
     """Set to disable printing the executing identity name."""
+    ENABLE_HARD_DELETE = "enable_hard_delete"
+    """Set to enable hard deletion of items, bypassing the workspace recycle bin."""
 
 
 class OperationType(str, Enum):

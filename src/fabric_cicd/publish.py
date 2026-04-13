@@ -256,6 +256,12 @@ def unpublish_all_orphan_items(
         Dict containing all collected API responses if the ``enable_response_collection`` feature flag is enabled
         and at least one response was collected; otherwise, None.
 
+    Note:
+        By default, the Fabric Delete Item API moves deleted items to the workspace recycle bin.
+        However, not all item types support soft delete; for those types, deletion requires the
+        ``enable_hard_delete`` feature flag. Enabling this flag bypasses the recycle bin and
+        permanently deletes items. Hard delete requires the workspace **Admin** role.
+
     items_to_include:
         This is an experimental feature in fabric-cicd. Use at your own risk as selective unpublishing is not recommended due to item dependencies.
         To enable this feature, see How To -> Optional Features for information on which flags to enable.
