@@ -1,0 +1,8 @@
+kind: breaking
+body: Remove implicit authentication in Microsoft Fabric Notebook and require explicit token credential
+time: 2026-04-13T14:54:36.4162537+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "930"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/930
