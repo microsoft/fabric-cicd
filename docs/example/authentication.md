@@ -385,6 +385,7 @@ When running fabric-cicd within Microsoft Fabric Notebooks, an explicit `token_c
     Most common pattern: clone repository and deploy from within notebook
     '''
 
+    import time
     import tempfile
     import subprocess
     import os
@@ -395,7 +396,7 @@ When running fabric-cicd within Microsoft Fabric Notebooks, an explicit `token_c
     class FabricNotebookCredential(TokenCredential):
         def get_token(self, *scopes, **kwargs):
             token = notebookutils.credentials.getToken("pbi")
-            return AccessToken(token, 0)
+            return AccessToken(token, int(time.time()) + 3600)  # 1 hour
 
     # Sample configuration values
     workspace_id = "your-workspace-id"
