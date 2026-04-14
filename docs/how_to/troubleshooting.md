@@ -262,8 +262,8 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 | Configuration      | Description                                                                         | Required |
 | ------------------ | ----------------------------------------------------------------------------------- | -------- |
 | `config_file`      | Path to your `config.yml` file                                                      | Yes      |
-| `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
 | `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)                             | Yes      |
+| `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
 | `config_override`  | Dictionary to override configuration values within `config.yml`                     | No       |
 
 **Quick Start**:
@@ -307,10 +307,10 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 
 | Configuration      | Description                                                         | Required |
 | ------------------ | ------------------------------------------------------------------- | -------- |
+| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)             | Yes      |
 | `api_url`          | Full API endpoint URL                                               | Yes      |
 | `method`           | HTTP method (GET, POST, DELETE, PATCH)                              | Yes      |
 | `body`             | Request payload (for POST/PATCH)                                    | Varies   |
-| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)             | Yes      |
 | other              | View `invoke()` in `FabricEndpoint` class for additional parameters | No       |
 
 **Quick Start**:
