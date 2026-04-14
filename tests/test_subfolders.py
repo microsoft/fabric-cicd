@@ -19,7 +19,6 @@ def mock_endpoint():
     """Mock FabricEndpoint to avoid real API calls."""
     mock = MagicMock()
     mock.invoke.return_value = {"body": {"value": []}, "header": {}}
-    mock.upn_auth = True
     return mock
 
 
@@ -257,7 +256,6 @@ def test_item_folder_association(repository_with_subfolders, valid_workspace_id)
         return {"body": {"value": []}}
 
     mock_endpoint = MagicMock()
-    mock_endpoint.upn_auth = True
     mock_endpoint.invoke.side_effect = mock_invoke_side_effect
 
     fabric_endpoint_patch = patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint)
