@@ -2,7 +2,7 @@
 
 The following are the most common authentication flows for fabric-cicd. However, because fabric-cicd supports any [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential), there are multiple authentication methods available beyond the ones described here. These examples provide starting points that should be adapted for your specific environment and security requirements.
 
-> **⚠️ NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential` fallback) and **implicit Fabric Notebook authentication** (no `token_credential` parameter) methods are no longer supported. `token_credential` is now a required parameter.
+> **⚠️ NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential` fallback) and **implicit Fabric Notebook authentication** (without a `token_credential` parameter) methods are no longer supported. `token_credential` is now a required parameter.
 
 **Notes:**
 

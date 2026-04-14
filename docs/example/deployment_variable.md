@@ -2,7 +2,7 @@
 
 A key concept in CI/CD is defining environment-specific deployment variables. The following are examples of how to inject variables from outside of the python script to handle values that are environment-specific, or common across other tooling. These examples provide starting points that should be adapted for your specific environment and security requirements.
 
-> **⚠️ NOTICE**: Due to security best practices, the **Default Credential** (`DefaultAzureCredential` fallback) and **implicit Fabric Notebook authentication** (no `token_credential` parameter) methods are no longer supported. `token_credential` is now a required parameter.
+> **⚠️ NOTICE**: Due to security best practices, the **Default Credential** (`DefaultAzureCredential` fallback) and **implicit Fabric Notebook authentication** (without a `token_credential` parameter) methods are no longer supported. `token_credential` is now a required parameter.
 
 **Note:** All examples below use the `AzureCliCredential` token for demonstration purposes. You can substitute this with other explicit credential methods based on your environment.
 
