@@ -185,6 +185,43 @@ Traceback (most recent call last):
 1. Consider deploying in smaller batches
 2. Check `fabric_cicd.error.log` for retry-after headers in API responses
 
+#### Workspace Private Link Connectivity
+
+**Symptom**: Deployments fail with `'Request is denied due to inbound communication policy'` when deploying to a workspace that has **"Allow connections only from workspace level private links"** enabled.
+
+**Explanation**: When workspace-level private links are enabled, the default public endpoint (`api.fabric.microsoft.com`) is blocked. The workspace-specific Fully Qualified Domain Name (FQDN) must be used instead. The FQDN format is:
+
+```
+https://{workspace_id_no_dashes}.z{first_2_chars}.w.api.fabric.microsoft.com
+```
+
+where `{workspace_id_no_dashes}` is the workspace ID with dashes removed, and `{first_2_chars}` are the first two characters of the workspace ID.
+
+See [Workspace-level private links overview — Connecting to workspaces](https://learn.microsoft.com/en-us/fabric/security/security-workspace-level-private-links-overview#connecting-to-workspaces) for more details.
+
+**Solution using the Python API** — override `constants.DEFAULT_API_ROOT_URL` before creating the `FabricWorkspace` object:
+
+```python
+import fabric_cicd.constants as constants
+
+workspace_id = "your-workspace-id"
+constants.DEFAULT_API_ROOT_URL = (
+    f"https://{workspace_id.replace('-', '')}"
+    f".z{workspace_id[0:2]}.w.api.fabric.microsoft.com"
+)
+```
+
+**Solution using config.yml** — set `DEFAULT_API_ROOT_URL` in the `constants` section, with environment-specific values if needed:
+
+```yaml
+constants:
+    DEFAULT_API_ROOT_URL:
+        dev: "https://{dev_workspace_fqdn}"
+        prod: "https://{prod_workspace_fqdn}"
+```
+
+**Important**: When using a private link setup, you must initialize `FabricWorkspace` with `workspace_id` rather than `workspace_name`. Resolving a workspace name requires calling the public list-workspaces API, which is blocked behind the private link.
+
 ### Debug Scripts
 
 The `devtools/` directory contains pre-built scripts to help test and validate deployments, parameter files, and Fabric REST APIs locally. These scripts already exist in the repository - you just need to configure them for your scenario.
