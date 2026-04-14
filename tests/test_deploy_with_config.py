@@ -561,7 +561,7 @@ class TestConfigOverridesIntegration:
         mock_workspace_instance.unpublish_responses = None
         mock_workspace.return_value = mock_workspace_instance
 
-        result = deploy_with_config(str(config_file), "dev")
+        result = deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         assert isinstance(result, DeploymentResult)
         assert result.responses == {"publish": {"Notebook": {"MyNotebook": {"body": {"id": "123"}}}}}
@@ -600,7 +600,7 @@ class TestConfigOverridesIntegration:
         mock_unpublish.side_effect = RuntimeError("Unpublish failed")
 
         with pytest.raises(RuntimeError) as exc_info:
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
@@ -645,9 +645,10 @@ class TestDeployWithConfig:
         # Mock workspace instance
         mock_workspace_instance = MagicMock()
         mock_workspace.return_value = mock_workspace_instance
+        mock_credential = MagicMock()
 
         # Execute deployment
-        deploy_with_config(str(config_file), "dev")
+        deploy_with_config(config_file_path=str(config_file), token_credential=mock_credential, environment="dev")
 
         # Verify workspace creation
         # Note: repository_directory will be resolved to absolute path during validation
@@ -658,7 +659,7 @@ class TestDeployWithConfig:
         assert "path" in call_args["repository_directory"]
         assert call_args["item_type_in_scope"] == ["Notebook", "DataPipeline"]
         assert call_args["environment"] == "dev"
-        assert call_args["token_credential"] is None
+        assert call_args["token_credential"] == mock_credential
 
         # Verify publish and unpublish calls
         mock_publish.assert_called_once_with(
@@ -706,7 +707,7 @@ class TestDeployWithConfig:
         mock_workspace.return_value = mock_workspace_instance
 
         # Execute deployment
-        deploy_with_config(str(config_file), "dev")
+        deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         # Verify workspace creation
         mock_workspace.assert_called_once()
@@ -718,7 +719,7 @@ class TestDeployWithConfig:
     def test_deploy_with_config_missing_file(self):
         """Test deployment with missing config file."""
         with pytest.raises(ConfigValidationError, match="Configuration file not found"):
-            deploy_with_config("nonexistent.yml", "dev")
+            deploy_with_config(config_file_path="nonexistent.yml", token_credential=MagicMock(), environment="dev")
 
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
@@ -750,7 +751,7 @@ class TestDeployWithConfig:
         mock_credential = MagicMock()
 
         # Execute deployment
-        deploy_with_config(str(config_file), "dev", token_credential=mock_credential)
+        deploy_with_config(config_file_path=str(config_file), token_credential=mock_credential, environment="dev")
 
         # Verify workspace creation with token credential
         # Note: repository_directory will be resolved to absolute path during validation
@@ -800,7 +801,12 @@ class TestDeployWithConfig:
         mock_workspace.return_value = mock_workspace_instance
 
         # Execute deployment with config override
-        deploy_with_config(str(config_file), "dev", config_override=config_override)
+        deploy_with_config(
+            config_file_path=str(config_file),
+            token_credential=MagicMock(),
+            environment="dev",
+            config_override=config_override,
+        )
 
         # Verify workspace creation
         mock_workspace.assert_called_once()
@@ -838,7 +844,7 @@ class TestDeployWithConfig:
         mock_workspace.return_value = mock_workspace_instance
 
         # Execute deployment
-        deploy_with_config(str(config_file), "dev")
+        deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         # Verify publish was called with shortcut_exclude_regex parameter
         mock_publish.assert_called_once_with(
@@ -874,7 +880,7 @@ class TestDeployWithConfig:
             yaml.dump(config_data, f)
 
         mock_workspace.return_value = MagicMock()
-        deploy_with_config(str(config_file), "dev")
+        deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         call_args = mock_publish.call_args[1]
         assert call_args["folder_path_to_include"] == ["/my/folder/path"]
@@ -898,7 +904,7 @@ class TestDeployWithConfig:
             yaml.dump(config_data, f)
 
         mock_workspace.return_value = MagicMock()
-        deploy_with_config(str(config_file), "dev")
+        deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         call_args = mock_publish.call_args[1]
         assert call_args["folder_path_to_include"] is None
@@ -928,7 +934,7 @@ class TestDeployWithConfig:
             yaml.dump(config_data, f)
 
         mock_workspace.return_value = MagicMock()
-        deploy_with_config(str(config_file), "dev")
+        deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         call_args = mock_publish.call_args[1]
         assert call_args["folder_path_to_include"] == ["/dev/folder"]
@@ -964,7 +970,7 @@ class TestDeployWithConfig:
                 patch("fabric_cicd.publish.publish_all_items"),
                 patch("fabric_cicd.publish.unpublish_all_orphan_items"),
             ):
-                deploy_with_config(str(config_file), "dev", token_credential=MagicMock())
+                deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
             # Assert FabricWorkspace was constructed with skip_parameterization=True
             call_kwargs = mock_fabric_ws.call_args[1]
@@ -997,7 +1003,7 @@ class TestDeployWithConfig:
                 patch("fabric_cicd.publish.publish_all_items"),
                 patch("fabric_cicd.publish.unpublish_all_orphan_items"),
             ):
-                deploy_with_config(str(config_file), "dev", token_credential=MagicMock())
+                deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
             call_kwargs = mock_fabric_ws.call_args[1]
             assert call_kwargs.get("skip_parameterization") is False
@@ -1383,7 +1389,7 @@ class TestDeployWithConfigReturnValue:
         mock_workspace.return_value = mock_workspace_instance
 
         # Execute deployment
-        result = deploy_with_config(str(config_file), "dev")
+        result = deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         # Verify result is a DeploymentResult
         assert isinstance(result, DeploymentResult)
@@ -1424,7 +1430,7 @@ class TestDeployWithConfigReturnValue:
         mock_workspace.return_value = mock_workspace_instance
 
         # Execute deployment
-        result = deploy_with_config(str(config_file), "dev")
+        result = deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         # Verify result is a DeploymentResult with COMPLETED status
         assert isinstance(result, DeploymentResult)
@@ -1444,7 +1450,7 @@ class TestDeployWithConfigFailures:
         config_file.write_text("invalid: yaml: content: [")
 
         with pytest.raises(InputError, match="Invalid YAML syntax"):
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
     def test_deploy_with_config_missing_core_raises_config_validation_error(self, tmp_path):
         """Test that deploy_with_config raises ConfigValidationError when core section is missing."""
@@ -1454,7 +1460,7 @@ class TestDeployWithConfigFailures:
             yaml.dump(config_data, f)
 
         with pytest.raises(ConfigValidationError, match="must contain a 'core' section"):
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
     def test_deploy_with_config_missing_environment_raises_config_validation_error(self, tmp_path):
         """Test that deploy_with_config raises ConfigValidationError when environment is not in workspace mappings."""
@@ -1472,7 +1478,7 @@ class TestDeployWithConfigFailures:
             yaml.dump(config_data, f)
 
         with pytest.raises(ConfigValidationError, match="Environment 'prod' not found"):
-            deploy_with_config(str(config_file), "prod")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="prod")
 
     def test_deploy_with_config_missing_workspace_id_raises_config_validation_error(self, tmp_path):
         """Test that deploy_with_config raises ConfigValidationError when workspace_id is missing."""
@@ -1486,7 +1492,7 @@ class TestDeployWithConfigFailures:
             yaml.dump(config_data, f)
 
         with pytest.raises(ConfigValidationError, match="must specify either 'workspace_id' or 'workspace'"):
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
@@ -1515,7 +1521,7 @@ class TestDeployWithConfigFailures:
         )
 
         with pytest.raises(PublishError, match="Failed to publish 1 item"):
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
     @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
@@ -1543,7 +1549,7 @@ class TestDeployWithConfigFailures:
         mock_workspace.side_effect = Exception("Workspace initialization failed")
 
         with pytest.raises(Exception, match="Workspace initialization failed"):
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         mock_publish.assert_not_called()
         mock_unpublish.assert_not_called()
@@ -1572,7 +1578,7 @@ class TestDeployWithConfigFailures:
         mock_unpublish.side_effect = RuntimeError("Unpublish operation failed")
 
         with pytest.raises(RuntimeError, match="Unpublish operation failed"):
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         # Verify publish was called successfully before unpublish failed
         mock_publish.assert_called_once()
@@ -1605,7 +1611,7 @@ class TestDeployWithConfigExceptionAttributes:
         mock_publish.side_effect = RuntimeError("Something broke")
 
         with pytest.raises(RuntimeError) as exc_info:
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
@@ -1644,7 +1650,7 @@ class TestDeployWithConfigExceptionAttributes:
         mock_unpublish.side_effect = RuntimeError("Unpublish failed")
 
         with pytest.raises(RuntimeError) as exc_info:
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
@@ -1674,7 +1680,7 @@ class TestDeployWithConfigExceptionAttributes:
         mock_publish.side_effect = RuntimeError("Publish failed")
 
         with pytest.raises(RuntimeError) as exc_info:
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
@@ -1686,7 +1692,7 @@ class TestDeployWithConfigExceptionAttributes:
         config_file.write_text("invalid: yaml: content: [")
 
         with pytest.raises(InputError) as exc_info:
-            deploy_with_config(str(config_file), "dev")
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         e = exc_info.value
         assert hasattr(e, "deployment_result")
@@ -1728,7 +1734,7 @@ class TestDeployWithConfigResponseCollection:
         mock_workspace_instance.unpublish_responses = None
         mock_workspace.return_value = mock_workspace_instance
 
-        result = deploy_with_config(str(config_file), "dev")
+        result = deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         assert isinstance(result, DeploymentResult)
         assert isinstance(result.responses, dict)
@@ -1766,7 +1772,7 @@ class TestDeployWithConfigResponseCollection:
         mock_workspace_instance.unpublish_responses = {"Notebook": {"nb2": {"body": {"id": "456"}}}}
         mock_workspace.return_value = mock_workspace_instance
 
-        result = deploy_with_config(str(config_file), "dev")
+        result = deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         assert isinstance(result, DeploymentResult)
         assert result.responses == {
@@ -1802,7 +1808,7 @@ class TestDeployWithConfigResponseCollection:
         mock_workspace_instance = MagicMock()
         mock_workspace.return_value = mock_workspace_instance
 
-        result = deploy_with_config(str(config_file), "dev")
+        result = deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
         assert isinstance(result, DeploymentResult)
         assert result.responses is None

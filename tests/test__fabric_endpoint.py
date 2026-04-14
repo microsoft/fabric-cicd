@@ -458,6 +458,7 @@ def test_handle_response_environment_libraries_not_found(setup_mocks):
     assert exit_loop is True
     assert long_running is False
 
+
 def test_format_invoke_log():
     """Test formatting of the invoke log message."""
     response = Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={}))

@@ -159,7 +159,9 @@ class FabricEndpoint:
             try:
                 access_token = self.token_credential.get_token(resource_url)
                 self.aad_token = access_token.token
-                self.aad_token_expiration = datetime.datetime.fromtimestamp(access_token.expires_on, tz=datetime.timezone.utc)
+                self.aad_token_expiration = datetime.datetime.fromtimestamp(
+                    access_token.expires_on, tz=datetime.timezone.utc
+                )
             except ClientAuthenticationError as e:
                 msg = f"Failed to acquire AAD token. {e}"
                 raise TokenError(msg, logger) from e
@@ -399,5 +401,3 @@ def _format_invoke_log(response: requests.Response, method: str, url: str, body:
         ])
 
     return "\n".join(message)
-
-

@@ -19,10 +19,12 @@ Basic example of configuration-based deployment:
 
 ```python
 from fabric_cicd import deploy_with_config
+from azure.identity import AzureCliCredential
 
 # Deploy using a config file
 deploy_with_config(
     config_file_path="C:/dev/workspace/config.yml",  # required
+    token_credential=AzureCliCredential(),  # required
     environment="dev"
 )
 ```
@@ -431,10 +433,12 @@ constants:
 
 ```python
 from fabric_cicd import deploy_with_config
+from azure.identity import AzureCliCredential
 
 # Deploy using a config file
 deploy_with_config(
     config_file_path="path/to/config.yml",  # required
+    token_credential=AzureCliCredential(),  # required
     environment="dev"  # optional (recommended)
 )
 ```
@@ -455,8 +459,8 @@ credential = ClientSecretCredential(
 # Deploy with custom credential
 deploy_with_config(
     config_file_path="path/to/config.yml",
-    environment="prod",
-    token_credential=credential
+    token_credential=credential,
+    environment="prod"
 )
 ```
 
@@ -466,6 +470,7 @@ The `config_override` parameter in `deploy_with_config()` allows you to dynamica
 
 ```python
 from fabric_cicd import deploy_with_config
+from azure.identity import AzureCliCredential
 
 config_override_dict = {
     "core": {
@@ -481,6 +486,7 @@ config_override_dict = {
 # Deploy with configuration override
 deploy_with_config(
     config_file_path="path/to/config.yml",
+    token_credential=AzureCliCredential(),
     environment="dev",
     config_override=config_override_dict
 )
