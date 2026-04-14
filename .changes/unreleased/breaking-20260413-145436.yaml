@@ -1,5 +1,5 @@
 kind: breaking
-body: Remove implicit authentication in Microsoft Fabric Notebook and require explicit token credential
+body: Remove implicit authentication in Microsoft Fabric Notebook and require explicit token credential and keyword-only arguments for FabricWorkspace constructor
 time: 2026-04-13T14:54:36.4162537+03:00
 custom:
     Author: shirasassoon
