@@ -17,7 +17,7 @@ C:/dev/workspace
 
 Basic example of configuration-based deployment:
 
-**Note:** All parameters except `config_file_path` must be passed as keyword arguments to `deploy_with_config()`.
+> **Note:** All parameters except `config_file_path` must be passed as keyword arguments to `deploy_with_config()`.
 
 ```python
 from fabric_cicd import deploy_with_config
@@ -37,7 +37,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 The configuration file includes several sections with configurable settings for different aspects of the deployment process.
 
-**Note:** Configuration values can be specified in two ways: as a single value (applied to any target environment provided) or as an environment mapping. Both approaches can be used within the same configuration file — for example, using environment mappings for workspace IDs while keeping a single value for repository directory.
+> **Note:** Configuration values can be specified in two ways: as a single value (applied to any target environment provided) or as an environment mapping. Both approaches can be used within the same configuration file — for example, using environment mappings for workspace IDs while keeping a single value for repository directory.
 
 ### Core Settings
 
@@ -119,7 +119,7 @@ core:
 
 The `publish` section is optional and controls item publishing behavior. If this section is omitted entirely, publishing will run with **default behavior — all items published, no exclusions.** It includes various optional settings to enable/disable publishing operations or selectively publish items.
 
-**Note:** `folder_exclude_regex` and `folder_path_to_include` are mutually exclusive — providing both for the same environment will result in a validation error. For detailed information about folder and item filtering behavior, see [Selective Deployment Features](optional_feature.md#selective-deployment-features).
+> **Note:** `folder_exclude_regex` and `folder_path_to_include` are mutually exclusive — providing both for the same environment will result in a validation error. For detailed information about folder and item filtering behavior, see [Selective Deployment Features](optional_feature.md#selective-deployment-features).
 
 ```yaml
 publish:
@@ -231,7 +231,7 @@ unpublish:
         <env..>: <bool_value>
 ```
 
-**Warning:** While selective deployment is supported in fabric-cicd, it is not recommended due to potential issues with dependency management.
+> **⚠️ Warning:** While selective deployment is supported in fabric-cicd, it is not recommended due to potential issues with dependency management.
 
 ### Features Setting
 
@@ -289,7 +289,7 @@ core:
 
 Fields are categorized as **required** or **optional**, which affects how missing environment values are handled when environment is passed into `deploy_with_config()`:
 
-**Note:** When the `publish` or `unpublish` sections are omitted entirely, both operations run by default. To skip either operation, explicitly set `skip: true` for that section.
+> **Note:** When the `publish` or `unpublish` sections are omitted entirely, both operations run by default. To skip either operation, explicitly set `skip: true` for that section.
 
 | Field                                   | Required | Environment Missing Behavior    |
 | --------------------------------------- | -------- | ------------------------------- |
