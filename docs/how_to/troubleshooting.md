@@ -129,13 +129,13 @@ Traceback (most recent call last):
 
 **Solution**:
 
-1. Explicit authentication is **strongly recommended** as `DefaultAzureCredential` fallback is deprecated and will be removed. fabric-cicd accepts any [`TokenCredential`](https://learn.microsoft.com/en-us/python/api/azure-core/azure.core.credentials.tokencredential) — choose the appropriate one for your scenario:
+1. Explicit authentication is **required** as the `DefaultAzureCredential` fallback has been removed. `token_credential` is now a required parameter. fabric-cicd accepts any [`TokenCredential`](https://learn.microsoft.com/en-us/python/api/azure-core/azure.core.credentials.tokencredential) — choose the appropriate one for your scenario:
     - Local development: `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
     - CI/CD pipelines with platform auth: `AzureCliCredential` or `AzurePowerShellCredential` (requires a prior login step in the workflow, e.g., `azure/login` or AzCLI task)
     - CI/CD pipelines with OIDC / workload identity federation: `WorkloadIdentityCredential` (secretless; recommended for GitHub Actions and Azure DevOps with federated credentials)
     - CI/CD pipelines with service principals: `ClientSecretCredential` (requires client ID, secret, and tenant ID)
     - CI/CD pipelines with managed identity: `ManagedIdentityCredential` (requires Azure-hosted self-hosted runners)
-    - Fabric Notebooks: Authentication is handled automatically within the Fabric runtime (no explicit credential required unless overriding with a specific identity)
+    - Fabric Notebooks: Provide an explicit credential. See Authentication Examples for details.
 
 2. Verify authentication setup:
     ```bash
@@ -195,13 +195,13 @@ The `devtools/` directory contains pre-built scripts to help test and validate d
 
 **Key Configuration Options**:
 
-| Configuration          | Description                                                      | Required                                                         |
-| ---------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `workspace_id`         | Target Fabric workspace ID                                       | Yes                                                              |
-| `environment`          | Target environment (used for parameterization)                   | No                                                               |
-| `repository_directory` | Path to Fabric workspace items files (absolute or relative path) | Yes                                                              |
-| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)  | No                                                               |
-| `token_credential`     | Explicit credential method (`AzureCliCredential`, etc.)          | No (default credential fallback is deprecated; will be required) |
+| Configuration          | Description                                                      | Required |
+| ---------------------- | ---------------------------------------------------------------- | -------- |
+| `workspace_id`         | Target Fabric workspace ID                                       | Yes      |
+| `environment`          | Target environment (used for parameterization)                   | No       |
+| `repository_directory` | Path to Fabric workspace items files (absolute or relative path) | Yes      |
+| `item_type_in_scope`   | Specific item types to deploy (defaults to all supported types)  | No       |
+| `token_credential`     | Explicit credential method (`AzureCliCredential`, etc.)          | Yes      |
 
 **Quick Start**:
 
@@ -259,12 +259,12 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 
 **Key Configuration Options**:
 
-| Configuration      | Description                                                                         | Required                                                         |
-| ------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `config_file`      | Path to your `config.yml` file                                                      | Yes                                                              |
-| `environment`      | Target environment (used for parameterization and environment-based configurations) | No                                                               |
-| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)                             | No (default credential fallback is deprecated; will be required) |
-| `config_override`  | Dictionary to override configuration values within `config.yml`                     | No                                                               |
+| Configuration      | Description                                                                         | Required |
+| ------------------ | ----------------------------------------------------------------------------------- | -------- |
+| `config_file`      | Path to your `config.yml` file                                                      | Yes      |
+| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)                             | Yes      |
+| `environment`      | Target environment (used for parameterization and environment-based configurations) | No       |
+| `config_override`  | Dictionary to override configuration values within `config.yml`                     | No       |
 
 **Quick Start**:
 
@@ -307,10 +307,10 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 
 | Configuration      | Description                                                         | Required |
 | ------------------ | ------------------------------------------------------------------- | -------- |
+| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)             | Yes      |
 | `api_url`          | Full API endpoint URL                                               | Yes      |
 | `method`           | HTTP method (GET, POST, DELETE, PATCH)                              | Yes      |
 | `body`             | Request payload (for POST/PATCH)                                    | Varies   |
-| `token_credential` | Explicit credential method (`AzureCliCredential`, etc.)             | Yes      |
 | other              | View `invoke()` in `FabricEndpoint` class for additional parameters | No       |
 
 **Quick Start**:

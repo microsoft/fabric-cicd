@@ -33,7 +33,6 @@ def mock_endpoint():
         return {"body": {"value": []}}
 
     mock.invoke.side_effect = mock_invoke
-    mock.upn_auth = True
     return mock
 
 

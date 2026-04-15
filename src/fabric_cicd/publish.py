@@ -377,8 +377,9 @@ def unpublish_all_orphan_items(
 
 def deploy_with_config(
     config_file_path: str,
+    *,
+    token_credential: TokenCredential,
     environment: str = "N/A",
-    token_credential: Optional[TokenCredential] = None,
     config_override: Optional[dict] = None,
 ) -> DeploymentResult:
     """
@@ -390,8 +391,8 @@ def deploy_with_config(
 
     Args:
         config_file_path: Path to the YAML configuration file as a string.
+        token_credential: Azure token credential for authentication (e.g., AzureCliCredential, ClientSecretCredential) - required.
         environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod'), if missing defaults to 'N/A'.
-        token_credential: Optional Azure token credential for authentication.
         config_override: Optional dictionary to override specific configuration values.
 
     Returns:
@@ -416,8 +417,11 @@ def deploy_with_config(
     Examples:
         Basic usage
         >>> from fabric_cicd import deploy_with_config
+        >>> from azure.identity import AzureCliCredential
+        >>> credential = AzureCliCredential()
         >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
+        ...     token_credential=credential,
         ...     environment="prod"
         ... )
         >>> print(result.status)    # DeploymentStatus.COMPLETED
@@ -430,8 +434,8 @@ def deploy_with_config(
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
         >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
-        ...     environment="prod",
-        ...     token_credential=credential
+        ...     token_credential=credential,
+        ...     environment="prod"
         ... )
 
         With override configuration
@@ -440,6 +444,7 @@ def deploy_with_config(
         >>> credential = ClientSecretCredential(tenant_id, client_id, client_secret)
         >>> result = deploy_with_config(
         ...     config_file_path="workspace/config.yml",
+        ...     token_credential=credential,
         ...     environment="prod",
         ...     config_override={
         ...         "core": {
@@ -455,9 +460,12 @@ def deploy_with_config(
 
         Handling deployment failures
         >>> from fabric_cicd import deploy_with_config
+        >>> from azure.identity import AzureCliCredential
+        >>> credential = AzureCliCredential()
         >>> try:
         ...     result = deploy_with_config(
         ...         config_file_path="workspace/config.yml",
+        ...         token_credential=credential,
         ...         environment="prod"
         ...     )
         ...     print(result.status)    # DeploymentStatus.COMPLETED

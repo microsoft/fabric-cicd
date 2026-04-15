@@ -10,10 +10,10 @@ pip install fabric-cicd
 
 ## Authentication
 
-> **⚠️ DEPRECATION NOTICE**: The `DefaultAzureCredential` fallback is deprecated and will be removed in a future release. Please provide an explicit `token_credential` parameter.
+> **⚠️ NOTICE**: Due to security best practices, the **Default Credential** (`DefaultAzureCredential` fallback) and **implicit Fabric Notebook authentication** (without a `token_credential` parameter) methods are no longer supported. `token_credential` is now a required parameter.
 
 - You must provide your own credential object that aligns with the `TokenCredential` class (from [azure.identity](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity?view=azure-python)). For more details, see the [TokenCredential](https://learn.microsoft.com/en-us/python/api/azure-core/azure.core.credentials.tokencredential?view=azure-python) documentation.
-- When running in Fabric Notebook runtime, authentication is handled automatically through the user session context and therefore an explicit credential is not required in this scenario.
+- When running in Fabric Notebook runtime, provide an explicit credential. See Authentication examples for details.
 
 **Recommended Authentication Methods:**
 
