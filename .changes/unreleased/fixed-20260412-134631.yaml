@@ -1,0 +1,8 @@
+kind: fixed
+body: Add `enable_hard_delete` feature flag to bypass workspace recycle bin during unpublish
+time: 2026-04-12T13:46:31.7502595+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "924"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/924

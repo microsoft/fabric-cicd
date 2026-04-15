@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Lakehouse",
+    "displayName": "OntologyDataLH"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "19b772b2-c916-8ae7-41fa-1fa21fbf1fb0"
+  }
+}

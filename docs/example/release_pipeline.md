@@ -4,7 +4,7 @@ The following are some common examples of how to deploy from tooling like Azure 
 
 ## Azure CLI
 
-This approach will work for both the Default Credential Flow and the Azure CLI Credential Flow. However, it is recommended to use the Azure CLI Credential Flow in case there are multiple identities present in the build VM.
+This approach uses the Azure CLI Credential Flow. An explicit credential method is required. This avoids ambiguity when multiple identities are present in the build VM.
 
 === "Azure DevOps"
 
@@ -42,12 +42,12 @@ This approach will work for both the Default Credential Flow and the Azure CLI C
 === "GitHub"
 
     ```yaml
-    ###Unconfirmed example at this time, however, the Azure DevOps example is a good starting point
+    # Unconfirmed example at this time. The Azure DevOps example is a good starting point.
     ```
 
 ## Azure PowerShell
 
-This approach will work for both the Default Credential Flow and the Azure PowerShell Credential Flow. However, it is recommended to use the Azure PowerShell Credential Flow in case there are multiple identities present in the build VM.
+This approach uses the Azure PowerShell Credential Flow. An explicit credential method is required. This avoids ambiguity when multiple identities are present in the build VM.
 
 === "Azure DevOps"
 
@@ -86,12 +86,12 @@ This approach will work for both the Default Credential Flow and the Azure Power
 === "GitHub"
 
     ```yaml
-    ###Unconfirmed example at this time, however, the Azure DevOps example is a good starting point
+    # Unconfirmed example at this time. The Azure DevOps example is a good starting point.
     ```
 
 ## Variable Groups
 
-This approach is best suited for the Passed Arguments example found in the Deployment Variable Examples, in combination with the Explicit SPN Credential flow in the Authentication Examples. The goal being to define values within the pipeline (or outside the pipeline in Azure DevOps variable groups) and inject them into the python script. Note this also doesn't take a dependency on PowerShell for those organizations or scenarios that PowerShell is not allowed.
+This approach is best suited for the Passed Arguments example found in the Deployment Variable Examples, in combination with a `ClientSecretCredential` as shown in the [Authentication Examples](authentication.md). The goal is to define values within the pipeline (or outside the pipeline in Azure DevOps variable groups) and inject them into the python script. Note this also doesn't take a dependency on PowerShell for those organizations or scenarios where PowerShell is not allowed.
 === "Azure DevOps"
 
     ```yml
@@ -136,12 +136,12 @@ This approach is best suited for the Passed Arguments example found in the Deplo
                     --tenant_id $(tenant_id) # from Fabric_Deployment_Group_KeyVault
                     --workspace_id $(workspace_id) # from Fabric_Deployment_Group
                     --environment $(environment_name) # from Fabric_Deployment_Group
-                    --repository_directory $repository_directory # from Fabric_Deployment_Group
+                    --repository_directory $(repository_directory) # from Fabric_Deployment_Group
                     --item_types_in_scope ${{ parameters.items_in_scope }}
     ```
 
 === "GitHub"
 
     ```yaml
-    ###Unconfirmed example at this time, however, the Azure DevOps example is a good starting point
+    # Unconfirmed example at this time. The Azure DevOps example is a good starting point.
     ```

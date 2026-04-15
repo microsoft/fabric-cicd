@@ -1,0 +1,8 @@
+kind: breaking
+body: Remove default credential fallback; explicit token credential is now required
+time: 2026-03-29T15:07:39.9569937+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "909"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/909

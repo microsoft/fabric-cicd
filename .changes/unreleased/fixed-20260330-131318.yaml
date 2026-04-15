@@ -1,0 +1,8 @@
+kind: fixed
+body: Ignore paramater file when not explicitly defined in config file
+time: 2026-03-30T13:13:18.023121+03:00
+custom:
+    Author: aviatco
+    AuthorLink: https://github.com/aviatco
+    Issue: "866"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/866

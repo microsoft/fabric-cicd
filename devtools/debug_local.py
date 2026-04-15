@@ -6,7 +6,7 @@
 import sys
 from pathlib import Path
 
-from azure.identity import ClientSecretCredential
+from azure.identity import AzureCliCredential, AzurePowerShellCredential, ClientSecretCredential
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
@@ -49,7 +49,14 @@ item_type_in_scope = [
     "Reflex",
     "Eventstream",
     "SparkJobDefinition",
+    "Ontology",
 ]
+
+# Azure CLI auth - comment out to use a different auth method
+token_credential = AzureCliCredential()
+
+# Uncomment to use PowerShell auth
+# token_credential = AzurePowerShellCredential()
 
 # Uncomment to use SPN auth
 # client_id = "your-client-id"
@@ -65,8 +72,8 @@ target_workspace = FabricWorkspace(
     environment=environment,
     repository_directory=repository_directory,
     item_type_in_scope=item_type_in_scope,
-    # Uncomment to use SPN auth
-    # token_credential=token_credential,
+    # Explicit token credential required for auth (choose one of the options above)
+    token_credential=token_credential,
 )
 
 # Uncomment to publish

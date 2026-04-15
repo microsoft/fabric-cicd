@@ -2,9 +2,9 @@ fabric-cicd is a Python library designed for use with [Microsoft Fabric](https:/
 
 ## Base Expectations
 
--   Full deployment every time, without considering commit diffs
--   Deploys into the tenant of the executing identity
--   Only supports items that have Source Control, and Public Create/Update APIs
+- Full deployment every time, without considering commit diffs
+- Deploys into the tenant of the executing identity
+- Only supports items that have Source Control, and Public Create/Update APIs
 
 ## Supported Item Types
 
@@ -41,4 +41,7 @@ publish_all_items(target_workspace)
 unpublish_all_orphan_items(target_workspace)
 ```
 
-> **Note**: The `environment` parameter is required for parameter replacement to work properly. It must match one of the environment keys defined in your `parameter.yml` file (e.g., "PPE", "PROD", "DEV"). If you don't need parameter replacement, you can omit this parameter.
+> **Notes:**
+>
+> - All parameters for `FabricWorkspace` must be passed as keyword arguments.
+> - The `environment` parameter is required for parameter replacement to work properly. It must match one of the environment keys defined in your `parameter.yml` file (e.g., "PPE", "PROD", "DEV"). If you don't need parameter replacement, you can omit this parameter.

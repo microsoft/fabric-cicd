@@ -11,6 +11,7 @@ from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fixtures.credentials import DummyTokenCredential
 
 import fabric_cicd.publish as publish
 from fabric_cicd import constants
@@ -41,7 +42,6 @@ def mock_endpoint():
         return {"body": {"value": [], "capacityId": "test-capacity"}}
 
     mock.invoke.side_effect = mock_invoke
-    mock.upn_auth = True
     return mock
 
 
@@ -124,6 +124,7 @@ def test_publish_only_existing_item_types(mock_endpoint, temp_workspace_dir):
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(workspace)
@@ -134,6 +135,33 @@ def test_publish_only_existing_item_types(mock_endpoint, temp_workspace_dir):
         mock_notebook_cls.assert_called_once_with(workspace)
         mock_notebook_instance.publish_all.assert_called_once()
         mock_env_cls.assert_not_called()
+
+
+def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes Ontology items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestOntology", "Ontology", "test-ontology-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._ontology.OntologyPublisher") as mock_ontology_cls,
+    ):
+        mock_ontology_instance = mock_ontology_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "Ontology" in workspace.repository_items
+        mock_ontology_cls.assert_called_once_with(workspace)
+        mock_ontology_instance.publish_all.assert_called_once()
 
 
 def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint, temp_workspace_dir):
@@ -148,6 +176,7 @@ def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint, temp_
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
         )
 
         expected_types = list(constants.ACCEPTED_ITEM_TYPES)
@@ -161,6 +190,7 @@ def test_empty_item_type_in_scope_list(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=[],
+            token_credential=DummyTokenCredential(),
         )
         assert workspace.item_type_in_scope == []
 
@@ -180,6 +210,7 @@ def test_invalid_item_types_in_scope(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["InvalidItemType"],
+            token_credential=DummyTokenCredential(),
         )
 
 
@@ -193,6 +224,7 @@ def test_multiple_invalid_item_types_in_scope(mock_endpoint, temp_workspace_dir)
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["FakeType", "AnotherInvalidType"],
+            token_credential=DummyTokenCredential(),
         )
 
 
@@ -206,6 +238,7 @@ def test_mixed_valid_and_invalid_item_types_in_scope(mock_endpoint, temp_workspa
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook", "BadType", "Environment"],
+            token_credential=DummyTokenCredential(),
         )
 
 
@@ -245,6 +278,7 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "Eventhouse"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.unpublish_all_orphan_items(workspace)
@@ -288,6 +322,7 @@ def test_unpublish_with_feature_flags_enabled(mock_endpoint, temp_workspace_dir,
                 workspace_id="12345678-1234-5678-abcd-1234567890ab",
                 repository_directory=str(temp_workspace_dir),
                 item_type_in_scope=["Lakehouse"],
+                token_credential=DummyTokenCredential(),
             )
 
             publish.unpublish_all_orphan_items(workspace)
@@ -339,6 +374,7 @@ def test_unpublish_orphan_item_is_deleted(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.unpublish_all_orphan_items(workspace)
@@ -387,6 +423,7 @@ def test_unpublish_orphan_excluded_by_regex(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.unpublish_all_orphan_items(workspace, item_name_exclude_regex=r"^Protected.*")
@@ -436,6 +473,7 @@ def test_unpublish_orphan_filtered_by_items_to_include(mock_endpoint, temp_works
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.unpublish_all_orphan_items(workspace, items_to_include=["TargetOrphan.Notebook"])
@@ -477,6 +515,7 @@ def test_unpublish_no_orphans_no_deletion(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.unpublish_all_orphan_items(workspace)
@@ -520,6 +559,7 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint, temp_worksp
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Lakehouse", "MirroredDatabase"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(workspace)
@@ -559,6 +599,7 @@ def test_folder_exclusion_with_regex(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook", "SemanticModel"],
+            token_credential=DummyTokenCredential(),
         )
 
         exclude_regex = r".*legacy.*"
@@ -593,6 +634,7 @@ def test_folder_exclusion_with_anchored_regex(mock_endpoint, temp_workspace_dir)
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         exclude_regex = r"^/legacy$"
@@ -619,6 +661,7 @@ def test_item_name_exclusion_still_works(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         exclude_regex = r".*DoNotPublish.*"
@@ -656,6 +699,7 @@ def test_folder_inclusion_with_folder_path_to_include(mock_endpoint, temp_worksp
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook", "SemanticModel"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(
@@ -692,6 +736,7 @@ def test_folder_inclusion_and_exclusion_together(mock_endpoint, temp_workspace_d
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         with pytest.raises(
@@ -719,6 +764,7 @@ def test_empty_folder_path_to_include_raises_error(mock_endpoint, temp_workspace
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         with pytest.raises(InputError, match="folder_path_to_include must not be an empty list"):
@@ -748,6 +794,7 @@ def test_folder_exclusion_with_items_to_include(mock_endpoint, temp_workspace_di
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(
@@ -778,6 +825,7 @@ def test_folder_inclusion_with_item_exclusion(mock_endpoint, temp_workspace_dir)
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(
@@ -808,6 +856,7 @@ def test_folder_inclusion_with_items_to_include(mock_endpoint, temp_workspace_di
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(
@@ -840,6 +889,7 @@ def test_all_filters_combined(mock_endpoint, temp_workspace_dir):
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
             item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
         )
 
         publish.publish_all_items(

@@ -156,6 +156,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._mlexperiment import MLExperimentPublisher
         from fabric_cicd._items._mounteddatafactory import MountedDataFactoryPublisher
         from fabric_cicd._items._notebook import NotebookPublisher
+        from fabric_cicd._items._ontology import OntologyPublisher
         from fabric_cicd._items._report import ReportPublisher
         from fabric_cicd._items._semanticmodel import SemanticModelPublisher
         from fabric_cicd._items._sparkjobdefinition import SparkJobDefinitionPublisher
@@ -190,6 +191,7 @@ class ItemPublisher(Publisher):
             ItemType.MOUNTED_DATA_FACTORY: MountedDataFactoryPublisher,
             ItemType.DATA_AGENT: DataAgentPublisher,
             ItemType.ML_EXPERIMENT: MLExperimentPublisher,
+            ItemType.ONTOLOGY: OntologyPublisher,
         }
 
         publisher_class = publisher_mapping.get(item_type)
