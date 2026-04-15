@@ -231,7 +231,7 @@ unpublish:
         <env..>: <bool_value>
 ```
 
-> **⚠️ Warning:** While selective deployment is supported in fabric-cicd, it is not recommended due to potential issues with dependency management.
+> **Warning:** While selective deployment is supported in fabric-cicd, it is not recommended due to potential issues with dependency management.
 
 ### Features Setting
 
