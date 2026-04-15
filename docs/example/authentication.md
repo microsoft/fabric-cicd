@@ -2,11 +2,11 @@
 
 The following are the most common authentication flows for fabric-cicd. However, because fabric-cicd supports any [TokenCredential](https://learn.microsoft.com/en-us/dotnet/api/azure.core.tokencredential), there are multiple authentication methods available beyond the ones described here. These examples provide starting points that should be adapted for your specific environment and security requirements.
 
-> **⚠️ DEPRECATION NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential`) authentication method is deprecated and will be removed in a future release. Please migrate to one of the explicit credential methods described below.
+> **⚠️ NOTICE:** Due to security best practices, the **Default Credential** (`DefaultAzureCredential` fallback) and **implicit Fabric Notebook authentication** (without a `token_credential` parameter) methods are no longer supported. `token_credential` is now a required parameter.
 
 **Notes:**
 
-- Explicit `token_credential` parameter is used for all scenarios except Fabric Notebook runtime, which handles authentication automatically.
+- Fabric Notebook users must provide an explicit `token_credential`. See [Fabric Notebook Authentication](#fabric-notebook-authentication) for options.
 - Avoid hardcoding credentials. Use environment variables or secret management services. SPN + Secret auth can also be achieved via `az login --service-principal` or `Connect-AzAccount -ServicePrincipal` in the CLI/PowerShell flows below.
 
 ## CLI Credential
@@ -375,20 +375,28 @@ This approach uses Azure Managed Identity, eliminating the need to manage secret
 
 ## Fabric Notebook Authentication
 
-When running fabric-cicd within Microsoft Fabric Notebooks, authentication is handled automatically through the user session context. No explicit `token_credential` parameter is required. Alternatively, if you want to use a different identity than the logged-in user, you can override the automatic authentication by providing an explicit credential.
+When running fabric-cicd within Microsoft Fabric Notebooks, an explicit `token_credential` parameter is required, consistent with all other environments. The simplest approach uses `notebookutils.credentials.getToken()` to create a credential from the current user session. Alternatively, you can use a service principal for specific identity requirements.
 
-=== "No Credential"
+=== "Session Credential"
 
     ```python
     '''
-    fabric-cicd automatically uses the Fabric Notebook session authentication
+    Use the Fabric Notebook session identity via notebookutils
     Most common pattern: clone repository and deploy from within notebook
     '''
 
+    import time
     import tempfile
     import subprocess
     import os
+    from azure.core.credentials import AccessToken, TokenCredential
     from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+    # Define a credential that wraps the Fabric session token
+    class FabricNotebookCredential(TokenCredential):
+        def get_token(self, *scopes, **kwargs):
+            token = notebookutils.credentials.getToken("pbi")
+            return AccessToken(token, int(time.time()) + 3600)  # 1 hour
 
     # Sample configuration values
     workspace_id = "your-workspace-id"
@@ -417,12 +425,13 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
         # Deploy workspace items from cloned repository
         item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
 
-        # Initialize FabricWorkspace - no token_credential needed
+        # Initialize FabricWorkspace with explicit session credential
         target_workspace = FabricWorkspace(
             workspace_id=workspace_id,
             environment=environment,
             repository_directory=workspace_root,
-            item_type_in_scope=item_type_in_scope
+            item_type_in_scope=item_type_in_scope,
+            token_credential=FabricNotebookCredential(),
         )
 
         # Publish all items defined in item_type_in_scope
@@ -435,12 +444,12 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
     print("Cleaned up temporary directory")
     ```
 
-=== "Credential"
+=== "SPN Credential"
 
     ```python
     '''
-    Override automatic authentication with explicit credential
-    Only needed for specific identity requirements
+    Use a service principal for specific identity requirements
+    Retrieve secrets from Azure Key Vault using notebookutils
     '''
 
     import tempfile
@@ -456,7 +465,6 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
     repo_ref = "main"
     workspace_directory = "your-workspace-directory"
 
-    # Use explicit SPN auth (overrides automatic authentication)
     # Retrieve secrets from Azure Key Vault using notebookutils
     key_vault_url = "https://your-keyvault.vault.azure.net/"
     client_id = notebookutils.credentials.getSecret(key_vault_url, "client-id")
@@ -489,7 +497,7 @@ When running fabric-cicd within Microsoft Fabric Notebooks, authentication is ha
         # Deploy workspace items from cloned repository
         item_type_in_scope = ["Notebook", "DataPipeline", "Environment"]
 
-        # Initialize with explicit credential
+        # Initialize with explicit SPN credential
         target_workspace = FabricWorkspace(
             workspace_id=workspace_id,
             environment=environment,

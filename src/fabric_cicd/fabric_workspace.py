@@ -17,7 +17,7 @@ from azure.core.credentials import TokenCredential
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex, check_valid_json_content, check_valid_yaml_content
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
-from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _generate_fabric_credential, _is_fabric_runtime
+from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -30,24 +30,25 @@ class FabricWorkspace:
 
     def __init__(
         self,
+        *,
         repository_directory: str,
+        token_credential: TokenCredential,
         item_type_in_scope: Optional[list[str]] = None,
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
-        token_credential: Optional[TokenCredential] = None,
         **kwargs,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
 
         Args:
-            workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
-            workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             repository_directory: Local directory path of the repository where items are to be deployed from.
+            token_credential: The token credential to use for API requests (e.g., AzureCliCredential, ClientSecretCredential) - required.
             item_type_in_scope: Item types that should be deployed for a given workspace. If omitted, defaults to all available item types.
             environment: The environment to be used for parameterization.
-            token_credential: The token credential to use for API requests (e.g., AzureCliCredential, ClientSecretCredential).
+            workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
+            workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             kwargs: Additional keyword arguments.
 
         Examples:
@@ -56,14 +57,16 @@ class FabricWorkspace:
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/path/to/repo",
-            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+            ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+            ...     token_credential=AzureCliCredential()  # or any other TokenCredential
             ... )
 
             Basic usage with workspace_name
             >>> from fabric_cicd import FabricWorkspace
             >>> workspace = FabricWorkspace(
             ...     workspace_name="your-workspace-name",
-            ...     repository_directory="/path/to/repo"
+            ...     repository_directory="/path/to/repo",
+            ...     token_credential=AzureCliCredential()  # or any other TokenCredential
             ... )
 
             With optional parameters
@@ -72,7 +75,8 @@ class FabricWorkspace:
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/your/path/to/repo",
             ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
-            ...     environment="your-target-environment"
+            ...     environment="your-target-environment",
+            ...     token_credential=AzureCliCredential()  # or any other TokenCredential
             ... )
 
             With token credential
@@ -100,15 +104,8 @@ class FabricWorkspace:
             validate_workspace_name,
         )
 
-        if token_credential is None:
-            if _is_fabric_runtime():
-                token_credential = validate_token_credential(_generate_fabric_credential())
-                logger.debug("Running in Fabric runtime - using generated Fabric credential for authentication.")
-            else:
-                msg = "A TokenCredential is required to authenticate API requests. Please pass a 'token_credential' (e.g., AzureCliCredential, ClientSecretCredential)."
-                raise InputError(msg, logger)
-        else:
-            token_credential = validate_token_credential(token_credential)
+        # Validate token_credential. A TokenCredential is required to authenticate API requests
+        token_credential = validate_token_credential(token_credential)
 
         # Initialize endpoint
         self.endpoint = FabricEndpoint(token_credential=token_credential)
