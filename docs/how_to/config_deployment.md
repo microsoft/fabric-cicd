@@ -17,6 +17,8 @@ C:/dev/workspace
 
 Basic example of configuration-based deployment:
 
+**Note:** All parameters except `config_file_path` must be passed as keyword arguments to `deploy_with_config()`.
+
 ```python
 from fabric_cicd import deploy_with_config
 from azure.identity import AzureCliCredential
