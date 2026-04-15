@@ -83,79 +83,93 @@ def publish_all_items(
     Examples:
         Basic usage
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> publish_all_items(workspace)
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items
+        >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> exclude_regex = ".*_do_not_publish"
         >>> publish_all_items(workspace, item_name_exclude_regex=exclude_regex)
 
         With folder exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_experimental_features")
         >>> append_feature_flag("enable_exclude_folder")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> folder_exclude_regex = "^/legacy"
         >>> publish_all_items(workspace, folder_path_exclude_regex=folder_exclude_regex)
 
         With folder inclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_experimental_features")
         >>> append_feature_flag("enable_include_folder")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> folder_path_to_include = ["/subfolder"]
         >>> publish_all_items(workspace, folder_path_to_include=folder_path_to_include)
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_experimental_features")
         >>> append_feature_flag("enable_items_to_include")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> items_to_include = ["Hello World.Notebook", "Hello.Environment"]
         >>> publish_all_items(workspace, items_to_include=items_to_include)
 
         With shortcut exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_experimental_features")
         >>> append_feature_flag("enable_shortcut_exclude")
         >>> append_feature_flag("enable_shortcut_publish")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Lakehouse"]
+        ...     item_type_in_scope=["Lakehouse"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> shortcut_exclude_regex = "^temp_.*"  # Exclude shortcuts starting with "temp_"
         >>> publish_all_items(workspace, shortcut_exclude_regex=shortcut_exclude_regex)
 
         With response collection
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_response_collection")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> responses = publish_all_items(workspace)
         >>> # Access all responses
@@ -269,10 +283,12 @@ def unpublish_all_orphan_items(
     Examples:
         Basic usage
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> publish_all_items(workspace)
         >>> unpublish_all_orphan_items(workspace)
@@ -290,12 +306,14 @@ def unpublish_all_orphan_items(
 
         With items to include
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_experimental_features")
         >>> append_feature_flag("enable_items_to_include")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> publish_all_items(workspace)
         >>> items_to_include = ["Hello World.Notebook", "Run Hello World.DataPipeline"]
@@ -303,11 +321,13 @@ def unpublish_all_orphan_items(
 
         With response collection
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
         >>> append_feature_flag("enable_response_collection")
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> publish_all_items(workspace)
         >>> responses = unpublish_all_orphan_items(workspace)
