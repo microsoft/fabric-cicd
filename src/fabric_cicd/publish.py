@@ -166,10 +166,12 @@ def publish_all_items(
 
         With get_changed_items (deploy only git-changed items)
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
+        >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
         ... )
         >>> changed = get_changed_items(workspace.repository_directory)
         >>> if changed:
