@@ -144,7 +144,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
 
 def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) -> str:
     """
-    Extracts the workspace ID from the $workspace variable to set as the replace_value.
+    Extracts workspace metadata from the $workspace variable to set as the replace_value.
 
     Supports the following formats:
     - $workspace.id or $workspace.$id - Returns the target workspace ID

@@ -239,6 +239,8 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
               file_path: "/Composite Model B.SemanticModel/definition/expressions.tmdl"
         ```
 
+        **Important:** `$workspace.$name` / `$workspace.name` returns the raw workspace display name. If the target value must remain URL-encoded, provide an already encoded replacement value (for example via environment-specific static values).
+
     - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         - `$items.<item_type>.<item_name>.<attribute>` (legacy format)
         - **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
