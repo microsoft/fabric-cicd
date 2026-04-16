@@ -238,7 +238,7 @@ class TestGetChangedItems:
             git_utils.get_changed_items(tmp_path, git_compare_ref="main")
 
         call_args = mock_run.call_args[0][0]
-        assert "main" in call_args
+        assert call_args == ["git", "diff", "--name-status", "main"]
 
     def test_excludes_files_outside_repository_directory(self, tmp_path):
         """Files changed outside the configured repository_directory are ignored."""
