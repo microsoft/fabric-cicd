@@ -20,7 +20,6 @@ from fabric_cicd._common._config_utils import (
 )
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
-from fabric_cicd._common._git_diff_utils import get_changed_items as get_changed_items
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_environment,
