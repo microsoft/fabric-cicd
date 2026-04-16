@@ -184,7 +184,14 @@ class FabricWorkspace:
         raise InputError(msg, logger)
 
     def _resolve_workspace_name(self, workspace_id: str) -> str:
-        """Resolve workspace display name based on the workspace ID given."""
+        """Resolve workspace display name based on the workspace ID given.
+
+        Args:
+            workspace_id: The workspace ID to resolve.
+
+        Returns:
+            str: The workspace display name.
+        """
         response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces")
         for workspace in response["body"]["value"]:
             if workspace["id"] == workspace_id:
