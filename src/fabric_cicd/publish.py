@@ -295,10 +295,12 @@ def unpublish_all_orphan_items(
 
         With regex name exclusion
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+        >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Environment", "Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()
         ... )
         >>> publish_all_items(workspace)
         >>> exclude_regex = ".*_do_not_delete"
