@@ -117,11 +117,13 @@ def get_changed_items(
 
     Examples:
         Deploy only changed items
+        >>> from azure.identity import AzureCliCredential
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
         >>> workspace = FabricWorkspace(
         ...     workspace_id="your-workspace-id",
         ...     repository_directory="/path/to/repo",
-        ...     item_type_in_scope=["Notebook", "DataPipeline"]
+        ...     item_type_in_scope=["Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()
         ... )
         >>> changed = get_changed_items(workspace.repository_directory)
         >>> if changed:
