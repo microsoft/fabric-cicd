@@ -54,6 +54,7 @@ class FabricWorkspace:
         Examples:
             Basic usage
             >>> from fabric_cicd import FabricWorkspace
+            >>> from azure.identity import AzureCliCredential
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/path/to/repo",
@@ -63,6 +64,7 @@ class FabricWorkspace:
 
             Basic usage with workspace_name
             >>> from fabric_cicd import FabricWorkspace
+            >>> from azure.identity import AzureCliCredential
             >>> workspace = FabricWorkspace(
             ...     workspace_name="your-workspace-name",
             ...     repository_directory="/path/to/repo",
@@ -71,6 +73,7 @@ class FabricWorkspace:
 
             With optional parameters
             >>> from fabric_cicd import FabricWorkspace
+            >>> from azure.identity import AzureCliCredential
             >>> workspace = FabricWorkspace(
             ...     workspace_id="your-workspace-id",
             ...     repository_directory="/your/path/to/repo",
@@ -79,7 +82,7 @@ class FabricWorkspace:
             ...     token_credential=AzureCliCredential()  # or any other TokenCredential
             ... )
 
-            With token credential
+            With service principal credentials
             >>> from fabric_cicd import FabricWorkspace
             >>> from azure.identity import ClientSecretCredential
             >>> client_id = "your-client-id"
