@@ -82,7 +82,7 @@ class FabricWorkspace:
             ...     token_credential=AzureCliCredential()  # or any other TokenCredential
             ... )
 
-            With SPN credential
+            With service principal credentials
             >>> from fabric_cicd import FabricWorkspace
             >>> from azure.identity import ClientSecretCredential
             >>> client_id = "your-client-id"
