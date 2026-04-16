@@ -3,7 +3,6 @@
 
 """Tests for git diff utilities: get_changed_items() and validate_git_compare_ref()."""
 
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -11,7 +10,6 @@ import pytest
 import fabric_cicd._common._git_diff_utils as git_utils
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._validate_input import validate_git_compare_ref
-
 
 # =============================================================================
 # Tests for validate_git_compare_ref()
