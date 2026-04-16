@@ -1132,9 +1132,7 @@ def test_resolve_workspace_name_not_found(patched_fabric_workspace, valid_worksp
     from fabric_cicd._common._exceptions import InputError
 
     mock_endpoint = MagicMock()
-    mock_endpoint.invoke.return_value = {
-        "body": {"value": [{"id": "other-id", "displayName": "Other Workspace"}]}
-    }
+    mock_endpoint.invoke.return_value = {"body": {"value": [{"id": "other-id", "displayName": "Other Workspace"}]}}
 
     with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
         workspace = patched_fabric_workspace(
