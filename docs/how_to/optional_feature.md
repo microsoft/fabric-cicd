@@ -103,7 +103,7 @@ Shortcuts are items associated with Lakehouse items and can be selectively publi
 
 `get_changed_items()` is a public utility function that uses `git diff` to detect which Fabric items have been added, modified, or renamed relative to a given git reference. It returns a list of strings in `"item_name.item_type"` format that can be passed directly to `items_to_include` in `publish_all_items()`.
 
-This function **does not require any feature flags** because it is a standalone utility — the filtering decision stays with the caller.
+While `get_changed_items()` itself requires no feature flags, passing its output to `items_to_include` requires the experimental feature flags.
 
 **Important:** If `get_changed_items()` returns an empty list (no changes detected), do not call `publish_all_items()` without an explicit `items_to_include` list, as this would default to a full deployment. Always guard against the empty-list case:
 
