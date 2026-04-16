@@ -361,6 +361,11 @@ class ItemPublisher(Publisher):
             items_to_include when set so that only relevant items are iterated.
 
         Subclasses can override to filter or transform the items.
+
+        Note:
+            The base implementation applies ``FabricWorkspace.items_to_include`` filtering.
+            To override this method and preserve this behavior, call ``super().get_items_to_publish()``
+            to keep ``items_to_include`` support, then apply any additional selection logic.
         """
         all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items_to_include = self.fabric_workspace_obj.items_to_include
