@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fixtures.credentials import DummyTokenCredential
 
-import fabric_cicd._common._git_utils as git_utils
+import fabric_cicd._common._git_diff_utils as git_utils
 import fabric_cicd.publish as publish
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
