@@ -301,7 +301,7 @@ def validate_git_compare_ref(git_compare_ref: str) -> str:
         raise InputError(msg, logger)
 
     # Allow only characters valid in git refs: alphanumeric, /, ., ~, ^, -, _
-    if not re.match(r"^[a-zA-Z0-9/.\-~^@{}]+$", git_compare_ref):
+    if not re.match(r"^[a-zA-Z0-9/_.\-~^@{}]+$", git_compare_ref):
         msg = f"git_compare_ref '{git_compare_ref}' contains invalid characters."
         raise InputError(msg, logger)
 
