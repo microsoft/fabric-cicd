@@ -231,7 +231,7 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         ```yaml
         find_replace:
             # Replace workspace name in Analysis Services connection string (URL-encoded form)
-            - find_value: (WORKSPACE%20NAME%20%5BDEV%5D)
+            - find_value: (MY%20WORKSPACE%20%5BDEV%5D)
               replace_value:
                   PPE: "$workspace.$name"
                   PROD: "$workspace.$name"

@@ -369,7 +369,7 @@ class TestParameterUtilities:
         assert result == "resolved-workspace-id"
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
 
-    def test_extract_workspace_id_name(self, mock_workspace):
+    def test_extract_workspace_id_with_workspace_name_variable(self, mock_workspace):
         """Tests _extract_workspace_id with workspace name variable."""
         from fabric_cicd._parameter._utils import _extract_workspace_id
 
