@@ -220,10 +220,24 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | Workspace Variable                                              | Description                                                                               | Example                                                    |
         | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
         | `$workspace.$id` or `$workspace.id`                             | Workspace ID of the target environment                                                    | `$workspace.$id` or `$workspace.id`                        |
+        | `$workspace.$name` or `$workspace.name`                         | Display name of the target workspace                                                      | `$workspace.$name` or `$workspace.name`                    |
         | `$workspace.<name>`                                             | Workspace ID of the specified workspace name                                              | `$workspace.TestWorkspace`                                 |
         | `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` | Attribute value of the specified item in a specified workspace (see supported attributes) | `$workspace.TestWorkspace.$items.Lakehouse.Example_LH.$id` |
 
         **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+
+        **Composite semantic model example (issue #895):** to replace a URL-encoded workspace name in an Analysis Services connection string in `expressions.tmdl`, use regex `find_value` to match the encoded text while using `$workspace.$name` for replacement (the variable resolves the raw target workspace display name).
+
+        ```yaml
+        find_replace:
+            # Replace workspace name in Analysis Services connection string (URL-encoded form)
+            - find_value: (WORKSPACE%20NAME%20%5BDEV%5D)
+              replace_value:
+                  PPE: "$workspace.$name"
+                  PROD: "$workspace.$name"
+              is_regex: "true"
+              file_path: "/Composite Model B.SemanticModel/definition/expressions.tmdl"
+        ```
 
     - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         - `$items.<item_type>.<item_name>.<attribute>` (legacy format)

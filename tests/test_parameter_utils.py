@@ -369,6 +369,21 @@ class TestParameterUtilities:
         assert result == "resolved-workspace-id"
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
 
+    def test_extract_workspace_id_name(self, mock_workspace):
+        """Tests _extract_workspace_id with workspace name variable."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
+
+        result = _extract_workspace_id(mock_workspace, "$workspace.name")
+        assert result == "My Target Workspace [PPE]"
+        mock_workspace._resolve_workspace_name.assert_called_once_with("mock-workspace-id")
+
+        mock_workspace._resolve_workspace_name.reset_mock()
+        result = _extract_workspace_id(mock_workspace, "$workspace.$name")
+        assert result == "My Target Workspace [PPE]"
+        mock_workspace._resolve_workspace_name.assert_called_once_with("mock-workspace-id")
+
     def test_extract_workspace_id_resolve_error(self, mock_workspace):
         """Tests _extract_workspace_id when workspace name resolution fails."""
         from fabric_cicd._parameter._utils import _extract_workspace_id
@@ -519,6 +534,16 @@ class TestParameterUtilities:
         mock_workspace._lookup_item_attribute.assert_called_once_with(
             "resolved-workspace-id", "Lakehouse", "Test_Lakehouse", "sqlendpointid"
         )
+
+    def test_extract_replace_value_workspace_name(self, mock_workspace):
+        """Tests extract_replace_value returns workspace name for $workspace.$name."""
+        mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
+
+        result = extract_replace_value(mock_workspace, "$workspace.$name")
+        assert result == "My Target Workspace [PPE]"
+
+        result = extract_replace_value(mock_workspace, "$workspace.name")
+        assert result == "My Target Workspace [PPE]"
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""

@@ -138,7 +138,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
         return _extract_item_attribute(workspace_obj, replace_value, get_dataflow_name)
 
     # Otherwise, raise an error for invalid variable syntax
-    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id"
+    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id or $workspace.name"
     raise InputError(msg, logger)
 
 
@@ -148,6 +148,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
 
     Supports the following formats:
     - $workspace.id or $workspace.$id - Returns the target workspace ID
+    - $workspace.name or $workspace.$name - Returns the target workspace display name
     - $workspace.<name> - Resolves the workspace ID from the name
     - $workspace.<name>.$items.<type>.<name>.$<attribute> - Resolves an item attribute from the specified workspace,
       where $attribute is any supported attribute in constants.ITEM_ATTR_LOOKUP
@@ -155,6 +156,10 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     # Case 1: $workspace.id
     if replace_value == "$workspace.id" or replace_value == "$workspace.$id":
         return workspace_obj.workspace_id
+
+    # Case 2: $workspace.name or $workspace.$name
+    if replace_value == "$workspace.name" or replace_value == "$workspace.$name":
+        return workspace_obj._resolve_workspace_name(workspace_obj.workspace_id)
 
     try:
         # Extract the variable string without the prefix
