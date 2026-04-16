@@ -3,7 +3,6 @@
 
 """Handles interactions with the Fabric API, including authentication and request management."""
 
-import base64
 import datetime
 import json
 import logging
@@ -12,7 +11,7 @@ import time
 from typing import Optional
 
 import requests
-from azure.core.credentials import AccessToken, TokenCredential
+from azure.core.credentials import TokenCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
 )
@@ -158,46 +157,17 @@ class FabricEndpoint:
             resource_url = "https://api.fabric.microsoft.com/.default"
 
             try:
-                self.aad_token = self.token_credential.get_token(resource_url).token
+                access_token = self.token_credential.get_token(resource_url)
+                self.aad_token = access_token.token
+                self.aad_token_expiration = datetime.datetime.fromtimestamp(
+                    access_token.expires_on, tz=datetime.timezone.utc
+                )
             except ClientAuthenticationError as e:
                 msg = f"Failed to acquire AAD token. {e}"
                 raise TokenError(msg, logger) from e
             except Exception as e:
                 msg = f"An unexpected error occurred when generating the AAD token. {e}"
                 raise TokenError(msg, logger) from e
-
-            try:
-                decoded_token = _decode_jwt(self.aad_token)
-                expiration = decoded_token.get("exp")
-                upn = decoded_token.get("upn")
-                appid = decoded_token.get("appid")
-                oid = decoded_token.get("oid")
-
-                if expiration:
-                    # Must be timezone-aware (UTC) to match the timezone-aware datetime used in comparison
-                    self.aad_token_expiration = datetime.datetime.fromtimestamp(expiration, tz=datetime.timezone.utc)
-                else:
-                    msg = "Token does not contain expiration claim."
-                    raise TokenError(msg, logger)
-
-                if upn:
-                    _log_executing_identity(f"Executing as User '{upn}'")
-                    self.upn_auth = True
-                else:
-                    self.upn_auth = False
-                    if appid:
-                        _log_executing_identity(f"Executing as Application Id '{appid}'")
-                    elif oid:
-                        _log_executing_identity(f"Executing as Object Id '{oid}'")
-
-            except Exception as e:
-                msg = f"An unexpected error occurred while decoding the credential token. {e}"
-                raise TokenError(msg, logger) from e
-
-
-def _log_executing_identity(msg: str) -> None:
-    if "disable_print_identity" not in constants.FEATURE_FLAG:
-        logger.info(msg)
 
 
 def _handle_response(
@@ -258,6 +228,8 @@ def _handle_response(
                     attempt=iteration_count - 1,
                     base_delay=0.5,
                     response_retry_after=retry_after,
+                    max_duration=max_duration,
+                    start_time=start_time,
                     prepend_message=f"{constants.INDENT}Operation in progress.",
                 )
         else:
@@ -401,32 +373,6 @@ def handle_retry(
         raise Exception(msg)
 
 
-def _decode_jwt(token: str) -> dict:
-    """
-    Decodes a JWT token and returns the payload as a dictionary.
-
-    Args:
-        token: The JWT token to decode.
-    """
-    try:
-        # Split the token into its parts
-        parts = token.split(".")
-        if len(parts) != 3:
-            msg = "The token has an invalid JWT format"
-            raise TokenError(msg, logger)
-
-        # Decode the payload (second part of the token)
-        payload = parts[1]
-        padding = "=" * (4 - len(payload) % 4)
-        payload += padding
-        decoded_bytes = base64.urlsafe_b64decode(payload.encode("utf-8"))
-        decoded_str = decoded_bytes.decode("utf-8")
-        return json.loads(decoded_str)
-    except Exception as e:
-        msg = f"An unexpected error occurred while decoding the credential token. {e}"
-        raise TokenError(msg, logger) from e
-
-
 def _format_invoke_log(response: requests.Response, method: str, url: str, body: str) -> str:
     """
     Format the log message for the invoke method.
@@ -457,47 +403,3 @@ def _format_invoke_log(response: requests.Response, method: str, url: str, body:
         ])
 
     return "\n".join(message)
-
-
-def _is_fabric_runtime() -> bool:
-    """Checks if the execution runtime is Fabric."""
-    try:
-        notebookutils = get_ipython().user_ns.get("notebookutils")  # noqa: F821
-        if notebookutils and hasattr(notebookutils, "runtime") and hasattr(notebookutils.runtime, "context"):
-            context = notebookutils.runtime.context
-            if "productType" in context:
-                return context["productType"].lower() == "fabric"
-        return False
-    except:
-        return False
-
-
-def _generate_fabric_credential() -> TokenCredential:
-    """Generates a TokenCredential for Fabric using notebookutils."""
-    from datetime import datetime, timezone
-
-    class FabricTokenCredential(TokenCredential):
-        """Custom credential that uses notebookutils to get tokens."""
-
-        def __init__(self, audience: str = "pbi") -> None:
-            self.audience = audience
-
-        def get_token(self, *scopes, **kwargs) -> AccessToken:  # noqa: ANN002, ARG002
-            """Get token using notebookutils."""
-            notebookutils = get_ipython().user_ns.get("notebookutils")  # noqa: F821
-            token_string = notebookutils.credentials.getToken(self.audience)
-
-            # Parse JWT to extract token expiration
-            try:
-                payload = _decode_jwt(token_string)
-                expires_on = payload.get("exp")
-
-                if expires_on:
-                    return AccessToken(token_string, expires_on)
-            except Exception:
-                pass  # Fall back to default expiration if parsing fails
-
-            # Fallback: use current time + 1 hour if exp claim is missing or parsing fails
-            return AccessToken(token_string, int(datetime.now(timezone.utc).timestamp()) + 3600)
-
-    return FabricTokenCredential("pbi")
