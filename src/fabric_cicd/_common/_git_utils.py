@@ -166,7 +166,7 @@ def _resolve_changed_items(
 
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-status", "--", git_compare_ref],
+            ["git", "diff", "--name-status", git_compare_ref],
             cwd=str(git_root),
             capture_output=True,
             text=True,
