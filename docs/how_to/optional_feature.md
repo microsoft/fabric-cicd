@@ -117,7 +117,7 @@ workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     repository_directory="/path/to/repo",
     item_type_in_scope=["Notebook", "DataPipeline"],
-    token_credential=token_credential,
+    token_credential=token_credential,  # or any other TokenCredential
 )
 
 changed = get_changed_items(workspace.repository_directory)

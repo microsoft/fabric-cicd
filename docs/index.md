@@ -31,11 +31,11 @@ token_credential = AzureCliCredential()
 
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
-    workspace_id = "your-workspace-id",
-    environment = "your-target-environment",
-    repository_directory = "your-repository-directory",
-    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"],
-    token_credential = token_credential,
+    workspace_id="your-workspace-id",
+    environment="your-target-environment",
+    repository_directory="your-repository-directory",
+    item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
+    token_credential=token_credential,  # or any other TokenCredential
 )
 
 # Publish all items defined in item_type_in_scope

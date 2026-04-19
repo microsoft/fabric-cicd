@@ -14,8 +14,9 @@ token_credential = AzureCliCredential()
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     repository_directory="C:/dev/workspace",
+    environment="PROD",
     item_type_in_scope=["Notebook"],
-    token_credential=token_credential,
+    token_credential=token_credential,  # or any other TokenCredential
 )
 ```
 
