@@ -7,11 +7,15 @@ To handle environment-specific values committed to git, use a `parameter.yml` fi
 Example of parameter.yml location based on provided repository directory:
 
 ```python
+from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace
+
+token_credential = AzureCliCredential()
 workspace = FabricWorkspace(
     workspace_id="your-workspace-id",
     repository_directory="C:/dev/workspace",
-    item_type_in_scope=["Notebook"]
+    item_type_in_scope=["Notebook"],
+    token_credential=token_credential,
 )
 ```
 

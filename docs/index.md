@@ -24,7 +24,10 @@ pip install fabric-cicd
 ## Basic Example
 
 ```python
+from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+
+token_credential = AzureCliCredential()
 
 # Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
@@ -32,6 +35,7 @@ target_workspace = FabricWorkspace(
     environment = "your-target-environment",
     repository_directory = "your-repository-directory",
     item_type_in_scope = ["Notebook", "DataPipeline", "Environment"],
+    token_credential = token_credential,
 )
 
 # Publish all items defined in item_type_in_scope
