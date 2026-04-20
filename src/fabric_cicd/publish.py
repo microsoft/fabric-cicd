@@ -177,6 +177,19 @@ def publish_all_items(
         >>> # Access individual item response (dict with "header", "body", "status_code" keys)
         >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
         >>> print(notebook_response["status_code"])  # e.g., 200
+
+        With get_changed_items (deploy only git-changed items)
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
+        >>> from azure.identity import AzureCliCredential
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Notebook", "DataPipeline"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
+        ... )
+        >>> changed = get_changed_items(workspace.repository_directory)
+        >>> if changed:
+        ...     publish_all_items(workspace, items_to_include=changed)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
@@ -340,6 +353,7 @@ def unpublish_all_orphan_items(
         >>> print(notebook_response["status_code"])  # e.g., 200
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
+
     validate_items_to_include(items_to_include, operation=constants.OperationType.UNPUBLISH)
 
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG

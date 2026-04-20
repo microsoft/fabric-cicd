@@ -50,7 +50,7 @@ Leverage the following when you have specific values that you need to define per
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
+        token_credential=token_credential,  # or any other TokenCredential
     )
 
     # Publish all items defined in item_type_in_scope
@@ -110,7 +110,7 @@ Leverage the following when you have specific values that you need to define per
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
+        token_credential=token_credential,  # or any other TokenCredential
     )
 
     # Publish all items defined in item_type_in_scope
@@ -162,7 +162,7 @@ Leverage the following when you have specific values that you need to define per
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
+        token_credential=token_credential,  # or any other TokenCredential
     )
 
     # Publish all items defined in item_type_in_scope
@@ -208,7 +208,7 @@ Leverage the following when you want to pass in variables outside of the python 
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
+        token_credential=token_credential,  # or any other TokenCredential
     )
 
     # Publish all items defined in item_type_in_scope
@@ -264,7 +264,7 @@ Leverage the following when you want to pass in variables outside of the python 
         environment=environment,
         repository_directory=repository_directory,
         item_type_in_scope=item_type_in_scope,
-        token_credential=token_credential,
+        token_credential=token_credential,  # or any other TokenCredential
     )
 
     # Publish all items defined in item_type_in_scope
