@@ -3,6 +3,7 @@
 
 """Functions to process and deploy Lakehouse item."""
 
+import copy
 import json
 import logging
 
@@ -57,16 +58,26 @@ def check_sqlendpoint_provision_status(fabric_workspace_obj: FabricWorkspace, it
         iteration += 1
 
 
-def list_deployed_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> list:
+def _get_shortcut_path(shortcut: dict) -> str:
     """
-    Lists all deployed shortcut paths
+    Build a unique shortcut path from shortcut metadata.
+
+    Args:
+        shortcut: The shortcut definition dictionary
+    """
+    return f"{shortcut['path']}/{shortcut['name']}"
+
+
+def list_deployed_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> dict[str, dict]:
+    """
+    Lists all deployed shortcut by path
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object containing the items to be published
         item_obj: The item object to list the shortcuts for
     """
     request_url = f"{fabric_workspace_obj.base_api_url}/items/{item_obj.guid}/shortcuts"
-    deployed_shortcut_paths = []
+    deployed_shortcuts_by_path = {}
 
     while request_url:
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/onelake-shortcuts/list-shortcuts
@@ -74,11 +85,12 @@ def list_deployed_shortcuts(fabric_workspace_obj: FabricWorkspace, item_obj: Ite
 
         # Handle cases where the response body is empty
         shortcuts = response["body"].get("value", [])
-        deployed_shortcut_paths.extend(f"{shortcut['path']}/{shortcut['name']}" for shortcut in shortcuts)
+        for shortcut in shortcuts:
+            deployed_shortcuts_by_path[_get_shortcut_path(shortcut)] = shortcut
 
         request_url = response["header"].get("continuationUri", None)
 
-    return deployed_shortcut_paths
+    return deployed_shortcuts_by_path
 
 
 def replace_default_lakehouse_id(shortcut: dict, item_obj: Item) -> dict:
@@ -165,6 +177,43 @@ class ShortcutPublisher(Publisher):
                 url=f"{self.fabric_workspace_obj.base_api_url}/items/{self.item_obj.guid}/shortcuts/{deployed_shortcut_path}",
             )
 
+    @staticmethod
+    def _is_shortcut_subset_match(repository_shortcut: object, deployed_shortcut: object) -> bool:
+        """
+        Recursively compare shortcut fields while ignoring extra deployed fields.
+
+        This allows server-side schema extensions without forcing unnecessary republish.
+        """
+        if isinstance(repository_shortcut, dict):
+            if not isinstance(deployed_shortcut, dict):
+                return False
+            for key, repository_value in repository_shortcut.items():
+                if key not in deployed_shortcut:
+                    return False
+                if not ShortcutPublisher._is_shortcut_subset_match(repository_value, deployed_shortcut[key]):
+                    return False
+            return True
+
+        if isinstance(repository_shortcut, list):
+            if not isinstance(deployed_shortcut, list) or len(repository_shortcut) != len(deployed_shortcut):
+                return False
+            return all(
+                ShortcutPublisher._is_shortcut_subset_match(repository_item, deployed_item)
+                for repository_item, deployed_item in zip(repository_shortcut, deployed_shortcut)
+            )
+
+        return repository_shortcut == deployed_shortcut
+
+    def _is_shortcut_changed(self, shortcut: dict, deployed_shortcut: dict) -> bool:
+        """
+        Determine whether a shortcut needs publishing.
+
+        Returns:
+            True when the shortcut differs from deployed state and should be published.
+        """
+        shortcut_for_compare = replace_default_lakehouse_id(copy.deepcopy(shortcut), self.item_obj)
+        return not self._is_shortcut_subset_match(shortcut_for_compare, deployed_shortcut)
+
     def publish_one(self, _shortcut_name: str, shortcut: dict) -> None:
         """
         Publish a single shortcut.
@@ -230,12 +279,29 @@ class ShortcutPublisher(Publisher):
                 )
                 logger.info(f"{constants.INDENT}Excluded shortcuts: {excluded_shortcuts}")
 
-        shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
+        shortcuts_to_publish = {_get_shortcut_path(shortcut): shortcut for shortcut in shortcuts}
 
         if shortcuts_to_publish:
             logger.info(f"Publishing Lakehouse '{self.item_obj.name}' Shortcuts")
-            shortcut_paths_to_unpublish = [path for path in deployed_shortcuts if path not in shortcuts_to_publish]
+            shortcut_paths_to_unpublish = [
+                path for path in list(deployed_shortcuts.keys()) if path not in shortcuts_to_publish
+            ]
             self._unpublish_shortcuts(shortcut_paths_to_unpublish)
-            # Deploy and overwrite shortcuts
+            if FeatureFlag.ENABLE_SHORTCUT_SMART_DIFF.value in constants.FEATURE_FLAG:
+                shortcuts_with_change = {}
+                unchanged_shortcut_count = 0
+                for shortcut_path, shortcut in shortcuts_to_publish.items():
+                    deployed_shortcut = deployed_shortcuts.get(shortcut_path)
+                    if deployed_shortcut and not self._is_shortcut_changed(shortcut, deployed_shortcut):
+                        unchanged_shortcut_count += 1
+                        continue
+                    shortcuts_with_change[shortcut_path] = shortcut
+                shortcuts_to_publish = shortcuts_with_change
+                if unchanged_shortcut_count:
+                    logger.info(
+                        f"{constants.INDENT}Skipped {unchanged_shortcut_count} unchanged shortcut(s) via smart diff"
+                    )
+
+            # Deploy and overwrite changed/new shortcuts
             for shortcut_path, shortcut in shortcuts_to_publish.items():
                 self.publish_one(shortcut_path, shortcut)
