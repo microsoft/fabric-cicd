@@ -232,7 +232,8 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
 
         > **Notes:**
         >
-        > - When using `$workspace.$name`, `$workspace.$name_encoded`, `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. When providing the workspace display name, ensure that it is an exact match (case sensitive).
+        > - When using `$workspace.$name`, `$workspace.$name_encoded`, `$workspace.<name>`, or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, ensure the executing identity has proper permissions to access the relevant workspace. 
+        > - For `$workspace.<name>` and `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, the provided workspace display name must be an exact, case-sensitive match.
         > - `$workspace.$name` returns the raw workspace display name. If the target value must remain URL-encoded, use `$workspace.$name_encoded` instead, which automatically percent-encodes the name (e.g., `My Workspace` becomes `My%20Workspace`).
 
     - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
