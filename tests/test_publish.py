@@ -1028,4 +1028,3 @@ class TestNotebookPublisher:
         assert mock_item.item_files[1].file_path.name == "notebook.py"
         assert mock_item.item_files[2].file_path.name == "readme.md"
         assert mock_item.item_files[3].file_path.name == "notebook.json"
-

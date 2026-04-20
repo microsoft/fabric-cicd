@@ -1104,6 +1104,47 @@ def test_base_api_url_kwarg_raises_error(temp_workspace_dir, valid_workspace_id)
         assert "constants.DEFAULT_API_ROOT_URL" in str(exc_info.value)
 
 
+def test_resolve_workspace_name(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Tests _resolve_workspace_name resolves display name from workspace ID."""
+    mock_endpoint = MagicMock()
+    mock_endpoint.invoke.return_value = {
+        "body": {
+            "value": [
+                {"id": "mock-workspace-id", "displayName": "My Workspace [DEV]"},
+                {"id": "other-id", "displayName": "Other Workspace"},
+            ]
+        }
+    }
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+
+    workspace.endpoint = mock_endpoint
+    result = workspace._resolve_workspace_name("mock-workspace-id")
+    assert result == "My Workspace [DEV]"
+
+
+def test_resolve_workspace_name_not_found(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Tests _resolve_workspace_name raises InputError when ID not found."""
+    from fabric_cicd._common._exceptions import InputError
+
+    mock_endpoint = MagicMock()
+    mock_endpoint.invoke.return_value = {"body": {"value": [{"id": "other-id", "displayName": "Other Workspace"}]}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+
+    workspace.endpoint = mock_endpoint
+    with pytest.raises(InputError, match="Workspace name could not be resolved from workspace ID"):
+        workspace._resolve_workspace_name("unknown-id")
+
+
 def test_lookup_item_attribute(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
     """Test that _lookup_item_attribute correctly finds items in another workspace."""
     # Mock endpoint response for workspace items

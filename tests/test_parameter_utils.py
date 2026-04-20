@@ -225,7 +225,7 @@ class TestParameterUtilities:
         with pytest.raises(
             InputError,
             match=re.escape(
-                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.attribute"
+                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.$attribute"
             ),
         ):
             result = extract_replace_value(mock_workspace, "$workspace.id", True)
@@ -234,7 +234,7 @@ class TestParameterUtilities:
         with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
             mock_extract.return_value = None
             result = extract_replace_value(mock_workspace, "$items.Notebook.Test Notebook.id", True)
-            assert result == None
+            assert result is None
             mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.Test Notebook.id", True)
 
         # With get_dataflow_name=True for a Dataflow item, should return the Dataflow name
@@ -368,6 +368,27 @@ class TestParameterUtilities:
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
         assert result == "resolved-workspace-id"
         mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+
+    def test_extract_workspace_id_with_workspace_name_variable(self, mock_workspace):
+        """Tests _extract_workspace_id with workspace name variable."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
+
+        mock_workspace._resolve_workspace_name.reset_mock()
+        result = _extract_workspace_id(mock_workspace, "$workspace.$name")
+        assert result == "My Target Workspace [PPE]"
+        mock_workspace._resolve_workspace_name.assert_called_once_with("mock-workspace-id")
+
+    def test_extract_workspace_id_name_encoded(self, mock_workspace):
+        """Tests _extract_workspace_id with $workspace.$name_encoded returns URL-encoded name."""
+        from fabric_cicd._parameter._utils import _extract_workspace_id
+
+        mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
+
+        result = _extract_workspace_id(mock_workspace, "$workspace.$name_encoded")
+        assert result == "My%20Target%20Workspace%20%5BPPE%5D"
+        mock_workspace._resolve_workspace_name.assert_called_once_with("mock-workspace-id")
 
     def test_extract_workspace_id_resolve_error(self, mock_workspace):
         """Tests _extract_workspace_id when workspace name resolution fails."""
@@ -519,6 +540,19 @@ class TestParameterUtilities:
         mock_workspace._lookup_item_attribute.assert_called_once_with(
             "resolved-workspace-id", "Lakehouse", "Test_Lakehouse", "sqlendpointid"
         )
+
+    def test_extract_replace_value_workspace_name(self, mock_workspace):
+        """Tests extract_replace_value returns workspace name for $workspace.$name."""
+        mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
+
+        result = extract_replace_value(mock_workspace, "$workspace.$name")
+        assert result == "My Target Workspace [PPE]"
+
+        # $workspace.name (without $) should resolve "name" as a workspace name, not return display name
+        mock_workspace._resolve_workspace_id.return_value = "resolved-id-for-name"
+        result = extract_replace_value(mock_workspace, "$workspace.name")
+        assert result == "resolved-id-for-name"
+        mock_workspace._resolve_workspace_id.assert_called_with("name")
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""

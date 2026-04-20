@@ -225,10 +225,16 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | Workspace Variable                                              | Description                                                                               | Example                                                    |
         | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
         | `$workspace.$id` or `$workspace.id`                             | Workspace ID of the target environment                                                    | `$workspace.$id` or `$workspace.id`                        |
+        | `$workspace.$name`                         | Display name of the target workspace                                                      | `$workspace.$name`                    |
+        | `$workspace.$name_encoded`                         | URL-encoded display name of the target workspace (spaces become `%20`, etc.)                                                      | `$workspace.$name_encoded`                    |
         | `$workspace.<name>`                                             | Workspace ID of the specified workspace name                                              | `$workspace.TestWorkspace`                                 |
         | `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` | Attribute value of the specified item in a specified workspace (see supported attributes) | `$workspace.TestWorkspace.$items.Lakehouse.Example_LH.$id` |
 
-        **Note:** When using `$workspace.<name>` or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>` variable, ensure the executing identity has proper permissions to access the specified workspace. Ensure that names match exactly (case sensitive).
+        > **Notes:**
+        >
+        > - When using `$workspace.$name`, `$workspace.$name_encoded`, `$workspace.<name>`, or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, ensure the executing identity has proper permissions to access the relevant workspace. 
+        > - For `$workspace.<name>` and `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, the provided workspace display name must be an exact, case-sensitive match.
+        > - `$workspace.$name` returns the raw workspace display name. If the target value must remain URL-encoded, use `$workspace.$name_encoded` instead, which automatically percent-encodes the name (e.g., `My Workspace` becomes `My%20Workspace`).
 
     - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         - `$items.<item_type>.<item_name>.<attribute>` (legacy format)

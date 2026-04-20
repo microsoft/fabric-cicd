@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import urllib.parse
 from pathlib import Path
 from typing import Optional, Union
 
@@ -128,7 +129,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
     # If $workspace variable, return the workspace ID value
     if replace_value.startswith("$workspace."):
         if get_dataflow_name:
-            msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.attribute"
+            msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.$attribute"
             raise InputError(msg, logger)
 
         return _extract_workspace_id(workspace_obj, replace_value)
@@ -138,16 +139,18 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
         return _extract_item_attribute(workspace_obj, replace_value, get_dataflow_name)
 
     # Otherwise, raise an error for invalid variable syntax
-    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id"
+    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.$attribute or $workspace.$id or $workspace.$name or $workspace.$name_encoded"
     raise InputError(msg, logger)
 
 
 def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) -> str:
     """
-    Extracts the workspace ID from the $workspace variable to set as the replace_value.
+    Extracts workspace ID or display name from the $workspace variable to set as the replace_value.
 
     Supports the following formats:
     - $workspace.id or $workspace.$id - Returns the target workspace ID
+    - $workspace.$name - Returns the target workspace display name
+    - $workspace.$name_encoded - Returns the target workspace display name, URL-encoded
     - $workspace.<name> - Resolves the workspace ID from the name
     - $workspace.<name>.$items.<type>.<name>.$<attribute> - Resolves an item attribute from the specified workspace,
       where $attribute is any supported attribute in constants.ITEM_ATTR_LOOKUP
@@ -155,6 +158,15 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     # Case 1: $workspace.id
     if replace_value == "$workspace.id" or replace_value == "$workspace.$id":
         return workspace_obj.workspace_id
+
+    # Case 2: $workspace.$name
+    if replace_value == "$workspace.$name":
+        return workspace_obj._resolve_workspace_name(workspace_obj.workspace_id)
+
+    # Case 3: $workspace.$name_encoded - URL-encoded display name
+    if replace_value == "$workspace.$name_encoded":
+        name = workspace_obj._resolve_workspace_name(workspace_obj.workspace_id)
+        return urllib.parse.quote(name, safe="")
 
     try:
         # Extract the variable string without the prefix
