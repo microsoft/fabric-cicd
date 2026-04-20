@@ -129,7 +129,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
     # If $workspace variable, return the workspace ID value
     if replace_value.startswith("$workspace."):
         if get_dataflow_name:
-            msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.attribute"
+            msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.$attribute"
             raise InputError(msg, logger)
 
         return _extract_workspace_id(workspace_obj, replace_value)
@@ -139,7 +139,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
         return _extract_item_attribute(workspace_obj, replace_value, get_dataflow_name)
 
     # Otherwise, raise an error for invalid variable syntax
-    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.attribute or $workspace.id or $workspace.name"
+    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.$attribute or $workspace.$id or $workspace.$name or $workspace.$name_encoded"
     raise InputError(msg, logger)
 
 
