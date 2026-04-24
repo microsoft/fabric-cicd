@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix not setting Native Execution Engine and Live Pool settings when deploying Environments
+time: 2026-04-24T10:31:20.3568472+02:00
+custom:
+    Author: lassevalentini
+    AuthorLink: https://github.com/lassevalentini
+    Issue: "776"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/776
