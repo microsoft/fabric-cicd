@@ -166,3 +166,4 @@ cython_debug/
 /http_trace.json
 /http_trace.json.lock
 /http_trace.json.gz
+src/deploy.py
