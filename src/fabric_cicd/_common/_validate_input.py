@@ -278,3 +278,31 @@ def validate_shortcut_exclude_regex(shortcut_exclude_regex: Optional[str]) -> No
         warning_message="Shortcut exclusion is enabled.",
         risk_warning="Using shortcut_exclude_regex will selectively exclude shortcuts from being deployed to lakehouses. Use with caution.",
     )
+
+
+def validate_git_compare_ref(git_compare_ref: str) -> str:
+    """
+    Validate the git_compare_ref parameter to prevent git flag injection.
+
+    Args:
+        git_compare_ref: The git ref to compare against.
+
+    Raises:
+        InputError: If the ref is empty, starts with '-', or contains invalid characters.
+    """
+    validate_data_type("string", "git_compare_ref", git_compare_ref)
+
+    if not git_compare_ref.strip():
+        msg = "git_compare_ref must not be an empty string."
+        raise InputError(msg, logger)
+
+    if git_compare_ref.startswith("-"):
+        msg = "git_compare_ref must not start with '-' to prevent git flag injection."
+        raise InputError(msg, logger)
+
+    # Allow only characters valid in git refs: alphanumeric, /, ., ~, ^, -, _
+    if not re.match(r"^[a-zA-Z0-9/_.\-~^@{}]+$", git_compare_ref):
+        msg = f"git_compare_ref '{git_compare_ref}' contains invalid characters."
+        raise InputError(msg, logger)
+
+    return git_compare_ref

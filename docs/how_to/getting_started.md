@@ -33,7 +33,7 @@ workspace = FabricWorkspace(
     environment="your-target-environment",
     repository_directory="your-repository-directory",
     item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
-    token_credential=token_credential,
+    token_credential=token_credential,  # or any other TokenCredential
 )
 ```
 

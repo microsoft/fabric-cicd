@@ -38,6 +38,7 @@ dev = [
     "mkdocs-material>=9.6.5",
     "mkdocs-minify-plugin>=0.8.0",
     "mkdocstrings-python>=1.13.0",
+    "pygments>=2.18.0,<2.20.0",
     "pytest>=8.3.4",
     "pytest-mock>=3.14.0",
     "ruff>=0.9.5",

@@ -1,8 +1,0 @@
-kind: new-items
-body: Add support for Ontology item type
-time: 2026-03-26T13:26:48.8457334+02:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "796"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/796
