@@ -1,0 +1,8 @@
+kind: docs
+body: Add guidance for Workspace Private Link deployments using FQDN workaround
+time: 2026-04-26T16:08:14.465568+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "958"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/958
