@@ -86,7 +86,7 @@ Quick reference for errors encountered when deploying with fabric-cicd.
 https://{workspace_id_no_dashes}.z{first_2_chars}.w.api.fabric.microsoft.com
 ```
 
-where `{workspace_id_no_dashes}` is the workspace ID with dashes removed, and `{first_2_chars}` are the first two characters of the workspace ID.
+where `{workspace_id_no_dashes}` is the workspace ID with dashes removed, and `{first_2_chars}` are the first two characters of the workspace ID **with dashes removed**.
 
 See [Workspace-level private links overview — Connecting to workspaces](https://learn.microsoft.com/en-us/fabric/security/security-workspace-level-private-links-overview#connecting-to-workspaces) for more details.
 
@@ -107,10 +107,13 @@ constants.DEFAULT_API_ROOT_URL = (
 
 ```yaml
 constants:
+    # Format: https://{workspace_id_no_dashes}.z{first_2_chars_no_dashes}.w.api.fabric.microsoft.com
     DEFAULT_API_ROOT_URL:
         dev: "https://{dev_workspace_fqdn}"
         prod: "https://{prod_workspace_fqdn}"
 ```
+
+Replace each value with the FQDN computed using the workspace ID format described above.
 
 **Important**: When using a private link setup, you must initialize `FabricWorkspace` with `workspace_id` rather than `workspace_name`. Resolving a workspace name requires calling the public list-workspaces API, which is blocked behind the private link.
 
