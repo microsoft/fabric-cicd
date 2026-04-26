@@ -96,9 +96,10 @@ See [Workspace-level private links overview — Connecting to workspaces](https:
 import fabric_cicd.constants as constants
 
 workspace_id = "your-workspace-id"
+workspace_id_no_dashes = workspace_id.replace("-", "")
 constants.DEFAULT_API_ROOT_URL = (
-    f"https://{workspace_id.replace('-', '')}"
-    f".z{workspace_id[0:2]}.w.api.fabric.microsoft.com"
+    f"https://{workspace_id_no_dashes}"
+    f".z{workspace_id_no_dashes[0:2]}.w.api.fabric.microsoft.com"
 )
 ```
 
