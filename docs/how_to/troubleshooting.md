@@ -1,6 +1,117 @@
 # Troubleshooting
 
-This guide provides comprehensive debugging and troubleshooting resources for both users deploying with fabric-cicd and contributors developing within the repository.
+This guide covers common errors and their solutions, debugging tools, and resources for getting help when deploying with fabric-cicd.
+
+## Common Issues and Solutions
+
+Quick reference for errors encountered when deploying with fabric-cicd.
+
+| Issue | Symptom |
+| ----- | ------- |
+| [Authentication Failures](#authentication-failures) | "authentication failed" or "401 Unauthorized" |
+| [Item Deployment Failures](#item-deployment-failures) | Specific items fail while others succeed |
+| [Parameter Substitution Issues](#parameter-substitution-issues) | Deployed items contain literal find values |
+| [API Rate Limiting](#api-rate-limiting) | "429 Too Many Requests" errors |
+| [Workspace Private Link Connectivity](#workspace-private-link-connectivity) | "Request is denied due to inbound communication policy" |
+
+### Authentication Failures
+
+**Symptom**: Errors mentioning "authentication failed" or "401 Unauthorized"
+
+**Solution**:
+
+1. Explicit authentication is **required** as the `DefaultAzureCredential` fallback has been removed. `token_credential` is now a required parameter. fabric-cicd accepts any [`TokenCredential`](https://learn.microsoft.com/en-us/python/api/azure-core/azure.core.credentials.tokencredential) — choose the appropriate one for your scenario:
+    - Local development: `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
+    - CI/CD pipelines with platform auth: `AzureCliCredential` or `AzurePowerShellCredential` (requires a prior login step in the workflow, e.g., `azure/login` or AzCLI task)
+    - CI/CD pipelines with OIDC / workload identity federation: `WorkloadIdentityCredential` (secretless; recommended for GitHub Actions and Azure DevOps with federated credentials)
+    - CI/CD pipelines with service principals: `ClientSecretCredential` (requires client ID, secret, and tenant ID)
+    - CI/CD pipelines with managed identity: `ManagedIdentityCredential` (requires Azure-hosted self-hosted runners)
+    - Fabric Notebooks: Provide an explicit credential. See Authentication Examples for details.
+
+2. Verify authentication setup:
+    ```bash
+    az login
+    ```
+    or
+    ```powershell
+    Connect-AzAccount
+    ```
+3. Check permissions: ensure your account has appropriate permissions on the target workspace
+
+4. For Service Principal authentication: verify client ID, secret, and tenant ID are correct
+
+5. See detailed examples: refer to [authentication examples](../example/authentication.md) for platform-specific implementation guidance
+
+### Item Deployment Failures
+
+**Symptom**: Specific items fail to deploy while others succeed
+
+**Solution**:
+
+1. Enable debug logging to see the exact API error
+2. Check `fabric_cicd.error.log` for detailed API response
+3. Verify the item definition files exist and are properly formatted
+4. Check if the item type is included in your `item_type_in_scope` list
+5. Ensure item dependencies exist (e.g., a Data Pipeline referencing a Notebook must be deployed along with the Notebook)
+6. If deleting and recreating an item with the same name, wait 5 minutes between operations due to Fabric API item name reservation
+
+### Parameter Substitution Issues
+
+**Symptom**: Deployed items contain literal find value instead of the proper replace value
+
+**Solution**:
+
+1. Verify your `parameter.yml` file is in the correct location (repository directory by default)
+2. Check that find values in your files exactly match those in `parameter.yml`
+3. Ensure the environment name matches between your script and `parameter.yml`
+4. Validate the find value regex and/or dynamic replacement variables in `parameter.yml`
+5. Use the [debug_parameterization.py](#debug_parameterizationpy) script to validate parameter files
+
+### API Rate Limiting
+
+**Symptom**: Deployments fail with "429 Too Many Requests" errors
+
+**Solution**:
+
+1. Consider deploying in smaller batches
+2. Check `fabric_cicd.error.log` for retry-after headers in API responses
+
+### Workspace Private Link Connectivity
+
+**Symptom**: Deployments fail with `'Request is denied due to inbound communication policy'` when deploying to a workspace that has **"Allow connections only from workspace level private links"** enabled.
+
+**Explanation**: When workspace-level private links are enabled, the default public endpoint (`api.fabric.microsoft.com`) is blocked. The workspace-specific Fully Qualified Domain Name (FQDN) must be used instead. The FQDN format is:
+
+```
+https://{workspace_id_no_dashes}.z{first_2_chars}.w.api.fabric.microsoft.com
+```
+
+where `{workspace_id_no_dashes}` is the workspace ID with dashes removed, and `{first_2_chars}` are the first two characters of the workspace ID.
+
+See [Workspace-level private links overview — Connecting to workspaces](https://learn.microsoft.com/en-us/fabric/security/security-workspace-level-private-links-overview#connecting-to-workspaces) for more details.
+
+**Solution using the Python API** — override `constants.DEFAULT_API_ROOT_URL` before creating the `FabricWorkspace` object:
+
+```python
+import fabric_cicd.constants as constants
+
+workspace_id = "your-workspace-id"
+constants.DEFAULT_API_ROOT_URL = (
+    f"https://{workspace_id.replace('-', '')}"
+    f".z{workspace_id[0:2]}.w.api.fabric.microsoft.com"
+)
+```
+
+**Solution using config.yml** — set `DEFAULT_API_ROOT_URL` in the `constants` section, with environment-specific values if needed:
+
+```yaml
+constants:
+    DEFAULT_API_ROOT_URL:
+        dev: "https://{dev_workspace_fqdn}"
+        prod: "https://{prod_workspace_fqdn}"
+```
+
+**Important**: When using a private link setup, you must initialize `FabricWorkspace` with `workspace_id` rather than `workspace_name`. Resolving a workspace name requires calling the public list-workspaces API, which is blocked behind the private link.
 
 ## Debugging Deployments
 
@@ -27,51 +138,6 @@ change_log_level()
 When debug logging is enabled, all API calls are logged with detailed request/response information, and additional context about internal operations is displayed. Both the console and the `fabric_cicd.error.log` file will contain the detailed information.
 
 **Important:** Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration. See [Understanding Error Logs](#understanding-error-logs) for details on interpreting log output.
-
-### Testing Deployments Locally
-
-Before running deployments via CI/CD pipelines, users can test the deployment workflow locally by running the provided debug scripts. This helps with:
-
-- Validating configuration changes without affecting production
-- Testing parameter file configurations
-- Debugging deployment issues
-- Verifying authentication and permissions
-
-fabric-cicd includes several debug scripts in the `devtools/` directory that allow users to run deployments against real workspaces in a controlled environment. See [Debug Scripts](#debug-scripts) for detailed information on:
-
-- `debug_local.py` or `debug_local config.py` - Test full deployment workflows
-- `debug_parameterization.py` - Validate parameter files without deploying
-- `debug_api.py` - Test Fabric REST API calls directly
-- `debug_trace_deployment.py` - Perform and end-to-end deployment against a Fabric Workspace and capture HTTP Traces to be used for Integration Tests
-
-**Tip:** Using these scripts locally can catch configuration errors early, saving time in your CI/CD pipeline.
-
-### Sample Workspace Directory
-
-fabric-cicd includes the `sample/workspace/` directory that demonstrates the recommended repository structure for Fabric item source control files. It contains sample items of various supported item types (e.g., Environment, Notebook, Data Pipeline, etc.).
-
-**Repository Directory Structure:**
-
-```
-sample/workspace/
-├── Sample Pipeline.DataPipeline/
-│   ├── .platform
-│   └── pipeline-content.json
-├── Sample_Notebook.Notebook/
-│   ├── .platform
-│   └── notebook-content.py
-...
-└── parameter.yml
-```
-
-Each item folder follows the naming convention `ItemName.ItemType/` and contains:
-
-- `.platform` file which contains the item metadata
-- Item definition files (e.g., `pipeline-content.json`, `notebook-content.py`)
-
-**Using the Sample:**
-
-Use this sample structure as a template for organizing your Fabric items. To test deployments with the items found in the sample workspace, set `repository_directory = "sample/workspace"` in `debug_local.py` or in `config.yml` when running `debug_local config.py`.
 
 ### Understanding Error Logs
 
@@ -121,112 +187,56 @@ Traceback (most recent call last):
   ...
 ```
 
-### Common Issues and Solutions
+### Testing Deployments Locally
 
-#### Authentication Failures
+Before running deployments via CI/CD pipelines, users can test the deployment workflow locally by running the provided debug scripts. This helps with:
 
-**Symptom**: Errors mentioning "authentication failed" or "401 Unauthorized"
+- Validating configuration changes without affecting production
+- Testing parameter file configurations
+- Debugging deployment issues
+- Verifying authentication and permissions
 
-**Solution**:
+fabric-cicd includes several debug scripts in the `devtools/` directory that allow users to run deployments against real workspaces in a controlled environment. See [Debug Scripts](#debug-scripts) for detailed information on:
 
-1. Explicit authentication is **required** as the `DefaultAzureCredential` fallback has been removed. `token_credential` is now a required parameter. fabric-cicd accepts any [`TokenCredential`](https://learn.microsoft.com/en-us/python/api/azure-core/azure.core.credentials.tokencredential) — choose the appropriate one for your scenario:
-    - Local development: `AzureCliCredential` (requires `az login`) or `AzurePowerShellCredential` (requires `Connect-AzAccount`)
-    - CI/CD pipelines with platform auth: `AzureCliCredential` or `AzurePowerShellCredential` (requires a prior login step in the workflow, e.g., `azure/login` or AzCLI task)
-    - CI/CD pipelines with OIDC / workload identity federation: `WorkloadIdentityCredential` (secretless; recommended for GitHub Actions and Azure DevOps with federated credentials)
-    - CI/CD pipelines with service principals: `ClientSecretCredential` (requires client ID, secret, and tenant ID)
-    - CI/CD pipelines with managed identity: `ManagedIdentityCredential` (requires Azure-hosted self-hosted runners)
-    - Fabric Notebooks: Provide an explicit credential. See Authentication Examples for details.
+- `debug_local.py` or `debug_local config.py` - Test full deployment workflows
+- `debug_parameterization.py` - Validate parameter files without deploying
+- `debug_api.py` - Test Fabric REST API calls directly
+- `debug_trace_deployment.py` - Perform and end-to-end deployment against a Fabric Workspace and capture HTTP Traces to be used for Integration Tests
 
-2. Verify authentication setup:
-    ```bash
-    az login
-    ```
-    or
-    ```powershell
-    Connect-AzAccount
-    ```
-3. Check permissions: ensure your account has appropriate permissions on the target workspace
+**Tip:** Using these scripts locally can catch configuration errors early, saving time in your CI/CD pipeline.
 
-4. For Service Principal authentication: verify client ID, secret, and tenant ID are correct
+### Sample Workspace Directory
 
-5. See detailed examples: refer to [authentication examples](../example/authentication.md) for platform-specific implementation guidance
+fabric-cicd includes the `sample/workspace/` directory that demonstrates the recommended repository structure for Fabric item source control files. It contains sample items of various supported item types (e.g., Environment, Notebook, Data Pipeline, etc.).
 
-#### Item Deployment Failures
-
-**Symptom**: Specific items fail to deploy while others succeed
-
-**Solution**:
-
-1. Enable debug logging to see the exact API error
-2. Check `fabric_cicd.error.log` for detailed API response
-3. Verify the item definition files exist and are properly formatted
-4. Check if the item type is included in your `item_type_in_scope` list
-5. Ensure item dependencies exist (e.g., a Data Pipeline referencing a Notebook must be deployed along with the Notebook)
-6. If deleting and recreating an item with the same name, wait 5 minutes between operations due to Fabric API item name reservation
-
-#### Parameter Substitution Issues
-
-**Symptom**: Deployed items contain literal find value instead of the proper replace value
-
-**Solution**:
-
-1. Verify your `parameter.yml` file is in the correct location (repository directory by default)
-2. Check that find values in your files exactly match those in `parameter.yml`
-3. Ensure the environment name matches between your script and `parameter.yml`
-4. Validate the find value regex and/or dynamic replacement variables in `parameter.yml`
-5. Use the [debug_parameterization.py](#debug_parameterizationpy) script to validate parameter files
-
-#### API Rate Limiting
-
-**Symptom**: Deployments fail with "429 Too Many Requests" errors
-
-**Solution**:
-
-1. Consider deploying in smaller batches
-2. Check `fabric_cicd.error.log` for retry-after headers in API responses
-
-#### Workspace Private Link Connectivity
-
-**Symptom**: Deployments fail with `'Request is denied due to inbound communication policy'` when deploying to a workspace that has **"Allow connections only from workspace level private links"** enabled.
-
-**Explanation**: When workspace-level private links are enabled, the default public endpoint (`api.fabric.microsoft.com`) is blocked. The workspace-specific Fully Qualified Domain Name (FQDN) must be used instead. The FQDN format is:
+**Repository Directory Structure:**
 
 ```
-https://{workspace_id_no_dashes}.z{first_2_chars}.w.api.fabric.microsoft.com
+sample/workspace/
+├── Sample Pipeline.DataPipeline/
+│   ├── .platform
+│   └── pipeline-content.json
+├── Sample_Notebook.Notebook/
+│   ├── .platform
+│   └── notebook-content.py
+...
+└── parameter.yml
 ```
 
-where `{workspace_id_no_dashes}` is the workspace ID with dashes removed, and `{first_2_chars}` are the first two characters of the workspace ID.
+Each item folder follows the naming convention `ItemName.ItemType/` and contains:
 
-See [Workspace-level private links overview — Connecting to workspaces](https://learn.microsoft.com/en-us/fabric/security/security-workspace-level-private-links-overview#connecting-to-workspaces) for more details.
+- `.platform` file which contains the item metadata
+- Item definition files (e.g., `pipeline-content.json`, `notebook-content.py`)
 
-**Solution using the Python API** — override `constants.DEFAULT_API_ROOT_URL` before creating the `FabricWorkspace` object:
+**Using the Sample:**
 
-```python
-import fabric_cicd.constants as constants
+Use this sample structure as a template for organizing your Fabric items. To test deployments with the items found in the sample workspace, set `repository_directory = "sample/workspace"` in `debug_local.py` or in `config.yml` when running `debug_local config.py`.
 
-workspace_id = "your-workspace-id"
-constants.DEFAULT_API_ROOT_URL = (
-    f"https://{workspace_id.replace('-', '')}"
-    f".z{workspace_id[0:2]}.w.api.fabric.microsoft.com"
-)
-```
-
-**Solution using config.yml** — set `DEFAULT_API_ROOT_URL` in the `constants` section, with environment-specific values if needed:
-
-```yaml
-constants:
-    DEFAULT_API_ROOT_URL:
-        dev: "https://{dev_workspace_fqdn}"
-        prod: "https://{prod_workspace_fqdn}"
-```
-
-**Important**: When using a private link setup, you must initialize `FabricWorkspace` with `workspace_id` rather than `workspace_name`. Resolving a workspace name requires calling the public list-workspaces API, which is blocked behind the private link.
-
-### Debug Scripts
+## Debug Scripts
 
 The `devtools/` directory contains pre-built scripts to help test and validate deployments, parameter files, and Fabric REST APIs locally. These scripts already exist in the repository - you just need to configure them for your scenario.
 
-#### debug_local.py
+### debug_local.py
 
 **Purpose**: Test full deployment workflows locally against a Microsoft Fabric workspace.
 
@@ -290,7 +300,7 @@ token_credential = ManagedIdentityCredential()
 constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 ```
 
-#### debug_local config.py
+### debug_local config.py
 
 **Purpose**: Test configuration-based deployment workflows using a `config.yml` file.
 
@@ -313,7 +323,7 @@ constants.DEFAULT_API_ROOT_URL = "https://api.fabric.microsoft.com"
 
 See [configuration deployment](config_deployment.md) for details on creating `config.yml`.
 
-#### debug_parameterization.py
+### debug_parameterization.py
 
 **Purpose**: Validate parameter file without deploying items - useful for catching parameterization errors early.
 
@@ -336,7 +346,7 @@ See [configuration deployment](config_deployment.md) for details on creating `co
 
 See [parameterization](parameterization.md#parameter-file-validation) for more information.
 
-#### debug_api.py
+### debug_api.py
 
 **Purpose**: Test Fabric REST API calls directly without going through full deployment workflows.
 
@@ -357,7 +367,7 @@ See [parameterization](parameterization.md#parameter-file-validation) for more i
 3. Uncomment `change_log_level()` to view API request/response details
 4. Run: `uv run python devtools/debug_api.py`
 
-#### debug_trace_deployment.py
+### debug_trace_deployment.py
 
 **Purpose**: Debug the public APIs called in `publish_all_items()` workflow with breakpoints using VS Code's debugger.
 
