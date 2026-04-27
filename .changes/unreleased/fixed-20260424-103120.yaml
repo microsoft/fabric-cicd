@@ -1,5 +1,5 @@
 kind: fixed
-body: Fix not setting Native Execution Engine and Live Pool settings when deploying Environments
+body: Fix incomplete Sparkcompute settings deployment by using the item definition API instead of the staging/sparkcompute API when deploying Environments
 time: 2026-04-24T10:31:20.3568472+02:00
 custom:
     Author: lassevalentini
