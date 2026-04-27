@@ -41,6 +41,10 @@ def _process_environment_file(fabric_workspace_obj: FabricWorkspace, item: Item,
         return file_obj.contents
 
     contents = file_obj.contents
+
+    if not "instance_pool_id" in contents:
+        return contents
+
     yaml_body = yaml.safe_load(contents)
     if not isinstance(yaml_body, dict):
         return contents
