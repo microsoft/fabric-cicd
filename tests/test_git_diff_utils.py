@@ -138,9 +138,7 @@ class TestFindPlatformItem:
     def test_returns_none_when_metadata_missing_type(self, tmp_path):
         item_dir = tmp_path / "NoType"
         item_dir.mkdir()
-        (item_dir / ".platform").write_text(
-            '{"metadata": {"displayName": "NoType"}}', encoding="utf-8"
-        )
+        (item_dir / ".platform").write_text('{"metadata": {"displayName": "NoType"}}', encoding="utf-8")
         file_path = item_dir / "file.py"
         file_path.touch()
         result = git_utils._find_platform_item(file_path, tmp_path)
