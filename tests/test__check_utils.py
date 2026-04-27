@@ -2,9 +2,12 @@
 # Licensed under the MIT License.
 
 import json
+import logging
+from unittest.mock import MagicMock
 
 import pytest
 
+import fabric_cicd._common._check_utils as check_utils
 from fabric_cicd._common._check_utils import check_file_type, check_valid_json_content, check_valid_yaml_content
 
 
@@ -41,6 +44,24 @@ def test_check_file_type_binary(binary_file):
 
 def test_check_file_type_image(image_file):
     assert check_file_type(image_file) == "image"
+
+
+def test_check_version_logs_notice_without_stdout_pollution(monkeypatch, caplog, capsys):
+    """Regression test: version notices should not be written to stdout."""
+    monkeypatch.setattr(check_utils.constants, "VERSION", "0.0.0")
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"info": {"version": "9.9.9"}}
+
+    monkeypatch.setattr(check_utils.requests, "get", lambda *_args, **_kwargs: mock_response)
+    monkeypatch.setattr(check_utils, "parse_changelog", lambda: {})
+
+    with caplog.at_level(logging.WARNING, logger="fabric_cicd._common._check_utils"):
+        check_utils.check_version()
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert any("new release of fabric-cicd is available" in message for message in caplog.messages)
 
 
 @pytest.fixture
