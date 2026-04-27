@@ -20,7 +20,11 @@ from fabric_cicd.constants import ItemType
 logger = logging.getLogger(__name__)
 
 
-def _process_environment_file(fabric_workspace_obj: FabricWorkspace, item: Item, file_obj: File) -> str:
+def _process_environment_file(
+    fabric_workspace_obj: FabricWorkspace,
+    item: Item,
+    file_obj: File,
+) -> str:
     """
     Process an Environment item file before it is included in the item definition payload.
 
@@ -81,12 +85,7 @@ def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
     """
     from fabric_cicd._parameter._utils import process_environment_key
 
-    # https://learn.microsoft.com/en-us/rest/api/fabric/spark/workspace-custom-pools/list-workspace-custom-pools
-    response = fabric_workspace_obj.endpoint.invoke(
-        method="GET",
-        url=f"{fabric_workspace_obj.base_api_url}/spark/pools",
-    )
-    pools = response["body"]["value"] or []
+    pools = fabric_workspace_obj._get_workspace_pools()
 
     pool_id = yaml_body["instance_pool_id"]
     if "spark_pool" in fabric_workspace_obj.environment_parameter:

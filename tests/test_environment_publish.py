@@ -76,19 +76,6 @@ def test_process_environment_file_replaces_instance_pool(tmp_path):
     sc = setting_dir / "Sparkcompute.yml"
     sc.write_text("instance_pool_id: pool-123\ndriver_cores: 4\n", encoding="utf-8")
 
-    class FakeEndpoint:
-        def invoke(self, method=None, url=None, **_kwargs):
-            if method == "GET" and url.endswith("/spark/pools"):
-                return {
-                    "body": {
-                        "value": [
-                            {"id": "resolved-guid-abc", "name": "MyPool", "type": "Capacity"},
-                            {"id": "other-guid", "name": "OtherPool", "type": "Workspace"},
-                        ]
-                    }
-                }
-            return {}
-
     class FakeWS:
         environment = "DEV"
         environment_parameter: ClassVar[dict] = {
@@ -100,7 +87,12 @@ def test_process_environment_file_replaces_instance_pool(tmp_path):
             ]
         }
         base_api_url = "https://api.example/v1/workspaces/ws-id"
-        endpoint = FakeEndpoint()
+
+        def _get_workspace_pools(self):
+            return [
+                {"id": "resolved-guid-abc", "name": "MyPool", "type": "Capacity"},
+                {"id": "other-guid", "name": "OtherPool", "type": "Workspace"},
+            ]
 
     dummy = DummyFile(sc)
     result = env_module._process_environment_file(FakeWS(), DummyItem("EnvC", [sc]), dummy)
@@ -118,12 +110,6 @@ def test_process_environment_file_pool_with_item_name_filter(tmp_path):
     sc = setting_dir / "Sparkcompute.yml"
     sc.write_text("instance_pool_id: pool-456\n", encoding="utf-8")
 
-    class FakeEndpoint:
-        def invoke(self, method=None, url=None, **_kwargs):
-            if method == "GET" and url.endswith("/spark/pools"):
-                return {"body": {"value": [{"id": "ws-pool-guid", "name": "WsPool", "type": "Workspace"}]}}
-            return {}
-
     class FakeWS:
         environment = "PROD"
         environment_parameter: ClassVar[dict] = {
@@ -136,7 +122,9 @@ def test_process_environment_file_pool_with_item_name_filter(tmp_path):
             ]
         }
         base_api_url = "https://api.example/v1/workspaces/ws-id"
-        endpoint = FakeEndpoint()
+
+        def _get_workspace_pools(self):
+            return [{"id": "ws-pool-guid", "name": "WsPool", "type": "Workspace"}]
 
     dummy = DummyFile(sc)
     result = env_module._process_environment_file(FakeWS(), DummyItem("EnvD", [sc]), dummy)
@@ -152,17 +140,15 @@ def test_process_environment_file_pool_no_match(tmp_path):
     sc = setting_dir / "Sparkcompute.yml"
     sc.write_text("instance_pool_id: unmatched-pool\n", encoding="utf-8")
 
-    class FakeEndpoint:
-        def invoke(self, _method=None, _url=None, **_kwargs):
-            return {"body": {"value": [{"id": "guid-other", "name": "OtherPool", "type": "Capacity"}]}}
-
     class FakeWS:
         environment = "DEV"
         environment_parameter: ClassVar[dict] = {
             "spark_pool": [{"instance_pool_id": "different-pool", "replace_value": {"DEV": "something"}}]
         }
         base_api_url = "https://api.example/v1/workspaces/ws-id"
-        endpoint = FakeEndpoint()
+
+        def _get_workspace_pools(self):
+            return [{"id": "guid-other", "name": "OtherPool", "type": "Capacity"}]
 
     dummy = DummyFile(sc)
     result = env_module._process_environment_file(FakeWS(), DummyItem("EnvE", [sc]), dummy)
@@ -179,15 +165,13 @@ def test_process_environment_file_no_spark_pool_param(tmp_path):
     sc = setting_dir / "Sparkcompute.yml"
     sc.write_text("instance_pool_id: some-pool\n", encoding="utf-8")
 
-    class FakeEndpoint:
-        def invoke(self, _method=None, _url=None, **_kwargs):
-            return {"body": {"value": []}}
-
     class FakeWS:
         environment = "DEV"
         environment_parameter: ClassVar[dict] = {}
         base_api_url = "https://api.example/v1/workspaces/ws-id"
-        endpoint = FakeEndpoint()
+
+        def _get_workspace_pools(self):
+            return []
 
     dummy = DummyFile(sc)
     result = env_module._process_environment_file(FakeWS(), DummyItem("EnvF", [sc]), dummy)
@@ -241,6 +225,9 @@ def test_publish_environments_passes_func_process_file(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
 
+        def _get_workspace_pools(self):
+            return []
+
         def _publish_item(self, item_name, item_type, **kwargs):
             captured["called_with"] = kwargs
             self.repository_items[item_type][item_name].skip_publish = True
@@ -293,6 +280,9 @@ def test_end_to_end_environment_setting_only(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
             self.environment_parameter = {}
+
+        def _get_workspace_pools(self):
+            return []
 
         def _publish_item(self, item_name, item_type, **_kwargs):
             item = self.repository_items[item_type][item_name]
@@ -352,6 +342,9 @@ def test_end_to_end_environment_with_libraries(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
             self.environment_parameter = {}
+
+        def _get_workspace_pools(self):
+            return []
 
         def _publish_item(self, item_name, item_type, **_kwargs):
             item = self.repository_items[item_type][item_name]
