@@ -10,6 +10,7 @@ import dpath
 import yaml
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
@@ -131,7 +132,7 @@ def _resolve_pool_id(pools: list[dict], pool_name: str, pool_type: str) -> str:
         f"Could not resolve custom Spark pool: name='{pool_name}', type='{pool_type}'. "
         f"No matching pool found in the target workspace."
     )
-    raise Exception(msg)
+    raise InputError(msg, logger)
 
 
 def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
