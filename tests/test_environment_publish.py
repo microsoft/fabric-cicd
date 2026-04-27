@@ -152,11 +152,17 @@ def test_process_environment_file_pool_no_match(tmp_path):
     sc = setting_dir / "Sparkcompute.yml"
     sc.write_text("instance_pool_id: unmatched-pool\n", encoding="utf-8")
 
+    class FakeEndpoint:
+        def invoke(self, _method=None, _url=None, **_kwargs):
+            return {"body": {"value": [{"id": "guid-other", "name": "OtherPool", "type": "Capacity"}]}}
+
     class FakeWS:
         environment = "DEV"
         environment_parameter: ClassVar[dict] = {
             "spark_pool": [{"instance_pool_id": "different-pool", "replace_value": {"DEV": "something"}}]
         }
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+        endpoint = FakeEndpoint()
 
     dummy = DummyFile(sc)
     result = env_module._process_environment_file(FakeWS(), DummyItem("EnvE", [sc]), dummy)
@@ -173,9 +179,15 @@ def test_process_environment_file_no_spark_pool_param(tmp_path):
     sc = setting_dir / "Sparkcompute.yml"
     sc.write_text("instance_pool_id: some-pool\n", encoding="utf-8")
 
+    class FakeEndpoint:
+        def invoke(self, _method=None, _url=None, **_kwargs):
+            return {"body": {"value": []}}
+
     class FakeWS:
         environment = "DEV"
         environment_parameter: ClassVar[dict] = {}
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+        endpoint = FakeEndpoint()
 
     dummy = DummyFile(sc)
     result = env_module._process_environment_file(FakeWS(), DummyItem("EnvF", [sc]), dummy)
@@ -185,40 +197,22 @@ def test_process_environment_file_no_spark_pool_param(tmp_path):
 
 def test_resolve_pool_id_success():
     """_resolve_pool_id returns the matching pool GUID from the API response."""
-
-    class FakeEndpoint:
-        def invoke(self, _method=None, _url=None, **_kwargs):
-            return {
-                "body": {
-                    "value": [
-                        {"id": "guid-cap", "name": "CapPool", "type": "Capacity"},
-                        {"id": "guid-ws", "name": "WsPool", "type": "Workspace"},
-                    ]
-                }
-            }
-
-    class FakeWS:
-        base_api_url = "https://api.example/v1/workspaces/ws-id"
-        endpoint = FakeEndpoint()
-
-    assert env_module._resolve_pool_id(FakeWS(), pool_name="CapPool", pool_type="Capacity") == "guid-cap"
-    assert env_module._resolve_pool_id(FakeWS(), pool_name="WsPool", pool_type="Workspace") == "guid-ws"
+    pools = [
+        {"id": "guid-cap", "name": "CapPool", "type": "Capacity"},
+        {"id": "guid-ws", "name": "WsPool", "type": "Workspace"},
+    ]
+    assert env_module._resolve_pool_id(pools, pool_name="CapPool", pool_type="Capacity") == "guid-cap"
+    assert env_module._resolve_pool_id(pools, pool_name="WsPool", pool_type="Workspace") == "guid-ws"
 
 
 def test_resolve_pool_id_not_found():
     """_resolve_pool_id raises when no matching pool is found."""
     import pytest
 
-    class FakeEndpoint:
-        def invoke(self, _method=None, _url=None, **_kwargs):
-            return {"body": {"value": [{"id": "guid-other", "name": "OtherPool", "type": "Capacity"}]}}
-
-    class FakeWS:
-        base_api_url = "https://api.example/v1/workspaces/ws-id"
-        endpoint = FakeEndpoint()
+    pools = [{"id": "guid-other", "name": "OtherPool", "type": "Capacity"}]
 
     with pytest.raises(Exception, match="Could not resolve custom Spark pool"):
-        env_module._resolve_pool_id(FakeWS(), pool_name="MissingPool", pool_type="Workspace")
+        env_module._resolve_pool_id(pools, pool_name="MissingPool", pool_type="Workspace")
 
 
 # ---------- Publisher integration tests ----------
