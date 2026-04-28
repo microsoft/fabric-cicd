@@ -4,23 +4,19 @@
 """
 Regression tests: items_to_include + semantic model connection binding.
 
-Same root cause as issue #948: when items_to_include scopes to a subset of
-semantic models, excluded models have skip_publish=True and guid="" after
-publish_all(). bind_semanticmodel_to_connection() must not attempt to bind
-them — doing so would produce URLs like
+When items_to_include scopes to a subset of semantic models, excluded models
+have skip_publish=True and guid="" after publish_all(). bind_semanticmodel_to_connection()
+must not attempt to bind them — doing so would produce URLs like
   GET  items//connections
   POST semanticModels//bindConnection
 which return HTTP 400.
 """
 
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._semanticmodel import SemanticModelPublisher, bind_semanticmodel_to_connection
 from fabric_cicd.fabric_workspace import FabricWorkspace
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -57,9 +53,8 @@ def test_bind_skips_model_with_skip_publish_true():
 
     workspace = MagicMock(spec=FabricWorkspace)
     workspace.workspace_id = "ws-123"
-    workspace.repository_items = {
-        "SemanticModel": {"SalesModel": included, "DevModel": excluded}
-    }
+    workspace.endpoint = MagicMock()
+    workspace.repository_items = {"SemanticModel": {"SalesModel": included, "DevModel": excluded}}
     workspace.endpoint.invoke.return_value = {
         "body": {"value": [{"id": "old-conn", "connectivityType": "ShareableCloud", "connectionDetails": {}}]},
         "status_code": 200,
@@ -72,10 +67,8 @@ def test_bind_skips_model_with_skip_publish_true():
 
     # Only SalesModel should trigger API calls; DevModel must be entirely skipped.
     called_urls = [c[1]["url"] for c in workspace.endpoint.invoke.call_args_list]
-    assert all("sales-guid" in url or "SalesModel" in url for url in called_urls), (
-        f"Unexpected URL in calls: {called_urls}"
-    )
-    assert not any("DevModel" in url or "//" in url for url in called_urls), (
+    assert all("sales-guid" in url for url in called_urls), f"Unexpected URL in calls: {called_urls}"
+    assert not any("DevModel" in url for url in called_urls), (
         f"Empty-GUID or DevModel URL must not be called, got: {called_urls}"
     )
 
@@ -91,9 +84,8 @@ def test_bind_skips_model_without_guid():
 
     workspace = MagicMock(spec=FabricWorkspace)
     workspace.workspace_id = "ws-123"
-    workspace.repository_items = {
-        "SemanticModel": {"SalesModel": deployed, "DevModel": not_deployed}
-    }
+    workspace.endpoint = MagicMock()
+    workspace.repository_items = {"SemanticModel": {"SalesModel": deployed, "DevModel": not_deployed}}
     workspace.endpoint.invoke.return_value = {
         "body": {"value": [{"id": "old-conn", "connectivityType": "ShareableCloud", "connectionDetails": {}}]},
         "status_code": 200,
@@ -105,12 +97,11 @@ def test_bind_skips_model_without_guid():
     bind_semanticmodel_to_connection(workspace, connections, connection_details)
 
     called_urls = [c[1]["url"] for c in workspace.endpoint.invoke.call_args_list]
-    assert not any("//" in url for url in called_urls), (
+    # An empty GUID produces a path like "items//connections"; strip the scheme to detect it.
+    assert not any("//" in url.split("://", 1)[-1] for url in called_urls), (
         f"Empty-GUID URL must not appear, got: {called_urls}"
     )
-    assert not any("DevModel" in url for url in called_urls), (
-        f"DevModel must be skipped, got: {called_urls}"
-    )
+    assert not any("DevModel" in url for url in called_urls), f"DevModel must be skipped, got: {called_urls}"
 
 
 def test_bind_processes_included_models_normally():
@@ -122,9 +113,8 @@ def test_bind_processes_included_models_normally():
 
     workspace = MagicMock(spec=FabricWorkspace)
     workspace.workspace_id = "ws-123"
-    workspace.repository_items = {
-        "SemanticModel": {"ModelA": model_a, "ModelB": model_b}
-    }
+    workspace.endpoint = MagicMock()
+    workspace.repository_items = {"SemanticModel": {"ModelA": model_a, "ModelB": model_b}}
     workspace.endpoint.invoke.return_value = {
         "body": {"value": [{"id": "old-conn", "connectivityType": "ShareableCloud", "connectionDetails": {}}]},
         "status_code": 200,
@@ -159,9 +149,8 @@ def test_post_publish_all_skips_excluded_semantic_models():
     workspace = MagicMock(spec=FabricWorkspace)
     workspace.workspace_id = "ws-123"
     workspace.environment = "UAT"
-    workspace.repository_items = {
-        "SemanticModel": {"SalesModel": included_model, "DevModel": excluded_model}
-    }
+    workspace.endpoint = MagicMock()
+    workspace.repository_items = {"SemanticModel": {"SalesModel": included_model, "DevModel": excluded_model}}
     workspace.environment_parameter = {
         "semantic_model_binding": {
             "default": {
@@ -172,19 +161,29 @@ def test_post_publish_all_skips_excluded_semantic_models():
     workspace.items_to_include = ["SalesModel.SemanticModel"]
 
     # Simulate the connections API and bind call responses
-    def fake_invoke(method, url, **kwargs):
-        if method == "GET" and "/v1/connections" == url.split("?")[0].split("api.fabric.microsoft.com")[-1]:
+    def fake_invoke(method, url, **_kwargs):
+        if method == "GET" and url.split("?")[0].split("api.fabric.microsoft.com")[-1] == "/v1/connections":
             return {
                 "body": {
                     "value": [
-                        {"id": "conn-001", "connectivityType": "ShareableCloud", "connectionDetails": {"type": "SQL", "path": "srv"}}
+                        {
+                            "id": "conn-001",
+                            "connectivityType": "ShareableCloud",
+                            "connectionDetails": {"type": "SQL", "path": "srv"},
+                        }
                     ]
                 }
             }
         if method == "GET" and "/connections" in url:
             return {
                 "body": {
-                    "value": [{"id": "old-conn", "connectivityType": "ShareableCloud", "connectionDetails": {"type": "SQL", "path": "srv"}}]
+                    "value": [
+                        {
+                            "id": "old-conn",
+                            "connectivityType": "ShareableCloud",
+                            "connectionDetails": {"type": "SQL", "path": "srv"},
+                        }
+                    ]
                 }
             }
         if method == "POST" and "bindConnection" in url:
@@ -201,14 +200,10 @@ def test_post_publish_all_skips_excluded_semantic_models():
 
     called_urls = [c[1]["url"] for c in workspace.endpoint.invoke.call_args_list]
 
-    # No call should reference an empty GUID segment
-    assert not any("//" in url for url in called_urls), (
-        f"Empty-GUID URL produced: {called_urls}"
-    )
+    # An empty GUID produces a path like "semanticModels//bindConnection"; strip the scheme to detect it.
+    assert not any("//" in url.split("://", 1)[-1] for url in called_urls), f"Empty-GUID URL produced: {called_urls}"
     # DevModel (excluded, guid='') must never appear in any URL
-    assert not any("DevModel" in url for url in called_urls), (
-        f"DevModel must be skipped entirely: {called_urls}"
-    )
+    assert not any("DevModel" in url for url in called_urls), f"DevModel must be skipped entirely: {called_urls}"
     # SalesModel should be bound (bindConnection called with sales-guid)
     assert any("sales-guid" in url and "bindConnection" in url for url in called_urls), (
         f"SalesModel bindConnection not called: {called_urls}"

@@ -187,7 +187,7 @@ def bind_semanticmodel_to_connection(
         item_obj = fabric_workspace_obj.repository_items[item_type][model_name]
 
         # Skip models excluded by items_to_include (skip_publish=True) or with no deployed
-        # GUID — binding would produce an empty-ID URL (HTTP 400), same root cause as issue #948.
+        # GUID — binding would produce an empty-ID URL (HTTP 400) and fail with a server error.
         if item_obj.skip_publish or not item_obj.guid:
             logger.debug(
                 f"Skipping connection binding for semantic model '{model_name}' "

@@ -309,7 +309,7 @@ def test_process_shortcuts_with_complex_regex_pattern(mock_fabric_workspace, moc
 
 
 # =============================================================================
-# Regression tests: items_to_include + shortcut publishing (issue #948)
+# Regression tests: items_to_include + shortcut publishing
 # =============================================================================
 
 
@@ -330,8 +330,6 @@ def _make_item(name: str, guid: str = "") -> Item:
 
 def test_excluded_lakehouses_marked_skip_publish_with_items_to_include():
     """
-    Regression test for issue #948.
-
     When items_to_include is set and the workspace contains lakehouses that are
     NOT in the include list, publish_all() must mark those lakehouses
     skip_publish=True so that post_publish_all() does not attempt to publish
@@ -396,9 +394,9 @@ def test_lakehouses_without_guid_are_not_shortcut_published():
 @pytest.mark.usefixtures("shortcut_publish_enabled")
 def test_publish_all_marks_excluded_items_skip_publish():
     """
-    End-to-end regression for issue #948: publish_all() must mark items excluded
-    by items_to_include as skip_publish=True before post_publish_all() runs,
-    so that shortcut publishing is never attempted for lakehouses with empty guids.
+    End-to-end regression: publish_all() must mark items excluded by items_to_include
+    as skip_publish=True before post_publish_all() runs, so that shortcut publishing
+    is never attempted for lakehouses with empty guids.
     """
     lh_bronze = _make_item("lh_bronze", guid="bronze-guid")
     lh_silver = _make_item("lh_silver", guid="")  # not deployed in this environment
