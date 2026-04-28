@@ -35,7 +35,7 @@ class ParallelConfig:
 
     enabled: bool = True
     max_workers: Optional[int] = PARALLEL_MAX_WORKERS
-    ordered_items_func: Optional[Callable[["ItemPublisher"], list[str]]] = None
+    ordered_items_func: Optional[Callable["ItemPublisher", list[str]]] = None
 
 
 class Publisher(ABC):
@@ -319,11 +319,15 @@ class ItemPublisher(Publisher):
             PublishError: If one or more items failed to publish.
         """
         self.pre_publish_all()
+        # Fetch all items once; used to mark excluded items as skip_publish and,
+        # when no items_to_include filter is active, as the full set to publish.
+        all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items = self.get_items_to_publish()
 
-        # Mark items excluded by get_items_to_publish() as skip_publish so that
-        # post_publish_all() hooks (e.g. shortcut publishing) correctly skip them.
-        all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
+        # Mark items excluded by get_items_to_publish() as skip_publish=True so that
+        # post_publish_all() hooks (e.g. shortcut publishing, connection binding) correctly
+        # skip them. This is the authoritative place where skip_publish is set for
+        # items filtered out by items_to_include.
         for item_name, item_obj in all_items.items():
             if item_name not in items:
                 item_obj.skip_publish = True
@@ -374,6 +378,11 @@ class ItemPublisher(Publisher):
             The base implementation applies ``FabricWorkspace.items_to_include`` filtering.
             To override this method and preserve this behavior, call ``super().get_items_to_publish()``
             to keep ``items_to_include`` support, then apply any additional selection logic.
+
+            Items NOT returned by this method will have ``skip_publish=True`` set on them
+            by ``publish_all()`` before ``post_publish_all()`` is called. This ensures that
+            ``post_publish_all()`` hooks (e.g. shortcut publishing, connection binding) can
+            reliably use ``item.skip_publish`` to determine whether an item was published.
         """
         all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items_to_include = self.fabric_workspace_obj.items_to_include
