@@ -367,14 +367,12 @@ class TestParameterUtilities:
         # Test with both backward-compatible and explicit ID syntaxes
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
         assert result == "resolved-workspace-id"
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
 
+        mock_workspace._resolve_workspace_id.reset_mock()
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$id")
         assert result == "resolved-workspace-id"
-
-        mock_workspace._resolve_workspace_id.assert_has_calls([
-            mock.call("test_workspace"),
-            mock.call("test_workspace"),
-        ])
+        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
 
     def test_extract_workspace_id_with_workspace_name_variable(self, mock_workspace):
         """Tests _extract_workspace_id with workspace name variable."""
@@ -559,11 +557,12 @@ class TestParameterUtilities:
         mock_workspace._resolve_workspace_id.return_value = "resolved-id-for-name"
         result = extract_replace_value(mock_workspace, "$workspace.name")
         assert result == "resolved-id-for-name"
-        mock_workspace._resolve_workspace_id.assert_called_with("name")
+        mock_workspace._resolve_workspace_id.assert_called_once_with("name")
 
+        mock_workspace._resolve_workspace_id.reset_mock()
         result = extract_replace_value(mock_workspace, "$workspace.TestWorkspace.$id")
         assert result == "resolved-id-for-name"
-        mock_workspace._resolve_workspace_id.assert_has_calls([mock.call("name"), mock.call("TestWorkspace")])
+        mock_workspace._resolve_workspace_id.assert_called_once_with("TestWorkspace")
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""
