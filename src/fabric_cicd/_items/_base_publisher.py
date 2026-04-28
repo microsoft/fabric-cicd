@@ -35,7 +35,7 @@ class ParallelConfig:
 
     enabled: bool = True
     max_workers: Optional[int] = PARALLEL_MAX_WORKERS
-    ordered_items_func: Optional[Callable["ItemPublisher", list[str]]] = None
+    ordered_items_func: Optional[Callable[["ItemPublisher"], list[str]]] = None
 
 
 class Publisher(ABC):
