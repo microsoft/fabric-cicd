@@ -151,7 +151,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     - $workspace.id or $workspace.$id - Returns the target workspace ID
     - $workspace.$name - Returns the target workspace display name
     - $workspace.$name_encoded - Returns the target workspace display name, URL-encoded
-    - $workspace.<name> - Resolves the workspace ID from the name
+    - $workspace.<name> or $workspace.<name>.$id - Resolves the workspace ID from the name
     - $workspace.<name>.$items.<type>.<name>.$<attribute> - Resolves an item attribute from the specified workspace,
       where $attribute is any supported attribute in constants.ITEM_ATTR_LOOKUP
     """
@@ -220,8 +220,8 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
             logger.debug(f"Found item {attribute}: {attribute_value}")
             return attribute_value
 
-        # Pattern: $workspace.<name>
-        workspace_name = var_string.strip()
+        # Pattern: $workspace.<name>.$id (explicit) or $workspace.<name> (backward-compatible)
+        workspace_name = var_string.removesuffix(".$id").strip()
         logger.debug(f"Extracted workspace name: {workspace_name}")
 
         # Resolve workspace ID

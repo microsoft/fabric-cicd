@@ -364,10 +364,15 @@ class TestParameterUtilities:
         # Mock the _resolve_workspace_id method
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
 
-        # Test with $workspace.name - should resolve the workspace ID from name
+        # Test with both backward-compatible and explicit ID syntaxes
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
         assert result == "resolved-workspace-id"
-        mock_workspace._resolve_workspace_id.assert_called_once_with("test_workspace")
+
+        result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$id")
+        assert result == "resolved-workspace-id"
+
+        assert mock_workspace._resolve_workspace_id.call_count == 2
+        mock_workspace._resolve_workspace_id.assert_called_with("test_workspace")
 
     def test_extract_workspace_id_with_workspace_name_variable(self, mock_workspace):
         """Tests _extract_workspace_id with workspace name variable."""
@@ -553,6 +558,10 @@ class TestParameterUtilities:
         result = extract_replace_value(mock_workspace, "$workspace.name")
         assert result == "resolved-id-for-name"
         mock_workspace._resolve_workspace_id.assert_called_with("name")
+
+        result = extract_replace_value(mock_workspace, "$workspace.TestWorkspace.$id")
+        assert result == "resolved-id-for-name"
+        mock_workspace._resolve_workspace_id.assert_called_with("TestWorkspace")
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""
