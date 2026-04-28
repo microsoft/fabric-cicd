@@ -47,7 +47,7 @@ def _process_environment_file(
 
     contents = file_obj.contents
 
-    if not "instance_pool_id" in contents:
+    if "instance_pool_id" not in contents:
         return contents
 
     yaml_body = yaml.safe_load(contents)
