@@ -371,7 +371,6 @@ class TestParameterUtilities:
         result = _extract_workspace_id(mock_workspace, "$workspace.test_workspace.$id")
         assert result == "resolved-workspace-id"
 
-        assert mock_workspace._resolve_workspace_id.call_count == 2
         mock_workspace._resolve_workspace_id.assert_has_calls([
             mock.call("test_workspace"),
             mock.call("test_workspace"),
@@ -564,7 +563,7 @@ class TestParameterUtilities:
 
         result = extract_replace_value(mock_workspace, "$workspace.TestWorkspace.$id")
         assert result == "resolved-id-for-name"
-        mock_workspace._resolve_workspace_id.assert_called_with("TestWorkspace")
+        mock_workspace._resolve_workspace_id.assert_has_calls([mock.call("name"), mock.call("TestWorkspace")])
 
     def test_extract_parameter_filters(self, mock_workspace):
         """Tests extract_parameter_filters function."""
