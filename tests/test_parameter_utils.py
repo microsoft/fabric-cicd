@@ -372,7 +372,10 @@ class TestParameterUtilities:
         assert result == "resolved-workspace-id"
 
         assert mock_workspace._resolve_workspace_id.call_count == 2
-        mock_workspace._resolve_workspace_id.assert_called_with("test_workspace")
+        mock_workspace._resolve_workspace_id.assert_has_calls([
+            mock.call("test_workspace"),
+            mock.call("test_workspace"),
+        ])
 
     def test_extract_workspace_id_with_workspace_name_variable(self, mock_workspace):
         """Tests _extract_workspace_id with workspace name variable."""
