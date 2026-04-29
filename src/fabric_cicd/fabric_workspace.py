@@ -141,6 +141,10 @@ class FabricWorkspace:
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
+        # Initialize workspace pools cache (used in Environment item processing)
+        self._workspace_pools_cache: Optional[list[dict]] = None
+        self._workspace_pools_cache_lock = threading.Lock()
+
         # Initialize cache for _get_item_attribute method
         self._item_attribute_cache = {}
         self._item_attribute_cache_lock = threading.Lock()
@@ -263,6 +267,31 @@ class FabricWorkspace:
         with self._item_attribute_cache_lock:
             self._item_attribute_cache[cache_key] = attribute_value
         return attribute_value
+
+    def _get_workspace_pools(self) -> list[dict]:
+        """Return the list of workspace custom Spark pools, fetching from the API on first call.
+
+        The result is cached so that subsequent calls during the same deployment
+        do not make additional API requests. Thread-safe via a lock.
+
+        Returns:
+            A list of pool dictionaries from the Fabric Spark custom-pools API.
+        """
+        with self._workspace_pools_cache_lock:
+            if self._workspace_pools_cache is None:
+                # https://learn.microsoft.com/en-us/rest/api/fabric/spark/custom-pools/list-workspace-custom-pools
+                response = self.endpoint.invoke(
+                    method="GET",
+                    url=f"{self.base_api_url}/spark/pools",
+                )
+
+                pools = response.get("body", {}).get("value") if isinstance(response, dict) else None
+                if not isinstance(pools, list):
+                    msg = f"Unexpected response from Spark pools API: expected 'body.value' to be a list. Response: {response}"
+                    raise InputError(msg, logger)
+                self._workspace_pools_cache = pools
+
+            return self._workspace_pools_cache
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
