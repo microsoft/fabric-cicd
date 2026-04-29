@@ -54,10 +54,6 @@ class FailedPublishedItemStatusError(BaseCustomError):
     pass
 
 
-class MissingFileError(BaseCustomError):
-    pass
-
-
 class PublishError(BaseCustomError):
     """Exception raised when one or more publish operations fail.
 

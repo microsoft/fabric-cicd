@@ -131,7 +131,7 @@ key_value_replace:
 
 ### `spark_pool`
 
-Environments attached to custom spark pools need to be parameterized because the `instance_pool_id` in the `Sparkcompute.yml` file isn't supported in the create/update environment APIs. Provide the `instance_pool_id` value, and the pool `type` and `name` values as the `replace_value` for each environment (e.g., PPE, PROD). An optional field, `item_name`, can be used to filter the specific environment item where the replacement will occur.
+Environments attached to custom spark pools need to be parameterized because the `instance_pool_id` in the `Sparkcompute.yml` file is workspace-specific and must be mapped to the target workspace's pool. Provide the `instance_pool_id` value, and the pool `type` and `name` values as the `replace_value` for each environment (e.g., PPE, PROD). An optional field, `item_name`, can be used to filter the specific environment item where the replacement will occur.
 
 ```yaml
 spark_pool:
@@ -890,7 +890,7 @@ key_value_replace:
 
 #### `spark_pool` Parameterization Case
 
-**Case:** An Environment is attached to a Capacity level Custom Pool. Source control for Environments does not output the right fields necessary to deploy, so the Spark Pool needs to be parameterized. **Note:** Defining different names per environment is supported in the `parameter.yml` file. In the `Sparkcompute.yaml` file, the referenced instance_pool_id `72c68dbc-0775-4d59-909d-a47896f4573b` points to a capacity custom pool named `CapacityPool_Large` of pool type `Capacity` for the `PROD` environment.
+**Case:** An Environment is attached to a Capacity level Custom Pool. The `instance_pool_id` in `Sparkcompute.yml` is workspace-specific and will differ between environments. The Spark Pool needs to be parameterized so fabric-cicd can resolve the correct pool in the target workspace. **Note:** Defining different names per environment is supported in the `parameter.yml` file. In the `Sparkcompute.yml` file, the referenced instance_pool_id `72c68dbc-0775-4d59-909d-a47896f4573b` points to a capacity custom pool named `CapacityPool_Large` of pool type `Capacity` for the `PROD` environment.
 
 **Solution:** This replacement is managed by the `spark_pool` input in the `parameter.yml` file where fabric-cicd finds every instance of the `instance_pool_id` and replaces it with the pool type and pool name for the _specified_ environment file.
 

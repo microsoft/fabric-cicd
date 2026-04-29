@@ -5,59 +5,132 @@
 
 import logging
 import re
-from pathlib import Path
 
 import dpath
 import yaml
 
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._common._exceptions import MissingFileError
+from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._fabric_endpoint import handle_retry
+from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
-from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
+from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
 
 
-def set_environment_deployment_type(item: Item) -> bool:
+def _process_environment_file(
+    fabric_workspace_obj: FabricWorkspace,
+    item: Item,
+    file_obj: File,
+) -> str:
     """
-    Return True if this Environment deployment should be treated as "shell-only".
+    Process an Environment item file before it is included in the item definition payload.
 
-    Shell-only when `Setting/Sparkcompute.yml` exists and there are no other
-    non-`.platform` repository files under the environment root.
+    For ``Setting/Sparkcompute.yml`` this performs ``instance_pool_id`` replacement
+    using the ``spark_pool`` parameter configuration so that the correct pool
+    reference is embedded directly in the YAML sent to the Fabric Items API.
+
+    All other files are returned unchanged.
 
     Args:
+        fabric_workspace_obj: The FabricWorkspace object.
         item: The Item object representing the Environment.
+        file_obj: The File object being processed.
+
+    Returns:
+        The (possibly modified) file contents as a string.
     """
-    root = Path(item.path) if item.path else None
-    shell_only = False
+    if not (file_obj.file_path.name == "Sparkcompute.yml" and file_obj.file_path.parent.name == "Setting"):
+        return file_obj.contents
 
-    for file in item.item_files:
-        fp = file.file_path
+    contents = file_obj.contents
 
-        # Ignore .platform metadata file
-        if fp.name == ".platform":
-            continue
+    if "instance_pool_id" not in contents:
+        return contents
 
-        # Use the path relative to the environment root, or full path if root is None
-        try:
-            rel_path = fp.relative_to(root) if root else fp
-        except ValueError:
-            logger.debug(f"Path '{fp}' is not relative to root '{root}'; using full path")
-            rel_path = fp
+    yaml_body = yaml.safe_load(contents)
+    if not isinstance(yaml_body, dict):
+        return contents
 
-        path_parts = list(rel_path.parts)
-        # Detect Setting/Sparkcompute.yml (case-sensitive)
-        if len(path_parts) >= 2 and path_parts[0] == "Setting" and path_parts[1] == "Sparkcompute.yml":
-            shell_only = True
-            # Continue checking for other non-.platform files
-            continue
+    if "instance_pool_id" in yaml_body:
+        yaml_body = _replace_instance_pool_id(fabric_workspace_obj, yaml_body, item.name)
 
-        # Any other files -> not shell-only
-        return False
+    return yaml.dump(yaml_body, default_flow_style=False, sort_keys=False)
 
-    return shell_only
+
+def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: dict, item_name: str) -> dict:
+    """
+    Replace ``instance_pool_id`` in parsed Sparkcompute YAML with a resolved pool GUID.
+
+    This function reads ``spark_pool`` parameter mappings from
+    ``fabric_workspace_obj.environment_parameter`` and finds the entry whose
+    ``instance_pool_id`` matches the current YAML value. If an ``item_name`` is
+    provided in the mapping, it must match the current Environment item name;
+    otherwise, the mapping applies globally.
+
+    The mapped target pool ``name`` and ``type`` are then resolved against the
+    workspace custom pool list returned by the Fabric API, and the resolved pool
+    ``id`` is written back to ``yaml_body["instance_pool_id"]``.
+
+    Args:
+        fabric_workspace_obj: Workspace context containing environment, parameters,
+            and endpoint configuration.
+        yaml_body: Parsed contents of ``Setting/Sparkcompute.yml``.
+        item_name: Environment item name used for optional per-item mapping filters.
+
+    Returns:
+        The YAML dictionary, updated if a matching mapping is found; otherwise unchanged.
+    """
+    from fabric_cicd._parameter._utils import process_environment_key
+
+    pool_id = yaml_body["instance_pool_id"]
+    if "spark_pool" in fabric_workspace_obj.environment_parameter:
+        pools = fabric_workspace_obj._get_workspace_pools()
+        parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
+        for key in parameter_dict:
+            instance_pool_id = key["instance_pool_id"]
+            replace_value = process_environment_key(fabric_workspace_obj.environment, key["replace_value"])
+            input_name = key.get("item_name")
+            if instance_pool_id == pool_id and (input_name == item_name or not input_name):
+                pool_config = replace_value[fabric_workspace_obj.environment]
+                resolved_id = _resolve_pool_id(
+                    pools,
+                    pool_name=pool_config["name"],
+                    pool_type=pool_config["type"],
+                )
+                yaml_body["instance_pool_id"] = resolved_id
+                break
+
+    return yaml_body
+
+
+def _resolve_pool_id(pools: list[dict], pool_name: str, pool_type: str) -> str:
+    """
+    Resolve a workspace custom Spark pool ID by pool ``name`` and ``type``.
+
+    Args:
+        pools: Pool objects from ``GET /spark/pools`` (expected to include
+            ``name``, ``type``, and ``id`` fields).
+        pool_name: Target pool display name.
+        pool_type: Target pool type (for example, ``"Capacity"`` or ``"Workspace"``).
+
+    Returns:
+        The matching pool GUID.
+
+    Raises:
+        InputError: If no pool exists with the specified ``name`` and ``type``.
+    """
+    for pool in pools:
+        if pool["name"] == pool_name and pool["type"] == pool_type:
+            return pool["id"]
+
+    msg = (
+        f"Could not resolve custom Spark pool: name='{pool_name}', type='{pool_type}'. "
+        f"No matching pool found in the target workspace."
+    )
+    raise InputError(msg, logger)
 
 
 def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, initial_check: bool = False) -> None:
@@ -130,25 +203,20 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
         logger.info(f"{constants.INDENT}Published: {completed}")
 
 
-def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
+def _submit_environment_publish(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
     """
-    Updates compute settings and publishes compute settings and libraries for a given environment item.
+    Submit a publish request for an Environment item.
 
-    This process involves two steps:
-    1. Check for ongoing publish.
-    2. Updating the compute settings.
-    3. Publish the updated settings and libraries.
+    Triggers the asynchronous publish of the environment's staged settings and
+    libraries. The publish state is monitored separately by the async publish
+    check hooks.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
-        item_name: Name of the environment item whose compute settings are to be published.
-        is_excluded: Flag indicating if Sparkcompute.yml was excluded from definition deployment.
+        item_name: Name of the environment item to publish.
     """
     item_type = ItemType.ENVIRONMENT.value
     item_guid = fabric_workspace_obj.repository_items[item_type][item_name].guid
-
-    # Update compute settings
-    _update_compute_settings(fabric_workspace_obj, item_guid, item_name)
 
     # Publish updated settings - compute settings and libraries (long-running operation)
     # https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
@@ -160,93 +228,6 @@ def _publish_environment_metadata(fabric_workspace_obj: FabricWorkspace, item_na
     logger.info(f"{constants.INDENT}Publish Submitted for Environment '{item_name}'")
 
 
-def _update_compute_settings(fabric_workspace_obj: FabricWorkspace, item_guid: str, item_name: str) -> None:
-    """
-    Update spark compute settings.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object.
-        item_guid: The GUID of the environment item.
-        item_name: Name of the environment item.
-    """
-    from fabric_cicd._parameter._utils import process_environment_key
-
-    # Get Setting/Sparkcompute.yml content from repository
-    yaml_contents = None
-    item = fabric_workspace_obj.repository_items[ItemType.ENVIRONMENT.value][item_name]
-    item_files = item.item_files
-    for file in item_files:
-        if file.file_path.name == "Sparkcompute.yml" and file.file_path.parent.name == "Setting":
-            file.contents = fabric_workspace_obj._replace_parameters(file, item)
-            yaml_contents = file.contents
-            break
-
-    if not yaml_contents:
-        msg = (
-            "Required file missing: Setting/Sparkcompute.yml for Environment "
-            f"'{item_name}'. Each Environment must include Setting/Sparkcompute.yml."
-        )
-        raise MissingFileError(msg, logger)
-
-    yaml_body = yaml.safe_load(yaml_contents)
-
-    # Update instance pool settings if present
-    if "instance_pool_id" in yaml_body:
-        pool_id = yaml_body["instance_pool_id"]
-        if "spark_pool" in fabric_workspace_obj.environment_parameter:
-            parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
-            for key in parameter_dict:
-                instance_pool_id = key["instance_pool_id"]
-                replace_value = process_environment_key(fabric_workspace_obj.environment, key["replace_value"])
-                input_name = key.get("item_name")
-                if instance_pool_id == pool_id and (input_name == item_name or not input_name):
-                    # replace any found references with specified environment value
-                    yaml_body["instancePool"] = replace_value[fabric_workspace_obj.environment]
-                    del yaml_body["instance_pool_id"]
-
-    yaml_body = _convert_environment_compute_to_camel(fabric_workspace_obj, yaml_body)
-
-    # Update compute settings
-    # https://learn.microsoft.com/en-us/rest/api/fabric/environment/staging/update-spark-compute
-    fabric_workspace_obj.endpoint.invoke(
-        method="PATCH",
-        url=f"{fabric_workspace_obj.base_api_url}/environments/{item_guid}/staging/sparkcompute?beta=False",
-        body=yaml_body,
-    )
-    logger.info(f"{constants.INDENT}Updated Spark Settings")
-
-
-def _convert_environment_compute_to_camel(fabric_workspace_obj: FabricWorkspace, input_dict: dict) -> dict:
-    """
-    Converts dictionary keys stored in snake_case to camelCase, except for 'spark_conf'.
-
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object.
-        input_dict: Dictionary with snake_case keys.
-    """
-    new_input_dict = {}
-
-    for key, value in input_dict.items():
-        if key == "spark_conf":
-            # Convert spark_conf dict to sparkProperties list of {key, value} objects
-            new_key = "sparkProperties"
-            # Ensure value is treated as a mapping
-            if isinstance(value, dict):
-                value = [{"key": k, "value": v} for k, v in value.items()]
-        else:
-            # Convert the key to camelCase
-            key_components = key.split("_")
-            new_key = key_components[0] + "".join(x.title() for x in key_components[1:])
-
-        # Recursively update dictionary values if they are dictionaries
-        if isinstance(value, dict):
-            value = _convert_environment_compute_to_camel(fabric_workspace_obj, value)
-
-        new_input_dict[new_key] = value
-
-    return new_input_dict
-
-
 class EnvironmentPublisher(ItemPublisher):
     """Publisher for Environment items."""
 
@@ -255,19 +236,15 @@ class EnvironmentPublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Environment item."""
-        is_shell_only = set_environment_deployment_type(item)
-        logger.debug(f"Environment '{item_name}'; shell_only deployment: {is_shell_only}")
-
         self.fabric_workspace_obj._publish_item(
             item_name=item_name,
             item_type=self.item_type,
-            exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
+            func_process_file=_process_environment_file,
             skip_publish_logging=True,
-            shell_only_publish=is_shell_only,
         )
         if item.skip_publish:
             return
-        _publish_environment_metadata(self.fabric_workspace_obj, item_name)
+        _submit_environment_publish(self.fabric_workspace_obj, item_name)
 
     def pre_publish_all(self) -> None:
         """Check environment publish state before publishing."""
