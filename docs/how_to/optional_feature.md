@@ -6,24 +6,24 @@ fabric-cicd has an expected default flow; however, there will always be cases wh
 
 For scenarios that aren't supported by default, fabric-cicd offers feature flags. Below is an exhaustive list of currently supported features.
 
-| Flag Name                                 | Description                                                                       | Experimental |
-| ----------------------------------------- | --------------------------------------------------------------------------------- | ------------ |
-| `enable_lakehouse_unpublish`              | Set to enable the deletion of Lakehouses                                          |              |
-| `enable_warehouse_unpublish`              | Set to enable the deletion of Warehouses                                          |              |
-| `enable_sqldatabase_unpublish`            | Set to enable the deletion of SQL Databases                                       |              |
-| `enable_eventhouse_unpublish`             | Set to enable the deletion of Eventhouses                                         |              |
-| `enable_kqldatabase_unpublish`            | Set to enable the deletion of KQL Databases (attached to Eventhouses)             |              |
-| `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the Lakehouse                              |              |
-| `enable_environment_variable_replacement` | Set to enable the use of pipeline variables                                       |              |
-| `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                                    |              |
-| `enable_experimental_features`            | Set to enable experimental features, such as selective deployments                |              |
-| `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items                          | ☑️           |
-| `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish operations                    | ☑️           |
-| `enable_include_folder`                   | Set to enable folder-based inclusion during publish operations                    | ☑️           |
-| `enable_shortcut_exclude`                 | Set to enable selective publishing of shortcuts in a Lakehouse                    | ☑️           |
-| `enable_response_collection`              | Set to enable collection of API responses during publish and unpublish operations |              |
-| `continue_on_shortcut_failure`            | Set to allow deployment to continue even when shortcuts fail to publish           |              |
-| `enable_hard_delete`                      | Set to enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. | |
+| Flag Name                                 | Description                                                                                               | Experimental |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------ |
+| `enable_lakehouse_unpublish`              | Set to enable the deletion of Lakehouses                                                                  |              |
+| `enable_warehouse_unpublish`              | Set to enable the deletion of Warehouses                                                                  |              |
+| `enable_sqldatabase_unpublish`            | Set to enable the deletion of SQL Databases                                                               |              |
+| `enable_eventhouse_unpublish`             | Set to enable the deletion of Eventhouses                                                                 |              |
+| `enable_kqldatabase_unpublish`            | Set to enable the deletion of KQL Databases (attached to Eventhouses)                                     |              |
+| `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the Lakehouse                                                      |              |
+| `enable_environment_variable_replacement` | Set to enable the use of pipeline variables                                                               |              |
+| `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                                                            |              |
+| `enable_experimental_features`            | Set to enable experimental features, such as selective deployments                                        |              |
+| `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items                                                  | ☑️           |
+| `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish operations                                            | ☑️           |
+| `enable_include_folder`                   | Set to enable folder-based inclusion during publish operations                                            | ☑️           |
+| `enable_shortcut_exclude`                 | Set to enable selective publishing of shortcuts in a Lakehouse                                            | ☑️           |
+| `enable_response_collection`              | Set to enable collection of API responses during publish and unpublish operations                         |              |
+| `continue_on_shortcut_failure`            | Set to allow deployment to continue even when shortcuts fail to publish                                   |              |
+| `enable_hard_delete`                      | Set to enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. |              |
 
 <span class="md-h3-nonanchor">Example</span>
 
@@ -79,14 +79,14 @@ A subset of items in the repository can be published/unpublished using one of th
 
 ### Filter Precedence
 
-Filters are evaluated in the following order (exclusion filters are always applied before inclusion filters):
+Filters are evaluated in the following order:
 
-1. **`item_name_exclude_regex`** — Items matching the regex are excluded
-2. **`folder_path_exclude_regex`** — Items in matching folders are excluded
-3. **`items_to_include`** — Only explicitly listed items are published
+1. **`items_to_include`** — Scope is narrowed upfront; only explicitly listed items proceed to further checks
+2. **`item_name_exclude_regex`** — Items matching the regex are excluded
+3. **`folder_path_exclude_regex`** — Items in matching folders are excluded
 4. **`folder_path_to_include`** — Only items in specified folders are published
 
-**Note:** `folder_path_exclude_regex` and `folder_path_to_include` are mutually exclusive — only one can be used per deployment. Standalone items (items not in any folder) are not impacted by folder-level filters.
+**Note:** `folder_path_exclude_regex` and `folder_path_to_include` are mutually exclusive — only one can be used per deployment. Standalone items (items not in any folder) are not impacted by folder-level filters. When `items_to_include` is combined with exclusion filters, an item must first be in the include list before exclusion filters are evaluated against it.
 
 ### Lakehouse Shortcut Filtering
 

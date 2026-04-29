@@ -629,7 +629,8 @@ class FabricWorkspace:
         # Initialize response collection for this item if responses are being tracked
         api_response = None
 
-        # ===== FILTER ORDER: Item Exclusion → Folder Exclusion → Item Inclusion → Folder Inclusion =====
+        # ===== FILTER ORDER (applied in _publish_item): Item Exclusion → Folder Exclusion → Folder Inclusion =====
+        # Note: items_to_include filtering is applied upstream in publish_all() via get_items_to_publish().
 
         # 1. Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
@@ -663,19 +664,7 @@ class FabricWorkspace:
                     # Reached the root level with no match; stop checking
                     break
 
-        # 3. Skip publishing if the item is not in the include list
-        if self.items_to_include:
-            current_item = f"{item_name}.{item_type}"
-            # Normalize include list to a lowercase set for efficient lookups
-            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
-            # Check for exact match or case-insensitive match
-            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
-            if not match_found:
-                item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
-                return
-
-        # 4. Skip publishing if the item's folder path is not in the include list
+        # 3. Skip publishing if the item's folder path is not in the include list
         # If the item's folder is not in the explicit include list, skip item publish (even though folder has been created).
         # Note: unlike exclusion, this does NOT walk ancestors — only exact folder match is checked.
         # (e.g., including /A does NOT include items in /A/B, or including /A/B does NOT include items in /A, but the folder /A will still exist).

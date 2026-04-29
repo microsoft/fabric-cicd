@@ -319,22 +319,26 @@ class ItemPublisher(Publisher):
             PublishError: If one or more items failed to publish.
         """
         self.pre_publish_all()
-        # Fetch all items once; used to mark excluded items as skip_publish and,
-        # when no items_to_include filter is active, as the full set to publish.
         all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items = self.get_items_to_publish()
 
-        # Mark items excluded by get_items_to_publish() as skip_publish=True so that
-        # post_publish_all() hooks (e.g. shortcut publishing, connection binding) correctly
-        # skip them. This is the authoritative place where skip_publish is set for
-        # items filtered out by items_to_include.
+        if not items:
+            skipped = list(all_items.keys())
+            if skipped:
+                logger.info(f"Skipping {self.item_type} item(s) due to items_to_include filter: {skipped}")
+            for item_obj in all_items.values():
+                item_obj.skip_publish = True
+            self.post_publish_all()
+            return
+
+        # Mark excluded items as skip_publish=True so post_publish_all() hooks
+        # can reliably skip them. Included items are left unchanged (False).
+        skipped = [name for name in all_items if name not in items]
+        if skipped:
+            logger.info(f"Skipping {self.item_type} item(s) due to items_to_include filter: {skipped}")
         for item_name, item_obj in all_items.items():
             if item_name not in items:
                 item_obj.skip_publish = True
-
-        if not items:
-            self.post_publish_all()
-            return
 
         config = getattr(self.__class__, "parallel_config", ParallelConfig())
 
