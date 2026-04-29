@@ -269,14 +269,11 @@ class FabricWorkspace:
                     url=f"{self.base_api_url}/spark/pools",
                 )
 
-                try:
-                    pools = response["body"]["value"]
-                    if not isinstance(pools, list):
-                        raise TypeError
-                    self._workspace_pools_cache = pools
-                except (KeyError, TypeError):
+                pools = response.get("body", {}).get("value") if isinstance(response, dict) else None
+                if not isinstance(pools, list):
                     msg = f"Unexpected response from Spark pools API: expected 'body.value' to be a list. Response: {response}"
                     raise InputError(msg, logger)
+                self._workspace_pools_cache = pools
 
             return self._workspace_pools_cache
 
