@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from fabric_cicd import constants
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._lakehouse import ShortcutPublisher
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -54,6 +55,39 @@ def create_shortcut_file(shortcuts_data):
     file_obj.name = "shortcuts.metadata.json"
     file_obj.contents = json.dumps(shortcuts_data)
     return file_obj
+
+
+def set_deployed_shortcuts(mock_fabric_workspace, deployed_shortcuts):
+    """Configure endpoint behavior to return specific deployed shortcuts."""
+
+    def mock_invoke(method, url, **_kwargs):
+        if method == "GET" and "shortcuts" in url:
+            return {"body": {"value": deployed_shortcuts}, "header": {}}
+        if method == "POST" and "shortcuts" in url:
+            return {"body": {"id": "mock-shortcut-id"}}
+        if method == "DELETE" and "shortcuts" in url:
+            return {"body": {}}
+        return {"body": {}}
+
+    mock_fabric_workspace.endpoint.invoke.side_effect = mock_invoke
+
+
+def get_shortcut_post_calls(mock_fabric_workspace):
+    """Return all shortcut create/overwrite API calls."""
+    return [
+        call
+        for call in mock_fabric_workspace.endpoint.invoke.call_args_list
+        if call[1].get("method") == "POST" and "shortcuts" in call[1].get("url", "")
+    ]
+
+
+@pytest.fixture
+def restore_feature_flags():
+    """Ensure feature flags are restored after test."""
+    original_flags = constants.FEATURE_FLAG.copy()
+    yield
+    constants.FEATURE_FLAG.clear()
+    constants.FEATURE_FLAG.update(original_flags)
 
 
 def test_process_shortcuts_with_exclude_regex_filters_shortcuts(mock_fabric_workspace, mock_item):
@@ -304,3 +338,140 @@ def test_process_shortcuts_with_complex_regex_pattern(mock_fabric_workspace, moc
     # Verify the published shortcut is the prod one
     published_shortcut = post_calls[0][1]["body"]
     assert published_shortcut["name"] == "prod_shortcut"
+
+
+def test_shortcut_smart_diff_skips_unchanged_shortcuts(mock_fabric_workspace, mock_item):
+    """Smart diff should skip publish for unchanged shortcuts."""
+    shortcuts_data = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+        },
+        {
+            "name": "shortcut2",
+            "path": "/Files",
+            "target": {"type": "OneLake", "oneLake": {"path": "Files/s2", "itemId": "item-2"}},
+        },
+    ]
+    deployed_shortcuts = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+            "serverManaged": {"createdBy": "system"},
+        },
+        {
+            "name": "shortcut2",
+            "path": "/Files",
+            "target": {"type": "OneLake", "oneLake": {"path": "Files/s2", "itemId": "item-2"}},
+            "serverManaged": {"createdBy": "system"},
+        },
+    ]
+
+    mock_item.item_files = [create_shortcut_file(shortcuts_data)]
+    set_deployed_shortcuts(mock_fabric_workspace, deployed_shortcuts)
+    constants.FEATURE_FLAG.add("enable_shortcut_smart_diff")
+    try:
+        ShortcutPublisher(mock_fabric_workspace, mock_item).publish_all()
+        post_calls = get_shortcut_post_calls(mock_fabric_workspace)
+        assert len(post_calls) == 0
+    finally:
+        constants.FEATURE_FLAG.discard("enable_shortcut_smart_diff")
+
+
+def test_shortcut_smart_diff_publishes_only_changed_shortcut(mock_fabric_workspace, mock_item):
+    """Smart diff should publish only shortcuts with changed fields."""
+    shortcuts_data = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+        },
+        {
+            "name": "shortcut2",
+            "path": "/Files",
+            "target": {"type": "OneLake", "oneLake": {"path": "Files/s2-new", "itemId": "item-2"}},
+        },
+    ]
+    deployed_shortcuts = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+        },
+        {
+            "name": "shortcut2",
+            "path": "/Files",
+            "target": {"type": "OneLake", "oneLake": {"path": "Files/s2-old", "itemId": "item-2"}},
+        },
+    ]
+
+    mock_item.item_files = [create_shortcut_file(shortcuts_data)]
+    set_deployed_shortcuts(mock_fabric_workspace, deployed_shortcuts)
+    constants.FEATURE_FLAG.add("enable_shortcut_smart_diff")
+    try:
+        ShortcutPublisher(mock_fabric_workspace, mock_item).publish_all()
+
+        post_calls = get_shortcut_post_calls(mock_fabric_workspace)
+        assert len(post_calls) == 1
+        assert post_calls[0][1]["body"]["name"] == "shortcut2"
+    finally:
+        constants.FEATURE_FLAG.discard("enable_shortcut_smart_diff")
+
+
+def test_shortcut_smart_diff_publishes_client_side_new_field(mock_fabric_workspace, mock_item):
+    """Smart diff should publish when repo contains a new field missing from deployed shortcut."""
+    shortcuts_data = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+            "clientField": {"owner": "team-a"},
+        }
+    ]
+    deployed_shortcuts = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+        }
+    ]
+
+    mock_item.item_files = [create_shortcut_file(shortcuts_data)]
+    set_deployed_shortcuts(mock_fabric_workspace, deployed_shortcuts)
+    constants.FEATURE_FLAG.add("enable_shortcut_smart_diff")
+    try:
+        ShortcutPublisher(mock_fabric_workspace, mock_item).publish_all()
+
+        post_calls = get_shortcut_post_calls(mock_fabric_workspace)
+        assert len(post_calls) == 1
+        assert post_calls[0][1]["body"]["name"] == "shortcut1"
+    finally:
+        constants.FEATURE_FLAG.discard("enable_shortcut_smart_diff")
+
+
+def test_shortcut_smart_diff_disabled_keeps_publish_all_behavior(mock_fabric_workspace, mock_item):
+    """When smart diff is disabled, unchanged shortcuts are still published."""
+    shortcuts_data = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+        }
+    ]
+    deployed_shortcuts = [
+        {
+            "name": "shortcut1",
+            "path": "/Tables",
+            "target": {"type": "OneLake", "oneLake": {"path": "Tables/s1", "itemId": "item-1"}},
+        }
+    ]
+
+    mock_item.item_files = [create_shortcut_file(shortcuts_data)]
+    set_deployed_shortcuts(mock_fabric_workspace, deployed_shortcuts)
+
+    ShortcutPublisher(mock_fabric_workspace, mock_item).publish_all()
+
+    post_calls = get_shortcut_post_calls(mock_fabric_workspace)
+    assert len(post_calls) == 1

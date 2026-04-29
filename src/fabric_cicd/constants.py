@@ -119,6 +119,8 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
     ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
     """Set to enable deploying shortcuts with the lakehouse."""
+    ENABLE_SHORTCUT_SMART_DIFF = "enable_shortcut_smart_diff"
+    """Set to enable change comparision before deploying shortcuts"""
     DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
     """Set to disable deploying workspace sub folders."""
     CONTINUE_ON_SHORTCUT_FAILURE = "continue_on_shortcut_failure"
