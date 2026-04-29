@@ -268,7 +268,16 @@ class FabricWorkspace:
                     method="GET",
                     url=f"{self.base_api_url}/spark/pools",
                 )
-                self._workspace_pools_cache = response["body"]["value"] or []
+
+                try:
+                    pools = response["body"]["value"]
+                    if not isinstance(pools, list):
+                        raise TypeError
+                    self._workspace_pools_cache = pools
+                except (KeyError, TypeError):
+                    msg = f"Unexpected response from Spark pools API: expected 'body.value' to be a list. Response: {response}"
+                    raise InputError(msg, logger)
+
             return self._workspace_pools_cache
 
     def _refresh_parameter_file(self) -> None:

@@ -85,10 +85,9 @@ def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
     """
     from fabric_cicd._parameter._utils import process_environment_key
 
-    pools = fabric_workspace_obj._get_workspace_pools()
-
     pool_id = yaml_body["instance_pool_id"]
     if "spark_pool" in fabric_workspace_obj.environment_parameter:
+        pools = fabric_workspace_obj._get_workspace_pools()
         parameter_dict = fabric_workspace_obj.environment_parameter["spark_pool"]
         for key in parameter_dict:
             instance_pool_id = key["instance_pool_id"]
@@ -121,7 +120,7 @@ def _resolve_pool_id(pools: list[dict], pool_name: str, pool_type: str) -> str:
         The matching pool GUID.
 
     Raises:
-        Exception: If no pool exists with the specified ``name`` and ``type``.
+        InputError: If no pool exists with the specified ``name`` and ``type``.
     """
     for pool in pools:
         if pool["name"] == pool_name and pool["type"] == pool_type:
