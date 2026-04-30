@@ -139,7 +139,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
         return _extract_item_attribute(workspace_obj, replace_value, get_dataflow_name)
 
     # Otherwise, raise an error for invalid variable syntax
-    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.$attribute or $workspace.$id or $workspace.$name or $workspace.$name_encoded"
+    msg = f"Invalid replace_value variable format: '{replace_value}'. Expected format: $items.type.name.$attribute or $workspace.$id or $workspace.$name or $workspace.$name_encoded or $workspace.<name>.$id or $workspace.<name>.$items.<type>.<name>.$attribute"
     raise InputError(msg, logger)
 
 
@@ -151,11 +151,11 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     - $workspace.id or $workspace.$id - Returns the target workspace ID
     - $workspace.$name - Returns the target workspace display name
     - $workspace.$name_encoded - Returns the target workspace display name, URL-encoded
-    - $workspace.<name> or $workspace.<name>.$id - Resolves the workspace ID from the name
     - $workspace.<name>.$items.<type>.<name>.$<attribute> - Resolves an item attribute from the specified workspace,
       where $attribute is any supported attribute in constants.ITEM_ATTR_LOOKUP
+    - $workspace.<name> or $workspace.<name>.$id - Resolves the workspace ID from the name
     """
-    # Case 1: $workspace.id
+    # Case 1: $workspace.$id ($workspace.id supported for backward compatibility)
     if replace_value == "$workspace.id" or replace_value == "$workspace.$id":
         return workspace_obj.workspace_id
 
@@ -172,7 +172,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
         # Extract the variable string without the prefix
         var_string = replace_value.removeprefix("$workspace.")
 
-        # Check if this is a cross-workspace item reference
+        # Case 4: Check if this is a cross-workspace item reference
         if "$items." in var_string:
             # Check if the variable ends with a valid attribute
             valid_attribute = False
@@ -220,7 +220,7 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
             logger.debug(f"Found item {attribute}: {attribute_value}")
             return attribute_value
 
-        # Pattern: $workspace.<name>.$id (explicit) or $workspace.<name> (backward-compatible)
+        # Case 5: Pattern: $workspace.<name>.$id (explicit) or $workspace.<name> (backward-compatible)
         workspace_name = var_string.removesuffix(".$id").strip()
         logger.debug(f"Extracted workspace name: {workspace_name}")
 
@@ -298,10 +298,6 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             # Extract item_name and attribute
             item_name = parts[1][:last_period_pos].strip()
             attribute = parts[1][last_period_pos + 1 :].strip()
-
-            logger.warning(
-                "The $items variable format has changed. Please update to the new format: $items.type.name.$attribute"
-            )
 
         # Validate attribute before further processing
         attr_name = attribute.lower()
