@@ -1123,7 +1123,8 @@ def test_resolve_workspace_name(patched_fabric_workspace, valid_workspace_id, te
         )
 
     workspace.endpoint = mock_endpoint
-    result = workspace._resolve_workspace_name("mock-workspace-id")
+    workspace.workspace_id = "mock-workspace-id"
+    result = workspace._resolve_workspace_name()
     assert result == "My Workspace [DEV]"
 
 
@@ -1141,8 +1142,9 @@ def test_resolve_workspace_name_not_found(patched_fabric_workspace, valid_worksp
         )
 
     workspace.endpoint = mock_endpoint
+    workspace.workspace_id = "unknown-id"
     with pytest.raises(InputError, match="Workspace name could not be resolved from workspace ID"):
-        workspace._resolve_workspace_name("unknown-id")
+        workspace._resolve_workspace_name()
 
 
 def test_lookup_item_attribute(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
