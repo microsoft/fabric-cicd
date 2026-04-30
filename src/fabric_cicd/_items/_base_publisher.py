@@ -142,6 +142,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._apacheairflowjob import ApacheAirflowJobPublisher
         from fabric_cicd._items._copyjob import CopyJobPublisher
         from fabric_cicd._items._dataagent import DataAgentPublisher
+        from fabric_cicd._items._databuildtooljob import DataBuildToolJobPublisher
         from fabric_cicd._items._dataflowgen2 import DataflowPublisher
         from fabric_cicd._items._datapipeline import DataPipelinePublisher
         from fabric_cicd._items._environment import EnvironmentPublisher
@@ -179,6 +180,7 @@ class ItemPublisher(Publisher):
             ItemType.SEMANTIC_MODEL: SemanticModelPublisher,
             ItemType.REPORT: ReportPublisher,
             ItemType.COPY_JOB: CopyJobPublisher,
+            ItemType.DATA_BUILD_TOOL_JOB: DataBuildToolJobPublisher,
             ItemType.KQL_DATABASE: KQLDatabasePublisher,
             ItemType.KQL_QUERYSET: KQLQuerysetPublisher,
             ItemType.REFLEX: ActivatorPublisher,
