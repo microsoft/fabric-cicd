@@ -162,11 +162,11 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
     try:
         # Case 2: $workspace.$name
         if replace_value == "$workspace.$name":
-            return workspace_obj._resolve_workspace_name(workspace_obj.workspace_id)
+            return workspace_obj._resolve_workspace_name()
 
         # Case 3: $workspace.$name_encoded - URL-encoded display name
         if replace_value == "$workspace.$name_encoded":
-            name = workspace_obj._resolve_workspace_name(workspace_obj.workspace_id)
+            name = workspace_obj._resolve_workspace_name()
             return urllib.parse.quote(name, safe="")
 
         # Extract the variable string without the prefix

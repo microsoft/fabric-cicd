@@ -353,7 +353,7 @@ class TestParameterUtilities:
         mock_workspace._resolve_workspace_name.reset_mock()
         result = _extract_workspace_id(mock_workspace, "$workspace.$name")
         assert result == "My Target Workspace [PPE]"
-        mock_workspace._resolve_workspace_name.assert_called_once_with("mock-workspace-id")
+        mock_workspace._resolve_workspace_name.assert_called_once_with()
 
     def test_extract_workspace_id_name_encoded(self, mock_workspace):
         """Tests _extract_workspace_id with $workspace.$name_encoded returns URL-encoded name."""
@@ -363,7 +363,7 @@ class TestParameterUtilities:
 
         result = _extract_workspace_id(mock_workspace, "$workspace.$name_encoded")
         assert result == "My%20Target%20Workspace%20%5BPPE%5D"
-        mock_workspace._resolve_workspace_name.assert_called_once_with("mock-workspace-id")
+        mock_workspace._resolve_workspace_name.assert_called_once_with()
 
     def test_extract_workspace_id_resolve_error(self, mock_workspace):
         """Tests _extract_workspace_id when workspace name resolution fails."""

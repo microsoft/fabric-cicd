@@ -1109,10 +1109,8 @@ def test_resolve_workspace_name(patched_fabric_workspace, valid_workspace_id, te
     mock_endpoint = MagicMock()
     mock_endpoint.invoke.return_value = {
         "body": {
-            "value": [
-                {"id": "mock-workspace-id", "displayName": "My Workspace [DEV]"},
-                {"id": "other-id", "displayName": "Other Workspace"},
-            ]
+            "id": "mock-workspace-id",
+            "displayName": "My Workspace [DEV]",
         }
     }
 
@@ -1123,16 +1121,16 @@ def test_resolve_workspace_name(patched_fabric_workspace, valid_workspace_id, te
         )
 
     workspace.endpoint = mock_endpoint
-    result = workspace._resolve_workspace_name("mock-workspace-id")
+    result = workspace._resolve_workspace_name()
     assert result == "My Workspace [DEV]"
 
 
 def test_resolve_workspace_name_not_found(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
-    """Tests _resolve_workspace_name raises InputError when ID not found."""
+    """Tests _resolve_workspace_name raises InputError when displayName not in response."""
     from fabric_cicd._common._exceptions import InputError
 
     mock_endpoint = MagicMock()
-    mock_endpoint.invoke.return_value = {"body": {"value": [{"id": "other-id", "displayName": "Other Workspace"}]}}
+    mock_endpoint.invoke.return_value = {"body": {}}
 
     with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
         workspace = patched_fabric_workspace(
@@ -1142,7 +1140,7 @@ def test_resolve_workspace_name_not_found(patched_fabric_workspace, valid_worksp
 
     workspace.endpoint = mock_endpoint
     with pytest.raises(InputError, match="Workspace name could not be resolved from workspace ID"):
-        workspace._resolve_workspace_name("unknown-id")
+        workspace._resolve_workspace_name()
 
 
 def test_lookup_item_attribute(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
