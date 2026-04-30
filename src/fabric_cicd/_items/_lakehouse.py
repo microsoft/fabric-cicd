@@ -132,7 +132,7 @@ class LakehousePublisher(ItemPublisher):
         if FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value in constants.FEATURE_FLAG:
             for item_obj in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 # Check if the item is published to avoid any post publish actions
-                if not item_obj.skip_publish:
+                if not item_obj.skip_publish and item_obj.guid:
                     shortcut_publisher = ShortcutPublisher(self.fabric_workspace_obj, item_obj)
                     shortcut_publisher.publish_all()
 
