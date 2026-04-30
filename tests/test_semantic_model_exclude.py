@@ -65,11 +65,19 @@ def test_bind_skips_model_with_skip_publish_true():
 
     bind_semanticmodel_to_connection(workspace, connections, connection_details)
 
-    # Only SalesModel should trigger API calls; DevModel must be entirely skipped.
     called_urls = [c[1]["url"] for c in workspace.endpoint.invoke.call_args_list]
-    assert all("sales-guid" in url for url in called_urls), f"Unexpected URL in calls: {called_urls}"
+
+    # Positive assertion: SalesModel MUST have triggered API calls (guards against vacuous all([]))
+    assert any("sales-guid" in url for url in called_urls), (
+        f"SalesModel should have triggered API calls, got: {called_urls}"
+    )
+    # Negative assertion: DevModel must be entirely skipped
     assert not any("DevModel" in url for url in called_urls), (
         f"Empty-GUID or DevModel URL must not be called, got: {called_urls}"
+    )
+    # Extra guard: no empty-segment URLs at all
+    assert not any("//" in url.split("://", 1)[-1] for url in called_urls), (
+        f"Empty-GUID URL must not appear, got: {called_urls}"
     )
 
 
