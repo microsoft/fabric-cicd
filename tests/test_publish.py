@@ -805,9 +805,9 @@ def test_folder_exclusion_with_items_to_include(mock_endpoint, temp_workspace_di
 
         assert workspace.repository_items["Notebook"]["ImportantNotebook"].skip_publish is True
         assert workspace.repository_items["Notebook"]["StandaloneNotebook"].skip_publish is False
-        # OtherNotebook is pre-filtered in get_items_to_publish() because it is not in
-        # items_to_include, so _publish_item is never called and skip_publish stays False.
-        assert workspace.repository_items["Notebook"]["OtherNotebook"].skip_publish is False
+        # OtherNotebook is excluded by get_items_to_publish() because it is not in
+        # items_to_include, so publish_all() marks it skip_publish=True.
+        assert workspace.repository_items["Notebook"]["OtherNotebook"].skip_publish is True
 
 
 @pytest.mark.usefixtures("experimental_feature_flags")
@@ -868,10 +868,10 @@ def test_folder_inclusion_with_items_to_include(mock_endpoint, temp_workspace_di
         )
 
         assert workspace.repository_items["Notebook"]["Notebook1"].skip_publish is False
-        # Notebook2 and ArchivedNotebook are pre-filtered in get_items_to_publish()
-        # because they are not in items_to_include, so skip_publish stays False.
-        assert workspace.repository_items["Notebook"]["Notebook2"].skip_publish is False
-        assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is False
+        # Notebook2 and ArchivedNotebook are excluded by get_items_to_publish()
+        # because they are not in items_to_include, so publish_all() marks them skip_publish=True.
+        assert workspace.repository_items["Notebook"]["Notebook2"].skip_publish is True
+        assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is True
 
 
 @pytest.mark.usefixtures("experimental_feature_flags")
@@ -903,13 +903,13 @@ def test_all_filters_combined(mock_endpoint, temp_workspace_dir):
             items_to_include=["TargetNotebook.Notebook"],
         )
 
-        # DebugNotebook, OtherNotebook, and ArchivedNotebook are pre-filtered in
+        # DebugNotebook, OtherNotebook, and ArchivedNotebook are excluded by
         # get_items_to_publish() because they are not in items_to_include, so
-        # _publish_item is never called and skip_publish stays False.
-        assert workspace.repository_items["Notebook"]["DebugNotebook"].skip_publish is False
+        # publish_all() marks them skip_publish=True.
+        assert workspace.repository_items["Notebook"]["DebugNotebook"].skip_publish is True
         assert workspace.repository_items["Notebook"]["TargetNotebook"].skip_publish is False
-        assert workspace.repository_items["Notebook"]["OtherNotebook"].skip_publish is False
-        assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is False
+        assert workspace.repository_items["Notebook"]["OtherNotebook"].skip_publish is True
+        assert workspace.repository_items["Notebook"]["ArchivedNotebook"].skip_publish is True
 
 
 # =============================================================================
