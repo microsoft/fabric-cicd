@@ -1,26 +1,27 @@
 {
   "project": {
     "projectType": "OneLake",
-    "connectionSettings": {
-      "type": "OneLake"
-    }
+    "folderPath": "dbt"
   },
   "profile": {
     "profileType": "DataWarehouse",
     "schema": "analytics_schema",
     "connectionSettings": {
-      "type": "DataWarehouse",
+      "name": "sample_warehouse",
       "properties": {
-        "workspaceId": "00000000-0000-0000-0000-000000000000",
-        "artifactId": "cccccccc-3333-4444-5555-dddddddddddd"
+        "type": "DataWarehouse",
+        "typeProperties": {
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "artifactId": "cccccccc-3333-4444-5555-dddddddddddd",
+          "endPoint": "sampleworkspace-samplewarehouse.datawarehouse.fabric.microsoft.com"
+        }
       }
     }
   },
   "command": {
-    "operation": "run",
+    "operation": "build",
     "arguments": {
-      "select": "model_a,model_b",
-      "fullRefresh": true,
+      "exclude": "",
       "threads": 4
     }
   }

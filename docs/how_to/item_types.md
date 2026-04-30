@@ -51,7 +51,7 @@
 - **Parameterization:**
     - Connection and profile references will always point to the original values unless parameterized in the `find_replace` section of the `parameter.yml` file.
 - **Definition file:**
-    - The deployment expects `dbtjob-content.json` (and optional `.platform`) in the item folder.
+    - The deployment expects both `dbtjob-content.json` and `.platform` in the item folder.
 - **Initial deployment:**
     - Validate connection/profile settings in the target workspace, especially when promoting between test and prod workspaces.
 
