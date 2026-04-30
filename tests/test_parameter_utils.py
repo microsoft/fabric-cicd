@@ -350,7 +350,6 @@ class TestParameterUtilities:
 
         mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
 
-        mock_workspace._resolve_workspace_name.reset_mock()
         result = _extract_workspace_id(mock_workspace, "$workspace.$name")
         assert result == "My Target Workspace [PPE]"
         mock_workspace._resolve_workspace_name.assert_called_once_with()
