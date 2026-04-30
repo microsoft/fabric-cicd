@@ -19,6 +19,13 @@ from fabric_cicd._common._exceptions import FileTypeError
 
 logger = logging.getLogger(__name__)
 
+# Cap the upstream HTTP calls (changelog fetch, pypi version check) so a
+# slow/unreachable host can't block CLI startup. The previous code passed
+# no `timeout=` and inherited the OS socket default, which can stall for
+# minutes-to-hours under poor network conditions (corporate proxies, broken
+# IPv6 paths, transient pypi outages). See microsoft/fabric-cli#224.
+_HTTP_TIMEOUT_SECONDS = 2
+
 
 def parse_changelog() -> dict[str, list[str]]:
     """Parse the changelog file and return a dictionary of versions with their changes."""
@@ -26,7 +33,8 @@ def parse_changelog() -> dict[str, list[str]]:
 
     try:
         response = requests.get(
-            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/docs/changelog.md"
+            "https://raw.githubusercontent.com/microsoft/fabric-cicd/refs/heads/main/docs/changelog.md",
+            timeout=_HTTP_TIMEOUT_SECONDS,
         )
         if response.status_code == 200:
             content = response.text
@@ -59,7 +67,10 @@ def check_version() -> None:
     """Check the current version of the fabric-cicd package and compare it with the latest version."""
     try:
         current_version = constants.VERSION
-        response = requests.get("https://pypi.org/pypi/fabric-cicd/json")
+        response = requests.get(
+            "https://pypi.org/pypi/fabric-cicd/json",
+            timeout=_HTTP_TIMEOUT_SECONDS,
+        )
         latest_version = response.json()["info"]["version"]
 
         if version.parse(current_version) < version.parse(latest_version):
