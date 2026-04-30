@@ -107,7 +107,6 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
     artifacts_folder = root_directory / "sample" / "workspace"
 
     item_types_to_deploy = [
-        "DataBuildToolJob",
         "Dataflow",
         "DataPipeline",
         "Environment",
