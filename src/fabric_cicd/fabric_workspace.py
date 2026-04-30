@@ -187,6 +187,14 @@ class FabricWorkspace:
         msg = f"Workspace ID could not be resolved from workspace name: {workspace_name}."
         raise InputError(msg, logger)
 
+    def _resolve_workspace_name(self) -> str:
+        """Resolve workspace display name of the target workspace ID."""
+        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}")
+        if "displayName" in response.get("body", {}):
+            return response["body"]["displayName"]
+        msg = f"Workspace name could not be resolved from workspace ID: {self.workspace_id}."
+        raise InputError(msg, logger)
+
     def _lookup_item_attribute(self, workspace_id: str, item_type: str, item_name: str, attribute_name: str) -> str:
         """Lookup item attribute in the specified workspace based on item type and name."""
         response = self.endpoint.invoke(
