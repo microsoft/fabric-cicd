@@ -220,7 +220,7 @@ messages:
 
           After the Next Steps section, always append this footer on a new line:
           `---`
-          `> 💡 If this issue requires the team's attention and was not escalated, you can tag @microsoft/fabric-cicd-dev to notify the team.`
+          `> 💡 If this issue requires the team's attention and was not escalated, you can tag @microsoft/fabric-cicd to notify the team.`
     - role: user
       content: "{{input}}"
 model: openai/gpt-4.1
