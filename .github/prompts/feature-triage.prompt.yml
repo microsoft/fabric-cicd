@@ -56,7 +56,6 @@ messages:
           | `deploy_with_config(config_file_path, *, environment, token_credential, ...)` | Config-based deployment from a YAML file. |
           | `append_feature_flag(flag)` | Enable a feature flag at runtime. |
           | `change_log_level("DEBUG")` | Enable debug logging for troubleshooting. |
-          | `configure_external_file_logging(path)` | Configure logging to a custom file path. |
           | `disable_file_logging()` | Disable file-based logging. |
           | `get_changed_items(repository_directory)` | Get list of git-changed items for selective deployment. |
           | `DeploymentResult` / `DeploymentStatus` | Deployment result types. |
@@ -137,6 +136,8 @@ messages:
           3. **Service principal (secret)**: `ClientSecretCredential(tenant_id, client_id, client_secret)` — CI/CD pipelines
           4. **Service principal (certificate)**: `CertificateCredential(tenant_id, client_id, certificate_path=...)` — CI/CD pipelines
           5. **Managed identity**: `ManagedIdentityCredential()` — Azure-hosted pipelines
+          6. **Workload identity federation (OIDC)**: `WorkloadIdentityCredential(tenant_id, client_id)` — secretless; recommended for GitHub Actions and Azure DevOps with federated credentials
+          7. **Fabric notebook**: Custom `TokenCredential` wrapping `notebookutils.credentials.getToken("pbi")` — see authentication docs
 
           ### Parameterization (parameter.yml)
 
