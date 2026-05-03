@@ -3,7 +3,9 @@
 
 """Constants for the fabric-cicd package."""
 
+from asyncio.log import logger
 import os
+import re
 from enum import Enum
 
 from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
@@ -175,8 +177,8 @@ def _get_fabric_fqdn_url(workspace_id: str) -> str:
     format required for private-link-enabled Fabric API endpoints.
 
     Args:
-        workspace_id: The workspace ID string, with or without dashes
-            (e.g., "f953f3da-c5f0-4e36-a644-c85933e35e2f" or "f953f3dac5f04e36a644c85933e35e2f").
+        workspace_id: The workspace ID string in standard GUID format with dashes
+            (e.g., "f953f3da-c5f0-4e36-a644-c85933e35e2f").
 
     Returns:
         The fully qualified domain name (FQDN) URL string in the format:
@@ -187,15 +189,15 @@ def _get_fabric_fqdn_url(workspace_id: str) -> str:
         >>> url
         'https://f953f3dac5f04e36a644c85933e35e2f.zf9.w.api.fabric.microsoft.com'
     """
-    # Remove all dashes from workspace_id
+    if not re.match(VALID_GUID_REGEX, workspace_id):
+        msg = f"workspace_id must be a valid GUID with dashes, got: '{workspace_id}'"
+        raise ValueError(msg)
     no_dashes = workspace_id.replace("-", "")
-    # Extract first 2 characters
     first_two = no_dashes[:2]
-    # Format as FQDN URL
     return f"https://{no_dashes}.z{first_two}.w.api.fabric.microsoft.com"
 
 
-def setup_fabric_fqdn(workspace_id: str) -> None:
+def configure_fabric_fqdn(workspace_id: str) -> None:
     """
     Configure Fabric API URLs for private-link-enabled workspaces.
 
@@ -215,11 +217,11 @@ def setup_fabric_fqdn(workspace_id: str) -> None:
 
     Examples:
         Basic usage with FabricWorkspace:
-        >>> from fabric_cicd import setup_fabric_fqdn, FabricWorkspace
+        >>> from fabric_cicd import configure_fabric_fqdn, FabricWorkspace
         >>> from azure.identity import AzureCliCredential
         >>>
         >>> workspace_id = "f953f3da-c5f0-4e36-a644-c85933e35e2f"
-        >>> setup_fabric_fqdn(workspace_id)
+        >>> configure_fabric_fqdn(workspace_id)
         >>>
         >>> token_credential = AzureCliCredential()
         >>> workspace = FabricWorkspace(
@@ -228,7 +230,21 @@ def setup_fabric_fqdn(workspace_id: str) -> None:
         ...     token_credential=token_credential
         ... )
     """
+    from fabric_cicd._common._validate_input import validate_workspace_id
+    from fabric_cicd._common._validate_env_vars import validate_api_url
+    
     global FABRIC_API_ROOT_URL, DEFAULT_API_ROOT_URL
+    
+    # Validate workspace_id format
+    workspace_id = validate_workspace_id(workspace_id)  # raises on invalid input
+    fqdn_url = _get_fabric_fqdn_url(workspace_id)
+    fqdn_url = validate_api_url(fqdn_url, "configure_fabric_fqdn")  # safety net
+    
+    if FABRIC_API_ROOT_URL != "https://api.fabric.microsoft.com":
+        logger.warning(
+            f"configure_fabric_fqdn: overwriting previously set FABRIC_API_ROOT_URL '{FABRIC_API_ROOT_URL}'"
+        )
+
     fqdn_url = _get_fabric_fqdn_url(workspace_id)
     FABRIC_API_ROOT_URL = fqdn_url
     DEFAULT_API_ROOT_URL = fqdn_url
