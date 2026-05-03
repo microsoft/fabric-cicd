@@ -25,8 +25,8 @@ jobs:
             #   Testing (fork):   suppress both  → true  / true
             #   Production:       enable both    → false / false
             # -------------------------------------------------------
-            SUPPRESS_LABELS: "true"
-            SUPPRESS_COMMENTS: "true"
+            SUPPRESS_LABELS: "false"
+            SUPPRESS_COMMENTS: "false"
 
         steps:
             - name: Checkout
