@@ -3,7 +3,9 @@
 
 """Constants for the fabric-cicd package."""
 
+from asyncio.log import logger
 import os
+import re
 from enum import Enum
 
 from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
@@ -165,6 +167,88 @@ ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
 # API URLs
 DEFAULT_API_ROOT_URL = validate_env_var_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
 FABRIC_API_ROOT_URL = validate_env_var_api_url(EnvVar.FABRIC_API_ROOT_URL.value, "https://api.fabric.microsoft.com")
+
+
+def _get_fabric_fqdn_url(workspace_id: str) -> str:
+    """
+    Transform workspace ID to FQDN format for private-link-enabled Fabric workspaces.
+
+    This is an internal helper function that converts a workspace ID to the FQDN
+    format required for private-link-enabled Fabric API endpoints.
+
+    Args:
+        workspace_id: The workspace ID string in standard GUID format with dashes
+            (e.g., "f953f3da-c5f0-4e36-a644-c85933e35e2f").
+
+    Returns:
+        The fully qualified domain name (FQDN) URL string in the format:
+        https://<workspace_id_no_dashes>.z<first_2_chars>.w.api.fabric.microsoft.com
+
+    Examples:
+        >>> url = _get_fabric_fqdn_url("f953f3da-c5f0-4e36-a644-c85933e35e2f")
+        >>> url
+        'https://f953f3dac5f04e36a644c85933e35e2f.zf9.w.api.fabric.microsoft.com'
+    """
+    if not re.match(VALID_GUID_REGEX, workspace_id):
+        msg = f"workspace_id must be a valid GUID with dashes, got: '{workspace_id}'"
+        raise ValueError(msg)
+    no_dashes = workspace_id.replace("-", "")
+    first_two = no_dashes[:2]
+    return f"https://{no_dashes}.z{first_two}.w.api.fabric.microsoft.com"
+
+
+def configure_fabric_fqdn(workspace_id: str) -> None:
+    """
+    Configure Fabric API URLs for private-link-enabled workspaces.
+
+    This function updates the global Fabric API URL constants to use the FQDN
+    format required for private-link-enabled workspaces. Call this function
+    before initializing a FabricWorkspace if you are using a private-link-enabled
+    workspace.
+
+    Args:
+        workspace_id: The workspace ID string, with or without dashes
+            (e.g., "f953f3da-c5f0-4e36-a644-c85933e35e2f" or "f953f3dac5f04e36a644c85933e35e2f").
+
+    Side Effects:
+        Updates the module-level constants:
+        - FABRIC_API_ROOT_URL: Set to the FQDN URL derived from workspace_id
+        - DEFAULT_API_ROOT_URL: Set to the same FQDN URL
+
+    Examples:
+        Basic usage with FabricWorkspace:
+        >>> from fabric_cicd import configure_fabric_fqdn, FabricWorkspace
+        >>> from azure.identity import AzureCliCredential
+        >>>
+        >>> workspace_id = "f953f3da-c5f0-4e36-a644-c85933e35e2f"
+        >>> configure_fabric_fqdn(workspace_id)
+        >>>
+        >>> token_credential = AzureCliCredential()
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id=workspace_id,
+        ...     repository_directory="/path/to/workspace",
+        ...     token_credential=token_credential
+        ... )
+    """
+    from fabric_cicd._common._validate_input import validate_workspace_id
+    from fabric_cicd._common._validate_env_vars import validate_api_url
+    
+    global FABRIC_API_ROOT_URL, DEFAULT_API_ROOT_URL
+    
+    # Validate workspace_id format
+    workspace_id = validate_workspace_id(workspace_id)  # raises on invalid input
+    fqdn_url = _get_fabric_fqdn_url(workspace_id)
+    fqdn_url = validate_api_url(fqdn_url, "configure_fabric_fqdn")  # safety net
+    
+    if FABRIC_API_ROOT_URL != "https://api.fabric.microsoft.com":
+        logger.warning(
+            f"configure_fabric_fqdn: overwriting previously set FABRIC_API_ROOT_URL '{FABRIC_API_ROOT_URL}'"
+        )
+
+    fqdn_url = _get_fabric_fqdn_url(workspace_id)
+    FABRIC_API_ROOT_URL = fqdn_url
+    DEFAULT_API_ROOT_URL = fqdn_url
+
 
 # Retry Settings
 RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))

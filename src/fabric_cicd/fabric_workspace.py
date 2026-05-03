@@ -113,6 +113,10 @@ class FabricWorkspace:
         # Initialize endpoint
         self.endpoint = FabricEndpoint(token_credential=token_credential)
 
+        # Snapshot at construction so subsequent configure_fabric_fqdn calls for a
+        # different workspace don't retarget this instance.
+        self._api_root_url = constants.DEFAULT_API_ROOT_URL
+
         # Set workspace_id class variable
         if workspace_id:
             self.workspace_id = validate_workspace_id(workspace_id)
@@ -176,11 +180,11 @@ class FabricWorkspace:
     @property
     def base_api_url(self) -> str:
         """Construct the base API URL using constants."""
-        return f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
+        return f"{self._api_root_url}/v1/workspaces/{self.workspace_id}"
 
     def _resolve_workspace_id(self, workspace_name: str) -> str:
         """Resolve workspace ID based on the workspace name given."""
-        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces")
+        response = self.endpoint.invoke(method="GET", url=f"{self._api_root_url}/v1/workspaces")
         for workspace in response["body"]["value"]:
             if workspace["displayName"] == workspace_name:
                 return workspace["id"]
@@ -189,7 +193,7 @@ class FabricWorkspace:
 
     def _resolve_workspace_name(self) -> str:
         """Resolve workspace display name of the target workspace ID."""
-        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}")
+        response = self.endpoint.invoke(method="GET", url=f"{self._api_root_url}/v1/workspaces/{self.workspace_id}")
         if "displayName" in response.get("body", {}):
             return response["body"]["displayName"]
         msg = f"Workspace name could not be resolved from workspace ID: {self.workspace_id}."
@@ -198,7 +202,7 @@ class FabricWorkspace:
     def _lookup_item_attribute(self, workspace_id: str, item_type: str, item_name: str, attribute_name: str) -> str:
         """Lookup item attribute in the specified workspace based on item type and name."""
         response = self.endpoint.invoke(
-            method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}/items"
+            method="GET", url=f"{self._api_root_url}/v1/workspaces/{workspace_id}/items"
         )
         for item in response["body"]["value"]:
             if item["type"] == item_type and item["displayName"] == item_name:
@@ -247,7 +251,7 @@ class FabricWorkspace:
 
         response = self.endpoint.invoke(
             method="GET",
-            url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{workspace_id}/{item_type.lower()}s/{item_guid}",
+            url=f"{self._api_root_url}/v1/workspaces/{workspace_id}/{item_type.lower()}s/{item_guid}",
         )
         # Extract the attribute value using the path
         attribute_value = dpath.get(response, property_path, default="")
