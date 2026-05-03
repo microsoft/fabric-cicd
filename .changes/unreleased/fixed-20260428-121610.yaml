@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix HTTP 400 errors when using ``items_to_include`` with post-publish operations (e.g. Lakehouse shortcut publishing)
+time: 2026-04-28T12:16:10.6116726+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "948"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/948

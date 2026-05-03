@@ -268,7 +268,6 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.REPORT.value: r".*\.pbi[/\\].*",
     ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
     ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
-    ItemType.ENVIRONMENT.value: r"\Setting",
 }
 
 # API Format Mapping for item types that require specific API formats

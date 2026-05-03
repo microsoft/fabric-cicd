@@ -139,7 +139,8 @@ class TestFindPlatformItem:
         item_dir = tmp_path / "NoType"
         item_dir.mkdir()
         (item_dir / ".platform").write_text(
-            '{"metadata": {"displayName": "NoType"}}', encoding="utf-8"
+            '{"metadata": {"displayName": "NoType"}}',
+            encoding="utf-8",
         )
         file_path = item_dir / "file.py"
         file_path.touch()
