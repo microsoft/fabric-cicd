@@ -141,6 +141,10 @@ class FabricWorkspace:
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
 
+        # Initialize workspace pools cache (used in Environment item processing)
+        self._workspace_pools_cache: Optional[list[dict]] = None
+        self._workspace_pools_cache_lock = threading.Lock()
+
         # Initialize cache for _get_item_attribute method
         self._item_attribute_cache = {}
         self._item_attribute_cache_lock = threading.Lock()
@@ -181,6 +185,14 @@ class FabricWorkspace:
             if workspace["displayName"] == workspace_name:
                 return workspace["id"]
         msg = f"Workspace ID could not be resolved from workspace name: {workspace_name}."
+        raise InputError(msg, logger)
+
+    def _resolve_workspace_name(self) -> str:
+        """Resolve workspace display name of the target workspace ID."""
+        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}")
+        if "displayName" in response.get("body", {}):
+            return response["body"]["displayName"]
+        msg = f"Workspace name could not be resolved from workspace ID: {self.workspace_id}."
         raise InputError(msg, logger)
 
     def _lookup_item_attribute(self, workspace_id: str, item_type: str, item_name: str, attribute_name: str) -> str:
@@ -247,6 +259,31 @@ class FabricWorkspace:
         with self._item_attribute_cache_lock:
             self._item_attribute_cache[cache_key] = attribute_value
         return attribute_value
+
+    def _get_workspace_pools(self) -> list[dict]:
+        """Return the list of workspace custom Spark pools, fetching from the API on first call.
+
+        The result is cached so that subsequent calls during the same deployment
+        do not make additional API requests. Thread-safe via a lock.
+
+        Returns:
+            A list of pool dictionaries from the Fabric Spark custom-pools API.
+        """
+        with self._workspace_pools_cache_lock:
+            if self._workspace_pools_cache is None:
+                # https://learn.microsoft.com/en-us/rest/api/fabric/spark/custom-pools/list-workspace-custom-pools
+                response = self.endpoint.invoke(
+                    method="GET",
+                    url=f"{self.base_api_url}/spark/pools",
+                )
+
+                pools = response.get("body", {}).get("value") if isinstance(response, dict) else None
+                if not isinstance(pools, list):
+                    msg = f"Unexpected response from Spark pools API: expected 'body.value' to be a list. Response: {response}"
+                    raise InputError(msg, logger)
+                self._workspace_pools_cache = pools
+
+            return self._workspace_pools_cache
 
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
@@ -600,7 +637,8 @@ class FabricWorkspace:
         # Initialize response collection for this item if responses are being tracked
         api_response = None
 
-        # ===== FILTER ORDER: Item Exclusion → Folder Exclusion → Item Inclusion → Folder Inclusion =====
+        # ===== FILTER ORDER (applied in _publish_item): Item Exclusion → Folder Exclusion → Folder Inclusion =====
+        # Note: items_to_include filtering is applied upstream in publish_all() via get_items_to_publish().
 
         # 1. Skip publishing if the item is excluded by the regex
         if self.publish_item_name_exclude_regex:
@@ -634,19 +672,7 @@ class FabricWorkspace:
                     # Reached the root level with no match; stop checking
                     break
 
-        # 3. Skip publishing if the item is not in the include list
-        if self.items_to_include:
-            current_item = f"{item_name}.{item_type}"
-            # Normalize include list to a lowercase set for efficient lookups
-            normalized_include_set = {include_item.lower() for include_item in self.items_to_include}
-            # Check for exact match or case-insensitive match
-            match_found = current_item in self.items_to_include or current_item.lower() in normalized_include_set
-            if not match_found:
-                item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' as it is not in the include list.")
-                return
-
-        # 4. Skip publishing if the item's folder path is not in the include list
+        # 3. Skip publishing if the item's folder path is not in the include list
         # If the item's folder is not in the explicit include list, skip item publish (even though folder has been created).
         # Note: unlike exclusion, this does NOT walk ancestors — only exact folder match is checked.
         # (e.g., including /A does NOT include items in /A/B, or including /A/B does NOT include items in /A, but the folder /A will still exist).

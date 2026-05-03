@@ -1,0 +1,8 @@
+kind: added
+body: Add `$workspace.$name` and `$workspace.$name_encoded` dynamic replacement variables for target workspace display name
+time: 2026-04-20T14:02:47.0254635+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "895"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/895
