@@ -199,7 +199,7 @@ jobs:
                           owner,
                           repo,
                           issue_number: issueNumber,
-                          body: '🔔 @microsoft/fabric-cicd-dev — This issue has been flagged by AI triage as requiring team attention. Please review the assessment above.'
+                          body: '🔔 @microsoft/fabric-cicd — This issue has been flagged by AI triage as requiring team attention. Please review the assessment above.'
                         });
                         core.info('Escalated to team.');
                       }
