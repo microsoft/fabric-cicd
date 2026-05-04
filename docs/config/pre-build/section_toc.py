@@ -80,10 +80,15 @@ def on_page_markdown(markdown, page, config, files):
                 content = f.read()
                 content_no_code = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
                 headers = re.findall(r"^(#{1,6})\s+(.*)", content_no_code, re.MULTILINE)
+                seen_slugs = {}
                 for header in headers:
                     level = len(header[0])
                     title = header[1]
-                    anchor = slugify(title)
+                    base_anchor = slugify(title)
+                    # MkDocs appends _1, _2, etc. for duplicate heading IDs
+                    count = seen_slugs.get(base_anchor, 0)
+                    seen_slugs[base_anchor] = count + 1
+                    anchor = base_anchor if count == 0 else f"{base_anchor}_{count}"
                     toc.append(f"{'   ' * level}- [{title}]({md_file.name}#{anchor})")
 
         toc_content = "\n".join(toc)
