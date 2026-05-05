@@ -8,8 +8,9 @@ import hashlib
 import json
 import logging
 import os
+import uuid
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Protocol
 from urllib.parse import urlparse
@@ -20,6 +21,20 @@ from fabric_cicd._common._file_lock import FileLock
 from fabric_cicd.constants import AUTHORIZATION_HEADER, EnvVar
 
 logger = logging.getLogger(__name__)
+
+
+def _trace_default(obj: object) -> str:
+    """Deterministic JSON fallback for non-native objects in HTTP traces."""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+    if isinstance(obj, (bytes, bytearray)):
+        try:
+            return bytes(obj).decode("utf-8")
+        except UnicodeDecodeError:
+            return base64.b64encode(bytes(obj)).decode("ascii")
+    return f"<NonSerializable:{type(obj).__name__}>"
 
 
 @dataclass
@@ -34,7 +49,7 @@ class HTTPRequest:
 
     def to_b64(self) -> str:
         """Serialize to base64-encoded JSON."""
-        request_json = json.dumps(asdict(self), separators=(",", ":"))
+        request_json = json.dumps(asdict(self), separators=(",", ":"), default=_trace_default)
         return base64.b64encode(request_json.encode()).decode()
 
     @classmethod
@@ -72,8 +87,7 @@ class HTTPResponse:
 
     def to_b64(self) -> str:
         """Serialize to base64-encoded JSON."""
-        # Some tests mock response payloads with non-JSON-native objects.
-        response_json = json.dumps(asdict(self), separators=(",", ":"), default=str)
+        response_json = json.dumps(asdict(self), separators=(",", ":"), default=_trace_default)
         return base64.b64encode(response_json.encode()).decode()
 
     @classmethod
