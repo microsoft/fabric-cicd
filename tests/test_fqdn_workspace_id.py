@@ -1,10 +1,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-import pytest
-
+import fabric_cicd
 import fabric_cicd.constants as constants
-from fabric_cicd.constants import _get_fabric_fqdn_url, configure_fabric_fqdn
+import pytest
+from fabric_cicd import configure_fabric_fqdn
+from fabric_cicd._common._validate_env_vars import _get_fabric_fqdn_url
 
 
 class TestGetFabricFqdnUrl:
@@ -37,7 +38,7 @@ class TestConfigureFabricFqdn:
         monkeypatch.setattr(constants, "DEFAULT_API_ROOT_URL", "https://api.powerbi.com")
 
         mock_logger = mocker.Mock()
-        monkeypatch.setattr(constants, "logger", mock_logger)
+        monkeypatch.setattr(fabric_cicd, "logger", mock_logger)
 
         configure_fabric_fqdn("f953f3da-c5f0-4e36-a644-c85933e35e2f")
         mock_logger.warning.assert_not_called()
