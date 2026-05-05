@@ -37,7 +37,7 @@ class FabricWorkspace:
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
-        **kwargs,
+        **kwargs: object,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
@@ -189,7 +189,9 @@ class FabricWorkspace:
 
     def _resolve_workspace_name(self) -> str:
         """Resolve workspace display name of the target workspace ID."""
-        response = self.endpoint.invoke(method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}")
+        response = self.endpoint.invoke(
+            method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{self.workspace_id}"
+        )
         if "displayName" in response.get("body", {}):
             return response["body"]["displayName"]
         msg = f"Workspace name could not be resolved from workspace ID: {self.workspace_id}."
