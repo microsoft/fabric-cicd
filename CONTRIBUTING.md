@@ -89,6 +89,51 @@ Before you begin, ensure you have the following installed:
     uv run ruff check
     ```
 
+## Documentation
+
+The project documentation is built with [MkDocs](https://www.mkdocs.org/). Source files live in the `docs/` directory and are configured via `mkdocs.yml` at the repository root.
+
+### Testing Locally
+
+To preview documentation changes locally:
+
+```sh
+uv run mkdocs serve
+```
+
+This starts a local development server (typically at `http://127.0.0.1:8000`) with live-reload — any changes you save to files in `docs/` will automatically refresh in the browser.
+
+To build the static site without serving (useful for catching build errors):
+
+```sh
+uv run mkdocs build --clean
+```
+
+### Adding a New Page
+
+1. **Create the Markdown file** in the appropriate subdirectory under `docs/`:
+    - `docs/how_to/` - Guides and tutorials
+    - `docs/example/` - Usage examples and patterns
+    - Top-level `docs/` - Standalone pages (e.g., changelog, about)
+
+2. **Register the page in `mkdocs.yml`** by adding an entry under the `nav` section:
+
+    ```yaml
+    nav:
+        - How To:
+              - Your New Page: how_to/your_new_page.md
+    ```
+
+3. **Preview your changes** by running `uv run mkdocs serve` and verifying the page renders correctly and appears in the navigation.
+
+### Documentation Guidelines
+
+- Write in clear, concise language
+- Use code blocks with language identifiers for syntax highlighting
+- Follow the structure and tone of existing pages
+- Include practical examples where possible
+- The `docs/config/pre-build/` directory contains hooks that run before the build (e.g., auto-updating item type lists) — avoid modifying these unless necessary
+
 ## Contribution process
 
 To avoid cases where submitted PRs are rejected, please follow the following steps:
