@@ -86,7 +86,7 @@ def check_version() -> None:
                 f"{Fore.CYAN}https://microsoft.github.io/fabric-cicd/latest/changelog/{Style.RESET_ALL}"
             )
 
-            print(msg)
+            logger.warning(msg)
     except Exception as e:
         # Silently handle errors, but log them if debug is needed
         logger.debug(f"Error checking version: {e}")
