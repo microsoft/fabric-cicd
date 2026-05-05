@@ -72,7 +72,8 @@ class HTTPResponse:
 
     def to_b64(self) -> str:
         """Serialize to base64-encoded JSON."""
-        response_json = json.dumps(asdict(self), separators=(",", ":"))
+        # Some tests mock response payloads with non-JSON-native objects.
+        response_json = json.dumps(asdict(self), separators=(",", ":"), default=str)
         return base64.b64encode(response_json.encode()).decode()
 
     @classmethod
