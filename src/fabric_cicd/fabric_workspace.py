@@ -37,7 +37,7 @@ class FabricWorkspace:
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
-        **kwargs,
+        **kwargs: object,
     ) -> None:
         """
         Initializes the FabricWorkspace instance.
