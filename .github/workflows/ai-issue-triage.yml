@@ -1,0 +1,279 @@
+name: "AI Issue Triage"
+
+on:
+    issues:
+        types: [labeled]
+    workflow_dispatch:
+        inputs:
+            issue_number:
+                description: "Issue number to triage"
+                required: true
+                type: number
+
+jobs:
+    ai-triage:
+        if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'needs triage'
+        runs-on: ubuntu-latest
+        permissions:
+            issues: write
+            models: read
+            contents: read
+
+        env:
+            # -------------------------------------------------------
+            # Phase control — toggle these two flags to switch phases:
+            #   Testing (fork):   suppress both  → true  / true
+            #   Production:       enable both    → false / false
+            # -------------------------------------------------------
+            SUPPRESS_LABELS: "false"
+            SUPPRESS_COMMENTS: "false"
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Resolve issue details
+              id: issue
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const issueNumber = context.payload.issue?.number || ${{ inputs.issue_number || 0 }};
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+
+                      const { data: issue } = await github.rest.issues.get({
+                        owner, repo, issue_number: issueNumber,
+                      });
+
+                      // Detect re-triage: check if any ai: labels exist from a prior assessment
+                      const hasAiLabels = issue.labels.some(l => l.name.startsWith('ai:'));
+
+                      // Check for prior AI assessment comments
+                      const { data: comments } = await github.rest.issues.listComments({
+                        owner, repo, issue_number: issueNumber, per_page: 100,
+                      });
+                      const hasAiComment = comments.some(c =>
+                        c.body && c.body.includes('### AI Assessment:')
+                      );
+
+                      const isRetriage = hasAiLabels || hasAiComment;
+                      let issueBody = issue.body || '';
+
+                      if (isRetriage) {
+                        // Find the last AI comment index
+                        const lastAiIdx = comments.reduce((acc, c, i) =>
+                          c.body && c.body.includes('### AI Assessment:') ? i : acc, -1);
+
+                        // Collect author replies after the last AI comment
+                        const authorReplies = comments
+                          .slice(lastAiIdx + 1)
+                          .filter(c => c.user.login === issue.user.login)
+                          .map(c => c.body)
+                          .join('\n\n---\n\n');
+
+                        if (authorReplies) {
+                          issueBody = `[RE-TRIAGE] The author has provided additional information in response to a prior AI assessment.\n\n`
+                            + `## Original Issue Summary\n${issue.title}\n\n`
+                            + `## Author's Follow-up Response\n${authorReplies}\n\n`
+                            + `Focus your assessment on the new information provided above. Reference the original issue only if needed for context.`;
+                        }
+                      }
+
+                      core.setOutput('number', issue.number);
+                      core.setOutput('body', issueBody);
+                      core.setOutput('title', issue.title);
+                      core.setOutput('html_url', issue.html_url);
+                      core.setOutput('labels', issue.labels.map(l => l.name).join(','));
+                      core.setOutput('is_retriage', isRetriage.toString());
+
+            - name: Run AI assessment
+              id: ai-assessment
+              uses: github/ai-assessment-comment-labeler@v1.0.1
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  issue_number: ${{ steps.issue.outputs.number }}
+                  issue_body: ${{ steps.issue.outputs.body }}
+                  repo_name: ${{ github.event.repository.name || github.repository }}
+                  owner: ${{ github.repository_owner }}
+                  ai_review_label: "needs triage"
+                  prompts_directory: ".github/prompts"
+                  labels_to_prompts_mapping: "bug,bug-triage.prompt.yml|enhancement,feature-triage.prompt.yml|question,question-triage.prompt.yml"
+                  model: "openai/gpt-4.1"
+                  max_tokens: 2000
+                  suppress_comments: ${{ env.SUPPRESS_COMMENTS }}
+                  suppress_labels: ${{ env.SUPPRESS_LABELS }}
+
+            - name: Post-process triage results
+              if: steps.ai-assessment.outputs.ai_assessments != ''
+              uses: actions/github-script@v7
+              env:
+                  ASSESSMENT_OUTPUT: ${{ steps.ai-assessment.outputs.ai_assessments }}
+                  SUPPRESS_LABELS: ${{ env.SUPPRESS_LABELS }}
+                  ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const assessments = JSON.parse(process.env.ASSESSMENT_OUTPUT);
+                      const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+                      const suppressLabels = process.env.SUPPRESS_LABELS === 'true';
+
+                      let needsHumanReview = false;
+                      let addHelpWanted = false;
+                      let needsAuthorFeedback = false;
+                      let canAutoClose = false;
+
+                      for (const assessment of assessments) {
+                        const label = (assessment.assessmentLabel || '').toLowerCase();
+
+                        // Check if the assessment requires human review
+                        if (label.includes('needs team review') || label.includes('needs maintainer input') || label.includes('potential bug') || label.includes('needs discussion')) {
+                          needsHumanReview = true;
+                        }
+
+                        // Check if feature should be tagged as help wanted
+                        if (label.includes('help wanted')) {
+                          addHelpWanted = true;
+                        }
+
+                        // Check if more information is needed from the issue author
+                        if (label.includes('needs author feedback') || label.includes('requires additional details')) {
+                          needsAuthorFeedback = true;
+                        }
+
+                        // Check if the AI fully resolved the issue (answered question, explained misconfiguration, redirected to docs)
+                        if (label.includes('answered') || label.includes('likely misconfiguration') || label.includes('redirect to docs')) {
+                          canAutoClose = true;
+                        }
+
+                        // Log for job summary
+                        core.info(`Prompt: ${assessment.prompt}, Label: ${assessment.assessmentLabel}`);
+                      }
+
+                      // Skip label changes in summary-only mode (Phase 3)
+                      if (suppressLabels) {
+                        core.info('Labels suppressed — logging decisions only.');
+                        core.exportVariable('LABEL_DECISIONS', JSON.stringify({
+                          needsHumanReview, addHelpWanted, needsAuthorFeedback, canAutoClose,
+                          assessmentLabels: assessments.map(a => a.assessmentLabel),
+                        }));
+                        return;
+                      }
+
+                      // Add 'help wanted' label if AI recommended community contribution
+                      if (addHelpWanted) {
+                        await github.rest.issues.addLabels({
+                          owner,
+                          repo,
+                          issue_number: issueNumber,
+                          labels: ['help wanted']
+                        });
+                        core.info('Added "help wanted" label based on AI assessment.');
+                      }
+
+                      // If AI fully handled the issue without needing team review
+                      if (!needsHumanReview) {
+                        // Auto-close if AI fully resolved (answered, misconfiguration, redirected)
+                        if (canAutoClose && !needsAuthorFeedback && !addHelpWanted) {
+                          await github.rest.issues.update({
+                            owner,
+                            repo,
+                            issue_number: issueNumber,
+                            state: 'closed',
+                            state_reason: 'completed'
+                          });
+                          core.info('Auto-closed issue — AI fully resolved it.');
+                        }
+                      } else {
+                        // Add consolidated label for easy filtering of all issues needing team attention
+                        await github.rest.issues.addLabels({
+                          owner,
+                          repo,
+                          issue_number: issueNumber,
+                          labels: ['ai:needs team attention']
+                        });
+
+                        // Notify team via comment on escalated issues
+                        await github.rest.issues.createComment({
+                          owner,
+                          repo,
+                          issue_number: issueNumber,
+                          body: '🔔 @microsoft/fabric-cicd — This issue has been flagged by AI triage as requiring team attention. Please review the assessment above.'
+                        });
+                        core.info('Escalated to team.');
+                      }
+
+                      // Always remove 'needs triage' — triage is complete regardless of outcome
+                      try {
+                        await github.rest.issues.removeLabel({
+                          owner,
+                          repo,
+                          issue_number: issueNumber,
+                          name: 'needs triage'
+                        });
+                        core.info('Removed "needs triage" — triage complete.');
+                      } catch (e) {
+                        core.info(`Could not remove "needs triage" label: ${e.message}`);
+                      }
+
+            - name: Generate triage summary
+              if: always() && steps.ai-assessment.outputs.ai_assessments != ''
+              uses: actions/github-script@v7
+              env:
+                  ASSESSMENT_OUTPUT: ${{ steps.ai-assessment.outputs.ai_assessments }}
+                  LABEL_DECISIONS: ${{ env.LABEL_DECISIONS }}
+                  ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+                  ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+                  ISSUE_URL: ${{ steps.issue.outputs.html_url }}
+              with:
+                  script: |
+                      const assessments = JSON.parse(process.env.ASSESSMENT_OUTPUT);
+                      const issueNumber = process.env.ISSUE_NUMBER;
+                      const issueTitle = process.env.ISSUE_TITLE;
+                      const issueUrl = process.env.ISSUE_URL;
+
+                      let summary = `## 🤖 AI Triage Report\n\n`;
+                      summary += `**Issue:** [#${issueNumber} — ${issueTitle}](${issueUrl})\n\n`;
+
+                      for (const assessment of assessments) {
+                        summary += `### Prompt: \`${assessment.prompt}\`\n`;
+                        summary += `**Assessment:** \`${assessment.assessmentLabel}\`\n\n`;
+                        summary += `<details><summary>Full AI Response</summary>\n\n`;
+                        summary += `${assessment.response}\n\n`;
+                        summary += `</details>\n\n`;
+                      }
+
+                      // Show label decisions
+                      const ld = process.env.LABEL_DECISIONS ? JSON.parse(process.env.LABEL_DECISIONS) : null;
+                      if (ld) {
+                        summary += `### 🏷️ Label Decisions (not applied — testing mode)\n\n`;
+                        summary += `| Decision | Value |\n|----------|-------|\n`;
+                        summary += `| AI assessment labels | ${(ld.assessmentLabels || []).map(l => '`' + l + '`').join(', ')} |\n`;
+                        summary += `| Would add \`help wanted\` | ${ld.addHelpWanted ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would add \`ai:needs team attention\` | ${ld.needsHumanReview ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would request author feedback | ${ld.needsAuthorFeedback ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would remove \`needs triage\` | ✅ Yes (always) |\n`;
+                        summary += `| Would auto-close | ${ld.canAutoClose && !ld.needsAuthorFeedback && !ld.addHelpWanted ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would notify team | ${ld.needsHumanReview ? '✅ Yes' : '❌ No'} |\n\n`;
+                      }
+
+                      summary += `---\n\n`;
+
+                      core.summary.addRaw(summary);
+                      await core.summary.write();
+
+                      const fs = require('fs');
+                      fs.mkdirSync('triage-reports', { recursive: true });
+                      fs.writeFileSync(
+                        `triage-reports/issue-${issueNumber}-triage.md`,
+                        summary
+                      );
+
+            - name: Upload triage report
+              if: always() && steps.ai-assessment.outputs.ai_assessments != ''
+              uses: actions/upload-artifact@v4
+              with:
+                  name: triage-report-issue-${{ steps.issue.outputs.number }}
+                  path: triage-reports/
+                  retention-days: 30
