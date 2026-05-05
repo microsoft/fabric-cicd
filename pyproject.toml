@@ -20,7 +20,6 @@ dependencies = [
     "dpath>=2.2.0",
     "filetype>=1.2.0",
     "jsonpath-ng>=1.8.0",
-    "packaging>=24.2",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
 ]

@@ -37,8 +37,6 @@ class EnvVar(str, Enum):
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
     PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
     """Override max parallel workers for concurrent item publishing. Defaults to 8."""
-    VERSION_CHECK_DISABLED = "FABRIC_CICD_VERSION_CHECK_DISABLED"
-    """Set to '1', 'true', or 'yes' to skip version check at startup."""
 
 
 class ItemType(str, Enum):
@@ -179,9 +177,6 @@ PARALLEL_MAX_WORKERS: int = (
 
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
-
-# Version Check
-VERSION_CHECK_DISABLED = os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "").lower() in VALID_ENABLE_FLAGS
 
 # Publish
 SHELL_ONLY_PUBLISH = [
