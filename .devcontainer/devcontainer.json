@@ -1,0 +1,31 @@
+{
+    "name": "fabric-cicd",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "features": {
+        "ghcr.io/devcontainers-extra/features/git-lfs:1": {},
+        "ghcr.io/devcontainers/features/node:2.0.0": {},
+        "ghcr.io/devcontainers/features/powershell:2.0.2": {},
+        "ghcr.io/devcontainers/features/azure-cli:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers-extra/features/uv:1": {},
+        "ghcr.io/devcontainers-extra/features/ruff:2": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "esbenp.prettier-vscode",
+                "ms-vscode.powershell",
+                "charliermarsh.ruff",
+                "tamasfe.even-better-toml"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": ".venv/bin/python",
+                "ruff.path": [".venv/bin/ruff"],
+                "autopep8.enable": false
+            }
+        }
+    },
+    "postCreateCommand": "npm install -g changie && uv sync --dev",
+    "forwardPorts": [8000]
+}
