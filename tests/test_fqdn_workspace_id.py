@@ -1,9 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+import pytest
+
 import fabric_cicd
 import fabric_cicd.constants as constants
-import pytest
 from fabric_cicd import configure_fabric_fqdn
 from fabric_cicd._common._validate_env_vars import _get_fabric_fqdn_url
 
@@ -30,8 +31,8 @@ class TestConfigureFabricFqdn:
         configure_fabric_fqdn("f953f3da-c5f0-4e36-a644-c85933e35e2f")
 
         expected = "https://f953f3dac5f04e36a644c85933e35e2f.zf9.w.api.fabric.microsoft.com"
-        assert constants.FABRIC_API_ROOT_URL == expected
-        assert constants.DEFAULT_API_ROOT_URL == expected
+        assert expected == constants.FABRIC_API_ROOT_URL
+        assert expected == constants.DEFAULT_API_ROOT_URL
 
     def test_overwrite_warning_on_second_call(self, monkeypatch, mocker):
         monkeypatch.setattr(constants, "FABRIC_API_ROOT_URL", "https://api.fabric.microsoft.com")

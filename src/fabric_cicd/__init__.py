@@ -194,10 +194,10 @@ __all__ = [
     "append_feature_flag",
     "change_log_level",
     "configure_external_file_logging",
+    "configure_fabric_fqdn",
     "deploy_with_config",
     "disable_file_logging",
     "get_changed_items",
     "publish_all_items",
-    "configure_fabric_fqdn",
     "unpublish_all_orphan_items",
 ]

@@ -6,7 +6,7 @@
 import os
 from enum import Enum
 
-from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
+from fabric_cicd._common._validate_env_vars import VALID_GUID_REGEX, validate_env_var_api_url  # noqa: F401
 
 # General
 VERSION = "1.0.0"
@@ -210,7 +210,6 @@ API_FORMAT_MAPPING = {
 }
 
 # REGEX Constants
-VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
 DATAFLOW_SOURCE_REGEX = (
     r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
