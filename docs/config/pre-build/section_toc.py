@@ -1,7 +1,32 @@
 from pathlib import Path
 import re
+import unicodedata
 
 import yaml
+
+
+def slugify(title):
+    """
+    Generate an anchor slug from a heading title, matching MkDocs/Python-Markdown toc behavior.
+    Strips markdown formatting (backticks, escape chars), lowercases, replaces spaces with hyphens,
+    and removes characters that aren't alphanumeric, hyphens, or underscores.
+    """
+    # Remove markdown escape backslashes (e.g. \_ALL\_ -> _ALL_)
+    slug = title.replace("\\", "")
+    # Remove backticks (inline code markers)
+    slug = slug.replace("`", "")
+    # Normalize unicode
+    slug = unicodedata.normalize("NFKD", slug)
+    # Lowercase
+    slug = slug.lower()
+    # Replace spaces with hyphens
+    slug = slug.replace(" ", "-")
+    # Remove characters that aren't alphanumeric, hyphens, or underscores
+    slug = re.sub(r"[^\w\-]", "", slug)
+    # Strip leading/trailing hyphens
+    slug = slug.strip("-")
+    return slug
+
 
 def get_section_order(nav, current_dir_str):
     """
@@ -55,10 +80,16 @@ def on_page_markdown(markdown, page, config, files):
                 content = f.read()
                 content_no_code = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
                 headers = re.findall(r"^(#{1,6})\s+(.*)", content_no_code, re.MULTILINE)
+                seen_slugs = {}
                 for header in headers:
                     level = len(header[0])
                     title = header[1]
-                    toc.append(f"{'   ' * level}- [{title}]({md_file.name}#{title.lower().replace(' ', '-')})")
+                    base_anchor = slugify(title)
+                    # MkDocs appends _1, _2, etc. for duplicate heading IDs
+                    count = seen_slugs.get(base_anchor, 0)
+                    seen_slugs[base_anchor] = count + 1
+                    anchor = base_anchor if count == 0 else f"{base_anchor}_{count}"
+                    toc.append(f"{'   ' * level}- [{title}]({md_file.name}#{anchor})")
 
         toc_content = "\n".join(toc)
         new_markdown = markdown[:start_index] + toc_content + markdown[end_index:]
