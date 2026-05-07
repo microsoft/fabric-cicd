@@ -31,6 +31,7 @@ def main():
     environment = "PPE"
     repository_directory = str(root_directory / "sample" / "workspace")
     item_type_in_scope = [
+        "DataBuildToolJob",
         "Dataflow",
         "DataPipeline",
         "Environment",

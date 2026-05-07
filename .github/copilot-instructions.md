@@ -173,7 +173,7 @@ The publish/unpublish dependency order is defined in `SERIAL_ITEM_PUBLISH_ORDER`
 
 ### Dependencies & Testing
 
-**Runtime:** `azure-identity`, `dpath`, `pyyaml`, `requests`, `packaging`  
+**Runtime:** `azure-identity`, `dpath`, `pyyaml`, `requests`  
 **Development:** `uv`, `ruff`, `pytest`, `mkdocs-material`
 
 **Test Types:** Unit (`tests/test_*.py`), Integration (mocked APIs), Parameter/File Handling, Workspace management

@@ -7,7 +7,6 @@ import logging
 import sys
 
 import fabric_cicd.constants as constants
-from fabric_cicd._common._check_utils import check_version
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
 from fabric_cicd._common._git_diff_utils import get_changed_items
 from fabric_cicd._common._logging import configure_logger, exception_handler, get_file_handler
@@ -181,9 +180,6 @@ def configure_fabric_fqdn(workspace_id: str) -> None:
 
 configure_logger()
 sys.excepthook = exception_handler
-
-if not constants.VERSION_CHECK_DISABLED:
-    check_version()
 
 __all__ = [
     "DeploymentResult",

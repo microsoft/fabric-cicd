@@ -37,8 +37,6 @@ class EnvVar(str, Enum):
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
     PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
     """Override max parallel workers for concurrent item publishing. Defaults to 8."""
-    VERSION_CHECK_DISABLED = "FABRIC_CICD_VERSION_CHECK_DISABLED"
-    """Set to '1', 'true', or 'yes' to skip version check at startup."""
 
 
 class ItemType(str, Enum):
@@ -47,6 +45,7 @@ class ItemType(str, Enum):
     APACHE_AIRFLOW_JOB = "ApacheAirflowJob"
     COPY_JOB = "CopyJob"
     DATA_AGENT = "DataAgent"
+    DATA_BUILD_TOOL_JOB = "DataBuildToolJob"
     DATA_PIPELINE = "DataPipeline"
     DATAFLOW = "Dataflow"
     ENVIRONMENT = "Environment"
@@ -88,19 +87,20 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     11: ItemType.SEMANTIC_MODEL,
     12: ItemType.REPORT,
     13: ItemType.COPY_JOB,
-    14: ItemType.KQL_DATABASE,
-    15: ItemType.KQL_QUERYSET,
-    16: ItemType.REFLEX,
-    17: ItemType.EVENTSTREAM,
-    18: ItemType.KQL_DASHBOARD,
-    19: ItemType.DATAFLOW,
-    20: ItemType.DATA_PIPELINE,
-    21: ItemType.GRAPHQL_API,
-    22: ItemType.APACHE_AIRFLOW_JOB,
-    23: ItemType.MOUNTED_DATA_FACTORY,
-    24: ItemType.DATA_AGENT,
-    25: ItemType.ML_EXPERIMENT,
-    26: ItemType.ONTOLOGY,
+    14: ItemType.DATA_BUILD_TOOL_JOB,
+    15: ItemType.KQL_DATABASE,
+    16: ItemType.KQL_QUERYSET,
+    17: ItemType.REFLEX,
+    18: ItemType.EVENTSTREAM,
+    19: ItemType.KQL_DASHBOARD,
+    20: ItemType.DATAFLOW,
+    21: ItemType.DATA_PIPELINE,
+    22: ItemType.GRAPHQL_API,
+    23: ItemType.APACHE_AIRFLOW_JOB,
+    24: ItemType.MOUNTED_DATA_FACTORY,
+    25: ItemType.DATA_AGENT,
+    26: ItemType.ML_EXPERIMENT,
+    27: ItemType.ONTOLOGY,
 }
 
 
@@ -180,9 +180,6 @@ PARALLEL_MAX_WORKERS: int = (
 
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
-
-# Version Check
-VERSION_CHECK_DISABLED = os.environ.get(EnvVar.VERSION_CHECK_DISABLED.value, "").lower() in VALID_ENABLE_FLAGS
 
 # Publish
 SHELL_ONLY_PUBLISH = [
