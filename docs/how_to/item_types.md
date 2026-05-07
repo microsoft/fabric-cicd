@@ -46,6 +46,13 @@
 - **Parameterization:**
     - Data source items (e.g., Lakehouse, Warehouse, Semantic Model) will always reference the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
 
+## Data Build Tool Job
+
+- **Parameterization:**
+    - Connection and profile references will always point to the original values unless parameterized in the `find_replace` section of the `parameter.yml` file.
+- **Initial deployment:**
+    - Validate connection/profile settings in the target workspace, especially when promoting between test and prod workspaces.
+
 ## Data Pipeline
 
 - **Parameterization:**
