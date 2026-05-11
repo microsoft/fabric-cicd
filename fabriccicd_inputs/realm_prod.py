@@ -1,0 +1,14 @@
+"""Realm PROD workspace definition."""
+
+from ._common import REALM_CAPACITY
+from ._schema import TargetEnvironment, WorkspaceEnvironment
+
+LAKEHOUSES = []
+
+WORKSPACE = WorkspaceEnvironment(
+    target=TargetEnvironment.PROD,
+    workspace_id="",
+    capacity=REALM_CAPACITY,
+    access_control=[],
+    lakehouses=LAKEHOUSES,
+)

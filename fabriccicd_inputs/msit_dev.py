@@ -1,0 +1,109 @@
+"""MSIT DEV workspace definition (lakehouses, access, capacity)."""
+
+from ._common import MSIT_CAPACITY, SECURITY_GROUP
+from ._schema import (
+    DataAccessEntry,
+    DataPermission,
+    FileAccessEntry,
+    LakehouseDefinition,
+    TableAccessEntry,
+    TargetEnvironment,
+    WorkspaceEnvironment,
+)
+
+LAKEHOUSES = [
+    LakehouseDefinition(
+        name="Lakehouse1",
+        access_list=[
+            DataAccessEntry(
+                display_name="Sikana.Tanupabrungsun",
+                email="Sikana.Tanupabrungsun@microsoft.com",
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+        table_access=[
+            TableAccessEntry(
+                display_name="Sikana.Tanupabrungsun",
+                email="Sikana.Tanupabrungsun@microsoft.com",
+                tables=["customers"],
+                permission=DataPermission.ReadWrite,
+            ),
+            TableAccessEntry(
+                display_name="v-vijareddy",
+                email="v-vijareddy@microsoft.com",
+                tables=["orders"],
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+        file_access=[
+            FileAccessEntry(
+                display_name="Sikana.Tanupabrungsun",
+                email="Sikana.Tanupabrungsun@microsoft.com",
+                paths=["/Files/raw/customers.csv"],
+                permission=DataPermission.ReadWrite,
+            ),
+            FileAccessEntry(
+                display_name="v-vijareddy",
+                email="v-vijareddy@microsoft.com",
+                paths=["/Files/raw/orders.csv"],
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+    ),
+    LakehouseDefinition(
+        name="Lakehouse2",
+        access_list=[
+            DataAccessEntry(
+                display_name="v-vijareddy",
+                email="v-vijareddy@microsoft.com",
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+        file_access=[
+            FileAccessEntry(
+                display_name="v-vijareddy",
+                email="v-vijareddy@microsoft.com",
+                paths=["/Files/raw"],
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+    ),
+    LakehouseDefinition(
+        name="Lakehouse3",
+        access_list=[
+            DataAccessEntry(
+                display_name="UserC",
+                email="userC@domain.com",
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+    ),
+    LakehouseDefinition(
+        name="Lakehouse4",
+        access_list=[
+            DataAccessEntry(
+                display_name="UserD",
+                email="userD@domain.com",
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+    ),
+    LakehouseDefinition(
+        name="Lakehouse5",
+        access_list=[
+            DataAccessEntry(
+                display_name="UserE",
+                email="userE@domain.com",
+                permission=DataPermission.ReadWrite,
+            ),
+        ],
+    ),
+]
+
+WORKSPACE = WorkspaceEnvironment(
+    target=TargetEnvironment.DEV,
+    workspace_id="34831a7c-bee0-4089-8d68-f1c0524bcb1d",
+    capacity=MSIT_CAPACITY,
+    access_control=[SECURITY_GROUP],
+    lakehouses=LAKEHOUSES,
+)

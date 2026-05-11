@@ -82,6 +82,12 @@ class FabricEndpoint:
                     "Authorization": f"Bearer {self.aad_token}",
                     "User-Agent": f"{constants.USER_AGENT}",
                 }
+
+                # Add realm ID header if set via environment variable
+                realm_id = os.environ.get("FABRIC_REALM_ID")
+                if realm_id:
+                    headers["x-ms-fabric-realm-id"] = realm_id
+
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
 
