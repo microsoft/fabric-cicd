@@ -176,6 +176,19 @@ Traceback (most recent call last):
 4. Validate the find value regex and/or dynamic replacement variables in `parameter.yml`
 5. Use the [debug_parameterization.py](#debug_parameterizationpy) script to validate parameter files
 
+#### Private Link Connection Failures
+
+**Symptom**: API calls fail with connection errors when deploying to a workspace with "Allow connections only from workspace level private links" enabled.
+
+**Solution**: Call `configure_fabric_fqdn` before initializing `FabricWorkspace`:
+
+```python
+from fabric_cicd import configure_fabric_fqdn, FabricWorkspace
+
+configure_fabric_fqdn(workspace_id)
+workspace = FabricWorkspace(workspace_id=workspace_id, ...)
+```
+
 #### API Rate Limiting
 
 **Symptom**: Deployments fail with "429 Too Many Requests" errors

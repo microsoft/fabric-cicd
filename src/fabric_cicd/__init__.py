@@ -7,10 +7,11 @@ import logging
 import sys
 
 import fabric_cicd.constants as constants
-from fabric_cicd._common._check_utils import check_version
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
 from fabric_cicd._common._git_diff_utils import get_changed_items
 from fabric_cicd._common._logging import configure_logger, exception_handler, get_file_handler
+from fabric_cicd._common._validate_env_vars import _get_fabric_fqdn_url, validate_api_url
+from fabric_cicd._common._validate_input import validate_workspace_id
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import deploy_with_config, publish_all_items, unpublish_all_orphan_items
@@ -132,11 +133,53 @@ def disable_file_logging() -> None:
     configure_logger(disable_log_file=True)
 
 
+def configure_fabric_fqdn(workspace_id: str) -> None:
+    """
+    Configure Fabric API URLs for private-link-enabled workspaces.
+
+    Updates the global Fabric API URL constants to use the FQDN format required
+    for private-link-enabled workspaces. Call this function before initializing
+    a FabricWorkspace if you are using a private-link-enabled workspace.
+
+    Args:
+        workspace_id: The workspace ID string in standard GUID format with dashes
+            (e.g., "f953f3da-c5f0-4e36-a644-c85933e35e2f").
+
+    Side Effects:
+        Updates the module-level constants in fabric_cicd.constants:
+        - FABRIC_API_ROOT_URL: Set to the FQDN URL derived from workspace_id
+        - DEFAULT_API_ROOT_URL: Set to the same FQDN URL
+
+    Examples:
+        Basic usage with FabricWorkspace:
+        >>> from fabric_cicd import configure_fabric_fqdn, FabricWorkspace
+        >>> from azure.identity import AzureCliCredential
+        >>>
+        >>> workspace_id = "f953f3da-c5f0-4e36-a644-c85933e35e2f"
+        >>> configure_fabric_fqdn(workspace_id)
+        >>>
+        >>> token_credential = AzureCliCredential()
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id=workspace_id,
+        ...     repository_directory="/path/to/workspace",
+        ...     token_credential=token_credential
+        ... )
+    """
+    workspace_id = validate_workspace_id(workspace_id)
+    fqdn_url = _get_fabric_fqdn_url(workspace_id)
+    fqdn_url = validate_api_url(fqdn_url, "configure_fabric_fqdn")
+
+    if constants.FABRIC_API_ROOT_URL != "https://api.fabric.microsoft.com":
+        logger.warning(
+            f"configure_fabric_fqdn: overwriting previously set FABRIC_API_ROOT_URL '{constants.FABRIC_API_ROOT_URL}'"
+        )
+
+    constants.FABRIC_API_ROOT_URL = fqdn_url
+    constants.DEFAULT_API_ROOT_URL = fqdn_url
+
+
 configure_logger()
 sys.excepthook = exception_handler
-
-if not constants.VERSION_CHECK_DISABLED:
-    check_version()
 
 __all__ = [
     "DeploymentResult",
@@ -147,6 +190,7 @@ __all__ = [
     "append_feature_flag",
     "change_log_level",
     "configure_external_file_logging",
+    "configure_fabric_fqdn",
     "deploy_with_config",
     "disable_file_logging",
     "get_changed_items",

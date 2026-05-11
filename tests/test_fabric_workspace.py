@@ -11,6 +11,7 @@ import pytest
 import yaml
 from fixtures.credentials import DummyTokenCredential
 
+from fabric_cicd import configure_fabric_fqdn
 from fabric_cicd.fabric_workspace import FabricWorkspace, constants
 
 
@@ -1763,3 +1764,33 @@ def test_publish_non_variable_library_calls_all_replacements(
         mock_logical.assert_called_once()
         mock_params.assert_called_once()
         mock_ws.assert_called_once()
+
+
+def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(
+    temp_workspace_dir, patched_fabric_workspace, monkeypatch
+):
+    """Test that a constructed FabricWorkspace retains its snapshotted URL
+    even if configure_fabric_fqdn is called again for a different workspace."""
+    workspace_id_a = "f953f3da-c5f0-4e36-a644-c85933e35e2f"
+    workspace_id_b = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+    # Reset globals to defaults before test
+    monkeypatch.setattr(constants, "DEFAULT_API_ROOT_URL", "https://api.powerbi.com")
+    monkeypatch.setattr(constants, "FABRIC_API_ROOT_URL", "https://api.fabric.microsoft.com")
+
+    # Configure for workspace a and construct it
+    configure_fabric_fqdn(workspace_id_a)
+    expected_fqdn_a = constants.DEFAULT_API_ROOT_URL  # snapshot what was set
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace_a = patched_fabric_workspace(
+            workspace_id=workspace_id_a,
+            repository_directory=str(temp_workspace_dir),
+        )
+
+    # Now configure for workspace b
+    configure_fabric_fqdn(workspace_id_b)
+
+    # workspace_a should still use fqdn_a, not fqdn_b
+    assert workspace_a._api_root_url == expected_fqdn_a
+    assert workspace_a.base_api_url.startswith(expected_fqdn_a)

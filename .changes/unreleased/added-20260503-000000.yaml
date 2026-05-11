@@ -1,0 +1,8 @@
+kind: added
+body: Add `configure_fabric_fqdn` to configure Fabric API URLs for private-link-enabled workspaces using per-workspace FQDN endpoints
+time: 2026-05-03T00:00:00.0000000+00:00
+custom:
+    Author: SumeshKashyap
+    AuthorLink: https://github.com/SumeshKashyap
+    Issue: "754"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/754
