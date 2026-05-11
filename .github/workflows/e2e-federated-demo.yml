@@ -32,6 +32,13 @@ jobs:
             - name: Install project
               run: uv sync
 
+            - name: Get OIDC token
+              run: |
+                  TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                    "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
+                  echo "$TOKEN" > "$RUNNER_TEMP/federated-token"
+                  echo "AZURE_FEDERATED_TOKEN_FILE=$RUNNER_TEMP/federated-token" >> "$GITHUB_ENV"
+
             - name: Validate federated auth
               env:
                   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
