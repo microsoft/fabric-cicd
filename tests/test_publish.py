@@ -1087,3 +1087,58 @@ def test_empty_items_to_include_skips_all_items(mock_endpoint, temp_workspace_di
         # All items should be marked as skip_publish since none match the empty include list
         assert workspace.repository_items["Notebook"]["NotebookA"].skip_publish is True
         assert workspace.repository_items["Notebook"]["NotebookB"].skip_publish is True
+
+
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_empty_items_to_include_skips_environment_publish_state_checks(mock_endpoint, temp_workspace_dir):
+    """Test that items_to_include=[] does not trigger environment publish-state checks for all environments."""
+    create_test_item(temp_workspace_dir, None, "EnvA", "Environment", "env-a-id")
+    create_test_item(temp_workspace_dir, None, "EnvB", "Environment", "env-b-id")
+
+    # Configure the mock to return environments with a "running" state.
+    # If filtering is broken (empty list treated as None), the publish-state
+    # checker would see these as in-progress and loop/retry indefinitely.
+    original_side_effect = mock_endpoint.invoke.side_effect
+
+    def env_aware_invoke(method, url, **kwargs):
+        if method == "GET" and url.endswith("/environments/"):
+            return {
+                "body": {
+                    "value": [
+                        {
+                            "displayName": "EnvA",
+                            "properties": {"publishDetails": {"state": "Running"}},
+                        },
+                        {
+                            "displayName": "EnvB",
+                            "properties": {"publishDetails": {"state": "Running"}},
+                        },
+                    ]
+                }
+            }
+        return original_side_effect(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = env_aware_invoke
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Environment"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        # This must complete without hanging — if filtering is broken,
+        # _check_environment_publish_state would see "Running" environments
+        # and retry indefinitely.
+        publish.publish_all_items(workspace, items_to_include=[])
+
+        # All environment items should be marked as skip_publish
+        assert workspace.repository_items["Environment"]["EnvA"].skip_publish is True
+        assert workspace.repository_items["Environment"]["EnvB"].skip_publish is True

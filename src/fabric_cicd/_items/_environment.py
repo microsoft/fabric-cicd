@@ -156,7 +156,8 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
             )
             # Check items_to_include list
             and (
-                not fabric_workspace_obj.items_to_include or k + ".Environment" in fabric_workspace_obj.items_to_include
+                fabric_workspace_obj.items_to_include is None
+                or k + ".Environment" in fabric_workspace_obj.items_to_include
             )
         )
     ]
