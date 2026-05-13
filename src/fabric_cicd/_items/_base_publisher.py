@@ -386,7 +386,7 @@ class ItemPublisher(Publisher):
         """
         all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items_to_include = self.fabric_workspace_obj.items_to_include
-        if not items_to_include:
+        if items_to_include is None:
             return all_items
         normalized_include_set = {i.lower() for i in items_to_include}
         return {

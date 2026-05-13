@@ -1055,3 +1055,35 @@ class TestNotebookPublisher:
         assert mock_item.item_files[1].file_path.name == "notebook.py"
         assert mock_item.item_files[2].file_path.name == "readme.md"
         assert mock_item.item_files[3].file_path.name == "notebook.json"
+
+
+# =============================================================================
+# Empty items_to_include Tests
+# =============================================================================
+
+
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_empty_items_to_include_skips_all_items(mock_endpoint, temp_workspace_dir):
+    """Test that passing an empty list to items_to_include deploys nothing."""
+    create_test_item(temp_workspace_dir, None, "NotebookA", "Notebook", "notebook-a-id")
+    create_test_item(temp_workspace_dir, None, "NotebookB", "Notebook", "notebook-b-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace, items_to_include=[])
+
+        # All items should be marked as skip_publish since none match the empty include list
+        assert workspace.repository_items["Notebook"]["NotebookA"].skip_publish is True
+        assert workspace.repository_items["Notebook"]["NotebookB"].skip_publish is True

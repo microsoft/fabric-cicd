@@ -239,7 +239,7 @@ def publish_all_items(
         )
         fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
-    if items_to_include:
+    if items_to_include is not None:
         validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
         fabric_workspace_obj.items_to_include = items_to_include
 
@@ -371,11 +371,11 @@ def unpublish_all_orphan_items(
         to_delete_list = items.ItemPublisher.get_orphaned_items(
             fabric_workspace_obj,
             item_type,
-            item_name_exclude_regex=item_name_exclude_regex if not items_to_include else None,
+            item_name_exclude_regex=item_name_exclude_regex if items_to_include is None else None,
             items_to_include=items_to_include,
         )
 
-        if items_to_include and to_delete_list:
+        if items_to_include is not None and to_delete_list:
             logger.debug(f"Items to include for unpublishing ({item_type}): {to_delete_list}")
 
         publisher = items.ItemPublisher.create(ItemType(item_type), fabric_workspace_obj)

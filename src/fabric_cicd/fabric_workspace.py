@@ -201,9 +201,7 @@ class FabricWorkspace:
 
     def _lookup_item_attribute(self, workspace_id: str, item_type: str, item_name: str, attribute_name: str) -> str:
         """Lookup item attribute in the specified workspace based on item type and name."""
-        response = self.endpoint.invoke(
-            method="GET", url=f"{self._api_root_url}/v1/workspaces/{workspace_id}/items"
-        )
+        response = self.endpoint.invoke(method="GET", url=f"{self._api_root_url}/v1/workspaces/{workspace_id}/items")
         for item in response["body"]["value"]:
             if item["type"] == item_type and item["displayName"] == item_name:
                 item_guid = item["id"]
