@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-import datetime
 import time
 from unittest.mock import Mock
 
@@ -114,8 +113,6 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
 
-    endpoint.aad_token_expiration = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
-    endpoint._refresh_token = Mock()
     monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *_, **__: "")
 
     response = endpoint.invoke("GET", "http://example.com")
@@ -223,14 +220,14 @@ def test_invoke_poll_long_running_default_with_202(setup_mocks, monkeypatch):
     assert mock_requests.call_count == 2  # Initial request + polling request
 
 
-def test_refresh_token(setup_mocks):
-    """Test refreshing token sets token and expiration from AccessToken."""
+def test_get_token(setup_mocks):
+    """Test getting token returns token from credential."""
     _dl, _mock_requests = setup_mocks
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token="test_token", expires_on=9999999999)
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
-    assert endpoint.aad_token == "test_token"
-    assert endpoint.aad_token_expiration == datetime.datetime.fromtimestamp(9999999999, tz=datetime.timezone.utc)
+    assert endpoint._get_token() == "test_token"
+    mock_token_credential.get_token.assert_called_with("https://api.fabric.microsoft.com/.default")
 
 
 @pytest.mark.parametrize(
@@ -241,8 +238,8 @@ def test_refresh_token(setup_mocks):
     ],
     ids=["auth_error", "unexpected_exception"],
 )
-def test_refresh_token_exceptions(raise_exception, expected_msg):
-    """Test token refresh exception handling for authentication failures."""
+def test_get_token_exceptions(raise_exception, expected_msg):
+    """Test token acquisition exception handling for authentication failures."""
     credential = DummyCredential("irrelevant")
     credential.raise_exception = raise_exception
     with pytest.raises(TokenError, match=expected_msg):
