@@ -48,12 +48,6 @@ pydocstyle.convention = "google"
     "ANN",  # flake8-annotations-complexity
 ]
 
-"{.deploy}/*" = [
-    "D",   # pydocstyle
-    "INP", # flake8-no-pep420
-    "ANN", # flake8-annotations-complexity
-]
-
 [format]
 preview = true
 docstring-code-format = false
