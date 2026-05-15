@@ -11,6 +11,7 @@ Commands:
     connect [ENV]           - Connect ENV workspace to Azure DevOps Git (default DEV)
     commit [ENV]            - Commit ENV workspace changes to Git (default DEV)
     deploy [ENV]            - Deploy items to ENV workspace (default DEV)
+    generate [ENV]          - Generate SJD/Env/Pipeline folders for ENV (default DEV)
     create-lakehouses [ENV] - Create lakehouses defined for ENV (default DEV)
     permissions [ENV]       - Assign lakehouse data permissions for ENV (default DEV)
     all [ENV]               - Create -> connect -> create-lakehouses -> permissions
@@ -25,44 +26,53 @@ import os
 import re
 import sys
 import time
+import uuid
 from collections import defaultdict
 from pathlib import Path
 
 import requests
+import yaml
 from azure.identity import AzureCliCredential
 
 from fabriccicd_inputs import (
-    PROJECT,
-    REPO,
     DataPermission,
-    FabricTopology,
+    Pipeline,
+    SparkEnvironment,
+    SparkJobDefinition,
     WorkspaceEnvironment,
-    get_topology,
+    get_workspace,
 )
 
 ENV_TARGETS = ("DEV", "TEST", "PROD")
 INPUTS_DIR = Path(__file__).parent / "fabriccicd_inputs"
 
 
-def load_config(realm_mode: bool) -> dict:
-    """Build a runtime config dict from the typed inputs package."""
-    topology: FabricTopology = get_topology(realm_mode)
+def load_config(env: str, realm_mode: bool) -> dict:
+    """Build a runtime config dict from the per-env input file.
+
+    All settings (api base, realm id, repo path, source control, tenant) come
+    from the ``WorkspaceEnvironment`` for ``env``. There is no shared/common
+    module - every value is declared explicitly per env.
+    """
+    ws = get_workspace(env, realm_mode)
+    sc = ws.source_control
     return {
-        "realm_mode": realm_mode,
-        "realm_id": topology.realm_id,
-        "base_url": topology.api_base,
-        "repo_path": topology.repo_path,
-        "workspace_prefix": topology.workspace_prefix,
-        "topology": topology,
+        "env": env.upper(),
+        "realm_mode": ws.realm_mode,
+        "realm_id": ws.realm_id,
+        "base_url": ws.api_base,
+        "repo_path": ws.repo_path,
+        "workspace_prefix": ws.workspace_prefix,
+        "workspace": ws,
         "git_config": {
-            "gitProviderType": REPO.provider.value,
-            "organizationName": REPO.organization,
-            "projectName": REPO.project,
-            "repositoryName": REPO.repository,
-            "branchName": REPO.branch,
-            "directoryName": REPO.directory,
+            "gitProviderType": sc.provider.value,
+            "organizationName": sc.organization,
+            "projectName": sc.project,
+            "repositoryName": sc.repository,
+            "branchName": sc.branch,
+            "directoryName": sc.directory,
         },
-        "tenant_id": PROJECT.tenant_id,
+        "tenant_id": ws.metadata.tenant_id,
     }
 
 
@@ -85,19 +95,25 @@ def get_headers(cfg: dict) -> dict:
 
 
 def workspace_display_name(cfg: dict, env: str) -> str:
-    """Build the Fabric display name for an env (e.g. fabric-vj-dev)."""
-    return f"{cfg['workspace_prefix']}-{env.lower()}"
+    """Build the Fabric display name for an env.
+
+    Uses ``workspace_name`` override if set on the env, otherwise resolves to
+    ``<workspace_prefix>-<env>``.
+    """
+    ws = get_workspace_env(cfg, env)
+    return ws.resolved_workspace_name()
 
 
 def get_workspace_env(cfg: dict, env: str) -> WorkspaceEnvironment:
-    """Resolve an env key to its WorkspaceEnvironment from the topology."""
-    topology: FabricTopology = cfg["topology"]
+    """Resolve an env key to its WorkspaceEnvironment.
+
+    If ``env`` matches the cfg's env, returns the cached workspace. Otherwise
+    re-resolves from the inputs package using the cfg's realm_mode.
+    """
     key = env.upper()
-    if key not in topology.workspaces:
-        valid = ", ".join(topology.workspaces.keys())
-        msg = f"Unknown environment '{env}'. Valid values: {valid}"
-        raise ValueError(msg)
-    return topology.workspaces[key]
+    if cfg.get("env") == key:
+        return cfg["workspace"]
+    return get_workspace(env, cfg["realm_mode"])
 
 
 def require_workspace_id(cfg: dict, env: str) -> str:
@@ -171,7 +187,9 @@ def _persist_workspace_id(cfg: dict, env: str, workspace_id: str) -> None:
         return
 
     target_file.write_text(new_content, encoding="utf-8")
-    cfg["topology"].workspaces[env.upper()].workspace_id = workspace_id
+    # Update in-memory copy if it's the env we currently have cached.
+    if cfg.get("env") == env.upper():
+        cfg["workspace"].workspace_id = workspace_id
     log(f"Persisted {env} workspace ID -> {target_file.name}", indent=True)
 
 
@@ -444,12 +462,192 @@ def commit_to_git(cfg: dict, headers: dict, env: str = "DEV") -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# Artifact generation: turn typed inputs into the Fabric Git folder layout.
+# ---------------------------------------------------------------------------
+
+PLATFORM_SCHEMA = (
+    "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json"
+)
+
+
+def _stable_logical_id(env_target: str, item_type: str, name: str) -> str:
+    """Deterministic per-(env, type, name) logicalId so re-generation is idempotent."""
+    seed = f"{env_target}|{item_type}|{name}".lower()
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+
+
+def _write_platform_file(folder: Path, item_type: str, display_name: str, description: str = "") -> None:
+    """Write the ``.platform`` metadata file. Preserves the existing logicalId if one is already present."""
+    folder.mkdir(parents=True, exist_ok=True)
+    platform_path = folder / ".platform"
+
+    existing_logical_id = ""
+    if platform_path.exists():
+        try:
+            existing = json.loads(platform_path.read_text(encoding="utf-8"))
+            existing_logical_id = existing.get("config", {}).get("logicalId", "")
+        except (OSError, json.JSONDecodeError):
+            existing_logical_id = ""
+
+    logical_id = existing_logical_id or _stable_logical_id(folder.parent.name, item_type, display_name)
+
+    payload = {
+        "$schema": PLATFORM_SCHEMA,
+        "metadata": {
+            "type": item_type,
+            "displayName": display_name,
+            "description": description or item_type,
+        },
+        "config": {"version": "2.0", "logicalId": logical_id},
+    }
+    platform_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _activity_to_json(activity) -> dict:  # noqa: ANN001
+    """Convert a PipelineActivity dataclass into Fabric's pipeline-content JSON shape."""
+    return {
+        "name": activity.name,
+        "type": activity.type,
+        "typeProperties": activity.type_properties,
+        "dependsOn": activity.depends_on,
+        "policy": activity.policy,
+        "userProperties": activity.user_properties,
+    }
+
+
+def _generate_spark_job_definition(repo_root: Path, sjd: SparkJobDefinition) -> None:
+    """Generate ``<name>.SparkJobDefinition/`` with .platform + SparkJobDefinitionV1.json.
+
+    The driver only emits the metadata; ``Main/`` and ``Libs/`` source files must
+    already exist in the folder (committed by the user).
+    """
+    folder = repo_root / f"{sjd.name}.SparkJobDefinition"
+    _write_platform_file(folder, "SparkJobDefinition", sjd.name, "Spark job definition")
+
+    definition = {
+        "executableFile": sjd.executable_file,
+        # default/additional lakehouse + environment IDs are resolved at deploy
+        # time via fabric-cicd's parameter.yml replacement (recommended) or can
+        # be patched in here directly. We leave them empty so deploys against
+        # different envs map them via parameter file.
+        "defaultLakehouseArtifactId": "",
+        "mainClass": sjd.main_class,
+        "additionalLakehouseIds": [],
+        "retryPolicy": sjd.retry_policy,
+        "commandLineArguments": sjd.command_line_arguments,
+        "additionalLibraryUris": list(sjd.additional_library_uris),
+        "language": sjd.language.value,
+        "environmentArtifactId": "",
+    }
+    (folder / "SparkJobDefinitionV1.json").write_text(json.dumps(definition, indent=4), encoding="utf-8")
+    log(f"Generated SJD '{sjd.name}' at {folder}", indent=True)
+
+
+def _generate_spark_environment(repo_root: Path, env_item: SparkEnvironment) -> None:
+    """Generate ``<name>.Environment/`` with .platform, Setting/Sparkcompute.yml, Libraries/."""
+    folder = repo_root / f"{env_item.name}.Environment"
+    _write_platform_file(folder, "Environment", env_item.name, env_item.description or "Environment")
+
+    # Spark compute settings.
+    setting_dir = folder / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    pool = env_item.pool
+    compute_doc: dict = {
+        "enable_native_execution_engine": False,
+        "runtime_version": env_item.runtime_version,
+    }
+    if pool.node_family:
+        compute_doc["node_family"] = pool.node_family
+    if pool.node_size:
+        compute_doc["node_size"] = pool.node_size
+    if pool.auto_scale_enabled:
+        compute_doc["dynamic_executor_allocation"] = {
+            "enabled": pool.dynamic_executor_allocation,
+            "min_executors": pool.min_node_count,
+            "max_executors": pool.max_node_count,
+        }
+    if env_item.spark_properties:
+        compute_doc["spark_conf"] = dict(env_item.spark_properties)
+    (setting_dir / "Sparkcompute.yml").write_text(yaml.safe_dump(compute_doc, sort_keys=False), encoding="utf-8")
+
+    # Libraries.
+    libs_dir = folder / "Libraries"
+    libs_dir.mkdir(parents=True, exist_ok=True)
+    pip_libs = [lib.file_name for lib in env_item.libraries if lib.library_type.lower() == "pypi"]
+    if pip_libs:
+        public_dir = libs_dir / "PublicLibraries"
+        public_dir.mkdir(parents=True, exist_ok=True)
+        env_yml = {"dependencies": [{"pip": pip_libs}]}
+        (public_dir / "environment.yml").write_text(yaml.safe_dump(env_yml, sort_keys=False), encoding="utf-8")
+    custom_libs = [lib for lib in env_item.libraries if lib.library_type.lower() != "pypi"]
+    if custom_libs:
+        custom_dir = libs_dir / "CustomLibraries"
+        custom_dir.mkdir(parents=True, exist_ok=True)
+        # The actual .whl/.jar files must be committed under CustomLibraries/ already.
+    log(f"Generated Spark Environment '{env_item.name}' at {folder}", indent=True)
+
+
+def _generate_pipeline(repo_root: Path, pipeline: Pipeline) -> None:
+    """Generate ``<name>.DataPipeline/`` with .platform + pipeline-content.json."""
+    folder = repo_root / f"{pipeline.name}.DataPipeline"
+    _write_platform_file(folder, "DataPipeline", pipeline.name, pipeline.description)
+
+    content: dict = {
+        "properties": {
+            "activities": [_activity_to_json(a) for a in pipeline.activities],
+        }
+    }
+    if pipeline.parameters:
+        content["properties"]["parameters"] = pipeline.parameters
+    if pipeline.variables:
+        content["properties"]["variables"] = pipeline.variables
+    if pipeline.annotations:
+        content["properties"]["annotations"] = list(pipeline.annotations)
+
+    (folder / "pipeline-content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
+    log(f"Generated Pipeline '{pipeline.name}' at {folder}", indent=True)
+
+
+def generate_artifacts(cfg: dict, env: str) -> None:
+    """Write SJD / Spark Environment / Pipeline folders from the env input into the repo path."""
+    ws = get_workspace_env(cfg, env)
+    if not (ws.spark_job_definitions or ws.spark_environments or ws.pipelines):
+        log(f"No SJDs / Spark envs / Pipelines declared for {env} - skipping artifact generation.")
+        return
+
+    repo_root = Path(cfg["repo_path"])
+    if not repo_root.exists():
+        log(f"ERROR: repo_path does not exist: {repo_root}")
+        return
+
+    print("\n" + "=" * 60)
+    print(f"  Generate artifacts for {env} -> {repo_root}")
+    print("=" * 60 + "\n")
+
+    # Spark environments first so SJDs can reference them by name on disk.
+    for spark_env in ws.spark_environments:
+        _generate_spark_environment(repo_root, spark_env)
+    for sjd in ws.spark_job_definitions:
+        _generate_spark_job_definition(repo_root, sjd)
+    for pipeline in ws.pipelines:
+        _generate_pipeline(repo_root, pipeline)
+
+    print("\n" + "=" * 60)
+    print("  Artifact generation complete.")
+    print("=" * 60 + "\n")
+
+
 def deploy(cfg: dict, env: str) -> None:
     """Deploy items to the env workspace via fabric-cicd."""
     if cfg["realm_mode"]:
         os.environ["FABRIC_API_ROOT_URL"] = "https://dailyapi.powerbi.com"
         os.environ["DEFAULT_API_ROOT_URL"] = "https://dailyapi.powerbi.com"
         os.environ["FABRIC_REALM_ID"] = cfg["realm_id"]
+
+    # Materialize SJD / Environment / Pipeline folders from the env input
+    # before handing off to fabric-cicd's repo-driven publisher.
+    generate_artifacts(cfg, env)
 
     from fabric_cicd import FabricWorkspace, publish_all_items
 
@@ -466,7 +664,7 @@ def deploy(cfg: dict, env: str) -> None:
         workspace_id=ws_id,
         environment=env,
         repository_directory=cfg["repo_path"],
-        item_type_in_scope=ws_env.publish.item_types_in_scope,
+        item_type_in_scope=ws_env.item_types_in_scope,
         token_credential=creds,
     )
     print(f"Deploying to {env}{mode_label}...")
@@ -979,6 +1177,7 @@ def main() -> None:
         "  sync [ENV]              - Force pull from Git with PreferRemote (default DEV)\n"
         "  commit [ENV]            - Commit ENV workspace to Git (default DEV)\n"
         "  deploy [ENV]            - Deploy items to ENV (default DEV)\n"
+        "  generate [ENV]          - Generate SJD/Env/Pipeline folders for ENV (default DEV)\n"
         "  create-lakehouses [ENV] - Create lakehouses for ENV (default DEV)\n"
         "  permissions [ENV]       - Assign lakehouse permissions for ENV (default DEV)\n"
         "  all [ENV]               - Full pipeline: check -> create -> clean -> deploy ->\n"
@@ -998,7 +1197,7 @@ def main() -> None:
     env_arg = args[1].upper() if len(args) > 1 else ""
     env = env_arg or "DEV"
 
-    cfg = load_config(realm_mode)
+    cfg = load_config(env, realm_mode)
     mode_label = " [REALM]" if realm_mode else ""
     print(f">> Mode:{mode_label} | Environment: {env}")
 
@@ -1012,9 +1211,11 @@ def main() -> None:
         headers = get_headers(cfg)
         delete_workspace(cfg, headers, env)
     elif command == "create":
-        headers = get_headers(cfg)
         envs = [env_arg] if env_arg else list(ENV_TARGETS)
-        create_workspaces(cfg, headers, envs)
+        for e in envs:
+            ecfg = load_config(e, realm_mode)
+            eheaders = get_headers(ecfg)
+            create_workspaces(ecfg, eheaders, [e])
     elif command == "connect":
         headers = get_headers(cfg)
         connect_git(cfg, headers, env)
@@ -1026,6 +1227,8 @@ def main() -> None:
         commit_to_git(cfg, headers, env)
     elif command == "deploy":
         deploy(cfg, env)
+    elif command == "generate":
+        generate_artifacts(cfg, env)
     elif command == "create-lakehouses":
         headers = get_headers(cfg)
         create_lakehouses(cfg, headers, env)

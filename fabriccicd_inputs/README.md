@@ -1,83 +1,130 @@
 # fabriccicd_inputs
 
-Typed, per-environment input files for Fabric CI/CD. This package replaces the
-old `fabriccicd.config.yml` + `lakehouse_access.xml` pair with one Python module
-per workspace, plus shared schemas and constants.
+Typed, per-environment input files for Fabric CI/CD. Each env file is fully
+self-contained — no shared `_common` module. Edit the env you care about and
+every value (workspace prefix, capacity, source-control, tenant, lakehouses,
+SJDs, Spark environments, pipelines) is right there in front of you.
 
 ## Layout
 
 ```
 fabriccicd_inputs/
-├── __init__.py       Assembles MSIT_TOPOLOGY + REALM_TOPOLOGY,
-│                     exposes get_topology() / get_workspace()
+├── __init__.py       Exposes MSIT_WORKSPACES, REALM_WORKSPACES, get_workspace()
 ├── _schema.py        Enums + dataclasses only (no values)
-├── _common.py        Values reused across envs:
-│                     PROJECT, REPO, REPO_PATH, WORKSPACE_PREFIX,
-│                     MSIT_CAPACITY, REALM_CAPACITY, SECURITY_GROUP,
-│                     REALM_ID, REALM_API_BASE
-├── msit_dev.py       MSIT DEV workspace (+ lakehouses + access)
-├── msit_test.py      MSIT TEST workspace
-├── msit_prod.py      MSIT PROD workspace
-├── realm_dev.py      Realm DEV workspace
-├── realm_test.py     Realm TEST workspace
-└── realm_prod.py     Realm PROD workspace
+├── msit_dev.py       MSIT DEV workspace — fully self-contained
+├── msit_test.py      MSIT TEST workspace — fully self-contained
+├── msit_prod.py      MSIT PROD workspace — fully self-contained
+├── realm_dev.py      Realm DEV workspace — fully self-contained
+├── realm_test.py     Realm TEST workspace — fully self-contained
+└── realm_prod.py     Realm PROD workspace — fully self-contained
 ```
 
-Files prefixed with `_` are internal (schemas and shared constants). The six
-`<mode>_<env>.py` files are what individual env owners edit day-to-day.
+Files prefixed with `_` are internal. The six `<mode>_<env>.py` files are what
+env owners edit day-to-day.
+
+## What each env file declares
+
+Every `<mode>_<env>.py` defines a single `WORKSPACE = WorkspaceEnvironment(...)`
+with all values inlined:
+
+| Field                     | Purpose                                                                 |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `target`                  | `TargetEnvironment.DEV` / `TEST` / `PROD`                               |
+| `workspace_prefix`        | Required. Final name = `<prefix>-<env>` unless overridden.              |
+| `workspace_name`          | Optional. If set, overrides `<prefix>-<env>` entirely.                  |
+| `workspace_id`            | GUID. Empty on a clean slate — the driver persists it back after create.|
+| `capacity`                | `FabricCapacity(capacity_id=..., label=...)`                            |
+| `metadata`                | `ProjectMetadata` with `tenant_id`                                      |
+| `repo_path`               | Local path to the cloned Fabric folder                                  |
+| `source_control`          | Git provider, org, project, repo, branch, directory                     |
+| `access_control`          | List of `Identity` (security groups / users / SPs + workspace roles)    |
+| `lakehouses`              | List of `LakehouseDefinition` with `access_list`/`table_access`/`file_access` |
+| `spark_environments`      | List of `SparkEnvironment` (runtime, spark properties, libraries, pool) |
+| `spark_job_definitions`   | List of `SparkJobDefinition` (executable, main class, args, libs, lakehouse, env) |
+| `pipelines`               | List of `Pipeline` with activity-level definition                       |
+| `item_types_in_scope`     | Which Fabric item types to deploy                                       |
+| `api_base`, `realm_mode`, `realm_id` | API targeting (MSIT vs dailyapi/realm)                       |
 
 ## Usage
 
 ```python
 from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, publish_all_items
-from fabriccicd_inputs import get_topology, get_workspace
+from fabriccicd_inputs import get_workspace
 
-# Pick a topology
-topology = get_topology(realm_mode=False)   # or True for realm
-
-# Get one workspace
+# Get one workspace — pulls everything from its env file.
 ws = get_workspace("DEV")                   # MSIT DEV
-ws = get_workspace("DEV", realm_mode=True)  # realm DEV
+ws = get_workspace("DEV", realm_mode=True)  # Realm DEV
 
-# Deploy
+# Deploy via fabric-cicd.
 workspace = FabricWorkspace(
     workspace_id=ws.workspace_id,
     environment=ws.target.value,
-    repository_directory=topology.repo_path,
-    item_type_in_scope=ws.publish.item_types_in_scope,
+    repository_directory=ws.repo_path,
+    item_type_in_scope=ws.item_types_in_scope,
     token_credential=AzureCliCredential(),
 )
 publish_all_items(workspace)
 ```
 
+In practice you don't call this directly — the `fabriccicd.py` driver in the
+repo root wraps the full workflow (`create`, `connect`, `deploy`, `generate`,
+`create-lakehouses`, `permissions`, etc.).
+
 ## Common edits
 
-| Task                                 | File to edit                                      |
-| ------------------------------------ | ------------------------------------------------- |
-| Add/change a lakehouse on MSIT DEV   | `msit_dev.py` → `LAKEHOUSES` list                 |
-| Grant a user access to a lakehouse   | `msit_dev.py` → that lakehouse's `access_list`    |
-| Change a workspace ID                | `<mode>_<env>.py` → `WORKSPACE.workspace_id`      |
-| Change capacity / security group     | `_shared.py`                                      |
-| Change repo path or workspace prefix | `_shared.py`                                      |
-| Add a new field to all envs          | `_schema.py` (then update each `<mode>_<env>.py`) |
+| Task                                  | File to edit                                            |
+| ------------------------------------- | ------------------------------------------------------- |
+| Change the workspace prefix or name   | `<mode>_<env>.py` → `workspace_prefix` / `workspace_name` |
+| Change a workspace ID                 | `<mode>_<env>.py` → `workspace_id`                       |
+| Add/change a lakehouse                | `<mode>_<env>.py` → `lakehouses=[...]`                   |
+| Grant a user access to a lakehouse    | `<mode>_<env>.py` → that lakehouse's `access_list`       |
+| Add a Spark Job Definition            | `<mode>_<env>.py` → `spark_job_definitions=[...]`        |
+| Add a Spark Environment               | `<mode>_<env>.py` → `spark_environments=[...]`           |
+| Add a Pipeline                        | `<mode>_<env>.py` → `pipelines=[...]`                    |
+| Change capacity / security group      | `<mode>_<env>.py` → `capacity` / `access_control`        |
+| Change repo path or branch            | `<mode>_<env>.py` → `repo_path` / `source_control`       |
+| Add a new field to all envs           | `_schema.py` (then update each `<mode>_<env>.py`)        |
+
+## Generated artifacts (SJD / Environment / Pipeline)
+
+For Spark Job Definitions, Spark Environments, and Pipelines, the driver
+generates the Fabric Git folder layout (`<name>.SparkJobDefinition/`,
+`<name>.Environment/`, `<name>.DataPipeline/`) from your typed input before
+calling `publish_all_items`.
+
+- **SJD source files** (`Main/<executable_file>`, `Libs/<additional_library_uris>`)
+  must already exist in the repo — the driver only emits metadata
+  (`.platform` + `SparkJobDefinitionV1.json`).
+- **Lakehouse and Environment IDs** are written as empty strings in the
+  generated SJD JSON. Resolve them per-env via `parameter.yml` (fabric-cicd's
+  standard mechanism).
+- **logicalIds** are deterministic UUIDv5 derived from `(env, type, name)`, so
+  re-generation is idempotent.
+
+Run generation alone (without deploying):
+
+```pwsh
+python fabriccicd.py generate DEV
+```
 
 ## Verifying a change
 
-Run the built-in summary to print every topology, workspace, capacity,
-access entry, and lakehouse:
+Run the built-in summary to print every workspace, capacity, access entry,
+lakehouse, SJD, Spark env, and pipeline:
 
 ```pwsh
 python -c "from fabriccicd_inputs import _print_summary; _print_summary()"
 ```
 
-If a typo or missing field breaks the topology, this command fails at import
-time (before any Fabric API call is made).
+If a typo or missing required field breaks an env, this command fails at
+import time (before any Fabric API call is made).
 
 ## Adding a new environment
 
 1. Create `fabriccicd_inputs/<mode>_<newenv>.py` modeled on an existing one.
-2. Define a `WORKSPACE = WorkspaceEnvironment(...)`.
-3. Register it in `__init__.py` under the appropriate topology's `workspaces`
-   dict.
+2. Define a `WORKSPACE = WorkspaceEnvironment(...)` with every required field
+   (`target`, `workspace_prefix`, `capacity`, `metadata`, `repo_path`,
+   `source_control`).
+3. Register it in `__init__.py` under `MSIT_WORKSPACES` or `REALM_WORKSPACES`.
 4. Re-run the summary command to verify.

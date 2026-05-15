@@ -2,12 +2,12 @@
 Fabric CI/CD typed input package.
 
 Per-environment workspace definitions live in the ``msit_*.py`` and ``realm_*.py``
-modules. Shared values (project, repo, capacities, security groups) are in
-``_common.py``. Schemas (enums and dataclasses) are in ``_schema.py``.
+modules. Each module declares its own ``WORKSPACE`` (a ``WorkspaceEnvironment``)
+with all values inlined - capacity, source control, repo path, lakehouses, Spark
+job definitions, Spark environments, pipelines, etc. There is no shared common
+module.
 
-Top-level topologies are assembled here:
-
-    from fabriccicd_inputs import MSIT_TOPOLOGY, REALM_TOPOLOGY, get_workspace
+Resolve a workspace via ``get_workspace(env, realm_mode=False)``.
 """
 
 from . import (
@@ -18,140 +18,111 @@ from . import (
     realm_prod,
     realm_test,
 )
-from ._common import (
-    MSIT_CAPACITY,
-    PROJECT,
-    REALM_API_BASE,
-    REALM_CAPACITY,
-    REALM_ID,
-    REPO,
-    REPO_PATH,
-    SECURITY_GROUP,
-    WORKSPACE_PREFIX,
-)
 from ._schema import (
     DataAccessEntry,
     DataPermission,
     FabricCapacity,
-    FabricTopology,
     FileAccessEntry,
     Identity,
     IdentityKind,
     LakehouseDefinition,
+    Pipeline,
+    PipelineActivity,
     ProjectMetadata,
-    PublishSettings,
     SourceControlProvider,
     SourceControlSettings,
+    SparkEnvironment,
+    SparkJobDefinition,
+    SparkLanguage,
+    SparkLibrary,
+    SparkPoolConfig,
     TableAccessEntry,
     TargetEnvironment,
     WorkspaceEnvironment,
     WorkspaceRole,
 )
 
-MSIT_TOPOLOGY = FabricTopology(
-    metadata=PROJECT,
-    source_control=REPO,
-    repo_path=REPO_PATH,
-    workspace_prefix=WORKSPACE_PREFIX,
-    workspaces={
-        "DEV": msit_dev.WORKSPACE,
-        "TEST": msit_test.WORKSPACE,
-        "PROD": msit_prod.WORKSPACE,
-    },
-)
+# Per-mode env tables. Each value is a fully self-contained WorkspaceEnvironment.
+MSIT_WORKSPACES: dict[str, WorkspaceEnvironment] = {
+    "DEV": msit_dev.WORKSPACE,
+    "TEST": msit_test.WORKSPACE,
+    "PROD": msit_prod.WORKSPACE,
+}
 
-REALM_TOPOLOGY = FabricTopology(
-    metadata=PROJECT,
-    source_control=REPO,
-    repo_path=REPO_PATH,
-    workspace_prefix=WORKSPACE_PREFIX,
-    workspaces={
-        "DEV": realm_dev.WORKSPACE,
-        "TEST": realm_test.WORKSPACE,
-        "PROD": realm_prod.WORKSPACE,
-    },
-    realm_mode=True,
-    realm_id=REALM_ID,
-    api_base=REALM_API_BASE,
-)
-
-TOPOLOGIES: dict[str, FabricTopology] = {
-    "msit": MSIT_TOPOLOGY,
-    "realm": REALM_TOPOLOGY,
+REALM_WORKSPACES: dict[str, WorkspaceEnvironment] = {
+    "DEV": realm_dev.WORKSPACE,
+    "TEST": realm_test.WORKSPACE,
+    "PROD": realm_prod.WORKSPACE,
 }
 
 
-def get_topology(realm_mode: bool = False) -> FabricTopology:
-    """Return the MSIT or Realm topology based on the mode flag."""
-    return REALM_TOPOLOGY if realm_mode else MSIT_TOPOLOGY
-
-
 def get_workspace(env: str, realm_mode: bool = False) -> WorkspaceEnvironment:
-    """Return the workspace environment for the given target (DEV/TEST/PROD)."""
-    topology = get_topology(realm_mode)
+    """Return the ``WorkspaceEnvironment`` for the given target (DEV/TEST/PROD).
+
+    ``realm_mode`` selects between the MSIT (default) and Realm input sets.
+    """
+    table = REALM_WORKSPACES if realm_mode else MSIT_WORKSPACES
     key = env.upper()
-    if key not in topology.workspaces:
-        valid = ", ".join(topology.workspaces.keys())
+    if key not in table:
+        valid = ", ".join(table.keys())
         msg = f"Unknown environment '{env}'. Valid values: {valid}"
         raise ValueError(msg)
-    return topology.workspaces[key]
+    return table[key]
 
 
 def _print_summary() -> None:
-    """Print a human-readable summary of the configured topologies."""
-    for mode, topology in TOPOLOGIES.items():
-        print(f"\n=== {mode.upper()} TOPOLOGY ===")
-        print(f"  Project       : {topology.metadata.project_name} ({topology.metadata.team})")
-        print(f"  Tenant        : {topology.metadata.tenant_id}")
-        print(f"  API base      : {topology.api_base}")
-        print(f"  Repo path     : {topology.repo_path}")
-        print(f"  Prefix        : {topology.workspace_prefix}")
-        print(
-            f"  Source control: {topology.source_control.provider.value} "
-            f"{topology.source_control.organization}/{topology.source_control.project}/"
-            f"{topology.source_control.repository}@{topology.source_control.branch}"
-        )
-        if topology.realm_mode:
-            print(f"  Realm ID      : {topology.realm_id}")
-        for env, ws in topology.workspaces.items():
-            print(f"  [{env}] {ws.workspace_id}  capacity={ws.capacity.capacity_id}")
+    """Print a human-readable summary of every configured workspace."""
+    for mode_label, table in (("MSIT", MSIT_WORKSPACES), ("REALM", REALM_WORKSPACES)):
+        print(f"\n=== {mode_label} WORKSPACES ===")
+        for env, ws in table.items():
+            print(f"  [{env}] {ws.resolved_workspace_name()}  id={ws.workspace_id or '(unset)'}")
+            print(f"        project   : {ws.metadata.project_name} ({ws.metadata.team})")
+            print(f"        tenant    : {ws.metadata.tenant_id}")
+            print(f"        capacity  : {ws.capacity.capacity_id} ({ws.capacity.label})")
+            print(f"        api_base  : {ws.api_base}  realm_mode={ws.realm_mode}")
+            print(f"        repo_path : {ws.repo_path}")
+            print(
+                f"        git       : {ws.source_control.provider.value} "
+                f"{ws.source_control.organization}/{ws.source_control.project}/"
+                f"{ws.source_control.repository}@{ws.source_control.branch}"
+            )
             for ident in ws.access_control:
-                print(f"        access: {ident.kind.value} '{ident.display_name}' -> {ident.workspace_role.value}")
+                print(f"        access    : {ident.kind.value} '{ident.display_name}' -> {ident.workspace_role.value}")
             for lh in ws.lakehouses:
                 emails = ", ".join(entry.email for entry in lh.access_list) or "(none)"
-                print(f"        lakehouse: {lh.name} -> {emails}")
+                print(f"        lakehouse : {lh.name} -> {emails}")
+            for sjd in ws.spark_job_definitions:
+                print(f"        SJD       : {sjd.name} ({sjd.language.value}) -> {sjd.executable_file}")
+            for se in ws.spark_environments:
+                print(f"        spark env : {se.name} (runtime {se.runtime_version})")
+            for pl in ws.pipelines:
+                print(f"        pipeline  : {pl.name} ({len(pl.activities)} activities)")
 
 
 __all__ = [
-    "MSIT_CAPACITY",
-    "MSIT_TOPOLOGY",
-    "PROJECT",
-    "REALM_API_BASE",
-    "REALM_CAPACITY",
-    "REALM_ID",
-    "REALM_TOPOLOGY",
-    "REPO",
-    "REPO_PATH",
-    "SECURITY_GROUP",
-    "TOPOLOGIES",
-    "WORKSPACE_PREFIX",
+    "MSIT_WORKSPACES",
+    "REALM_WORKSPACES",
     "DataAccessEntry",
     "DataPermission",
     "FabricCapacity",
-    "FabricTopology",
     "FileAccessEntry",
     "Identity",
     "IdentityKind",
     "LakehouseDefinition",
+    "Pipeline",
+    "PipelineActivity",
     "ProjectMetadata",
-    "PublishSettings",
     "SourceControlProvider",
     "SourceControlSettings",
+    "SparkEnvironment",
+    "SparkJobDefinition",
+    "SparkLanguage",
+    "SparkLibrary",
+    "SparkPoolConfig",
     "TableAccessEntry",
     "TargetEnvironment",
     "WorkspaceEnvironment",
     "WorkspaceRole",
-    "get_topology",
     "get_workspace",
 ]
 
