@@ -93,7 +93,7 @@ class FabricEndpoint:
 
                 # Handle expired authentication token
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
-                    logger.info(f"{constants.INDENT}AAD token expired. Refreshing token.")
+                    logger.info(f"{constants.INDENT}AAD token expired. Retrying with refreshed token.")
                 # Handle long-running operations without polling (e.g., for environment item publish)
                 elif response.status_code == 202 and not poll_long_running:
                     # Accept 202, do not poll

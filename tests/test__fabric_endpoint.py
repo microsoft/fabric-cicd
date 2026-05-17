@@ -5,6 +5,7 @@ import time
 from unittest.mock import Mock
 
 import pytest
+import requests
 from azure.core.exceptions import ClientAuthenticationError
 
 from fabric_cicd import constants
@@ -117,8 +118,11 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
     response = endpoint.invoke("GET", "http://example.com")
 
-    assert f"{constants.INDENT}AAD token expired. Refreshing token." in dl.messages
+    assert f"{constants.INDENT}AAD token expired. Retrying with refreshed token." in dl.messages
     assert response["status_code"] == 200
+
+    # Assert get_token was called: once at init + once for first request + once for retry
+    assert mock_token_credential.get_token.call_count == 3
 
 
 def test_invoke_exception(setup_mocks):
@@ -473,3 +477,36 @@ def test_format_invoke_log():
     log_message = _format_invoke_log(response, "GET", "http://example.com", "{}")
     assert "Method: GET" in log_message
     assert "URL: http://example.com" in log_message
+
+
+def test_invoke_connection_error_retries_then_succeeds(setup_mocks, monkeypatch):
+    """Test that connection errors are retried and succeed on subsequent attempt."""
+    dl, mock_requests = setup_mocks
+    mock_requests.side_effect = [
+        requests.exceptions.ConnectionError("Connection refused"),
+        Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})),
+    ]
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    response = endpoint.invoke("GET", "http://example.com")
+
+    assert response["status_code"] == 200
+    assert mock_requests.call_count == 2
+    assert any("Connection error encountered." in msg for msg in dl.messages)
+
+
+def test_invoke_connection_error_exceeds_max_duration(setup_mocks, monkeypatch):
+    """Test that persistent connection errors raise InvokeError after max_duration."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = requests.exceptions.ConnectionError("Connection refused")
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    with pytest.raises(InvokeError):
+        endpoint.invoke("GET", "http://example.com", max_duration=0)
