@@ -3,6 +3,7 @@
 
 """Handles interactions with the Fabric API, including authentication and request management."""
 
+import datetime
 import json
 import logging
 import os
@@ -42,8 +43,10 @@ class FabricEndpoint:
         self.token_credential = token_credential
         self.requests = requests_module
         self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
+        self._token: Optional[str] = None
+        self._token_expiry: Optional[datetime.datetime] = None
 
-        # Eagerly validate credentials at init; the SDK caches the token internally
+        # Eagerly validate credentials at init and cache the token
         self._get_token()
 
     def invoke(
@@ -93,6 +96,7 @@ class FabricEndpoint:
 
                 # Handle expired authentication token
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
+                    self._token = None  # Invalidate cache to force refresh
                     logger.info(f"{constants.INDENT}AAD token expired. Retrying with refreshed token.")
                 # Handle long-running operations without polling (e.g., for environment item publish)
                 elif response.status_code == 202 and not poll_long_running:
@@ -145,12 +149,23 @@ class FabricEndpoint:
         }
 
     def _get_token(self) -> str:
-        """Gets an AAD token. The Azure Identity SDK handles caching and refresh internally."""
+        """Gets an AAD token, using a cached value if still valid."""
         resource_url = "https://api.fabric.microsoft.com/.default"
+
+        if (
+            self._token is not None
+            and self._token_expiry is not None
+            and self._token_expiry > datetime.datetime.now(datetime.timezone.utc)
+        ):
+            return self._token
 
         try:
             access_token = self.token_credential.get_token(resource_url)
-            return access_token.token
+            self._token = access_token.token
+            self._token_expiry = datetime.datetime.fromtimestamp(
+                access_token.expires_on, tz=datetime.timezone.utc
+            )
+            return self._token
         except ClientAuthenticationError as e:
             msg = f"Failed to acquire AAD token. {e}"
             raise TokenError(msg, logger) from e

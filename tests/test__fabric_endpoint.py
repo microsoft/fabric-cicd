@@ -121,8 +121,8 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
     assert f"{constants.INDENT}AAD token expired. Retrying with refreshed token." in dl.messages
     assert response["status_code"] == 200
 
-    # Assert get_token was called: once at init + once for first request + once for retry
-    assert mock_token_credential.get_token.call_count == 3
+    # Assert get_token was called: once at init (cached for first request) + once for retry after invalidation
+    assert mock_token_credential.get_token.call_count == 2
 
 
 def test_invoke_exception(setup_mocks):
