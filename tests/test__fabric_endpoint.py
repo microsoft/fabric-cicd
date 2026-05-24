@@ -118,7 +118,7 @@ def test_get_token_proactive_refresh_on_expiry(setup_mocks):
 
 def test_get_token_refreshes_within_expiry_buffer(setup_mocks):
     """Test that _get_token refreshes when token expires within the 10-second buffer."""
-    _, mock_requests = setup_mocks
+    _, _mock_requests = setup_mocks
     mock_token_credential = Mock()
     # First token expires in 5 seconds (within buffer), second token is long-lived
     expires_within_buffer = time.time() + 5
@@ -137,7 +137,7 @@ def test_get_token_refreshes_within_expiry_buffer(setup_mocks):
 
 def test_get_token_caches_when_outside_expiry_buffer(setup_mocks):
     """Test that _get_token returns cached token when expiry is beyond the 10-second buffer."""
-    _, mock_requests = setup_mocks
+    _, _mock_requests = setup_mocks
     mock_token_credential = Mock()
     # Token expires in 60 seconds (well beyond buffer)
     expires_outside_buffer = time.time() + 60
