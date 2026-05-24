@@ -111,6 +111,41 @@ This approach uses the Azure PowerShell Credential Flow. An explicit credential 
                     python -u $(System.DefaultWorkingDirectory)/.deploy/fabric_workspace.py
     ```
 
+=== "GitHub"
+
+    This example uses [workload identity federation (OIDC)](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation) with `enable-AzPSSession: true` to set up an Azure PowerShell context. You must configure a federated identity credential on your Azure AD app registration. See [Azure login with OIDC](https://github.com/azure/login#login-with-openid-connect-oidc-recommended) for setup instructions.
+
+    ```yaml
+    name: Deploy Fabric Workspace
+
+    on:
+      push:
+        branches:
+          - dev
+          - main
+
+    permissions:
+      id-token: write
+      contents: read
+
+    jobs:
+      deploy:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-python@v5
+            with:
+              python-version: '3.12'
+          - run: pip install fabric-cicd
+          - uses: azure/login@v2
+            with:
+              client-id: ${{ secrets.AZURE_CLIENT_ID }}
+              tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+              subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+              enable-AzPSSession: true
+          - run: python .deploy/fabric_workspace.py
+    ```
+
 ## Variable Groups
 
 This approach is best suited for the Passed Arguments example found in the Deployment Variable Examples, in combination with a `ClientSecretCredential` as shown in the [Authentication Examples](authentication.md). The goal is to define values within the pipeline (or outside the pipeline in Azure DevOps variable groups) and inject them into the python script. Note this also doesn't take a dependency on PowerShell for those organizations or scenarios where PowerShell is not allowed.
