@@ -42,7 +42,33 @@ This approach uses the Azure CLI Credential Flow. An explicit credential method 
 === "GitHub"
 
     ```yaml
-    # Unconfirmed example at this time. The Azure DevOps example is a good starting point.
+    name: Deploy Fabric Workspace
+
+    on:
+      push:
+        branches:
+          - dev
+          - main
+
+    permissions:
+      id-token: write
+      contents: read
+
+    jobs:
+      deploy:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-python@v5
+            with:
+              python-version: '3.12'
+          - run: pip install fabric-cicd
+          - uses: azure/login@v2
+            with:
+              client-id: ${{ secrets.AZURE_CLIENT_ID }}
+              tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+              subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          - run: python .deploy/fabric_workspace.py
     ```
 
 ## Azure PowerShell
@@ -81,12 +107,6 @@ This approach uses the Azure PowerShell Credential Flow. An explicit credential 
                   pwsh: true
                   Inline: |
                     python -u $(System.DefaultWorkingDirectory)/.deploy/fabric_workspace.py
-    ```
-
-=== "GitHub"
-
-    ```yaml
-    # Unconfirmed example at this time. The Azure DevOps example is a good starting point.
     ```
 
 ## Variable Groups
@@ -143,5 +163,31 @@ This approach is best suited for the Passed Arguments example found in the Deplo
 === "GitHub"
 
     ```yaml
-    # Unconfirmed example at this time. The Azure DevOps example is a good starting point.
+    name: Deploy Fabric Workspace
+
+    on:
+      push:
+        branches:
+          - dev
+          - main
+
+    jobs:
+      deploy:
+        runs-on: ubuntu-latest
+        environment: ${{ github.ref_name }}  # Maps to GitHub Environment for secrets/variables
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-python@v5
+            with:
+              python-version: '3.12'
+          - run: pip install fabric-cicd
+          - run: |
+              python .deploy/fabric_workspace.py \
+                --spn_client_id ${{ secrets.SPN_CLIENT_ID }} \
+                --spn_client_secret ${{ secrets.SPN_CLIENT_SECRET }} \
+                --tenant_id ${{ secrets.TENANT_ID }} \
+                --workspace_id ${{ vars.WORKSPACE_ID }} \
+                --environment ${{ vars.ENVIRONMENT_NAME }} \
+                --repository_directory ${{ vars.REPOSITORY_DIRECTORY }} \
+                --item_types_in_scope "${{ vars.ITEMS_IN_SCOPE }}"
     ```
