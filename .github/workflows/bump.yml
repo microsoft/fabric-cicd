@@ -59,9 +59,10 @@ jobs:
 
             - name: Validate Version Bump
               id: version_bump_check
+              env:
+                  PR_TITLE: ${{ github.event.pull_request.title || needs.get-pr-details.outputs.pr_title }}
               run: |
                   set -e
-                  PR_TITLE="${{ github.event.pull_request.title || needs.get-pr-details.outputs.pr_title }}"
                   VERSION_REGEX='^v([0-9]+\.[0-9]+\.[0-9]+)$'
 
                   if [[ "$PR_TITLE" =~ $VERSION_REGEX ]]; then
