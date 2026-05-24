@@ -41,6 +41,8 @@ This approach uses the Azure CLI Credential Flow. An explicit credential method 
 
 === "GitHub"
 
+    This example uses [workload identity federation (OIDC)](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation) for authentication. You must configure a federated identity credential on your Azure AD app registration that trusts GitHub's OIDC token issuer. See [Azure login with OIDC](https://github.com/azure/login#login-with-openid-connect-oidc-recommended) for setup instructions.
+
     ```yaml
     name: Deploy Fabric Workspace
 
