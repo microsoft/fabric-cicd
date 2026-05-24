@@ -116,6 +116,42 @@ def test_get_token_proactive_refresh_on_expiry(setup_mocks):
     assert mock_token_credential.get_token.call_count == 2
 
 
+def test_get_token_refreshes_within_expiry_buffer(setup_mocks):
+    """Test that _get_token refreshes when token expires within the 10-second buffer."""
+    _, mock_requests = setup_mocks
+    mock_token_credential = Mock()
+    # First token expires in 5 seconds (within buffer), second token is long-lived
+    expires_within_buffer = time.time() + 5
+    mock_token_credential.get_token.side_effect = [
+        Mock(token="near_expiry_token", expires_on=expires_within_buffer),
+        Mock(token="fresh_token", expires_on=9999999999),
+    ]
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Token expires in 5s which is within the 10s buffer, so it should refresh
+    token = endpoint._get_token()
+
+    assert token == "fresh_token"
+    assert mock_token_credential.get_token.call_count == 2
+
+
+def test_get_token_caches_when_outside_expiry_buffer(setup_mocks):
+    """Test that _get_token returns cached token when expiry is beyond the 10-second buffer."""
+    _, mock_requests = setup_mocks
+    mock_token_credential = Mock()
+    # Token expires in 60 seconds (well beyond buffer)
+    expires_outside_buffer = time.time() + 60
+    mock_token_credential.get_token.return_value = Mock(token="valid_token", expires_on=expires_outside_buffer)
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Token expires in 60s which is beyond the 10s buffer, so it should use cache
+    token = endpoint._get_token()
+
+    assert token == "valid_token"
+    # Only called once at init — subsequent call returns cached
+    assert mock_token_credential.get_token.call_count == 1
+
+
 def test_invoke_sends_refreshed_token_in_header(setup_mocks, monkeypatch):
     """Test that the refreshed token is actually sent in the Authorization header."""
     _, mock_requests = setup_mocks

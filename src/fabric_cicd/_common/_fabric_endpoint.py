@@ -151,11 +151,12 @@ class FabricEndpoint:
     def _get_token(self) -> str:
         """Gets an AAD token, using a cached value if still valid."""
         resource_url = "https://api.fabric.microsoft.com/.default"
+        token_expiry_buffer = datetime.timedelta(seconds=10)
 
         if (
             self._token is not None
             and self._token_expiry is not None
-            and self._token_expiry > datetime.datetime.now(datetime.timezone.utc)
+            and self._token_expiry > datetime.datetime.now(datetime.timezone.utc) + token_expiry_buffer
         ):
             return self._token
 
