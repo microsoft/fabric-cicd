@@ -70,8 +70,8 @@ class TestTokenAcquisitionPerformance:
         p99 = sorted(timings)[98]
 
         # Cached token should be sub-millisecond on average
-        assert avg < 0.01, f"Average _get_token latency {avg*1000:.2f}ms, expected < 10ms"
-        assert p99 < 0.05, f"p99 _get_token latency {p99*1000:.2f}ms, expected < 50ms"
+        assert avg < 0.01, f"Average _get_token latency {avg * 1000:.2f}ms, expected < 10ms"
+        assert p99 < 0.05, f"p99 _get_token latency {p99 * 1000:.2f}ms, expected < 50ms"
 
     def test_repeated_token_consistency(self, live_endpoint):
         """Token value should remain stable across rapid calls (SDK caching works)."""

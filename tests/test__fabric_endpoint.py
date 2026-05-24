@@ -93,7 +93,8 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
     # Assert get_token was called: once at init (cached for first request) + once for retry after invalidation
     assert mock_token_credential.get_token.call_count == 2
-    
+
+
 def test_get_token_proactive_refresh_on_expiry(setup_mocks):
     """Test that _get_token fetches a new token when cached token has expired by time."""
     _, mock_requests = setup_mocks
@@ -113,7 +114,8 @@ def test_get_token_proactive_refresh_on_expiry(setup_mocks):
 
     assert token == "second_token"
     assert mock_token_credential.get_token.call_count == 2
-    
+
+
 def test_invoke_sends_refreshed_token_in_header(setup_mocks, monkeypatch):
     """Test that the refreshed token is actually sent in the Authorization header."""
     _, mock_requests = setup_mocks
@@ -134,6 +136,7 @@ def test_invoke_sends_refreshed_token_in_header(setup_mocks, monkeypatch):
     # Second request should use the fresh token
     second_call_headers = mock_requests.call_args_list[1][1]["headers"]
     assert second_call_headers["Authorization"] == "Bearer fresh_token"
+
 
 def test_invoke_exception(setup_mocks):
     """Test that a generic exception during request is wrapped in InvokeError."""
@@ -198,6 +201,7 @@ def test_invoke_poll_long_running_true_with_202(setup_mocks, monkeypatch):
     assert response["status_code"] == 200
     assert mock_requests.call_count == 2  # Initial request + polling request
 
+
 def test_invoke_connection_error_retries_then_succeeds(setup_mocks, monkeypatch):
     """Test that connection errors are retried and succeed on subsequent attempt."""
     dl, mock_requests = setup_mocks
@@ -229,7 +233,8 @@ def test_invoke_connection_error_exceeds_max_duration(setup_mocks, monkeypatch):
 
     with pytest.raises(InvokeError):
         endpoint.invoke("GET", "http://example.com", max_duration=0)
-        
+
+
 def test_invoke_timeout_retries_then_succeeds(setup_mocks, monkeypatch):
     """Test that Timeout errors are retried and succeed on subsequent attempt."""
     dl, mock_requests = setup_mocks
@@ -248,6 +253,7 @@ def test_invoke_timeout_retries_then_succeeds(setup_mocks, monkeypatch):
     assert mock_requests.call_count == 2
     assert any("Connection error encountered." in msg for msg in dl.messages)
 
+
 def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
     """Test that persistent Timeout errors raise InvokeError after max_duration."""
     _, mock_requests = setup_mocks
@@ -260,6 +266,7 @@ def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
 
     with pytest.raises(InvokeError):
         endpoint.invoke("GET", "http://example.com", max_duration=0)
+
 
 def test_invoke_calls_http_tracer(setup_mocks):
     """Test that invoke calls http_tracer capture methods and save."""
@@ -277,6 +284,7 @@ def test_invoke_calls_http_tracer(setup_mocks):
     mock_tracer.capture_request.assert_called_once()
     mock_tracer.capture_response.assert_called_once()
     mock_tracer.save.assert_called_once()
+
 
 def test_get_token(setup_mocks):
     """Test getting token returns token from credential and caches it."""
@@ -525,15 +533,17 @@ def test_handle_response_environment_libraries_not_found(setup_mocks):
     )
     assert exit_loop is True
     assert long_running is False
-    
+
+
 def test_handle_response_202_no_location_exits(setup_mocks):
     """Test 202 with no Location header exits immediately."""
     _, _ = setup_mocks
     response = Mock(status_code=202, headers={}, json=Mock(return_value={}), text="")
-    exit_loop, _method, _url, _body, long_running = _handle_response(
+    exit_loop, _method, _url, _body, _long_running = _handle_response(
         response=response, method="POST", url="old", body="{}", long_running=False, iteration_count=1
     )
     assert exit_loop is True
+
 
 def test_handle_retry_exponential_backoff(monkeypatch):
     """Test that handle_retry calculates exponential backoff correctly."""
@@ -569,7 +579,8 @@ def test_handle_retry_exceeds_max_duration():
     """Test that handle_retry raises when max_duration is exceeded."""
     with pytest.raises(Exception, match="Maximum execution duration"):
         handle_retry(attempt=1, base_delay=10, max_duration=0, start_time=0.0)
-        
+
+
 def test_handle_retry_no_max_duration(monkeypatch):
     """Test that handle_retry works when max_duration is None (no timeout)."""
     sleep_values = []
@@ -577,6 +588,7 @@ def test_handle_retry_no_max_duration(monkeypatch):
 
     handle_retry(attempt=1, base_delay=10, response_retry_after=60, max_duration=None, start_time=None)
     assert sleep_values[-1] == 20
+
 
 def test_format_invoke_log():
     """Test formatting of the invoke log message."""
