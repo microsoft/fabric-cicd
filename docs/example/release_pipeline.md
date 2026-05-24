@@ -199,6 +199,8 @@ This approach is best suited for the Passed Arguments example found in the Deplo
 
 === "GitHub"
 
+    This example requires [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) named `dev` and `main` to be configured in your repository settings, with the appropriate secrets and variables defined in each environment.
+
     ```yaml
     name: Deploy Fabric Workspace
 
@@ -211,7 +213,7 @@ This approach is best suited for the Passed Arguments example found in the Deplo
     jobs:
       deploy:
         runs-on: ubuntu-latest
-        environment: ${{ github.ref_name }}  # Maps to GitHub Environment for secrets/variables
+        environment: ${{ github.ref_name }}  # Requires GitHub Environments named "dev" and "main"
         steps:
           - uses: actions/checkout@v4
           - uses: actions/setup-python@v5
