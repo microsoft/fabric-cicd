@@ -22,6 +22,9 @@ from fabric_cicd._common._http_tracer import HTTPTracer, HTTPTracerFactory
 
 logger = logging.getLogger(__name__)
 
+_RESOURCE_URL = "https://api.fabric.microsoft.com/.default"
+_TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
+
 
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
@@ -97,7 +100,7 @@ class FabricEndpoint:
                 # Handle expired authentication token
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
                     self._token = None  # Invalidate cache to force refresh
-                    logger.info(f"{constants.INDENT}AAD token expired. Retrying with refreshed token.")
+                    logger.info(f"{constants.INDENT}Microsoft Entra token expired. Retrying with refreshed token.")
                 # Handle long-running operations without polling (e.g., for environment item publish)
                 elif response.status_code == 202 and not poll_long_running:
                     # Accept 202, do not poll
@@ -149,29 +152,26 @@ class FabricEndpoint:
         }
 
     def _get_token(self) -> str:
-        """Gets an AAD token, using a cached value if still valid."""
-        resource_url = "https://api.fabric.microsoft.com/.default"
-        token_expiry_buffer = datetime.timedelta(seconds=10)
-
+        """Gets a Microsoft Entra token, using a cached value if still valid."""
         if (
             self._token is not None
             and self._token_expiry is not None
-            and self._token_expiry > datetime.datetime.now(datetime.timezone.utc) + token_expiry_buffer
+            and self._token_expiry > datetime.datetime.now(datetime.timezone.utc) + _TOKEN_EXPIRY_BUFFER
         ):
             return self._token
 
         try:
-            access_token = self.token_credential.get_token(resource_url)
+            access_token = self.token_credential.get_token(_RESOURCE_URL)
             self._token = access_token.token
             self._token_expiry = datetime.datetime.fromtimestamp(
                 access_token.expires_on, tz=datetime.timezone.utc
             )
             return self._token
         except ClientAuthenticationError as e:
-            msg = f"Failed to acquire AAD token. {e}"
+            msg = f"Failed to acquire Microsoft Entra token. {e}"
             raise TokenError(msg, logger) from e
         except Exception as e:
-            msg = f"An unexpected error occurred when generating the AAD token. {e}"
+            msg = f"An unexpected error occurred when generating the Microsoft Entra token. {e}"
             raise TokenError(msg, logger) from e
 
 

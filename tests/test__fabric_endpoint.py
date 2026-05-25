@@ -74,7 +74,7 @@ def test_invoke(setup_mocks, method, url, body, files):
 
 
 def test_invoke_token_expired(setup_mocks, monkeypatch):
-    """Test invoking endpoint when the AAD token is expired and refreshed."""
+    """Test invoking endpoint when the Microsoft Entra token is expired and refreshed."""
     dl, mock_requests = setup_mocks
     mock_requests.side_effect = [
         Mock(status_code=401, headers={"x-ms-public-api-error-code": "TokenExpired"}),
@@ -88,7 +88,7 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
 
     response = endpoint.invoke("GET", "http://example.com")
 
-    assert f"{constants.INDENT}AAD token expired. Retrying with refreshed token." in dl.messages
+    assert f"{constants.INDENT}Microsoft Entra token expired. Retrying with refreshed token." in dl.messages
     assert response["status_code"] == 200
 
     # Assert get_token was called: once at init (cached for first request) + once for retry after invalidation
@@ -337,8 +337,8 @@ def test_get_token(setup_mocks):
 @pytest.mark.parametrize(
     ("raise_exception", "expected_msg"),
     [
-        (ClientAuthenticationError("Auth failed"), "Failed to acquire AAD token. Auth failed"),
-        (Exception("Unexpected error"), "An unexpected error occurred when generating the AAD token. Unexpected error"),
+        (ClientAuthenticationError("Auth failed"), "Failed to acquire Microsoft Entra token. Auth failed"),
+        (Exception("Unexpected error"), "An unexpected error occurred when generating the Microsoft Entra token. Unexpected error"),
     ],
     ids=["auth_error", "unexpected_exception"],
 )
