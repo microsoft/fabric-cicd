@@ -22,6 +22,9 @@ from fabric_cicd._common._http_tracer import HTTPTracer, HTTPTracerFactory
 
 logger = logging.getLogger(__name__)
 
+_RESOURCE_URL = "https://api.fabric.microsoft.com/.default"
+_TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
+
 
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
@@ -40,13 +43,14 @@ class FabricEndpoint:
             requests_module: The requests module.
             http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
         """
-        self.aad_token = None
-        self.aad_token_expiration = None
         self.token_credential = token_credential
         self.requests = requests_module
         self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
+        self._token: Optional[str] = None
+        self._token_expiry: Optional[datetime.datetime] = None
 
-        self._refresh_token()
+        # Eagerly validate credentials at init and cache the token
+        self._get_token()
 
     def invoke(
         self,
@@ -79,7 +83,7 @@ class FabricEndpoint:
         while not exit_loop:
             try:
                 headers = {
-                    "Authorization": f"Bearer {self.aad_token}",
+                    "Authorization": f"Bearer {self._get_token()}",
                     "User-Agent": f"{constants.USER_AGENT}",
                 }
                 if files is None:
@@ -95,8 +99,8 @@ class FabricEndpoint:
 
                 # Handle expired authentication token
                 if response.status_code == 401 and response.headers.get("x-ms-public-api-error-code") == "TokenExpired":
-                    logger.info(f"{constants.INDENT}AAD token expired. Refreshing token.")
-                    self._refresh_token()
+                    self._token = None  # Invalidate cache to force refresh
+                    logger.info(f"{constants.INDENT}Microsoft Entra token expired. Retrying with refreshed token.")
                 # Handle long-running operations without polling (e.g., for environment item publish)
                 elif response.status_code == 202 and not poll_long_running:
                     # Accept 202, do not poll
@@ -147,27 +151,28 @@ class FabricEndpoint:
             "status_code": response.status_code,
         }
 
-    def _refresh_token(self) -> None:
-        """Refreshes the AAD token if empty or expiration has passed."""
+    def _get_token(self) -> str:
+        """Gets a Microsoft Entra token, using a cached value if still valid."""
         if (
-            self.aad_token is None
-            or self.aad_token_expiration is None
-            or self.aad_token_expiration < datetime.datetime.now(datetime.timezone.utc)
+            self._token is not None
+            and self._token_expiry is not None
+            and self._token_expiry > datetime.datetime.now(datetime.timezone.utc) + _TOKEN_EXPIRY_BUFFER
         ):
-            resource_url = "https://api.fabric.microsoft.com/.default"
+            return self._token
 
-            try:
-                access_token = self.token_credential.get_token(resource_url)
-                self.aad_token = access_token.token
-                self.aad_token_expiration = datetime.datetime.fromtimestamp(
-                    access_token.expires_on, tz=datetime.timezone.utc
-                )
-            except ClientAuthenticationError as e:
-                msg = f"Failed to acquire AAD token. {e}"
-                raise TokenError(msg, logger) from e
-            except Exception as e:
-                msg = f"An unexpected error occurred when generating the AAD token. {e}"
-                raise TokenError(msg, logger) from e
+        try:
+            access_token = self.token_credential.get_token(_RESOURCE_URL)
+            self._token = access_token.token
+            self._token_expiry = datetime.datetime.fromtimestamp(
+                access_token.expires_on, tz=datetime.timezone.utc
+            )
+            return self._token
+        except ClientAuthenticationError as e:
+            msg = f"Failed to acquire Microsoft Entra token. {e}"
+            raise TokenError(msg, logger) from e
+        except Exception as e:
+            msg = f"An unexpected error occurred when generating the Microsoft Entra token. {e}"
+            raise TokenError(msg, logger) from e
 
 
 def _handle_response(

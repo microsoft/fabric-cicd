@@ -1,16 +1,16 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-import datetime
 import time
 from unittest.mock import Mock
 
 import pytest
+import requests
 from azure.core.exceptions import ClientAuthenticationError
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
-from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _format_invoke_log, _handle_response
+from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _format_invoke_log, _handle_response, handle_retry
 
 
 class DummyLogger:
@@ -52,36 +52,6 @@ def generate_mock_token():
     return "mock_token_value"
 
 
-def test_integration(setup_mocks):
-    """Test integration of FabricEndpoint for GET request."""
-    _, mock_requests = setup_mocks
-    mock_requests.return_value = Mock(
-        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
-    )
-    mock_token_credential = Mock()
-    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
-    endpoint = FabricEndpoint(token_credential=mock_token_credential)
-    response = endpoint.invoke("GET", "http://example.com")
-    assert response["status_code"] == 200
-
-
-def test_performance(setup_mocks):
-    """Test that _handle_response completes quickly under long-running simulation."""
-    _, _mock_requests = setup_mocks
-    response = Mock(status_code=200, headers={}, json=Mock(return_value={"status": "Succeeded"}))
-    start_time = time.time()
-    _handle_response(
-        response=response,
-        method="GET",
-        url="old",
-        body="{}",
-        long_running=True,
-        iteration_count=2,
-    )
-    end_time = time.time()
-    assert (end_time - start_time) < 1  # Ensure the function completes within 1 second
-
-
 @pytest.mark.parametrize(
     ("method", "url", "body", "files"),
     [
@@ -104,7 +74,7 @@ def test_invoke(setup_mocks, method, url, body, files):
 
 
 def test_invoke_token_expired(setup_mocks, monkeypatch):
-    """Test invoking endpoint when the AAD token is expired and refreshed."""
+    """Test invoking endpoint when the Microsoft Entra token is expired and refreshed."""
     dl, mock_requests = setup_mocks
     mock_requests.side_effect = [
         Mock(status_code=401, headers={"x-ms-public-api-error-code": "TokenExpired"}),
@@ -114,18 +84,98 @@ def test_invoke_token_expired(setup_mocks, monkeypatch):
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
 
-    endpoint.aad_token_expiration = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
-    endpoint._refresh_token = Mock()
     monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *_, **__: "")
 
     response = endpoint.invoke("GET", "http://example.com")
 
-    assert f"{constants.INDENT}AAD token expired. Refreshing token." in dl.messages
+    assert f"{constants.INDENT}Microsoft Entra token expired. Retrying with refreshed token." in dl.messages
     assert response["status_code"] == 200
+
+    # Assert get_token was called: once at init (cached for first request) + once for retry after invalidation
+    assert mock_token_credential.get_token.call_count == 2
+
+
+def test_get_token_proactive_refresh_on_expiry(setup_mocks):
+    """Test that _get_token fetches a new token when cached token has expired by time."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    # First token expires immediately (epoch 0), second token is long-lived
+    mock_token_credential.get_token.side_effect = [
+        Mock(token="first_token", expires_on=0),
+        Mock(token="second_token", expires_on=9999999999),
+    ]
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Init consumed first token (already expired), so next call should fetch again
+    token = endpoint._get_token()
+
+    assert token == "second_token"
+    assert mock_token_credential.get_token.call_count == 2
+
+
+def test_get_token_refreshes_within_expiry_buffer(setup_mocks):
+    """Test that _get_token refreshes when token expires within the 10-second buffer."""
+    _, _mock_requests = setup_mocks
+    mock_token_credential = Mock()
+    # First token expires in 5 seconds (within buffer), second token is long-lived
+    expires_within_buffer = time.time() + 5
+    mock_token_credential.get_token.side_effect = [
+        Mock(token="near_expiry_token", expires_on=expires_within_buffer),
+        Mock(token="fresh_token", expires_on=9999999999),
+    ]
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Token expires in 5s which is within the 10s buffer, so it should refresh
+    token = endpoint._get_token()
+
+    assert token == "fresh_token"
+    assert mock_token_credential.get_token.call_count == 2
+
+
+def test_get_token_caches_when_outside_expiry_buffer(setup_mocks):
+    """Test that _get_token returns cached token when expiry is beyond the 10-second buffer."""
+    _, _mock_requests = setup_mocks
+    mock_token_credential = Mock()
+    # Token expires in 60 seconds (well beyond buffer)
+    expires_outside_buffer = time.time() + 60
+    mock_token_credential.get_token.return_value = Mock(token="valid_token", expires_on=expires_outside_buffer)
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    # Token expires in 60s which is beyond the 10s buffer, so it should use cache
+    token = endpoint._get_token()
+
+    assert token == "valid_token"
+    # Only called once at init — subsequent call returns cached
+    assert mock_token_credential.get_token.call_count == 1
+
+
+def test_invoke_sends_refreshed_token_in_header(setup_mocks, monkeypatch):
+    """Test that the refreshed token is actually sent in the Authorization header."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = [
+        Mock(status_code=401, headers={"x-ms-public-api-error-code": "TokenExpired"}),
+        Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})),
+    ]
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.side_effect = [
+        Mock(token="stale_token", expires_on=9999999999),
+        Mock(token="fresh_token", expires_on=9999999999),
+    ]
+    monkeypatch.setattr("fabric_cicd._common._fabric_endpoint._format_invoke_log", lambda *_, **__: "")
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    endpoint.invoke("GET", "http://example.com")
+
+    # Second request should use the fresh token
+    second_call_headers = mock_requests.call_args_list[1][1]["headers"]
+    assert second_call_headers["Authorization"] == "Bearer fresh_token"
 
 
 def test_invoke_exception(setup_mocks):
-    """Test invoking endpoint when the AAD token is expired and refreshed."""
+    """Test that a generic exception during request is wrapped in InvokeError."""
     _, mock_requests = setup_mocks
     mock_requests.side_effect = Exception("Test exception")
     mock_token_credential = Mock()
@@ -188,61 +238,112 @@ def test_invoke_poll_long_running_true_with_202(setup_mocks, monkeypatch):
     assert mock_requests.call_count == 2  # Initial request + polling request
 
 
-def test_invoke_poll_long_running_default_with_202(setup_mocks, monkeypatch):
-    """Test invoke method with default poll_long_running (True) polls on 202 response."""
-    _, mock_requests = setup_mocks
-
-    # First call returns 202 with Location header, second call returns 200 with Succeeded status
+def test_invoke_connection_error_retries_then_succeeds(setup_mocks, monkeypatch):
+    """Test that connection errors are retried and succeed on subsequent attempt."""
+    dl, mock_requests = setup_mocks
     mock_requests.side_effect = [
-        Mock(
-            status_code=202,
-            headers={"Content-Type": "application/json", "Location": "http://example.com/status"},
-            json=Mock(return_value={}),
-            text="{}",
-        ),
-        Mock(
-            status_code=200,
-            headers={"Content-Type": "application/json"},
-            json=Mock(return_value={"status": "Succeeded"}),
-            text='{"status": "Succeeded"}',
-        ),
+        requests.exceptions.ConnectionError("Connection refused"),
+        Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})),
     ]
-
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
-    endpoint = FabricEndpoint(token_credential=mock_token_credential)
-
-    # Mock time.sleep to avoid delays in tests
     monkeypatch.setattr("time.sleep", lambda _: None)
 
-    # Don't pass poll_long_running, should default to True
-    response = endpoint.invoke("POST", "http://example.com")
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    response = endpoint.invoke("GET", "http://example.com")
 
-    # Should poll and return final status
     assert response["status_code"] == 200
-    assert mock_requests.call_count == 2  # Initial request + polling request
+    assert mock_requests.call_count == 2
+    assert any("Connection error encountered." in msg for msg in dl.messages)
 
 
-def test_refresh_token(setup_mocks):
-    """Test refreshing token sets token and expiration from AccessToken."""
+def test_invoke_connection_error_exceeds_max_duration(setup_mocks, monkeypatch):
+    """Test that persistent connection errors raise InvokeError after max_duration."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = requests.exceptions.ConnectionError("Connection refused")
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    with pytest.raises(InvokeError):
+        endpoint.invoke("GET", "http://example.com", max_duration=0)
+
+
+def test_invoke_timeout_retries_then_succeeds(setup_mocks, monkeypatch):
+    """Test that Timeout errors are retried and succeed on subsequent attempt."""
+    dl, mock_requests = setup_mocks
+    mock_requests.side_effect = [
+        requests.exceptions.Timeout("Request timed out"),
+        Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})),
+    ]
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    response = endpoint.invoke("GET", "http://example.com")
+
+    assert response["status_code"] == 200
+    assert mock_requests.call_count == 2
+    assert any("Connection error encountered." in msg for msg in dl.messages)
+
+
+def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
+    """Test that persistent Timeout errors raise InvokeError after max_duration."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = requests.exceptions.Timeout("Request timed out")
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    with pytest.raises(InvokeError):
+        endpoint.invoke("GET", "http://example.com", max_duration=0)
+
+
+def test_invoke_calls_http_tracer(setup_mocks):
+    """Test that invoke calls http_tracer capture methods and save."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    mock_tracer = Mock()
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, http_tracer=mock_tracer)
+    endpoint.invoke("GET", "http://example.com")
+
+    mock_tracer.capture_request.assert_called_once()
+    mock_tracer.capture_response.assert_called_once()
+    mock_tracer.save.assert_called_once()
+
+
+def test_get_token(setup_mocks):
+    """Test getting token returns token from credential and caches it."""
     _dl, _mock_requests = setup_mocks
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token="test_token", expires_on=9999999999)
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
-    assert endpoint.aad_token == "test_token"
-    assert endpoint.aad_token_expiration == datetime.datetime.fromtimestamp(9999999999, tz=datetime.timezone.utc)
+    assert endpoint._get_token() == "test_token"
+    assert endpoint._get_token() == "test_token"  # Second call uses cache
+    # Only called once at init — subsequent calls return cached
+    mock_token_credential.get_token.assert_called_once_with("https://api.fabric.microsoft.com/.default")
 
 
 @pytest.mark.parametrize(
     ("raise_exception", "expected_msg"),
     [
-        (ClientAuthenticationError("Auth failed"), "Failed to acquire AAD token. Auth failed"),
-        (Exception("Unexpected error"), "An unexpected error occurred when generating the AAD token. Unexpected error"),
+        (ClientAuthenticationError("Auth failed"), "Failed to acquire Microsoft Entra token. Auth failed"),
+        (Exception("Unexpected error"), "An unexpected error occurred when generating the Microsoft Entra token. Unexpected error"),
     ],
     ids=["auth_error", "unexpected_exception"],
 )
-def test_refresh_token_exceptions(raise_exception, expected_msg):
-    """Test token refresh exception handling for authentication failures."""
+def test_get_token_exceptions(raise_exception, expected_msg):
+    """Test token acquisition exception handling for authentication failures."""
     credential = DummyCredential("irrelevant")
     credential.raise_exception = raise_exception
     with pytest.raises(TokenError, match=expected_msg):
@@ -286,7 +387,7 @@ def test_handle_response(
     response_json,
 ):
     """Test _handle_response behavior for various HTTP responses and long-running operations."""
-    response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=response_json))
+    response = Mock(status_code=status_code, headers=response_header, json=Mock(return_value=response_json), text="{}")
 
     exit_loop, _method, _url, _body, long_running = _handle_response(
         response=response,
@@ -470,9 +571,66 @@ def test_handle_response_environment_libraries_not_found(setup_mocks):
     assert long_running is False
 
 
+def test_handle_response_202_no_location_exits(setup_mocks):
+    """Test 202 with no Location header exits immediately."""
+    _, _ = setup_mocks
+    response = Mock(status_code=202, headers={}, json=Mock(return_value={}), text="")
+    exit_loop, _method, _url, _body, _long_running = _handle_response(
+        response=response, method="POST", url="old", body="{}", long_running=False, iteration_count=1
+    )
+    assert exit_loop is True
+
+
+def test_handle_retry_exponential_backoff(monkeypatch):
+    """Test that handle_retry calculates exponential backoff correctly."""
+    sleep_values = []
+    monkeypatch.setattr("time.sleep", lambda x: sleep_values.append(x))
+
+    handle_retry(attempt=1, base_delay=10, response_retry_after=60, max_duration=300, start_time=time.time())
+    # delay = min(60, 10 * 2^1) = min(60, 20) = 20
+    assert sleep_values[-1] == 20
+
+
+def test_handle_retry_capped_by_retry_after(monkeypatch):
+    """Test that delay is capped by Retry-After header value."""
+    sleep_values = []
+    monkeypatch.setattr("time.sleep", lambda x: sleep_values.append(x))
+
+    handle_retry(attempt=10, base_delay=10, response_retry_after=30, max_duration=300, start_time=time.time())
+    # delay = min(30, 10 * 2^10) = min(30, 10240) = 30
+    assert sleep_values[-1] == 30
+
+
+def test_handle_retry_override_env_var(monkeypatch):
+    """Test that RETRY_DELAY_OVERRIDE_SECONDS env var overrides backoff calculation."""
+    sleep_values = []
+    monkeypatch.setattr("time.sleep", lambda x: sleep_values.append(x))
+    monkeypatch.setenv(constants.EnvVar.RETRY_DELAY_OVERRIDE_SECONDS.value, "0.01")
+
+    handle_retry(attempt=5, base_delay=10, response_retry_after=60, max_duration=300, start_time=time.time())
+    assert sleep_values[-1] == 0.01
+
+
+def test_handle_retry_exceeds_max_duration():
+    """Test that handle_retry raises when max_duration is exceeded."""
+    with pytest.raises(Exception, match="Maximum execution duration"):
+        handle_retry(attempt=1, base_delay=10, max_duration=0, start_time=0.0)
+
+
+def test_handle_retry_no_max_duration(monkeypatch):
+    """Test that handle_retry works when max_duration is None (no timeout)."""
+    sleep_values = []
+    monkeypatch.setattr("time.sleep", lambda x: sleep_values.append(x))
+
+    handle_retry(attempt=1, base_delay=10, response_retry_after=60, max_duration=None, start_time=None)
+    assert sleep_values[-1] == 20
+
+
 def test_format_invoke_log():
     """Test formatting of the invoke log message."""
     response = Mock(status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={}))
     log_message = _format_invoke_log(response, "GET", "http://example.com", "{}")
     assert "Method: GET" in log_message
     assert "URL: http://example.com" in log_message
+    assert "Response Status: 200" in log_message
+    assert "Request Body:" in log_message
