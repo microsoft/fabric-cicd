@@ -1,8 +1,0 @@
-kind: optimization
-body: Remove version check on import to reduce noise and eliminate unnecessary PyPI network call at startup
-time: 2026-05-05T14:27:43.6077342+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "973"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/973

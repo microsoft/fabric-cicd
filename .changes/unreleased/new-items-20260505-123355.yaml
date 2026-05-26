@@ -1,8 +1,0 @@
-kind: new-items
-body: Add support for DataBuildToolJob item
-time: 2026-05-05T12:33:55.6581835-05:00
-custom:
-    Author: crazy-treyn
-    AuthorLink: https://github.com/crazy-treyn
-    Issue: "864"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/864

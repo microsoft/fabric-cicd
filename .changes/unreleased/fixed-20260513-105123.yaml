@@ -1,8 +1,0 @@
-kind: fixed
-body: Prevent empty ``items_to_include`` list from bypassing item filtering
-time: 2026-05-13T10:51:23.1152012+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "980"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/980
