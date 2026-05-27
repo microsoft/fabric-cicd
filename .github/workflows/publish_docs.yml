@@ -9,6 +9,10 @@ on:
 permissions:
     contents: write
 
+concurrency:
+    group: publish-docs-gh-pages
+    cancel-in-progress: false
+
 jobs:
     publish-docs:
         name: Publish Docs
