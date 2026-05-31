@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from fabric_cicd._common._check_utils import check_file_type, check_tmdl_file, check_valid_json_content, check_valid_yaml_content
+from fabric_cicd._common._check_utils import (
+    check_file_type,
+    check_tmdl_file,
+    check_valid_json_content,
+    check_valid_yaml_content,
+)
 
 
 @pytest.fixture
