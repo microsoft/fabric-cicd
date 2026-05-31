@@ -13,7 +13,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -1276,7 +1276,7 @@ runtime_version: "1.2"
         assert "\t\t\tserver: sql-ppe.contoso.net\n" in result
         assert "\t\t\tserver: untouched.contoso.net\n" in result
 
-    @patch.object(logger, "debug")
+    @patch("fabric_cicd._parameter._utils.logger.debug")
     def test_replace_key_value_tmdl_no_match_logs_debug_and_returns_unchanged(self, mock_debug, mock_workspace):
         """Test TMDL replacement returns unchanged content and logs when no nodes match."""
         tmdl_content = (
@@ -1308,7 +1308,7 @@ runtime_version: "1.2"
 
         result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
 
-        assert '\t\t"workspace-123" meta [IsParameterQuery=true, Type="Text"]\n' in result
+        assert '\t\t"mock-workspace-id" meta [IsParameterQuery=true, Type="Text"]\n' in result
 
     def test_replace_key_value_tmdl_environment_not_found_returns_unchanged(self, mock_workspace):
         """Test TMDL replacement leaves content unchanged when env key is missing."""
