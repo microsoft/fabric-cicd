@@ -65,6 +65,7 @@ from fabric_cicd._parameter._utils import (
     process_environment_key,
     process_input_path,
     replace_key_value,
+    replace_key_value_tmdl,
     replace_variables_in_parameter_file,
 )
 
@@ -1224,6 +1225,99 @@ runtime_version: "1.2"
         result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["config"]["threshold"] == 0.8
+
+    def test_replace_key_value_tmdl_expression_preserves_meta_and_targets_single_block(self, mock_workspace):
+        """Test TMDL expression replacement preserves metadata and only changes target expression."""
+        tmdl_content = (
+            "expression DatabaseServer =\n"
+            '\t\t"sql-dev.contoso.net" meta [IsParameterQuery=true, Type="Text"]\n'
+            "\tlineageTag: abc123\n"
+            "expression DatabaseName =\n"
+            '\t\t"AdventureWorks" meta [IsParameterQuery=true, Type="Text"]\n'
+        )
+        param_dict = {
+            "find_key": "expression.DatabaseServer",
+            "replace_value": {"dev": "sql-ppe.contoso.net"},
+        }
+
+        result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
+
+        assert '\t\t"sql-ppe.contoso.net" meta [IsParameterQuery=true, Type="Text"]\n' in result
+        assert '\t\t"AdventureWorks" meta [IsParameterQuery=true, Type="Text"]\n' in result
+
+    def test_replace_key_value_tmdl_data_source_nested_path(self, mock_workspace):
+        """Test TMDL dataSource nested key replacement by named path."""
+        tmdl_content = (
+            "dataSource ExtSql\n"
+            "\ttype: structured\n"
+            "\tconnectionDetails\n"
+            "\t\tprotocol: tds\n"
+            "\t\taddress\n"
+            "\t\t\tserver: sql-dev.contoso.net\n"
+            "\t\t\tdatabase: AdventureWorks\n"
+            "dataSource OtherSql\n"
+            "\ttype: structured\n"
+            "\tconnectionDetails\n"
+            "\t\taddress\n"
+            "\t\t\tserver: untouched.contoso.net\n"
+        )
+        param_dict = {
+            "find_key": "dataSource.ExtSql.connectionDetails.address.server",
+            "replace_value": {"dev": "sql-ppe.contoso.net"},
+        }
+
+        result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
+
+        assert "\t\t\tserver: sql-ppe.contoso.net\n" in result
+        assert "\t\t\tserver: untouched.contoso.net\n" in result
+
+    @patch.object(logger, "debug")
+    def test_replace_key_value_tmdl_no_match_logs_debug_and_returns_unchanged(self, mock_debug, mock_workspace):
+        """Test TMDL replacement returns unchanged content and logs when no nodes match."""
+        tmdl_content = (
+            "dataSource ExtSql\n"
+            "\tconnectionDetails\n"
+            "\t\taddress\n"
+            "\t\t\tserver: sql-dev.contoso.net\n"
+        )
+        param_dict = {
+            "find_key": "dataSource.ExtSql.connectionDetails.address.database",
+            "replace_value": {"dev": "AdventureWorks"},
+        }
+
+        result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
+
+        assert result == tmdl_content
+        assert any("No TMDL nodes found for find_key" in call[0][0] for call in mock_debug.call_args_list)
+
+    def test_replace_key_value_tmdl_expression_dynamic_variable(self, mock_workspace):
+        """Test TMDL expression replacement supports dynamic workspace variables."""
+        tmdl_content = (
+            "expression WorkspaceId =\n"
+            '\t\t"old-workspace-id" meta [IsParameterQuery=true, Type="Text"]\n'
+        )
+        param_dict = {
+            "find_key": "expression.WorkspaceId",
+            "replace_value": {"dev": "$workspace.$id"},
+        }
+
+        result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
+
+        assert '\t\t"workspace-123" meta [IsParameterQuery=true, Type="Text"]\n' in result
+
+    def test_replace_key_value_tmdl_environment_not_found_returns_unchanged(self, mock_workspace):
+        """Test TMDL replacement leaves content unchanged when env key is missing."""
+        tmdl_content = (
+            "expression DatabaseServer =\n"
+            '\t\t"sql-dev.contoso.net" meta [IsParameterQuery=true, Type="Text"]\n'
+        )
+        param_dict = {
+            "find_key": "expression.DatabaseServer",
+            "replace_value": {"prod": "sql-prod.contoso.net"},
+        }
+
+        result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
+        assert result == tmdl_content
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""

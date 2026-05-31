@@ -1,0 +1,4 @@
+expression DatabaseServer =
+"sql-dev.contoso.net" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+lineageTag: abc123
+queryGroup: Parameters

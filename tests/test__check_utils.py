@@ -2,10 +2,11 @@
 # Licensed under the MIT License.
 
 import json
+from pathlib import Path
 
 import pytest
 
-from fabric_cicd._common._check_utils import check_file_type, check_valid_json_content, check_valid_yaml_content
+from fabric_cicd._common._check_utils import check_file_type, check_tmdl_file, check_valid_json_content, check_valid_yaml_content
 
 
 @pytest.fixture
@@ -290,3 +291,13 @@ if __name__ == "__main__":
     df.show()
 """
     assert check_valid_yaml_content(python_content) is False
+
+
+def test_check_tmdl_file_with_tmdl_extension():
+    """Test check_tmdl_file for a .tmdl path."""
+    assert check_tmdl_file(Path("model.tmdl")) is True
+
+
+def test_check_tmdl_file_with_non_tmdl_extension():
+    """Test check_tmdl_file for a non-.tmdl path."""
+    assert check_tmdl_file(Path("model.json")) is False

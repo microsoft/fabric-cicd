@@ -1,0 +1,7 @@
+dataSource ExtSql
+type: structured
+connectionDetails
+protocol: tds
+address
+server: sql-dev.contoso.net
+database: AdventureWorks

@@ -94,9 +94,9 @@ find_replace:
 
 ### `key_value_replace`
 
-Provides the ability to perform key based replacement operations in JSON and YAML files. This will look for a specific key using a valid JSONPath expression and replace every found instance in every file. Specify the `find_key` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
+Provides the ability to perform key based replacement operations in JSON, YAML, and Semantic Model TMDL files. This will look for a specific key using a valid JSONPath expression for JSON/YAML content and a TMDL key path for `.tmdl` content, then replace every found instance in every file. Specify the `find_key` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. Refer to https://jsonpath.com/ for a simple to use JSONPath evaluator.
 
-Note: A common use case for this parameter is to replace values in key/value file types like Data Pipeline, Schedule files, etc. The `key_value_replace` parameter automatically detects and processes any file containing valid JSON or YAML content, regardless of file extension (e.g., `.schedules` files). This does not apply to `.platform` files, which are intentionally excluded from parameterization to maintain item integrity.
+Note: A common use case for this parameter is to replace values in key/value file types like Data Pipeline and Schedule files. The `key_value_replace` parameter automatically detects and processes any file containing valid JSON or YAML content, regardless of file extension (e.g., `.schedules` files). For Semantic Models, `.tmdl` files are also supported for expression and dataSource key paths. This does not apply to `.platform` files, which are intentionally excluded from parameterization to maintain item integrity.
 
 The `replace_value` field supports the same dynamic replacement variables as `find_replace`, including `$items` and `$workspace` notation. See the **Dynamic Replacement** section under `find_replace` for details on supported variables and attributes.
 
@@ -751,6 +751,35 @@ find_replace:
 # META     }
 # META   }
 # META }
+```
+
+### Semantic Models
+
+`key_value_replace` supports Semantic Model `.tmdl` files for name-based replacement in:
+
+- M-query parameters in `expression.<ParameterName>`
+- Data source connection details in `dataSource.<SourceName>.<nested>.<property>`
+
+Use `item_type: "SemanticModel"` to scope replacements to Semantic Model artifacts.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+key_value_replace:
+    # Replace M-query parameter value by parameter name
+    - find_key: expression.DatabaseServer
+      replace_value:
+          PPE: "sql-ppe.contoso.net"
+          PROD: "sql-prod.contoso.net"
+      item_type: "SemanticModel"
+      item_name: "SalesModel"
+
+    # Replace data source connection server by data source name
+    - find_key: dataSource.ExtSql.connectionDetails.address.server
+      replace_value:
+          PPE: "sql-ppe.contoso.net"
+          PROD: "sql-prod.contoso.net"
+      item_type: "SemanticModel"
 ```
 
 ### Data Pipelines

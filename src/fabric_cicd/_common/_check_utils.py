@@ -84,3 +84,16 @@ def check_valid_yaml_content(content: str) -> bool:
         return isinstance(result, (dict, list))
     except yaml.YAMLError:
         return False
+
+
+def check_tmdl_file(file_path: Path) -> bool:
+    """
+    Check if the file is a TMDL file by extension.
+
+    Args:
+        file_path: The file path to check.
+
+    Returns:
+        bool: True when the file path ends with .tmdl, otherwise False.
+    """
+    return str(file_path).endswith(".tmdl")
