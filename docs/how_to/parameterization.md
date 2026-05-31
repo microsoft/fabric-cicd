@@ -37,6 +37,11 @@ find_replace:
       replace_value:
           PPE: "ppe-lakehouse-id"
           PROD: "prod-lakehouse-id"
+    - find_value: "$workspace.Dev Workspace.$id"
+      replace_value:
+          PPE: "$workspace.$id"
+          PROD: "$workspace.$id"
+      item_type: "DataPipeline"
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="Environment")].value

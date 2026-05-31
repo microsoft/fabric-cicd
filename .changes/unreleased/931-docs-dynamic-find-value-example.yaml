@@ -1,0 +1,6 @@
+kind: docs
+body: Add a dynamic `find_value` example to the parameterization `parameter.yml` sample.
+time: 2026-05-31T12:35:00.0000000Z
+custom:
+  Issue: 931
+  Author: copilot-swe-agent[bot]
