@@ -66,7 +66,12 @@ def _validate_regex_pattern(matches: list, find_value: str) -> None:
             raise InputError(msg, logger)
 
 
-def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> dict:
+def extract_find_value(
+    param_dict: dict,
+    file_content: str,
+    filter_match: bool,
+    workspace_obj: Optional["FabricWorkspace"] = None,
+) -> dict:
     """
     Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided.
     Returns replacement information for use with re.sub() or string replace().
@@ -75,6 +80,7 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
         param_dict: The parameter dictionary containing the find_value and is_regex keys.
         file_content: The content of the file where the find_value will be searched.
         filter_match: A boolean to check for a regex match in filtered files only.
+        workspace_obj: Optional workspace object used to resolve dynamic variables in find_value.
 
     Returns:
         Dictionary with keys:
@@ -88,6 +94,28 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
     # No find value -> nothing to do
     if not find_value:
         return {"pattern": "", "is_regex": False, "has_matches": False}
+
+    # Resolve dynamic variable in find_value if present
+    if find_value and find_value.startswith("$") and workspace_obj is not None:
+        if find_value.startswith("$items."):
+            msg = (
+                f"Dynamic variable '{find_value}' is not supported in find_value. "
+                "Same-workspace item attributes ($items.*) resolve to the target environment's item ID, "
+                "which cannot be present in the source file."
+            )
+            raise InputError(msg, logger)
+
+        if find_value.startswith("$workspace."):
+            var_string = find_value.removeprefix("$workspace.")
+            if ".$items." in var_string:
+                workspace_name = var_string.split(".$items.", 1)[0].strip()
+                logger.warning(
+                    f"Dynamic variable '{find_value}' in find_value references a cross-workspace item attribute. "
+                    f"Ensure the referenced item exists in workspace '{workspace_name}' at deployment time, "
+                    "or the replacement will fail."
+                )
+
+        find_value = extract_replace_value(workspace_obj, find_value)
 
     # Regex find_value
     if is_regex:

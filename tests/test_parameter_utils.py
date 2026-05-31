@@ -191,6 +191,52 @@ class TestParameterUtilities:
         expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
         assert result == expected
 
+    def test_extract_find_value_dynamic_workspace_id(self, mock_workspace):
+        """Tests extract_find_value resolves $workspace.$id when workspace_obj is provided."""
+        param_dict = {"find_value": "$workspace.$id"}
+        expected = {"pattern": "mock-workspace-id", "is_regex": False, "has_matches": True}
+        assert extract_find_value(param_dict, "content with mock-workspace-id", True, workspace_obj=mock_workspace) == expected
+
+    def test_extract_find_value_dynamic_named_workspace_id(self, mock_workspace):
+        """Tests extract_find_value resolves $workspace.<name>.$id when workspace_obj is provided."""
+        mock_workspace._resolve_workspace_id.return_value = "dev-workspace-id"
+        param_dict = {"find_value": "$workspace.dev.$id"}
+        expected = {"pattern": "dev-workspace-id", "is_regex": False, "has_matches": True}
+        assert extract_find_value(param_dict, "content with dev-workspace-id", True, workspace_obj=mock_workspace) == expected
+        mock_workspace._resolve_workspace_id.assert_called_once_with("dev")
+
+    def test_extract_find_value_cross_workspace_item_warns(self, mock_workspace, caplog):
+        """Tests extract_find_value resolves cross-workspace item attributes and logs a warning."""
+        mock_workspace._resolve_workspace_id.return_value = "workspace-dev-id"
+        mock_workspace._lookup_item_attribute.return_value = "cross-item-id"
+        find_value = "$workspace.dev.$items.Lakehouse.Example.$id"
+        param_dict = {"find_value": find_value}
+
+        with caplog.at_level(logging.WARNING):
+            result = extract_find_value(param_dict, "content with cross-item-id", True, workspace_obj=mock_workspace)
+
+        assert result == {"pattern": "cross-item-id", "is_regex": False, "has_matches": True}
+        assert (
+            f"Dynamic variable '{find_value}' in find_value references a cross-workspace item attribute. "
+            "Ensure the referenced item exists in workspace 'dev' at deployment time, "
+            "or the replacement will fail."
+        ) in caplog.text
+
+    def test_extract_find_value_dynamic_items_raises_input_error(self, mock_workspace):
+        """Tests extract_find_value rejects same-workspace $items variables."""
+        find_value = "$items.Lakehouse.Example.$id"
+        param_dict = {"find_value": find_value}
+
+        with pytest.raises(
+            InputError,
+            match=re.escape(
+                f"Dynamic variable '{find_value}' is not supported in find_value. "
+                "Same-workspace item attributes ($items.*) resolve to the target environment's item ID, "
+                "which cannot be present in the source file."
+            ),
+        ):
+            extract_find_value(param_dict, "content", True, workspace_obj=mock_workspace)
+
     def test_extract_replace_value_default(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=False."""
         # Regular string should be returned as is

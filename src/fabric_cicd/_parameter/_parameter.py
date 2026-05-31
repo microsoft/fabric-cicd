@@ -703,6 +703,7 @@ class Parameter:
                 return False, constants.PARAMETER_MSGS["missing required value"].format(key, param_name)
 
             expected_type = "dictionary" if key == "replace_value" else "string"
+            # For find_replace, find_value may be a literal string or a '$'-prefixed dynamic variable.
             is_valid, msg = self._validate_data_type(param_dict[key], expected_type, key, param_name)
             if not is_valid:
                 return False, msg

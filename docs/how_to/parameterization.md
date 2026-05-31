@@ -219,6 +219,7 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
 - **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
 - Dynamic replacement works in tandem with `find_value` (for `find_replace`) as either a regex or a literal string, or with `find_key` (for `key_value_replace`) as a JSONPath expression.
 - The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
+- `find_value` in `find_replace` also supports dynamic variables using the same syntax as `replace_value`, with one restriction: `$items.<item_type>.<item_name>.$<attribute>` is not supported in `find_value` because it resolves to target workspace values (which cannot already exist in source files being searched).
 - **Supported variables:**
     - **Workspace variable:**
 
@@ -235,6 +236,7 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         > - When using `$workspace.$name`, `$workspace.$name_encoded`, `$workspace.<name>.$id` / `$workspace.<name>`, or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, ensure the executing identity has proper permissions to access the relevant workspace. 
         > - For `$workspace.<name>.$id` / `$workspace.<name>` and `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, the provided workspace display name must be an exact, case-sensitive match.
         > - `$workspace.$name` returns the raw workspace display name. If the target value must remain URL-encoded, use `$workspace.$name_encoded` instead, which automatically percent-encodes the name (e.g., `My Workspace` becomes `My%20Workspace`).
+        > - For `find_value`, cross-workspace item references (`$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`) are supported. Ensure the referenced item already exists in the specified workspace at deployment time, or the replacement will fail.
 
     - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
         - `$items.<item_type>.<item_name>.<attribute>` (legacy format)
@@ -258,6 +260,7 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
             - The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
             - An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
             - The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
+        - In `find_value`, `$items.<item_type>.<item_name>.$<attribute>` is not supported because it resolves to target workspace item attributes (replacement outputs), not source values to search for.
 
         - For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
 
