@@ -96,4 +96,4 @@ def check_tmdl_file(file_path: Path) -> bool:
     Returns:
         bool: True when the file path ends with .tmdl, otherwise False.
     """
-    return str(file_path).endswith(".tmdl")
+    return file_path.suffix == ".tmdl"

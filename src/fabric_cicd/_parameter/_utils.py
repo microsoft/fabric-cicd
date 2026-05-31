@@ -455,7 +455,7 @@ def replace_key_value_tmdl(workspace_obj: FabricWorkspace, param_dict: dict, con
     if env not in replace_value_dict:
         return content
 
-    processed_value: object = replace_value_dict[env]
+    processed_value = replace_value_dict[env]
     if isinstance(processed_value, str):
         processed_value = extract_replace_value(workspace_obj, processed_value)
     replacement_text = str(processed_value)
@@ -465,6 +465,8 @@ def replace_key_value_tmdl(workspace_obj: FabricWorkspace, param_dict: dict, con
     block_name = find_key_parts[1]
     nested_path = find_key_parts[2:]
     replacement_count = 0
+    expression_meta_pattern = re.compile(r"^(.*?)(\s+meta\s+\[.*)$")
+    expression_value_spacing_pattern = re.compile(r"^(\s*)(.*?)(\s*)$")
 
     def _split_line(line: str) -> tuple[str, str]:
         if line.endswith("\r\n"):
@@ -481,7 +483,7 @@ def replace_key_value_tmdl(workspace_obj: FabricWorkspace, param_dict: dict, con
         value_part = line_body
         meta_part = ""
 
-        meta_match = re.match(r"^(.*?)(\s+meta\s+\[.*)$", line_body)
+        meta_match = expression_meta_pattern.match(line_body)
         if meta_match:
             value_part = meta_match.group(1)
             meta_part = meta_match.group(2)
@@ -491,9 +493,9 @@ def replace_key_value_tmdl(workspace_obj: FabricWorkspace, param_dict: dict, con
         if stripped_value.startswith('"') and stripped_value.endswith('"') and not replacement_value.startswith('"'):
             replacement_value = f'"{replacement_value}"'
 
-        value_spacing_match = re.match(r"^(\s*).*(\s*)$", value_part)
+        value_spacing_match = expression_value_spacing_pattern.match(value_part)
         leading_value_ws = value_spacing_match.group(1) if value_spacing_match else ""
-        trailing_value_ws = value_spacing_match.group(2) if value_spacing_match else ""
+        trailing_value_ws = value_spacing_match.group(3) if value_spacing_match else ""
 
         return f"{leading_value_ws}{replacement_value}{trailing_value_ws}{meta_part}{line_ending}"
 

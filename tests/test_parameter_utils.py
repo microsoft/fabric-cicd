@@ -1241,9 +1241,14 @@ runtime_version: "1.2"
         }
 
         result = replace_key_value_tmdl(mock_workspace, param_dict, tmdl_content, "dev")
-
-        assert '\t\t"sql-ppe.contoso.net" meta [IsParameterQuery=true, Type="Text"]\n' in result
-        assert '\t\t"AdventureWorks" meta [IsParameterQuery=true, Type="Text"]\n' in result
+        expected = (
+            "expression DatabaseServer =\n"
+            '\t\t"sql-ppe.contoso.net" meta [IsParameterQuery=true, Type="Text"]\n'
+            "\tlineageTag: abc123\n"
+            "expression DatabaseName =\n"
+            '\t\t"AdventureWorks" meta [IsParameterQuery=true, Type="Text"]\n'
+        )
+        assert result == expected
 
     def test_replace_key_value_tmdl_data_source_nested_path(self, mock_workspace):
         """Test TMDL dataSource nested key replacement by named path."""
