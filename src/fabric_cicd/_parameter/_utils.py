@@ -97,6 +97,7 @@ def extract_find_value(
 
     # Resolve dynamic variable in find_value if present
     if find_value and find_value.startswith("$") and workspace_obj is not None:
+        # Block $items.* variables - resolves to target env values that won't exist in source files
         if find_value.startswith("$items."):
             msg = (
                 f"Dynamic variable '{find_value}' is not supported in find_value. "
@@ -105,6 +106,7 @@ def extract_find_value(
             )
             raise InputError(msg, logger)
 
+        # Warn on cross-workspace item references — allowed but depend on runtime state
         if find_value.startswith("$workspace."):
             var_string = find_value.removeprefix("$workspace.")
             if ".$items." in var_string:
@@ -115,7 +117,10 @@ def extract_find_value(
                     "or the replacement will fail."
                 )
 
+        # Delegate to the shared variable resolution logic (same as replace_value)
+        find_value_var = find_value
         find_value = extract_replace_value(workspace_obj, find_value)
+        logger.debug(f"Resolved variable {find_value_var} in find_value to: {find_value}")
 
     # Regex find_value
     if is_regex:
