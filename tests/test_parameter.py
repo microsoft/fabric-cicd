@@ -2640,7 +2640,7 @@ def test_validate_required_values_warns_cross_workspace_items_in_find_value(empt
     param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
 
     with caplog.at_level(logging.WARNING):
-        ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+        ok, _msg = empty_parameter._validate_required_values("find_replace", param_dict)
 
     assert ok is True
     expected_warning = constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, "dev")
