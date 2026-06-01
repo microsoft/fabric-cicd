@@ -707,8 +707,22 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
-        # Validate find_value is a valid regex if is_regex is set to true
         if param_name == "find_replace":
+            # Reject $items.* in find_value — resolves to target env values that can't exist in source files
+            find_value = param_dict.get("find_value", "")
+            if find_value.startswith("$items."):
+                return False, constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
+
+            # Warn on cross-workspace item references — allowed but depend on runtime state
+            if find_value.startswith("$workspace."):
+                var_string = find_value.removeprefix("$workspace.")
+                if ".$items." in var_string:
+                    workspace_name = var_string.split(".$items.", 1)[0].strip()
+                    logger.warning(
+                        constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, workspace_name)
+                    )
+
+            # Validate find_value is a valid regex if is_regex is set to true
             is_valid, msg = self._validate_find_regex(param_name, param_dict)
             if not is_valid:
                 return False, msg

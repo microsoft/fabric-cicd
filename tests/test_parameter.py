@@ -2623,6 +2623,30 @@ def test_validate_required_values_integration_calls_find_key_validator(empty_par
     assert "must be an absolute JSONPath" in msg
 
 
+def test_validate_required_values_rejects_items_in_find_value(empty_parameter):
+    """Validation rejects $items.* in find_value (resolves to target env, can't exist in source)."""
+    find_value = "$items.Lakehouse.Example.$id"
+    param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
+    ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    assert ok is False
+    assert msg == constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
+
+
+def test_validate_required_values_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
+    """Validation warns on cross-workspace $items references in find_value."""
+    import logging
+
+    find_value = "$workspace.dev.$items.Lakehouse.Example.$id"
+    param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
+
+    with caplog.at_level(logging.WARNING):
+        ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+
+    assert ok is True
+    expected_warning = constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, "dev")
+    assert expected_warning in caplog.text
+
+
 def test_validate_and_evaluate_bracket_key_with_yaml(empty_parameter):
     """JSONPath with bracket notation should parse and match YAML keys with spaces."""
     import yaml
