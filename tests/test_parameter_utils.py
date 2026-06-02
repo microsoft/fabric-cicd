@@ -222,6 +222,14 @@ class TestParameterUtilities:
 
         assert result == {"pattern": "cross-item-id", "is_regex": False, "has_matches": True}
 
+    def test_extract_find_value_rejects_items_variable(self, mock_workspace):
+        """Tests extract_find_value raises InputError when $items.* is used in find_value."""
+        find_value = "$items.Lakehouse.Example.$id"
+        param_dict = {"find_value": find_value}
+
+        with pytest.raises(InputError, match=re.escape(find_value)):
+            extract_find_value(param_dict, "some content", True, workspace_obj=mock_workspace)
+
     def test_extract_replace_value_default(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=False."""
         # Regular string should be returned as is
