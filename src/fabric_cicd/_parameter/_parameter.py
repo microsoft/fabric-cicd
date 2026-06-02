@@ -722,6 +722,13 @@ class Parameter:
                         constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, workspace_name)
                     )
 
+            # Reject combining dynamic variables with is_regex — these are separate features
+            # Only check for $workspace. prefix (not bare $) to avoid flagging legitimate regex anchors
+            is_regex_val = param_dict.get("is_regex", "")
+            is_regex = isinstance(is_regex_val, str) and is_regex_val.lower() == "true"
+            if is_regex and find_value.startswith("$workspace."):
+                return False, constants.PARAMETER_MSGS["incompatible_find_value_regex_variable"].format(find_value)
+
             # Validate find_value is a valid regex if is_regex is set to true
             is_valid, msg = self._validate_find_regex(param_name, param_dict)
             if not is_valid:

@@ -2647,6 +2647,23 @@ def test_validate_required_values_warns_cross_workspace_items_in_find_value(empt
     assert expected_warning in caplog.text
 
 
+def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_parameter):
+    """Validation rejects combining is_regex with $workspace.* dynamic variable in find_value."""
+    find_value = "$workspace.dev.$id"
+    param_dict = {"find_value": find_value, "is_regex": "true", "replace_value": {"DEV": "some-id"}}
+    ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    assert ok is False
+    assert msg == constants.PARAMETER_MSGS["incompatible_find_value_regex_variable"].format(find_value)
+
+
+def test_validate_required_values_allows_regex_with_dollar_anchor(empty_parameter):
+    """Validation allows legitimate regex patterns starting with $ (regex anchor) when is_regex is set."""
+    # A regex pattern like "value$" or "$" at the start is a regex anchor, not a dynamic variable
+    param_dict = {"find_value": "value=(\\w+)$", "is_regex": "true", "replace_value": {"DEV": "new-val"}}
+    ok, _msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    assert ok is True
+
+
 def test_validate_and_evaluate_bracket_key_with_yaml(empty_parameter):
     """JSONPath with bracket notation should parse and match YAML keys with spaces."""
     import yaml

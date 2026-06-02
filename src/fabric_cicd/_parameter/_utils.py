@@ -107,6 +107,10 @@ def extract_find_value(
         find_value = extract_replace_value(workspace_obj, find_value)
         logger.debug(f"Resolved variable {find_value_var} in find_value to: {find_value}")
 
+        # Guard against empty resolved value — prevents "" in file_content (always True) causing file corruption
+        if not find_value:
+            return {"pattern": "", "is_regex": False, "has_matches": False}
+
     # Regex find_value
     if is_regex:
         try:

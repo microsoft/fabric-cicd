@@ -230,6 +230,13 @@ class TestParameterUtilities:
         with pytest.raises(InputError, match=re.escape(find_value)):
             extract_find_value(param_dict, "some content", True, workspace_obj=mock_workspace)
 
+    def test_extract_find_value_dynamic_variable_resolves_empty(self, mock_workspace):
+        """Tests extract_find_value returns no-op when dynamic variable resolves to empty string."""
+        mock_workspace._resolve_workspace_id.return_value = ""
+        param_dict = {"find_value": "$workspace.nonexistent"}
+        expected = {"pattern": "", "is_regex": False, "has_matches": False}
+        assert extract_find_value(param_dict, "any content", True, workspace_obj=mock_workspace) == expected
+
     def test_extract_replace_value_default(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=False."""
         # Regular string should be returned as is
