@@ -171,6 +171,8 @@ def get_source_dataflow_name(
         filter_match = check_replacement(
             input_type, input_name, input_path, ItemType.DATAFLOW.value, item_name, file_path
         )
+        # workspace_obj intentionally not passed — find_value must be a literal GUID or regex pattern
+        # to match against the dataflow ID extracted from file content
         find_info = extract_find_value(param, file_content, filter_match)
 
         # Skip if this parameter doesn't match the dataflow ID

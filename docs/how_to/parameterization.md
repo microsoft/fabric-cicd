@@ -214,11 +214,16 @@ find_replace:
 
 ### Dynamic Replacement
 
-The `find_replace` parameter (`find_value` and `replace_value`) and `key_value_replace` parameter (`replace_value`) support fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
+The `find_replace` and `key_value_replace` parameters support fabric-cicd defined _variables_ that reference workspace or deployed item metadata. Variable support differs by field:
+
+- **`replace_value`** (both `find_replace` and `key_value_replace`): supports `$items.*` and `$workspace.*` variables.
+- **`find_value`** (`find_replace`): supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`). Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched.
+- **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression.
+
+Additional notes:
 
 - **`$items` variables resolve for items that exist in the `repository_directory`.** Cross-workspace variables (`$workspace.<name>.$items...`) reference items outside the repository — these items must exist in the specified workspace at deployment time.
 - Within a single parameter entry, `replace_value` can mix static strings and variables across environments, e.g. `PPE` set to a literal GUID and `PROD` set to a `$workspace.$id` variable.
-- **Limitation:** `$items.<item_type>.<item_name>.$<attribute>` is not supported in `find_value` because it resolves to target workspace values that cannot exist in source files being searched. All other `$workspace` variables are supported in `find_value`.
 
 - **Supported variables:**
     - **Workspace variables:** resolve the target workspace's properties (ID, name) or look up metadata from a named workspace.
