@@ -128,9 +128,9 @@ class TestParameterUtilities:
         """Tests extract_find_value with string."""
         # Test with plain text
         param_dict = {"find_value": "test-value"}
-        expected = {"pattern": "test-value", "is_regex": False, "has_matches": True}
+        expected = {"pattern": "test-value", "is_regex": False, "has_matches": True, "ignore_case": False}
         assert extract_find_value(param_dict, "content with test-value", True) == expected
-        expected_no_match = {"pattern": "test-value", "is_regex": False, "has_matches": False}
+        expected_no_match = {"pattern": "test-value", "is_regex": False, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
 
     def test_extract_find_value_valid_regex(self):
@@ -138,13 +138,13 @@ class TestParameterUtilities:
         param_dict = {"find_value": "id=([\\w-]+)", "is_regex": "true"}
 
         # Test with regex
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert extract_find_value(param_dict, "content with id=abc-123", True) == expected
         # Test with non-matching regex
-        expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
+        expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
         # Test with regex but filter_match=False - should still return is_regex=True
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "content with id=abc-123", False) == expected
 
     def test_extract_find_value_invalid_regex(self):
@@ -182,13 +182,13 @@ class TestParameterUtilities:
         # Test with multiple matches in content - now returns simple dict format
         content_with_multiple = "content with id=abc-123 and id=def-456 and id=ghi-789"
         result = extract_find_value(param_dict, content_with_multiple, True)
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert result == expected
 
         # Test that content is detected as having matches
         content_with_duplicates = "content with id=abc-123 and id=def-456 and id=abc-123"
         result = extract_find_value(param_dict, content_with_duplicates, True)
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert result == expected
 
     def test_extract_replace_value_default(self, mock_workspace):

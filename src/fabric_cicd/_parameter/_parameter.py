@@ -29,7 +29,7 @@ class Parameter:
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
             "minimum": {"find_value", "replace_value"},
-            "maximum": {"find_value", "replace_value", "is_regex", "item_type", "item_name", "file_path"},
+            "maximum": {"find_value", "replace_value", "is_regex", "ignore_case", "item_type", "item_name", "file_path"},
         },
         "spark_pool": {
             "minimum": {"instance_pool_id", "replace_value"},

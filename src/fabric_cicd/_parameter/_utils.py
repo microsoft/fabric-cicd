@@ -81,18 +81,21 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
         - 'pattern': The find pattern (original string or regex pattern)
         - 'is_regex': Whether this is a regex pattern
         - 'has_matches': Whether any matches were found
+        - 'ignore_case': Whether case-insensitive matching is enabled
     """
     find_value = param_dict.get("find_value")
     is_regex = param_dict.get("is_regex", "").lower() == "true"
+    ignore_case = param_dict.get("ignore_case", "").lower() == "true"
+    flags = re.IGNORECASE if ignore_case else 0
 
     # No find value -> nothing to do
     if not find_value:
-        return {"pattern": "", "is_regex": False, "has_matches": False}
+        return {"pattern": "", "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
 
     # Regex find_value
     if is_regex:
         try:
-            compiled = re.compile(find_value)
+            compiled = re.compile(find_value, flags)
         except re.error as re_err:
             msg = f"Invalid regex '{find_value}': {re_err}"
             raise InputError(msg, logger) from re_err
@@ -102,18 +105,21 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
 
         # If file excluded by filters, do not search — return no-match but keep validation
         if not filter_match:
-            return {"pattern": find_value, "is_regex": True, "has_matches": False}
+            return {"pattern": find_value, "is_regex": True, "has_matches": False, "ignore_case": ignore_case}
 
         matches = list(re.finditer(compiled, file_content))
         _validate_regex_pattern(matches, find_value)
 
-        return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches)}
+        return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches), "ignore_case": ignore_case}
 
     # Non-regex find_value
     if not filter_match:
-        return {"pattern": find_value, "is_regex": False, "has_matches": False}
+        return {"pattern": find_value, "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
 
-    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content}
+    if ignore_case:
+        return {"pattern": find_value, "is_regex": False, "has_matches": find_value.lower() in file_content.lower(), "ignore_case": ignore_case}
+
+    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content, "ignore_case": ignore_case}
 
 
 def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:

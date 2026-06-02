@@ -72,7 +72,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 ### `find_replace`
 
-For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. The `is_regex` field can be added and set to `"true"` to enable regex pattern matching for the `find_value`.
+For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. The `is_regex` field can be added and set to `"true"` to enable regex pattern matching for the `find_value`. The `ignore_case` field can be added and set to `"true"` to enable case-insensitive matching for the `find_value`.
 
 Note: A common use case for this function is to replace values in text based file types like notebooks.
 
@@ -86,6 +86,8 @@ find_replace:
       # Optional fields
       # Set to "true" to treat find_value as a regex pattern
       is_regex: "<true|True>"
+      # Set to "true" to enable case-insensitive matching for find_value
+      ignore_case: "<true|True>"
       # Filter values must be a string or array of strings
       item_type: <item-type-filter-value>
       item_name: <item-name-filter-value>
@@ -343,7 +345,37 @@ When optional fields are omitted or left empty, only basic parameterization func
 **Important:**
 
 - String input values should be wrapped in quotes. Remember to escape special characters, such as **\\** in `file_path` inputs.
-- `is_regex` and filter fields can be used in the same parameter configuration.
+- `is_regex`, `ignore_case`, and filter fields can be used in the same parameter configuration.
+
+### Case-Insensitive Matching
+
+#### `ignore_case`
+
+- Only applicable to the `find_replace` parameter.
+- Include `ignore_case` field to enable case-insensitive matching for the `find_value`.
+- When the `ignore_case` field is set to the **string** value `"true"` or `"True"` (case-insensitive), case-insensitive matching is enabled.
+- Works with both literal string and regex `find_value` patterns:
+    - **Literal string:** Matches and replaces all occurrences of the `find_value` regardless of casing in the file content (e.g., `"MyServer"` matches `"myserver"`, `"MYSERVER"`, etc.).
+    - **Regex pattern:** Compiles the regex with the case-insensitive flag, allowing the pattern to match regardless of character casing.
+- **Note:** The `replace_value` is always inserted literally as-is — it does not adapt to the casing of the matched text.
+
+```yaml
+find_replace:
+    # Case-insensitive literal string match
+    - find_value: "my-dev-server"
+      replace_value:
+          PPE: "my-ppe-server"
+          PROD: "my-prod-server"
+      ignore_case: "true"
+
+    # Case-insensitive regex match
+    - find_value: server_name=\"([^\"]+)\"
+      replace_value:
+          PPE: "ppe-server.database.windows.net"
+          PROD: "prod-server.database.windows.net"
+      is_regex: "true"
+      ignore_case: "true"
+```
 
 ### Regex Pattern Match
 

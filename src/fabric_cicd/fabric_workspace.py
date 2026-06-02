@@ -538,6 +538,8 @@ class FabricWorkspace:
                     if replace_value:
                         pattern = find_info["pattern"]
                         is_regex = find_info["is_regex"]
+                        ignore_case = find_info["ignore_case"]
+                        flags = re.IGNORECASE if ignore_case else 0
 
                         if is_regex:
                             # For regex patterns, use re.sub with lambda to replace only the captured group
@@ -552,13 +554,17 @@ class FabricWorkspace:
                                     + match.group(0)[match.end(1) - match.start(0) :]
                                 ),
                                 raw_file,
+                                flags=flags,
                             )
                             logger.debug(
                                 f"Replacing regex pattern '{pattern}' captured group with '{replace_value}' in {item_name}.{item_type}"
                             )
                         else:
-                            # For non-regex matches, replace as before
-                            raw_file = raw_file.replace(pattern, replace_value)
+                            # For non-regex matches, use re.sub when case-insensitive, otherwise plain replace
+                            if ignore_case:
+                                raw_file = re.sub(re.escape(pattern), replace_value, raw_file, flags=re.IGNORECASE)
+                            else:
+                                raw_file = raw_file.replace(pattern, replace_value)
                             logger.debug(f"Replacing '{pattern}' with '{replace_value}' in {item_name}.{item_type}")
 
         return raw_file
