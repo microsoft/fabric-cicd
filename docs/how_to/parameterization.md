@@ -217,7 +217,7 @@ find_replace:
 The `find_replace` and `key_value_replace` parameters support fabric-cicd defined _variables_ that reference workspace or deployed item metadata. Variable support differs by field:
 
 - **`replace_value`** (both `find_replace` and `key_value_replace`): supports `$items.*` and `$workspace.*` variables.
-- **`find_value`** (`find_replace`): supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`). Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched.
+- **`find_value`** (`find_replace`): supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`). Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched. **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both.
 - **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression.
 
 Additional notes:
@@ -358,6 +358,7 @@ When optional fields are omitted or left empty, only basic parameterization func
 - Include `is_regex` field when setting the `find_value` to a **valid regex pattern.**
 - When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
 - When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
+- **`is_regex` cannot be combined with dynamic replacement variables** (e.g., `$workspace.*`) in `find_value`. Dynamic variables resolve to plain strings at runtime, making regex matching redundant. Use one feature or the other.
 
 ### Supported File Filters
 
