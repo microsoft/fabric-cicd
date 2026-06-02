@@ -96,7 +96,7 @@ def extract_find_value(
         return {"pattern": "", "is_regex": False, "has_matches": False}
 
     # Resolve dynamic variable in find_value if present
-    if find_value and find_value.startswith("$") and workspace_obj is not None:
+    if find_value.startswith("$") and workspace_obj is not None:
         # $items.* is never valid in find_value — it resolves to target-env IDs that can't exist in source files
         if find_value.startswith("$items."):
             msg = constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
