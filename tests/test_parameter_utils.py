@@ -191,6 +191,32 @@ class TestParameterUtilities:
         expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert result == expected
 
+    def test_extract_find_value_ignore_case_literal(self):
+        """Tests extract_find_value with ignore_case: 'true' for literal find_value."""
+        param_dict = {"find_value": "Test-Value", "ignore_case": "true"}
+
+        # Case-insensitive match should find the value regardless of case
+        expected = {"pattern": "Test-Value", "is_regex": False, "has_matches": True, "ignore_case": True}
+        assert extract_find_value(param_dict, "content with test-value here", True) == expected
+        assert extract_find_value(param_dict, "content with TEST-VALUE here", True) == expected
+
+        # Non-matching content should still return has_matches=False
+        expected_no_match = {"pattern": "Test-Value", "is_regex": False, "has_matches": False, "ignore_case": True}
+        assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
+
+    def test_extract_find_value_ignore_case_regex(self):
+        """Tests extract_find_value with ignore_case: 'true' for regex find_value."""
+        param_dict = {"find_value": "ID=([\\w-]+)", "is_regex": "true", "ignore_case": "true"}
+
+        # Case-insensitive regex should match regardless of case
+        expected = {"pattern": "ID=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": True}
+        assert extract_find_value(param_dict, "content with id=abc-123", True) == expected
+        assert extract_find_value(param_dict, "content with Id=Abc-123", True) == expected
+
+        # Non-matching content
+        expected_no_match = {"pattern": "ID=([\\w-]+)", "is_regex": True, "has_matches": False, "ignore_case": True}
+        assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
+
     def test_extract_replace_value_default(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=False."""
         # Regular string should be returned as is

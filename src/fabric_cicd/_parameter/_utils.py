@@ -84,8 +84,8 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
         - 'ignore_case': Whether case-insensitive matching is enabled
     """
     find_value = param_dict.get("find_value")
-    is_regex = param_dict.get("is_regex", "").lower() == "true"
-    ignore_case = param_dict.get("ignore_case", "").lower() == "true"
+    is_regex = str(param_dict.get("is_regex", "")).lower() == "true"
+    ignore_case = str(param_dict.get("ignore_case", "")).lower() == "true"
     flags = re.IGNORECASE if ignore_case else 0
 
     # No find value -> nothing to do

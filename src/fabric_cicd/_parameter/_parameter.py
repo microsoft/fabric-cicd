@@ -709,9 +709,25 @@ class Parameter:
 
         # Validate find_value is a valid regex if is_regex is set to true
         if param_name == "find_replace":
+            # Validate is_regex type if present
+            if param_dict.get("is_regex") is not None:
+                is_valid, msg = self._validate_data_type(
+                    param_dict["is_regex"], "string", "is_regex", param_name
+                )
+                if not is_valid:
+                    return False, msg
+
             is_valid, msg = self._validate_find_regex(param_name, param_dict)
             if not is_valid:
                 return False, msg
+
+            # Validate ignore_case type if present
+            if param_dict.get("ignore_case") is not None:
+                is_valid, msg = self._validate_data_type(
+                    param_dict["ignore_case"], "string", "ignore_case", param_name
+                )
+                if not is_valid:
+                    return False, msg
 
         if param_name == "key_value_replace":
             is_valid, msg = self._validate_key_value_find_key(param_dict)

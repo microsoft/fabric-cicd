@@ -562,7 +562,12 @@ class FabricWorkspace:
                         else:
                             # For non-regex matches, use re.sub when case-insensitive, otherwise plain replace
                             if ignore_case:
-                                raw_file = re.sub(re.escape(pattern), replace_value, raw_file, flags=re.IGNORECASE)
+                                raw_file = re.sub(
+                                    re.escape(pattern),
+                                    lambda _match, repl=replace_value: repl,
+                                    raw_file,
+                                    flags=re.IGNORECASE,
+                                )
                             else:
                                 raw_file = raw_file.replace(pattern, replace_value)
                             logger.debug(f"Replacing '{pattern}' with '{replace_value}' in {item_name}.{item_type}")
