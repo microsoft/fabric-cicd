@@ -214,10 +214,11 @@ def run_notebook(headers: dict, ws_id: str, notebook_id: str) -> None:
             return
 
 
-def main() -> None:
-    ws = get_workspace("DEV", realm_mode=False)
+def run(env: str = "DEV", realm_mode: bool = False) -> None:
+    env = env.upper()
+    ws = get_workspace(env, realm_mode=realm_mode)
     if not ws.workspace_id:
-        log("DEV workspace_id is empty. Run 'python fabriccicd.py create DEV' first.")
+        log(f"{env} workspace_id is empty. Run 'python fabriccicd.py create {env}' first.")
         sys.exit(1)
     ws_id = ws.workspace_id
     log(f"Workspace: {ws_id}")
@@ -234,6 +235,11 @@ def main() -> None:
     log(f"Notebook ID: {notebook_id}")
 
     run_notebook(headers, ws_id, notebook_id)
+
+
+def main() -> None:
+    env = (sys.argv[1] if len(sys.argv) > 1 else "DEV").upper()
+    run(env)
 
 
 if __name__ == "__main__":

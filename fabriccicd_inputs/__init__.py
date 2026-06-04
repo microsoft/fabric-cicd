@@ -10,6 +10,10 @@ module.
 Resolve a workspace via ``get_workspace(env, realm_mode=False)``.
 """
 
+import os
+from dataclasses import replace
+from pathlib import Path
+
 from . import (
     msit_dev,
     msit_prod,
@@ -29,6 +33,7 @@ from ._schema import (
     Pipeline,
     PipelineActivity,
     ProjectMetadata,
+    Schedule,
     SourceControlProvider,
     SourceControlSettings,
     SparkEnvironment,
@@ -55,11 +60,36 @@ REALM_WORKSPACES: dict[str, WorkspaceEnvironment] = {
     "PROD": realm_prod.WORKSPACE,
 }
 
+# Sidecar directory used to persist personal DEV workspace IDs when
+# ``FABRICCICD_USER`` is set. Kept outside the shared input files so multiple
+# developers can each have their own DEV workspace without checked-in conflicts.
+_PERSONAL_ID_DIR = Path(__file__).parent / ".local"
+
+
+def _sanitize_user(user: str) -> str:
+    """Restrict FABRICCICD_USER to a safe filename charset to prevent path traversal."""
+    raw = user.strip().lower()
+    safe = "".join(ch if (ch.isalnum() or ch in "_-") else "_" for ch in raw).strip("_")
+    if not safe:
+        msg = "FABRICCICD_USER resolves to an empty value after sanitization"
+        raise ValueError(msg)
+    return safe
+
+
+def _personal_id_path(mode: str, env: str, user: str) -> Path:
+    """Return the sidecar path that stores a developer's personal workspace ID for ``env``."""
+    return _PERSONAL_ID_DIR / f"{mode}_{env.lower()}_{_sanitize_user(user)}.id"
+
 
 def get_workspace(env: str, realm_mode: bool = False) -> WorkspaceEnvironment:
     """Return the ``WorkspaceEnvironment`` for the given target (DEV/TEST/PROD).
 
     ``realm_mode`` selects between the MSIT (default) and Realm input sets.
+
+    When ``FABRICCICD_USER`` is set, the returned workspace's ``workspace_id``
+    is replaced with the developer's personal value (read from a sidecar file
+    under ``fabriccicd_inputs/.local/``). This isolates each developer's
+    DEV/TEST/PROD workspaces from the shared input files.
     """
     table = REALM_WORKSPACES if realm_mode else MSIT_WORKSPACES
     key = env.upper()
@@ -67,7 +97,16 @@ def get_workspace(env: str, realm_mode: bool = False) -> WorkspaceEnvironment:
         valid = ", ".join(table.keys())
         msg = f"Unknown environment '{env}'. Valid values: {valid}"
         raise ValueError(msg)
-    return table[key]
+    ws = table[key]
+
+    user = os.environ.get("FABRICCICD_USER", "").strip().lower()
+    if user:
+        mode = "realm" if realm_mode else "msit"
+        sidecar = _personal_id_path(mode, key, user)
+        personal_id = sidecar.read_text(encoding="utf-8").strip() if sidecar.exists() else ""
+        # Return a copy so per-user overrides don't leak into the shared module-level instance.
+        ws = replace(ws, workspace_id=personal_id)
+    return ws
 
 
 def _print_summary() -> None:
@@ -112,6 +151,7 @@ __all__ = [
     "Pipeline",
     "PipelineActivity",
     "ProjectMetadata",
+    "Schedule",
     "SourceControlProvider",
     "SourceControlSettings",
     "SparkEnvironment",

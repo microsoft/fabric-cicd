@@ -24,7 +24,6 @@ WORKSPACE = WorkspaceEnvironment(
         tenant_id="33e01921-4d64-4f8c-a055-5bdaffd5e33d",
         project_name="fabric-cicd",
     ),
-    repo_path=r"c:\Users\v-vijareddy\Asimov-vNext-Deployment\fabric",
     source_control=SourceControlSettings(
         provider=SourceControlProvider.AzureDevOps,
         organization="msazure",

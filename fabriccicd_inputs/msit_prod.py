@@ -1,61 +1,17 @@
-"""MSIT PROD workspace definition - all values inlined (no shared/common module)."""
+"""MSIT PROD workspace definition.
 
-from ._schema import (
-    FabricCapacity,
-    Identity,
-    IdentityKind,
-    LakehouseDefinition,
-    ProjectMetadata,
-    SourceControlProvider,
-    SourceControlSettings,
-    TargetEnvironment,
-    WorkspaceEnvironment,
-    WorkspaceRole,
-)
+Inherits the full item set from ``msit_dev`` and overrides only env-specific
+fields. See ``msit_test.py`` for the same pattern.
+"""
 
-WORKSPACE = WorkspaceEnvironment(
+from dataclasses import replace
+
+from ._schema import TargetEnvironment
+from .msit_dev import WORKSPACE as DEV_WORKSPACE
+
+WORKSPACE = replace(
+    DEV_WORKSPACE,
     target=TargetEnvironment.PROD,
-    workspace_prefix="fabric-cicd",
-    workspace_name="",
+    workspace_name="",  # resolve to "fabric-cicd-prod" (or personal via FABRICCICD_USER)
     workspace_id="404e3248-3895-4834-bb58-b098491f6680",
-    capacity=FabricCapacity(
-        capacity_id="F41BC187-38C5-4835-817C-629BD784ADD7",
-        label="MSIT",
-    ),
-    metadata=ProjectMetadata(
-        owner="Core",
-        team="DnA",
-        tenant_id="33e01921-4d64-4f8c-a055-5bdaffd5e33d",
-        project_name="fabric-cicd",
-    ),
-    repo_path=r"c:\Users\v-vijareddy\Asimov-vNext-Deployment\fabric",
-    source_control=SourceControlSettings(
-        provider=SourceControlProvider.AzureDevOps,
-        organization="msazure",
-        project="One",
-        repository="Asimov-vNext-Deployment",
-        branch="main",
-        directory="fabric",
-    ),
-    access_control=[
-        Identity(
-            display_name="fabric-cicd-contributors",
-            object_id="cbb157e6-143f-4eb7-a9fb-688199a3b569",
-            kind=IdentityKind.Group,
-            workspace_role=WorkspaceRole.Contributor,
-        ),
-    ],
-    lakehouses=[
-        LakehouseDefinition(name="Lakehouse1"),
-        LakehouseDefinition(name="Lakehouse2"),
-        LakehouseDefinition(name="Lakehouse3"),
-        LakehouseDefinition(name="Lakehouse4"),
-        LakehouseDefinition(name="Lakehouse5"),
-    ],
-    spark_environments=[],
-    spark_job_definitions=[],
-    pipelines=[],
-    api_base="https://api.fabric.microsoft.com/v1",
-    realm_mode=False,
-    realm_id="",
 )

@@ -1,61 +1,20 @@
-"""MSIT TEST workspace definition - all values inlined (no shared/common module)."""
+"""MSIT TEST workspace definition.
 
-from ._schema import (
-    FabricCapacity,
-    Identity,
-    IdentityKind,
-    LakehouseDefinition,
-    ProjectMetadata,
-    SourceControlProvider,
-    SourceControlSettings,
-    TargetEnvironment,
-    WorkspaceEnvironment,
-    WorkspaceRole,
-)
+Inherits the full item set (lakehouses, access lists, spark env, SJDs, pipelines)
+from ``msit_dev`` and overrides only the env-specific fields (target,
+workspace_id, workspace_name). This guarantees TEST always carries the same
+items as DEV — adding a pipeline/SJD/lakehouse in ``msit_dev.py`` automatically
+applies here on the next deploy.
+"""
 
-WORKSPACE = WorkspaceEnvironment(
+from dataclasses import replace
+
+from ._schema import TargetEnvironment
+from .msit_dev import WORKSPACE as DEV_WORKSPACE
+
+WORKSPACE = replace(
+    DEV_WORKSPACE,
     target=TargetEnvironment.TEST,
-    workspace_prefix="fabric-cicd",
-    workspace_name="",
-    workspace_id="976eff69-63d6-4e0d-b952-658a888e287d",
-    capacity=FabricCapacity(
-        capacity_id="F41BC187-38C5-4835-817C-629BD784ADD7",
-        label="MSIT",
-    ),
-    metadata=ProjectMetadata(
-        owner="Core",
-        team="DnA",
-        tenant_id="33e01921-4d64-4f8c-a055-5bdaffd5e33d",
-        project_name="fabric-cicd",
-    ),
-    repo_path=r"c:\Users\v-vijareddy\Asimov-vNext-Deployment\fabric",
-    source_control=SourceControlSettings(
-        provider=SourceControlProvider.AzureDevOps,
-        organization="msazure",
-        project="One",
-        repository="Asimov-vNext-Deployment",
-        branch="dev",
-        directory="fabric",
-    ),
-    access_control=[
-        Identity(
-            display_name="fabric-cicd-contributors",
-            object_id="cbb157e6-143f-4eb7-a9fb-688199a3b569",
-            kind=IdentityKind.Group,
-            workspace_role=WorkspaceRole.Contributor,
-        ),
-    ],
-    lakehouses=[
-        LakehouseDefinition(name="Lakehouse1"),
-        LakehouseDefinition(name="Lakehouse2"),
-        LakehouseDefinition(name="Lakehouse3"),
-        LakehouseDefinition(name="Lakehouse4"),
-        LakehouseDefinition(name="Lakehouse5"),
-    ],
-    spark_environments=[],
-    spark_job_definitions=[],
-    pipelines=[],
-    api_base="https://api.fabric.microsoft.com/v1",
-    realm_mode=False,
-    realm_id="",
+    workspace_name="",  # resolve to "fabric-cicd-test" (or personal via FABRICCICD_USER)
+    workspace_id="",  # filled in by `python fabriccicd.py create TEST`
 )

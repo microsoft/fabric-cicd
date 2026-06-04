@@ -6,6 +6,8 @@ pipelines, etc.). There is no shared/common module - everything is explicit
 per env.
 """
 
+import os
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -111,6 +113,44 @@ class FileAccessEntry:
 
 
 @dataclass
+class Shortcut:
+    """OneLake shortcut: a pointer inside a lakehouse to data living elsewhere.
+
+    The shortcut appears under ``<path>/<name>`` of the parent lakehouse
+    (typically ``path="Tables"`` or ``path="Files"``). Source identifies where
+    the data actually lives. No data is copied.
+
+    Examples:
+        # Point to another Fabric lakehouse's table
+        Shortcut(name="shared_customers", path="Tables",
+                 source_type="OneLake",
+                 source_workspace_id="<ws-guid>",
+                 source_item_id="<lakehouse-guid>",
+                 source_path="Tables/customers")
+
+        # Point to ADLS Gen2 folder
+        Shortcut(name="raw_events", path="Files",
+                 source_type="AdlsGen2",
+                 source_location="https://<account>.dfs.core.windows.net",
+                 source_subpath="/container/events",
+                 connection_id="<connection-guid>")
+    """
+
+    name: str
+    path: str  # "Tables" or "Files"
+    source_type: str  # "OneLake" | "AdlsGen2" | "S3" | "GoogleCloudStorage" | "Dataverse"
+    # OneLake source fields
+    source_workspace_id: str = ""
+    source_item_id: str = ""
+    source_path: str = ""
+    # External source fields (ADLS / S3 / GCS)
+    source_location: str = ""
+    source_subpath: str = ""
+    connection_id: str = ""
+    enabled: bool = True
+
+
+@dataclass
 class LakehouseDefinition:
     """Definition of a lakehouse to provision and its access list."""
 
@@ -120,6 +160,7 @@ class LakehouseDefinition:
     access_list: list[DataAccessEntry] = field(default_factory=list)
     table_access: list[TableAccessEntry] = field(default_factory=list)
     file_access: list[FileAccessEntry] = field(default_factory=list)
+    shortcuts: list[Shortcut] = field(default_factory=list)
 
 
 @dataclass
@@ -191,6 +232,9 @@ class SparkJobDefinition:
     executable_file: str = "main.py"
     """File name under ``Main/`` (e.g. ``main.py`` or ``myapp.jar``)."""
 
+    local_executable_artifact: str = ""
+    """Local path to executable artifact uploaded during deploy for onelake:// paths."""
+
     main_class: str = ""
     """Entry class for JVM jobs (Scala/Java). Leave empty for Python/R."""
 
@@ -206,6 +250,32 @@ class SparkJobDefinition:
     """Name of a Spark environment declared in this same env. Resolved to ID at deploy time."""
 
     retry_policy: dict | None = None
+
+
+@dataclass
+class Schedule:
+    """Job schedule for a Fabric item (e.g. a pipeline).
+
+    Created via ``POST /workspaces/{ws}/items/{itemId}/jobSchedules``. Supports
+    ``Cron`` (recurring N units), ``Daily``, and ``Weekly`` configurations.
+
+    Examples:
+        Schedule(type="Cron", interval=30, interval_unit="Minutes",
+                 start="2026-06-01T00:00:00", end="2026-12-31T23:59:59")
+        Schedule(type="Daily", times=["09:00", "21:00"])
+        Schedule(type="Weekly", weekdays=["Monday","Friday"], times=["06:00"])
+    """
+
+    type: str = "Cron"  # "Cron" | "Daily" | "Weekly"
+    enabled: bool = True
+    interval: int = 30
+    interval_unit: str = "Minutes"  # "Minutes" | "Hours"
+    times: list[str] = field(default_factory=list)  # for Daily/Weekly, e.g. ["09:00"]
+    weekdays: list[str] = field(default_factory=list)  # for Weekly
+    start: str = ""  # ISO 8601, e.g. "2026-06-01T00:00:00"
+    end: str = ""
+    timezone: str = "UTC"
+    job_type: str = "Pipeline"  # job type used by Fabric scheduler
 
 
 @dataclass
@@ -236,6 +306,8 @@ class Pipeline:
     parameters: dict = field(default_factory=dict)
     variables: dict = field(default_factory=dict)
     annotations: list[str] = field(default_factory=list)
+    schedule: "Schedule | None" = None
+    schedules: list["Schedule"] = field(default_factory=list)
 
 
 @dataclass
@@ -268,8 +340,14 @@ class WorkspaceEnvironment:
 
     capacity: FabricCapacity
     metadata: ProjectMetadata
-    repo_path: str
     source_control: SourceControlSettings
+
+    repo_path: str = ""
+    """Optional. Absolute path to the local items directory for this environment.
+    When empty, ``fabriccicd.py`` auto-resolves it to ``<toolkit-root>/../fabric/<env>``
+    (i.e. ``fabric/dev/``, ``fabric/test/``, or ``fabric/prod/`` next to ``scripts/``),
+    so DEV / TEST / PROD each own a separate set of generated artifacts and never
+    overwrite each other on disk."""
 
     workspace_name: str = ""
     """Optional. If set, overrides ``<workspace_prefix>-<env>``."""
@@ -300,7 +378,89 @@ class WorkspaceEnvironment:
     realm_id: str = ""
 
     def resolved_workspace_name(self) -> str:
-        """Return the effective Fabric workspace display name for this env."""
+        """Return the effective Fabric workspace display name for this env.
+
+        If ``FABRICCICD_USER`` is set and ``workspace_name`` is not explicitly
+        overridden, the developer alias is injected so each engineer gets a
+        personal workspace (``<workspace_prefix>-<user>-<env>``) — applies to
+        DEV, TEST, and PROD alike. This avoids contention when multiple
+        developers iterate on the same project.
+        """
         if self.workspace_name:
             return self.workspace_name
-        return f"{self.workspace_prefix}-{self.target.value.lower()}"
+        base = f"{self.workspace_prefix}-{self.target.value.lower()}"
+        user = os.environ.get("FABRICCICD_USER", "").strip().lower()
+        if user:
+            return f"{self.workspace_prefix}-{user}-{self.target.value.lower()}"
+        return base
+
+
+# ---------------------------------------------------------------------------
+# Cross-reference helpers
+# ---------------------------------------------------------------------------
+
+
+def stable_logical_id(item_type: str, name: str) -> str:
+    """Deterministic per-(type, name) logicalId.
+
+    Matches the value the deployment driver writes into each item's
+    ``.platform`` file. Use this from inputs files when one item needs to
+    reference another by ID (e.g. a pipeline activity targeting a Spark Job
+    Definition). At publish time the upstream ``fabric-cicd`` library
+    rewrites these placeholder IDs to the real workspace GUIDs.
+    """
+    seed = f"{item_type}|{name}".lower()
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+
+
+def spark_job_activity(
+    activity_name: str,
+    sjd_name: str,
+    *,
+    depends_on: "list[str] | None" = None,
+    default_lakehouse: str = "",
+    additional_lakehouses: "list[str] | None" = None,
+    command_line_arguments: str = "",
+) -> "PipelineActivity":
+    """Build a ``FabricSparkJobDefinition`` activity that runs the named SJD.
+
+    ``sjd_name`` must match a ``SparkJobDefinition.name`` declared in the
+    same workspace. ``default_lakehouse`` / ``additional_lakehouses`` reference
+    ``LakehouseDefinition.name`` entries; their logicalIds are resolved by
+    fabric-cicd to real GUIDs at publish time. ``command_line_arguments``
+    overrides the SJD's default args for this activity invocation only.
+    """
+    type_properties: dict = {
+        "sparkJobDefinitionId": stable_logical_id("SparkJobDefinition", sjd_name),
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+    }
+    if default_lakehouse:
+        type_properties["defaultLakehouse"] = {
+            "workspaceId": "00000000-0000-0000-0000-000000000000",
+            "artifactId": stable_logical_id("Lakehouse", default_lakehouse),
+        }
+    if additional_lakehouses:
+        type_properties["additionalLakehouses"] = [
+            {
+                "workspaceId": "00000000-0000-0000-0000-000000000000",
+                "artifactId": stable_logical_id("Lakehouse", lh),
+                "name": lh,
+            }
+            for lh in additional_lakehouses
+        ]
+    if command_line_arguments:
+        type_properties["commandLineArguments"] = command_line_arguments
+    depends_on_payload = [{"activity": dep, "dependencyConditions": ["Succeeded"]} for dep in (depends_on or [])]
+    return PipelineActivity(
+        name=activity_name,
+        type="FabricSparkJobDefinition",
+        type_properties=type_properties,
+        depends_on=depends_on_payload,
+        policy={
+            "timeout": "0.12:00:00",
+            "retry": 0,
+            "retryIntervalInSeconds": 30,
+            "secureInput": False,
+            "secureOutput": False,
+        },
+    )

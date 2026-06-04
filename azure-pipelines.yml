@@ -1,0 +1,62 @@
+# Azure DevOps pipeline for Fabric CI/CD.
+#
+# Trigger: every push to the `dev` branch (e.g. when a PR is merged).
+# Action:  deploy items declared in `fabriccicd_inputs/msit_dev.py` to the
+#          MSIT DEV Fabric workspace (`fabric-cicd-dev`).
+#
+# Setup required in Azure DevOps (one-time) -- see azure-pipelines-SETUP.md.
+
+trigger:
+    branches:
+        include:
+            - dev
+    paths:
+        include:
+            - fabric/**
+            - scripts/fabriccicd.py
+            - scripts/fabriccicd_inputs/**
+            - scripts/requirements.txt
+            - azure-pipelines.yml
+
+pr: none
+
+pool:
+    vmImage: ubuntu-latest
+
+variables:
+    - group: fabric-cicd-secrets
+    - name: PYTHON_VERSION
+      value: "3.11"
+    - name: SCRIPTS_DIR
+      value: scripts
+
+stages:
+    - stage: Deploy_DEV
+      displayName: Deploy to MSIT DEV
+      jobs:
+          - job: Deploy
+            displayName: Deploy Fabric items
+            timeoutInMinutes: 60
+            steps:
+                - checkout: self
+                  displayName: Checkout repo
+
+                - task: UsePythonVersion@0
+                  inputs:
+                      versionSpec: $(PYTHON_VERSION)
+                  displayName: Use Python $(PYTHON_VERSION)
+
+                - script: |
+                      python -m pip install --upgrade pip
+                      pip install -r $(SCRIPTS_DIR)/requirements.txt
+                  displayName: Install Python dependencies
+
+                - script: python $(SCRIPTS_DIR)/fabriccicd.py check
+                  displayName: Repo duplicate-item scan
+
+                - script: python $(SCRIPTS_DIR)/fabriccicd.py deploy DEV
+                  displayName: Deploy items to MSIT DEV
+                  env:
+                      AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+                      AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+                      AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)

@@ -9,7 +9,7 @@
         "startDateTime": "2025-07-01T12:00:00",
         "endDateTime": "2029-07-01T12:00:00",
         "localTimeZoneId": "Pacific Standard Time",
-        "interval": 15
+        "interval": 1
       }
     }
   ]

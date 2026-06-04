@@ -8,23 +8,31 @@ from ._schema import (
     Identity,
     IdentityKind,
     LakehouseDefinition,
+    Pipeline,
+    PipelineActivity,
     ProjectMetadata,
+    Schedule,
+    Shortcut,
     SourceControlProvider,
     SourceControlSettings,
+    SparkEnvironment,
+    SparkJobDefinition,
+    SparkLanguage,
+    SparkLibrary,
     TableAccessEntry,
     TargetEnvironment,
     WorkspaceEnvironment,
     WorkspaceRole,
+    spark_job_activity,
 )
 
 WORKSPACE = WorkspaceEnvironment(
     target=TargetEnvironment.DEV,
     workspace_prefix="fabric-cicd",
     workspace_name="",  # leave empty to resolve to "fabric-cicd-dev"
-    workspace_id="34831a7c-bee0-4089-8d68-f1c0524bcb1d",
+    workspace_id="67a4353f-223f-46fa-92da-3ab5a5cacfd2",
     capacity=FabricCapacity(
         capacity_id="F41BC187-38C5-4835-817C-629BD784ADD7",
-        label="MSIT",
     ),
     metadata=ProjectMetadata(
         owner="Core",
@@ -32,13 +40,12 @@ WORKSPACE = WorkspaceEnvironment(
         tenant_id="33e01921-4d64-4f8c-a055-5bdaffd5e33d",
         project_name="fabric-cicd",
     ),
-    repo_path=r"c:\Users\v-vijareddy\Asimov-vNext-Deployment\fabric",
     source_control=SourceControlSettings(
         provider=SourceControlProvider.AzureDevOps,
         organization="msazure",
         project="One",
         repository="Asimov-vNext-Deployment",
-        branch="dev",
+        branch="main",
         directory="fabric",
     ),
     access_control=[
@@ -105,6 +112,16 @@ WORKSPACE = WorkspaceEnvironment(
                     permission=DataPermission.ReadWrite,
                 ),
             ],
+            shortcuts=[
+                Shortcut(
+                    name="adls_raw_events",
+                    path="Files",
+                    source_type="AdlsGen2",
+                    source_location="https://sdndevusw3.dfs.core.windows.net",
+                    source_subpath="/raw",
+                    connection_id="f4f4053b-95fe-46ca-8493-7cbac2e3cfde",
+                ),
+            ],
         ),
         LakehouseDefinition(
             name="Lakehouse3",
@@ -138,32 +155,80 @@ WORKSPACE = WorkspaceEnvironment(
         ),
     ],
     spark_environments=[
-        # Example - uncomment and customize per env.
-        # SparkEnvironment(
-        #     name="DevSparkEnv",
-        #     runtime_version="1.3",
-        #     spark_properties={"spark.sql.shuffle.partitions": "200"},
-        #     libraries=[SparkLibrary(file_name="my_utils-0.1.0-py3-none-any.whl")],
-        # ),
+        SparkEnvironment(
+            name="DevSparkEnv",
+            runtime_version="1.3",
+            spark_properties={"spark.sql.shuffle.partitions": "200"},
+            libraries=[SparkLibrary(file_name="my_utils-0.1.0-py3-none-any.whl")],
+        ),
     ],
     spark_job_definitions=[
-        # Example - uncomment and customize per env.
-        # SparkJobDefinition(
-        #     name="MyJob",
-        #     language=SparkLanguage.Python,
-        #     executable_file="main.py",
-        #     command_line_arguments="arg1 true",
-        #     additional_library_uris=["pipeline_config.py"],
-        #     default_lakehouse="Lakehouse1",
-        #     environment="DevSparkEnv",
-        # ),
+        SparkJobDefinition(
+            name="MyJob",
+            language=SparkLanguage.Scala,
+            executable_file="onelake://Lakehouse1/Files/JobArtifacts/my_job.jar",
+            local_executable_artifact="deploy_artifacts/my_job.jar",
+            main_class="com.contoso.fabric.MyJobMain",
+            command_line_arguments="arg1 true",
+            additional_library_uris=[],
+            default_lakehouse="Lakehouse1",
+            environment="DevSparkEnv",
+        ),
     ],
     pipelines=[
-        # Example - uncomment and customize per env.
-        # Pipeline(
-        #     name="MyPipeline",
-        #     activities=[],
-        # ),
+        Pipeline(
+            name="MyPipeline",
+            activities=[
+                PipelineActivity(
+                    name="Wait1",
+                    type="Wait",
+                    type_properties={"waitTimeInSeconds": 1},
+                    policy={
+                        "timeout": "0.12:00:00",
+                        "retry": 0,
+                        "retryIntervalInSeconds": 30,
+                        "secureInput": False,
+                        "secureOutput": False,
+                    },
+                ),
+                spark_job_activity(
+                    activity_name="RunMyJob",
+                    sjd_name="MyJob",
+                    depends_on=["Wait1"],
+                    default_lakehouse="Lakehouse1",
+                    additional_lakehouses=["Lakehouse2"],
+                    command_line_arguments="--env DEV --batch daily",
+                ),
+            ],
+            schedule=Schedule(
+                type="Cron",
+                enabled=True,
+                interval=1,
+                interval_unit="Minutes",
+                start="2026-05-27T16:04:08",
+                end="2026-12-31T23:59:59",
+                timezone="UTC",
+            ),
+            schedules=[
+                Schedule(
+                    type="Cron",
+                    enabled=True,
+                    interval=15,
+                    interval_unit="Minutes",
+                    start="2026-06-03T11:00:00",
+                    end="2027-06-03T11:00:00",
+                    timezone="Eastern Standard Time",
+                ),
+                Schedule(
+                    type="Daily",
+                    enabled=True,
+                    times=["11:00"],
+                    start="2026-06-03T11:00:00",
+                    end="2027-06-03T11:00:00",
+                    timezone="Eastern Standard Time",
+                ),
+            ],
+        ),
     ],
     api_base="https://api.fabric.microsoft.com/v1",
     realm_mode=False,
