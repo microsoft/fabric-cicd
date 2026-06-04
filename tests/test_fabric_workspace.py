@@ -601,6 +601,91 @@ find_replace:
     assert "ppe-replacement-value" in replaced_content_with_env, "Replacement should occur with matching environment"
 
 
+def test_environment_parameter_replacement_ignore_case(patched_fabric_workspace, temp_workspace_dir, valid_workspace_id):
+    """Test that find_replace with ignore_case performs case-insensitive replacement."""
+    parameter_content = """
+find_replace:
+    - find_value: "MyDevServer"
+      replace_value:
+        PPE: "my-ppe-server"
+        PROD: "my-prod-server"
+      ignore_case: "true"
+"""
+
+    notebook_dir = temp_workspace_dir / "Test Notebook.Notebook"
+    notebook_dir.mkdir(parents=True)
+
+    # Content has different casing than find_value
+    notebook_content = 'server = "MYDEVSERVER"\nbackup = "mydevserver"'
+
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (notebook_dir / "notebook-content.py").write_text(notebook_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+        )
+
+    test_item = Item(type="Notebook", name="Test Notebook", description="", guid="test-guid", path=notebook_dir)
+    test_file = File(item_path=notebook_dir, file_path=notebook_dir / "notebook-content.py")
+
+    result = workspace._replace_parameters(test_file, test_item)
+
+    # Both case variants should be replaced
+    assert "MYDEVSERVER" not in result
+    assert "mydevserver" not in result
+    assert result.count("my-ppe-server") == 2
+
+
+def test_environment_parameter_replacement_ignore_case_regex(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
+    """Test that find_replace with ignore_case and is_regex performs case-insensitive regex replacement."""
+    parameter_content = """
+find_replace:
+    - find_value: server_name="([^"]+)"
+      replace_value:
+        PPE: "ppe-server.database.windows.net"
+      is_regex: "true"
+      ignore_case: "true"
+"""
+
+    notebook_dir = temp_workspace_dir / "Test Notebook.Notebook"
+    notebook_dir.mkdir(parents=True)
+
+    # Content has different casing than regex pattern
+    notebook_content = 'SERVER_NAME="dev-server.database.windows.net"'
+
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (notebook_dir / "notebook-content.py").write_text(notebook_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+        )
+
+    test_item = Item(type="Notebook", name="Test Notebook", description="", guid="test-guid", path=notebook_dir)
+    test_file = File(item_path=notebook_dir, file_path=notebook_dir / "notebook-content.py")
+
+    result = workspace._replace_parameters(test_file, test_item)
+
+    # Regex captured group should be replaced, surrounding text preserved
+    assert "dev-server.database.windows.net" not in result
+    assert 'SERVER_NAME="ppe-server.database.windows.net"' in result
+
+
 def test_empty_logical_id_validation(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that empty logical IDs raise a ParsingError during repository refresh."""
     from fabric_cicd._common._exceptions import ParsingError
