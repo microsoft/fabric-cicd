@@ -128,9 +128,9 @@ class TestParameterUtilities:
         """Tests extract_find_value with string."""
         # Test with plain text
         param_dict = {"find_value": "test-value"}
-        expected = {"pattern": "test-value", "is_regex": False, "has_matches": True}
+        expected = {"pattern": "test-value", "is_regex": False, "has_matches": True, "ignore_case": False}
         assert extract_find_value(param_dict, "content with test-value", True) == expected
-        expected_no_match = {"pattern": "test-value", "is_regex": False, "has_matches": False}
+        expected_no_match = {"pattern": "test-value", "is_regex": False, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
 
     def test_extract_find_value_valid_regex(self):
@@ -138,13 +138,13 @@ class TestParameterUtilities:
         param_dict = {"find_value": "id=([\\w-]+)", "is_regex": "true"}
 
         # Test with regex
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert extract_find_value(param_dict, "content with id=abc-123", True) == expected
         # Test with non-matching regex
-        expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
+        expected_no_match = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
         # Test with regex but filter_match=False - should still return is_regex=True
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "content with id=abc-123", False) == expected
 
     def test_extract_find_value_invalid_regex(self):
@@ -182,19 +182,19 @@ class TestParameterUtilities:
         # Test with multiple matches in content - now returns simple dict format
         content_with_multiple = "content with id=abc-123 and id=def-456 and id=ghi-789"
         result = extract_find_value(param_dict, content_with_multiple, True)
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert result == expected
 
         # Test that content is detected as having matches
         content_with_duplicates = "content with id=abc-123 and id=def-456 and id=abc-123"
         result = extract_find_value(param_dict, content_with_duplicates, True)
-        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True}
+        expected = {"pattern": "id=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": False}
         assert result == expected
 
     def test_extract_find_value_dynamic_workspace_id(self, mock_workspace):
         """Tests extract_find_value resolves $workspace.$id when workspace_obj is provided."""
         param_dict = {"find_value": "$workspace.$id"}
-        expected = {"pattern": "mock-workspace-id", "is_regex": False, "has_matches": True}
+        expected = {"pattern": "mock-workspace-id", "is_regex": False, "has_matches": True, "ignore_case": False}
         assert (
             extract_find_value(param_dict, "content with mock-workspace-id", True, workspace_obj=mock_workspace)
             == expected
@@ -204,7 +204,7 @@ class TestParameterUtilities:
         """Tests extract_find_value resolves $workspace.<name>.$id when workspace_obj is provided."""
         mock_workspace._resolve_workspace_id.return_value = "dev-workspace-id"
         param_dict = {"find_value": "$workspace.dev.$id"}
-        expected = {"pattern": "dev-workspace-id", "is_regex": False, "has_matches": True}
+        expected = {"pattern": "dev-workspace-id", "is_regex": False, "has_matches": True, "ignore_case": False}
         assert (
             extract_find_value(param_dict, "content with dev-workspace-id", True, workspace_obj=mock_workspace)
             == expected
@@ -220,7 +220,7 @@ class TestParameterUtilities:
 
         result = extract_find_value(param_dict, "content with cross-item-id", True, workspace_obj=mock_workspace)
 
-        assert result == {"pattern": "cross-item-id", "is_regex": False, "has_matches": True}
+        assert result == {"pattern": "cross-item-id", "is_regex": False, "has_matches": True, "ignore_case": False}
 
     def test_extract_find_value_rejects_items_variable(self, mock_workspace):
         """Tests extract_find_value raises InputError when $items.* is used in find_value."""
@@ -234,8 +234,34 @@ class TestParameterUtilities:
         """Tests extract_find_value returns no-op when dynamic variable resolves to empty string."""
         mock_workspace._resolve_workspace_id.return_value = ""
         param_dict = {"find_value": "$workspace.nonexistent"}
-        expected = {"pattern": "", "is_regex": False, "has_matches": False}
+        expected = {"pattern": "", "is_regex": False, "has_matches": False, "ignore_case": False}
         assert extract_find_value(param_dict, "any content", True, workspace_obj=mock_workspace) == expected
+
+    def test_extract_find_value_ignore_case_literal(self):
+        """Tests extract_find_value with ignore_case: 'true' for literal find_value."""
+        param_dict = {"find_value": "Test-Value", "ignore_case": "true"}
+
+        # Case-insensitive match should find the value regardless of case
+        expected = {"pattern": "Test-Value", "is_regex": False, "has_matches": True, "ignore_case": True}
+        assert extract_find_value(param_dict, "content with test-value here", True) == expected
+        assert extract_find_value(param_dict, "content with TEST-VALUE here", True) == expected
+
+        # Non-matching content should still return has_matches=False
+        expected_no_match = {"pattern": "Test-Value", "is_regex": False, "has_matches": False, "ignore_case": True}
+        assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
+
+    def test_extract_find_value_ignore_case_regex(self):
+        """Tests extract_find_value with ignore_case: 'true' for regex find_value."""
+        param_dict = {"find_value": "ID=([\\w-]+)", "is_regex": "true", "ignore_case": "true"}
+
+        # Case-insensitive regex should match regardless of case
+        expected = {"pattern": "ID=([\\w-]+)", "is_regex": True, "has_matches": True, "ignore_case": True}
+        assert extract_find_value(param_dict, "content with id=abc-123", True) == expected
+        assert extract_find_value(param_dict, "content with Id=Abc-123", True) == expected
+
+        # Non-matching content
+        expected_no_match = {"pattern": "ID=([\\w-]+)", "is_regex": True, "has_matches": False, "ignore_case": True}
+        assert extract_find_value(param_dict, "unrelated content", True) == expected_no_match
 
     def test_extract_replace_value_default(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=False."""

@@ -213,6 +213,24 @@ find_replace:
       item_type: "Notebook"
 """
 
+SAMPLE_PARAMETER_INVALID_IS_REGEX_FALSE = """
+find_replace:
+    - find_value: "some_value"
+      replace_value:
+          PPE: "ppe_value"
+          PROD: "prod_value"
+      is_regex: False
+"""
+
+SAMPLE_PARAMETER_INVALID_IGNORE_CASE = """
+find_replace:
+    - find_value: "some_value"
+      replace_value:
+          PPE: "ppe_value"
+          PROD: "prod_value"
+      ignore_case: True
+"""
+
 SAMPLE_PARAMETER_ALL_ENV = """
 find_replace:
     # Required Fields 
@@ -354,6 +372,12 @@ def repository_directory(tmp_path):
 
     invalid_parameter_file_path8 = workspace_dir / "invalid_is_regex_parameter.yml"
     invalid_parameter_file_path8.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX)
+
+    invalid_parameter_file_path9 = workspace_dir / "invalid_ignore_case_parameter.yml"
+    invalid_parameter_file_path9.write_text(SAMPLE_PARAMETER_INVALID_IGNORE_CASE)
+
+    invalid_parameter_file_path10 = workspace_dir / "invalid_is_regex_false_parameter.yml"
+    invalid_parameter_file_path10.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX_FALSE)
 
     # Create duplicate keys parameter files
     duplicate_keys_file = workspace_dir / "duplicate_keys_parameter.yml"
@@ -1195,6 +1219,8 @@ def test_validate_item_name_with_accented_characters(repository_directory, item_
         ("invalid_yaml_struc_parameter.yml", False, "invalid load"),
         ("invalid_yaml_char_parameter.yml", False, "invalid load"),
         ("invalid_is_regex_parameter.yml", False, "invalid data type"),
+        ("invalid_is_regex_false_parameter.yml", False, "invalid data type"),
+        ("invalid_ignore_case_parameter.yml", False, "invalid data type"),
     ],
 )
 def test_validate_invalid_parameters(
@@ -1289,6 +1315,45 @@ def test_validate_invalid_parameters(
         assert param_obj._validate_parameter("find_replace") == (
             result,
             constants.PARAMETER_MSGS[msg].format("is_regex", "string", "find_replace"),
+        )
+
+    # Invalid is_regex value (False boolean) in find_replace parameter
+    if param_file_name == "invalid_is_regex_false_parameter.yml":
+        param_obj.environment_parameter = {
+            "find_replace": [
+                {
+                    "find_value": "some_value",
+                    "replace_value": {
+                        "PPE": "ppe_value",
+                        "PROD": "prod_value",
+                    },
+                    "is_regex": False,  # This is a boolean, not a string
+                }
+            ]
+        }
+        assert param_obj._validate_parameter("find_replace") == (
+            result,
+            constants.PARAMETER_MSGS[msg].format("is_regex", "string", "find_replace"),
+        )
+
+    # Invalid ignore_case value in find_replace parameter
+    if param_file_name == "invalid_ignore_case_parameter.yml":
+        # Mock the environment_parameter to have the invalid ignore_case (boolean instead of string)
+        param_obj.environment_parameter = {
+            "find_replace": [
+                {
+                    "find_value": "some_value",
+                    "replace_value": {
+                        "PPE": "ppe_value",
+                        "PROD": "prod_value",
+                    },
+                    "ignore_case": True,  # This is a boolean, not a string
+                }
+            ]
+        }
+        assert param_obj._validate_parameter("find_replace") == (
+            result,
+            constants.PARAMETER_MSGS[msg].format("ignore_case", "string", "find_replace"),
         )
 
 
