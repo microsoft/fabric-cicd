@@ -218,9 +218,12 @@ find_replace:
 
 The `find_replace` and `key_value_replace` parameters support fabric-cicd defined _variables_ that reference workspace or deployed item metadata. Variable support differs by field:
 
-- **`replace_value`** (both `find_replace` and `key_value_replace`): supports `$items.*` and `$workspace.*` variables.
-- **`find_value`** (`find_replace`): supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`). Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched. **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both.
-- **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression.
+- **`replace_value`** (both `find_replace` and `key_value_replace`): supports `$items.*` and `$workspace.*` variables
+- **`find_value`** (`find_replace`): 
+    - Supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`)
+    - Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched
+    - **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both
+- **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
 
 Additional notes:
 
