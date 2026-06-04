@@ -140,6 +140,8 @@ class FeatureFlag(str, Enum):
     """Set to enable collection of API responses during publish operations."""
     ENABLE_HARD_DELETE = "enable_hard_delete"
     """Set to enable hard deletion of items, bypassing the workspace recycle bin."""
+    ENABLE_BULK_PUBLISH = "enable_bulk_publish"
+    """Set to enable publishing of items using the bulk import API."""
 
 
 class OperationType(str, Enum):
@@ -162,6 +164,8 @@ UNPUBLISH_FLAG_MAPPING = {
 
 # Item Type
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
+BULK_UNSUPPORTED_ITEM_TYPES = [ItemType.WAREHOUSE.value]
+BULK_ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType if item_type.value not in BULK_UNSUPPORTED_ITEM_TYPES)
 
 # API URLs
 DEFAULT_API_ROOT_URL = validate_env_var_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
@@ -188,6 +192,9 @@ SHELL_ONLY_PUBLISH = [
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,
 ]
+
+# Item count limit for bulk publish API (as per current API documentation)
+BULK_ITEM_COUNT_LIMIT = 1000
 
 # Items that do not require assigned capacity
 NO_ASSIGNED_CAPACITY_REQUIRED = [ItemType.SEMANTIC_MODEL.value, ItemType.REPORT.value]

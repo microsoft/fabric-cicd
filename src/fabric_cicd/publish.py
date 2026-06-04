@@ -212,51 +212,95 @@ def publish_all_items(
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
-
+    
+    # Determine publishing mode path
+    if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
+        unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
+        if unsupported or fabric_workspace_obj.contains_param_vars:
+            reasons = []
+            # Contains item types that are not yet supported for bulk publish
+            if unsupported:
+                reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
+            # Contains parameter variables that require runtime resolution, which is not compatible with bulk publish
+            if fabric_workspace_obj.contains_param_vars:
+                reasons.append("parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution")
+            logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
+        else:
+            fabric_workspace_obj.bulk_publish_enabled = True
+    
+    # Ignore selective deployment parameters if bulk publish is enabled
+    if fabric_workspace_obj.bulk_publish_enabled:
+        ignored_params = []
+        if item_name_exclude_regex:
+            ignored_params.append("item_name_exclude_regex")
+        if folder_path_exclude_regex:
+            ignored_params.append("folder_path_exclude_regex")
+        if folder_path_to_include:
+            ignored_params.append("folder_path_to_include")
+        if items_to_include:
+            ignored_params.append("items_to_include")
+        if shortcut_exclude_regex:
+            ignored_params.append("shortcut_exclude_regex")
+        if ignored_params:
+            logger.warning(
+                f"Selective deployment parameters ignored in bulk publish mode: {', '.join(ignored_params)}."
+            )
+    
+    # Apply selective deployment features      
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
-        if folder_path_exclude_regex is not None and folder_path_to_include is not None:
-            msg = "Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include' simultaneously. Choose one filtering strategy."
-            raise InputError(msg, logger)
+        if not fabric_workspace_obj.bulk_publish_enabled:
+            if folder_path_exclude_regex is not None and folder_path_to_include is not None:
+                msg = "Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include' simultaneously. Choose one filtering strategy."
+                raise InputError(msg, logger)
 
-        if folder_path_exclude_regex is not None:
-            validate_folder_path_exclude_regex(folder_path_exclude_regex)
-            fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
+            if folder_path_exclude_regex is not None:
+                validate_folder_path_exclude_regex(folder_path_exclude_regex)
+                fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
-        if folder_path_to_include is not None:
-            validate_folder_path_to_include(folder_path_to_include)
-            fabric_workspace_obj.publish_folder_path_to_include = folder_path_to_include
+            if folder_path_to_include is not None:
+                validate_folder_path_to_include(folder_path_to_include)
+                fabric_workspace_obj.publish_folder_path_to_include = folder_path_to_include
 
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
-        fabric_workspace_obj._publish_folders()
+        
+        if not fabric_workspace_obj.bulk_publish_enabled:
+            fabric_workspace_obj._publish_folders()
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
+    
+    if not fabric_workspace_obj.bulk_publish_enabled:
+        if item_name_exclude_regex:
+            logger.warning(
+                "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+            )
+            fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
-    if item_name_exclude_regex:
-        logger.warning(
-            "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
-        fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+        if items_to_include is not None:
+            validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
+            fabric_workspace_obj.items_to_include = items_to_include
 
-    if items_to_include is not None:
-        validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
-        fabric_workspace_obj.items_to_include = items_to_include
-
-    if shortcut_exclude_regex:
-        validate_shortcut_exclude_regex(shortcut_exclude_regex)
-        fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
-
-    # Publish items in the defined order synchronously
-    total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
-    publishers_with_async_check: list[items.ItemPublisher] = []
-    for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
-        log_header(logger, f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
-        publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
-        publisher.publish_all()
-        if publisher.has_async_publish_check:
-            publishers_with_async_check.append(publisher)
-
+        if shortcut_exclude_regex:
+            validate_shortcut_exclude_regex(shortcut_exclude_regex)
+            fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
+        
+    # Execute chosen publish mode
+    if fabric_workspace_obj.bulk_publish_enabled:
+        # Publish all items in bulk (experimental)
+        log_header(logger, f"Publishing Items in Bulk")
+        publishers_with_async_check = items.ItemPublisher.publish_all_bulk(fabric_workspace_obj)
+    else:
+        # Publish items in the defined order synchronously (standard)
+        total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
+        publishers_with_async_check: list[items.ItemPublisher] = []
+        for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
+            log_header(logger, f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
+            publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
+            publisher.publish_all()
+            if publisher.has_async_publish_check:
+                publishers_with_async_check.append(publisher)
+    
     # Check asynchronous publish status for relevant item types
     for publisher in publishers_with_async_check:
         log_header(logger, f"Checking {publisher.item_type} Publish State")

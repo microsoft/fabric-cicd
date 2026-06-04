@@ -297,6 +297,42 @@ class ItemPublisher(Publisher):
             regex_pattern = re.compile(item_name_exclude_regex)
             return [name for name in to_delete_set if not regex_pattern.match(name)]
         return list(to_delete_set)
+    
+    @staticmethod
+    def publish_all_bulk(fabric_workspace_obj: "FabricWorkspace") -> list["ItemPublisher"]:
+        """
+        Execute a single bulk publish across all item types in scope.
+
+        Lifecycle:
+            1. pre_publish_all() — per type
+            2. get_items_to_publish() — per type, collect into one pool
+            3. _publish_items() — single cross-type API call
+            4. post_publish_all() — per type
+
+        Returns:
+            List of publishers that have async checks pending.
+        """
+        publishers: list[ItemPublisher] = []
+        items_with_context: list[tuple[str, Item, ItemPublisher]] = []
+
+        # Phase 1: Pre-hooks + collect items with their publisher context
+        for _order_num, item_type in ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
+            publisher = ItemPublisher.create(item_type, fabric_workspace_obj)
+            publisher.pre_publish_all()
+            type_items = publisher.get_items_to_publish()
+            for item_name, item in type_items.items():
+                items_with_context.append((item_name, item, publisher))
+            publishers.append(publisher)
+
+        # Phase 2: Single bulk API call (publisher context used inside for per-item transforms)
+        if items_with_context:
+            fabric_workspace_obj._publish_items(items_with_context)
+
+        # Phase 3: Post-hooks per type
+        for publisher in publishers:
+            publisher.post_publish_all()
+
+        return [p for p in publishers if p.has_async_publish_check]
 
     # endregion
 

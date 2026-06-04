@@ -141,6 +141,8 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+        self.contains_param_vars = False
+        self.bulk_publish_enabled = False
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
@@ -305,6 +307,9 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
+            dynamic_variables_found = parameter_obj._search_dynamic_replacement_variables_in_parameter_file()
+            if dynamic_variables_found:
+                self.contains_param_vars = True
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -798,6 +803,95 @@ class FabricWorkspace:
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published {item_type} '{item_name}'")
         return
+    
+    def _publish_items(self, items_with_context: list[tuple[str, "Item", object]]) -> None:
+        """
+        Publishes or updates items in bulk via the bulk import API.
+        
+        Args:
+            items_with_context: A list of tuples containing item name, Item object, and publisher context required for processing the item files.
+        """
+        # Prepare the definition parts for all items to be published in bulk
+        definition_parts = []
+        for item_name, item, publisher in items_with_context:
+            item_parts = self._prepare_bulk_item_parts(item, publisher)
+            definition_parts.extend(item_parts)
+
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
+        response = self.endpoint.invoke(
+            method="POST",
+            url=f"{self.base_api_url}/items/bulkImportDefinitions?beta=True",
+            body={
+                "definitionParts": definition_parts,
+                "options": {"allowPairingByName": False},
+            },
+        )
+        
+        # Log results grouped by operation type
+        details = response.get("body", {}).get("importItemDefinitionsDetails", [])
+        created = []
+        updated = []
+
+        for d in details:
+            item_type = d["itemType"]
+            item_name = d["itemDisplayName"]
+            item_id = d.get("itemId")
+
+            # Assign GUIDs from the response
+            if item_id and item_type in self.repository_items:
+                if item_name in self.repository_items[item_type]:
+                    self.repository_items[item_type][item_name].guid = item_id
+
+            # Store response if responses are being tracked
+            if self.responses is not None:
+                if item_type not in self.responses:
+                    self.responses[item_type] = {}
+                self.responses[item_type][item_name] = d
+
+            # Collect logging info
+            op = d.get("operationType")
+            label = f"{item_type}: {item_name}"
+            if op == "Create":
+                created.append(label)
+            elif op == "Update":
+                updated.append(label)
+
+        # Log after the loop
+        if created:
+            logger.info(f"{constants.INDENT}Published items (create): {sorted(created)}")
+        if updated:
+            logger.info(f"{constants.INDENT}Published items (update): {sorted(updated)}")
+
+    def _prepare_bulk_item_parts(self, item: "Item", publisher: object) -> list[dict]:
+        """
+        Prepare all file payload parts for a single item in bulk import format.
+        
+        Args:
+            item: The Item object.
+            publisher: The publisher context required for processing the item files.
+        """
+        exclude_path = getattr(publisher, "exclude_path", r"^(?!.*)")
+        func_process_file = getattr(publisher, "func_process_file", None)
+
+        # Build the workspace-relative prefix for this item's files, e.g., "/Folder1/Folder2/MyReport.Report"
+        item_dir_name = item.path.name 
+        folder_path = item.folder_path or ""
+        path_prefix = f"{folder_path}/{item_dir_name}"
+
+        parts = []
+        for file in item.item_files:
+            if not str(file.file_path).endswith(".platform"):
+                if re.match(exclude_path, file.relative_path):
+                    continue
+                if file.type == "text":
+                    file.contents = func_process_file(self, item, file) if func_process_file else file.contents
+                    file.contents = self._replace_parameters(file, item)
+            
+            payload = file.base64_payload
+            payload["path"] = f"{path_prefix}/{file.relative_path}"
+            parts.append(payload)
+
+        return parts
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """
