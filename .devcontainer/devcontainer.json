@@ -26,6 +26,6 @@
             }
         }
     },
-    "postCreateCommand": "npm install -g changie && uv sync --dev",
+    "postCreateCommand": "npm install -g changie@1.19.0 && uv sync --dev",
     "forwardPorts": [8000]
 }
