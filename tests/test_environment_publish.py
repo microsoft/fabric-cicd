@@ -224,6 +224,7 @@ def test_publish_environments_passes_func_process_file(tmp_path):
             self.endpoint = FakeEndpoint()
             self.repository_directory = tmp_path
             self.responses = None
+            self.bulk_publish_enabled = False
 
         def _get_workspace_pools(self):
             return []
@@ -280,6 +281,7 @@ def test_end_to_end_environment_setting_only(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
             self.environment_parameter = {}
+            self.bulk_publish_enabled = False
 
         def _get_workspace_pools(self):
             return []
@@ -342,6 +344,7 @@ def test_end_to_end_environment_with_libraries(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
             self.environment_parameter = {}
+            self.bulk_publish_enabled = False
 
         def _get_workspace_pools(self):
             return []
