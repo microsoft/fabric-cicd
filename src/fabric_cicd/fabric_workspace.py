@@ -814,17 +814,17 @@ class FabricWorkspace:
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published {item_type} '{item_name}'")
         return
-    
+
     def _publish_items(self, items_with_context: list[tuple[str, "Item", object]]) -> None:
         """
         Publishes or updates items in bulk via the bulk import API.
-        
+
         Args:
             items_with_context: A list of tuples containing item name, Item object, and publisher context required for processing the item files.
         """
         # Prepare the definition parts for all items to be published in bulk
         definition_parts = []
-        for item_name, item, publisher in items_with_context:
+        for _item_name, item, publisher in items_with_context:
             item_parts = self._prepare_bulk_item_parts(item, publisher)
             definition_parts.extend(item_parts)
 
@@ -837,7 +837,7 @@ class FabricWorkspace:
                 "options": {"allowPairingByName": False},
             },
         )
-        
+
         # Log results grouped by operation type
         details = response.get("body", {}).get("importItemDefinitionsDetails", [])
         created = []
@@ -849,9 +849,8 @@ class FabricWorkspace:
             item_id = d.get("itemId")
 
             # Assign GUIDs from the response
-            if item_id and item_type in self.repository_items:
-                if item_name in self.repository_items[item_type]:
-                    self.repository_items[item_type][item_name].guid = item_id
+            if (item_id and item_type in self.repository_items) and (item_name in self.repository_items[item_type]):
+                self.repository_items[item_type][item_name].guid = item_id
 
             # Store response if responses are being tracked
             if self.responses is not None:
@@ -876,7 +875,7 @@ class FabricWorkspace:
     def _prepare_bulk_item_parts(self, item: "Item", publisher: object) -> list[dict]:
         """
         Prepare all file payload parts for a single item in bulk import format.
-        
+
         Args:
             item: The Item object.
             publisher: The publisher context required for processing the item files.
@@ -885,7 +884,7 @@ class FabricWorkspace:
         func_process_file = getattr(publisher, "func_process_file", None)
 
         # Build the workspace-relative prefix for this item's files, e.g., "/Folder1/Folder2/MyReport.Report"
-        item_dir_name = item.path.name 
+        item_dir_name = item.path.name
         folder_path = item.folder_path or ""
         path_prefix = f"{folder_path}/{item_dir_name}"
 
@@ -897,7 +896,7 @@ class FabricWorkspace:
                 if file.type == "text":
                     file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                     file.contents = self._replace_parameters(file, item)
-            
+
             payload = file.base64_payload
             payload["path"] = f"{path_prefix}/{file.relative_path}"
             parts.append(payload)

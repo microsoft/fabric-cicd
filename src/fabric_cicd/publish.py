@@ -212,7 +212,7 @@ def publish_all_items(
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
-    
+
     # Determine publishing mode path
     if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
         unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
@@ -223,11 +223,13 @@ def publish_all_items(
                 reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
             # Contains parameter variables that require runtime resolution, which is not compatible with bulk publish
             if fabric_workspace_obj.contains_param_vars:
-                reasons.append("parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution")
+                reasons.append(
+                    "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
+                )
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
-    
+
     # Ignore selective deployment parameters if bulk publish is enabled
     if fabric_workspace_obj.bulk_publish_enabled:
         ignored_params = []
@@ -245,8 +247,8 @@ def publish_all_items(
             logger.warning(
                 f"Selective deployment parameters ignored in bulk publish mode: {', '.join(ignored_params)}."
             )
-    
-    # Apply selective deployment features      
+
+    # Apply selective deployment features
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         if not fabric_workspace_obj.bulk_publish_enabled:
             if folder_path_exclude_regex is not None and folder_path_to_include is not None:
@@ -263,13 +265,13 @@ def publish_all_items(
 
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
-        
+
         if not fabric_workspace_obj.bulk_publish_enabled:
             fabric_workspace_obj._publish_folders()
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
-    
+
     if not fabric_workspace_obj.bulk_publish_enabled:
         if item_name_exclude_regex:
             logger.warning(
@@ -284,11 +286,11 @@ def publish_all_items(
         if shortcut_exclude_regex:
             validate_shortcut_exclude_regex(shortcut_exclude_regex)
             fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
-        
+
     # Execute chosen publish mode
     if fabric_workspace_obj.bulk_publish_enabled:
         # Publish all items in bulk (experimental)
-        log_header(logger, f"Publishing Items in Bulk")
+        log_header(logger, "Publishing Items in Bulk")
         publishers_with_async_check = items.ItemPublisher.publish_all_bulk(fabric_workspace_obj)
     else:
         # Publish items in the defined order synchronously (standard)
@@ -300,7 +302,7 @@ def publish_all_items(
             publisher.publish_all()
             if publisher.has_async_publish_check:
                 publishers_with_async_check.append(publisher)
-    
+
     # Check asynchronous publish status for relevant item types
     for publisher in publishers_with_async_check:
         log_header(logger, f"Checking {publisher.item_type} Publish State")
