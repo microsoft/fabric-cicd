@@ -13,10 +13,6 @@
          <lastmod>2026-06-07</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/fabric-cicd/1.1.0/code_reference/</loc>
-         <lastmod>2026-06-07</lastmod>
-    </url>
-    <url>
          <loc>https://microsoft.github.io/fabric-cicd/1.1.0/example/</loc>
          <lastmod>2026-06-07</lastmod>
     </url>
@@ -45,10 +41,6 @@
          <lastmod>2026-06-07</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/fabric-cicd/1.1.0/how_to/item_types/</loc>
-         <lastmod>2026-06-07</lastmod>
-    </url>
-    <url>
          <loc>https://microsoft.github.io/fabric-cicd/1.1.0/how_to/optional_feature/</loc>
          <lastmod>2026-06-07</lastmod>
     </url>
@@ -58,6 +50,18 @@
     </url>
     <url>
          <loc>https://microsoft.github.io/fabric-cicd/1.1.0/how_to/troubleshooting/</loc>
+         <lastmod>2026-06-07</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/1.1.0/reference/</loc>
+         <lastmod>2026-06-07</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/1.1.0/reference/code_reference/</loc>
+         <lastmod>2026-06-07</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/fabric-cicd/1.1.0/reference/item_types/</loc>
          <lastmod>2026-06-07</lastmod>
     </url>
 </urlset>
