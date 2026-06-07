@@ -601,7 +601,9 @@ find_replace:
     assert "ppe-replacement-value" in replaced_content_with_env, "Replacement should occur with matching environment"
 
 
-def test_environment_parameter_replacement_ignore_case(patched_fabric_workspace, temp_workspace_dir, valid_workspace_id):
+def test_environment_parameter_replacement_ignore_case(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
     """Test that find_replace with ignore_case performs case-insensitive replacement."""
     parameter_content = """
 find_replace:
