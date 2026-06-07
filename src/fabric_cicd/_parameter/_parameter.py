@@ -29,7 +29,7 @@ class Parameter:
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
             "minimum": {"find_value", "replace_value"},
-            "maximum": {"find_value", "replace_value", "is_regex", "item_type", "item_name", "file_path"},
+            "maximum": {"find_value", "replace_value", "is_regex", "ignore_case", "item_type", "item_name", "file_path"},
         },
         "spark_pool": {
             "minimum": {"instance_pool_id", "replace_value"},
@@ -725,11 +725,48 @@ class Parameter:
             if not is_valid:
                 return False, msg
 
-        # Validate find_value is a valid regex if is_regex is set to true
         if param_name == "find_replace":
+            # Reject $items.* in find_value — resolves to target env values that can't exist in source files
+            find_value = param_dict.get("find_value", "")
+            if find_value.startswith("$items."):
+                return False, constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
+
+            # Warn on cross-workspace item references — allowed but depend on runtime state
+            if find_value.startswith("$workspace."):
+                var_string = find_value.removeprefix("$workspace.")
+                if ".$items." in var_string:
+                    workspace_name = var_string.split(".$items.", 1)[0].strip()
+                    logger.warning(
+                        constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, workspace_name)
+                    )
+
+            # Validate is_regex type if present
+            if param_dict.get("is_regex") is not None:
+                is_valid, msg = self._validate_data_type(
+                    param_dict["is_regex"], "string", "is_regex", param_name
+                )
+                if not is_valid:
+                    return False, msg
+
+            # Reject combining dynamic variables with is_regex — these are separate features
+            # Only check for $workspace. prefix (not bare $) to avoid flagging legitimate regex anchors
+            is_regex_val = param_dict.get("is_regex", "")
+            is_regex = isinstance(is_regex_val, str) and is_regex_val.lower() == "true"
+            if is_regex and find_value.startswith("$workspace."):
+                return False, constants.PARAMETER_MSGS["incompatible_find_value_regex_variable"].format(find_value)
+
+            # Validate find_value is a valid regex if is_regex is set to true
             is_valid, msg = self._validate_find_regex(param_name, param_dict)
             if not is_valid:
                 return False, msg
+
+            # Validate ignore_case type if present
+            if param_dict.get("ignore_case") is not None:
+                is_valid, msg = self._validate_data_type(
+                    param_dict["ignore_case"], "string", "ignore_case", param_name
+                )
+                if not is_valid:
+                    return False, msg
 
         if param_name == "key_value_replace":
             is_valid, msg = self._validate_key_value_find_key(param_dict)

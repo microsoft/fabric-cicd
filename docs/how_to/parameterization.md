@@ -72,7 +72,7 @@ Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?te
 
 ### `find_replace`
 
-For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. The `is_regex` field can be added and set to `"true"` to enable regex pattern matching for the `find_value`.
+For generic find-and-replace operations. This will replace every instance of a specified string in every file. Specify the `find_value` and the `replace_value` for each environment (e.g., PPE, PROD). Optional fields, including `item_type`, `item_name`, and `file_path`, can be used as file filters for more fine-grained control over where the replacement occurs. The `is_regex` field can be added and set to `"true"` to enable regex pattern matching for the `find_value`. The `ignore_case` field can be added and set to `"true"` to enable case-insensitive matching for the `find_value`.
 
 Note: A common use case for this function is to replace values in text based file types like notebooks.
 
@@ -86,6 +86,8 @@ find_replace:
       # Optional fields
       # Set to "true" to treat find_value as a regex pattern
       is_regex: "<true|True>"
+      # Set to "true" to enable case-insensitive matching for find_value
+      ignore_case: "<true|True>"
       # Filter values must be a string or array of strings
       item_type: <item-type-filter-value>
       item_name: <item-name-filter-value>
@@ -214,13 +216,22 @@ find_replace:
 
 ### Dynamic Replacement
 
-The `replace_value` field in the `find_replace` and `key_value_replace` parameters supports fabric-cicd defined _variables_ that reference workspace or deployed item metadata:
+The `find_replace` and `key_value_replace` parameters support fabric-cicd defined _variables_ that reference workspace or deployed item metadata. Variable support differs by field:
 
-- **Dynamic workspace/item metadata replacement ONLY works for referenced items that exist in the `repository_directory`.**
-- Dynamic replacement works in tandem with `find_value` (for `find_replace`) as either a regex or a literal string, or with `find_key` (for `key_value_replace`) as a JSONPath expression.
-- The `replace_value` can contain a mix of input values within the _same_ parameter input, e.g. `PPE` is set to a static string and `PROD` is set to a variable.
+- **`replace_value`** (both `find_replace` and `key_value_replace`): supports `$items.*` and `$workspace.*` variables
+- **`find_value`** (`find_replace`): 
+    - Supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`)
+    - Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched
+    - **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both
+- **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
+
+Additional notes:
+
+- **`$items` variables resolve for items that exist in the `repository_directory`.** Cross-workspace variables (`$workspace.<name>.$items...`) reference items outside the repository — these items must exist in the specified workspace at deployment time.
+- Within a single parameter entry, `replace_value` can mix static strings and variables across environments, e.g. `PPE` set to a literal GUID and `PROD` set to a `$workspace.$id` variable.
+
 - **Supported variables:**
-    - **Workspace variable:**
+    - **Workspace variables:** resolve the target workspace's properties (ID, name) or look up metadata from a named workspace.
 
         | Workspace Variable                                              | Description                                                                               | Example                                                    |
         | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
@@ -232,14 +243,13 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
 
         > **Notes:**
         >
-        > - When using `$workspace.$name`, `$workspace.$name_encoded`, `$workspace.<name>.$id` / `$workspace.<name>`, or `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, ensure the executing identity has proper permissions to access the relevant workspace. 
-        > - For `$workspace.<name>.$id` / `$workspace.<name>` and `$workspace.<name>.$items.<item_type>.<item_name>.$<attribute>`, the provided workspace display name must be an exact, case-sensitive match.
+        > - When using `$workspace` variables that reference other workspaces, ensure the executing identity has proper permissions to access the relevant workspace. 
+        > - Workspace display names in cross-workspace variables (e.g., `$workspace.TestWorkspace.$id`) must be an exact, case-sensitive match.
         > - `$workspace.$name` returns the raw workspace display name. If the target value must remain URL-encoded, use `$workspace.$name_encoded` instead, which automatically percent-encodes the name (e.g., `My Workspace` becomes `My%20Workspace`).
-
-    - **Item attribute variable:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
-        - `$items.<item_type>.<item_name>.<attribute>` (legacy format)
-        - **`$items.<item_type>.<item_name>.$<attribute>`** (new format)
-        - **Supported attributes:**
+    
+    <br>
+    
+    - **Item attribute variables:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
 
         | Attribute Variable                                | Supported Items                   | Example                                           | Sample Replace Value                                           |
         | ------------------------------------------------- | --------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
@@ -248,18 +258,18 @@ The `replace_value` field in the `find_replace` and `key_value_replace` paramete
         | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
         | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                        | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
         
-        - Attributes should be **lowercase**.
-        - Item type and name are **case-sensitive**.
-        - Item type must be valid and in scope.
-        - Item name must be an **exact match** (include spaces, if present).
-        - **Example:** set `$items.Notebook.Hello World.$id` to get the item ID of the `"Hello World"` Notebook in the target workspace.
-        - **Important**: Deployment will fail in the following cases:
-            - Incorrect variable syntax used, e.g., `$item.Notebook.Hello World.$id` instead of `$items.Notebook.Hello World.$id`.
-            - The specified **item type** or **name** is invalid or does NOT exist in the deployed workspace, e.g., `$items.Notebook.HelloWorld.$id` or `$items.Environment.Hello World.$id`.
-            - An invalid attribute name is provided, e.g., `$items.Notebook.Hello World.$guid` instead of `$items.Notebook.Hello World.$id`.
-            - The attribute value does NOT exist, e.g., `$items.Notebook.Hello World.$sqlendpoint` (Notebook items don't have a SQL Endpoint).
-
-        - For example use-cases, see the **Notebook/Dataflow Advanced `find_replace` Parameterization Case.**
+        > **Notes:**
+        >
+        > - Attributes should be **lowercase**.
+        > - The legacy format without `$` prefix on the attribute is also supported
+        > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
+        > - Item type must be valid and in scope.
+        
+        <br>
+        
+        - **Example:** `$items.Notebook.Hello World.$id` → returns the item ID of the "Hello World" Notebook in the target workspace.
+        - **Important**: Deployment will fail if the variable contains any error — including a typo in the syntax (e.g., `$item` instead of `$items`), a non-existent item type or name, or an unsupported attribute for the given item type.
+        - See the **Notebook/Dataflow Advanced `find_replace` Parameterization Case** for examples.
 
 ### Environment Variable Replacement
 
@@ -343,7 +353,37 @@ When optional fields are omitted or left empty, only basic parameterization func
 **Important:**
 
 - String input values should be wrapped in quotes. Remember to escape special characters, such as **\\** in `file_path` inputs.
-- `is_regex` and filter fields can be used in the same parameter configuration.
+- `is_regex`, `ignore_case`, and filter fields can be used in the same parameter configuration.
+
+### Case-Insensitive Matching
+
+#### `ignore_case`
+
+- Only applicable to the `find_replace` parameter.
+- Include `ignore_case` field to enable case-insensitive matching for the `find_value`.
+- When the `ignore_case` field is set to the **string** value `"true"` or `"True"` (case-insensitive), case-insensitive matching is enabled.
+- Works with both literal string and regex `find_value` patterns:
+    - **Literal string:** Matches and replaces all occurrences of the `find_value` regardless of casing in the file content (e.g., `"MyServer"` matches `"myserver"`, `"MYSERVER"`, etc.).
+    - **Regex pattern:** Compiles the regex with the case-insensitive flag, allowing the pattern to match regardless of character casing.
+- **Note:** The `replace_value` is always inserted literally as-is — it does not adapt to the casing of the matched text.
+
+```yaml
+find_replace:
+    # Case-insensitive literal string match
+    - find_value: "my-dev-server"
+      replace_value:
+          PPE: "my-ppe-server"
+          PROD: "my-prod-server"
+      ignore_case: "true"
+
+    # Case-insensitive regex match
+    - find_value: server_name=\"([^\"]+)\"
+      replace_value:
+          PPE: "ppe-server.database.windows.net"
+          PROD: "prod-server.database.windows.net"
+      is_regex: "true"
+      ignore_case: "true"
+```
 
 ### Regex Pattern Match
 
@@ -353,6 +393,7 @@ When optional fields are omitted or left empty, only basic parameterization func
 - Include `is_regex` field when setting the `find_value` to a **valid regex pattern.**
 - When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
 - When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
+- **`is_regex` cannot be combined with dynamic replacement variables** (e.g., `$workspace.*`) in `find_value`. Dynamic variables resolve to plain strings at runtime, making regex matching redundant. Use one feature or the other.
 
 ### Supported File Filters
 
@@ -551,6 +592,13 @@ find_replace:
           - "Hello World"
           - "Goodbye World"
       file_path: "**/notebook-content.py" # filter on notebook files using wildcard paths
+      
+    # workspace ID of "Dev Workspace" to be replaced with target workspace ID (dynamic)
+    - find_value: "$workspace.Dev Workspace.$id"
+      replace_value:
+          PPE: "$workspace.$id"
+          PROD: "$workspace.$id"
+      item_type: "DataPipeline"
 
 key_value_replace:
     # SQL Server Connection to be replaced

@@ -310,6 +310,9 @@ PARAMETER_MSGS = {
     "validation_complete": "Parameter file validation passed",
     "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
     "duplicate_semantic_model": "Duplicate semantic model names found: {}. Each semantic model should only appear once in the configuration as only one connection can be bound per semantic model. Please remove duplicate entries to avoid unpredictable binding behavior.",
+    "unsupported_find_value_variable": "Dynamic replacement variable '{}' is not supported in find_value. Same-workspace item attributes ($items.*) resolve to the target environment's item ID, which cannot be present in the source file",
+    "find_value_variable_warning": "Dynamic replacement variable '{}' in find_value references a cross-workspace item attribute. Ensure the referenced item exists in workspace '{}' at deployment time",
+    "incompatible_find_value_regex_variable": "Dynamic replacement variable '{}' in find_value cannot be combined with is_regex. Use either a dynamic variable OR a regex pattern, not both",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",

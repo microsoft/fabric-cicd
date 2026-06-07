@@ -66,7 +66,12 @@ def _validate_regex_pattern(matches: list, find_value: str) -> None:
             raise InputError(msg, logger)
 
 
-def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) -> dict:
+def extract_find_value(
+    param_dict: dict,
+    file_content: str,
+    filter_match: bool,
+    workspace_obj: Optional["FabricWorkspace"] = None,
+) -> dict:
     """
     Extracts the find_value and sets the value. Processes the find_value if a valid regex is provided.
     Returns replacement information for use with re.sub() or string replace().
@@ -75,24 +80,44 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
         param_dict: The parameter dictionary containing the find_value and is_regex keys.
         file_content: The content of the file where the find_value will be searched.
         filter_match: A boolean to check for a regex match in filtered files only.
+        workspace_obj: Optional workspace object used to resolve dynamic variables in find_value.
 
     Returns:
         Dictionary with keys:
         - 'pattern': The find pattern (original string or regex pattern)
         - 'is_regex': Whether this is a regex pattern
         - 'has_matches': Whether any matches were found
+        - 'ignore_case': Whether case-insensitive matching is enabled
     """
     find_value = param_dict.get("find_value")
-    is_regex = param_dict.get("is_regex", "").lower() == "true"
+    is_regex = str(param_dict.get("is_regex", "")).lower() == "true"
+    ignore_case = str(param_dict.get("ignore_case", "")).lower() == "true"
+    flags = re.IGNORECASE if ignore_case else 0
 
     # No find value -> nothing to do
     if not find_value:
-        return {"pattern": "", "is_regex": False, "has_matches": False}
+        return {"pattern": "", "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
+
+    # Resolve dynamic variable in find_value if present
+    if find_value.startswith("$") and workspace_obj is not None:
+        # $items.* is never valid in find_value — it resolves to target-env IDs that can't exist in source files
+        if find_value.startswith("$items."):
+            msg = constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
+            raise InputError(msg, logger)
+
+        # Delegate to the shared variable resolution logic (same as replace_value)
+        find_value_var = find_value
+        find_value = extract_replace_value(workspace_obj, find_value)
+        logger.debug(f"Resolved variable {find_value_var} in find_value to: {find_value}")
+
+        # Guard against empty resolved value — prevents "" in file_content (always True) causing file corruption
+        if not find_value:
+            return {"pattern": "", "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
 
     # Regex find_value
     if is_regex:
         try:
-            compiled = re.compile(find_value)
+            compiled = re.compile(find_value, flags)
         except re.error as re_err:
             msg = f"Invalid regex '{find_value}': {re_err}"
             raise InputError(msg, logger) from re_err
@@ -102,18 +127,21 @@ def extract_find_value(param_dict: dict, file_content: str, filter_match: bool) 
 
         # If file excluded by filters, do not search — return no-match but keep validation
         if not filter_match:
-            return {"pattern": find_value, "is_regex": True, "has_matches": False}
+            return {"pattern": find_value, "is_regex": True, "has_matches": False, "ignore_case": ignore_case}
 
         matches = list(re.finditer(compiled, file_content))
         _validate_regex_pattern(matches, find_value)
 
-        return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches)}
+        return {"pattern": find_value, "is_regex": True, "has_matches": bool(matches), "ignore_case": ignore_case}
 
     # Non-regex find_value
     if not filter_match:
-        return {"pattern": find_value, "is_regex": False, "has_matches": False}
+        return {"pattern": find_value, "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
 
-    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content}
+    if ignore_case:
+        return {"pattern": find_value, "is_regex": False, "has_matches": find_value.lower() in file_content.lower(), "ignore_case": ignore_case}
+
+    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content, "ignore_case": ignore_case}
 
 
 def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:

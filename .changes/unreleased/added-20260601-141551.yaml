@@ -1,0 +1,8 @@
+kind: added
+body: Add dynamic replacement variable support for the `find_value` of `find_replace`
+time: 2026-06-01T14:15:51.0915909+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "931"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/931

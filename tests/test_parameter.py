@@ -213,6 +213,24 @@ find_replace:
       item_type: "Notebook"
 """
 
+SAMPLE_PARAMETER_INVALID_IS_REGEX_FALSE = """
+find_replace:
+    - find_value: "some_value"
+      replace_value:
+          PPE: "ppe_value"
+          PROD: "prod_value"
+      is_regex: False
+"""
+
+SAMPLE_PARAMETER_INVALID_IGNORE_CASE = """
+find_replace:
+    - find_value: "some_value"
+      replace_value:
+          PPE: "ppe_value"
+          PROD: "prod_value"
+      ignore_case: True
+"""
+
 SAMPLE_PARAMETER_ALL_ENV = """
 find_replace:
     # Required Fields 
@@ -354,6 +372,12 @@ def repository_directory(tmp_path):
 
     invalid_parameter_file_path8 = workspace_dir / "invalid_is_regex_parameter.yml"
     invalid_parameter_file_path8.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX)
+
+    invalid_parameter_file_path9 = workspace_dir / "invalid_ignore_case_parameter.yml"
+    invalid_parameter_file_path9.write_text(SAMPLE_PARAMETER_INVALID_IGNORE_CASE)
+
+    invalid_parameter_file_path10 = workspace_dir / "invalid_is_regex_false_parameter.yml"
+    invalid_parameter_file_path10.write_text(SAMPLE_PARAMETER_INVALID_IS_REGEX_FALSE)
 
     # Create duplicate keys parameter files
     duplicate_keys_file = workspace_dir / "duplicate_keys_parameter.yml"
@@ -1195,6 +1219,8 @@ def test_validate_item_name_with_accented_characters(repository_directory, item_
         ("invalid_yaml_struc_parameter.yml", False, "invalid load"),
         ("invalid_yaml_char_parameter.yml", False, "invalid load"),
         ("invalid_is_regex_parameter.yml", False, "invalid data type"),
+        ("invalid_is_regex_false_parameter.yml", False, "invalid data type"),
+        ("invalid_ignore_case_parameter.yml", False, "invalid data type"),
     ],
 )
 def test_validate_invalid_parameters(
@@ -1289,6 +1315,45 @@ def test_validate_invalid_parameters(
         assert param_obj._validate_parameter("find_replace") == (
             result,
             constants.PARAMETER_MSGS[msg].format("is_regex", "string", "find_replace"),
+        )
+
+    # Invalid is_regex value (False boolean) in find_replace parameter
+    if param_file_name == "invalid_is_regex_false_parameter.yml":
+        param_obj.environment_parameter = {
+            "find_replace": [
+                {
+                    "find_value": "some_value",
+                    "replace_value": {
+                        "PPE": "ppe_value",
+                        "PROD": "prod_value",
+                    },
+                    "is_regex": False,  # This is a boolean, not a string
+                }
+            ]
+        }
+        assert param_obj._validate_parameter("find_replace") == (
+            result,
+            constants.PARAMETER_MSGS[msg].format("is_regex", "string", "find_replace"),
+        )
+
+    # Invalid ignore_case value in find_replace parameter
+    if param_file_name == "invalid_ignore_case_parameter.yml":
+        # Mock the environment_parameter to have the invalid ignore_case (boolean instead of string)
+        param_obj.environment_parameter = {
+            "find_replace": [
+                {
+                    "find_value": "some_value",
+                    "replace_value": {
+                        "PPE": "ppe_value",
+                        "PROD": "prod_value",
+                    },
+                    "ignore_case": True,  # This is a boolean, not a string
+                }
+            ]
+        }
+        assert param_obj._validate_parameter("find_replace") == (
+            result,
+            constants.PARAMETER_MSGS[msg].format("ignore_case", "string", "find_replace"),
         )
 
 
@@ -2621,6 +2686,47 @@ def test_validate_required_values_integration_calls_find_key_validator(empty_par
     ok, msg = empty_parameter._validate_required_values("key_value_replace", param_dict)
     assert ok is False
     assert "must be an absolute JSONPath" in msg
+
+
+def test_validate_required_values_rejects_items_in_find_value(empty_parameter):
+    """Validation rejects $items.* in find_value (resolves to target env, can't exist in source)."""
+    find_value = "$items.Lakehouse.Example.$id"
+    param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
+    ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    assert ok is False
+    assert msg == constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
+
+
+def test_validate_required_values_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
+    """Validation warns on cross-workspace $items references in find_value."""
+    import logging
+
+    find_value = "$workspace.dev.$items.Lakehouse.Example.$id"
+    param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
+
+    with caplog.at_level(logging.WARNING):
+        ok, _msg = empty_parameter._validate_required_values("find_replace", param_dict)
+
+    assert ok is True
+    expected_warning = constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, "dev")
+    assert expected_warning in caplog.text
+
+
+def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_parameter):
+    """Validation rejects combining is_regex with $workspace.* dynamic variable in find_value."""
+    find_value = "$workspace.dev.$id"
+    param_dict = {"find_value": find_value, "is_regex": "true", "replace_value": {"DEV": "some-id"}}
+    ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    assert ok is False
+    assert msg == constants.PARAMETER_MSGS["incompatible_find_value_regex_variable"].format(find_value)
+
+
+def test_validate_required_values_allows_regex_with_dollar_anchor(empty_parameter):
+    """Validation allows legitimate regex patterns starting with $ (regex anchor) when is_regex is set."""
+    # A regex pattern like "value$" or "$" at the start is a regex anchor, not a dynamic variable
+    param_dict = {"find_value": "value=(\\w+)$", "is_regex": "true", "replace_value": {"DEV": "new-val"}}
+    ok, _msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    assert ok is True
 
 
 def test_validate_and_evaluate_bracket_key_with_yaml(empty_parameter):
