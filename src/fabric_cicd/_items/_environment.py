@@ -234,6 +234,7 @@ class EnvironmentPublisher(ItemPublisher):
 
     item_type = ItemType.ENVIRONMENT.value
     has_async_publish_check = True
+    func_process_file = staticmethod(_process_environment_file)
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Environment item."""

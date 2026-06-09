@@ -364,6 +364,13 @@ class FabricWorkspace:
                         raise FailedPublishedItemStatusError(msg, logger)
                     visited_logical_ids.add(item_logical_id)
 
+                elif self.bulk_publish_enabled:
+                    msg = (
+                        f"Item '{item_name}.{item_type}' has the default logicalId '{constants.DEFAULT_GUID}' "
+                        f"in the .platform file. The bulk import API only accepts a unique logicalId. "
+                    )
+                    raise InputError(msg, logger)
+
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 # Special handling for KQLDatabase items:
@@ -437,18 +444,20 @@ class FabricWorkspace:
             if item_type not in self.workspace_items:
                 self.workspace_items[item_type] = {}
 
-            # Get additional properties
-            if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
-                sql_endpoint = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
-                )
-                sql_endpoint_id = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
-                )
-            if item_type in [ItemType.EVENTHOUSE.value]:
-                query_service_uri = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
-                )
+            # Only collect attribute values when parameterization with dynamic variables is in use
+            if self.contains_param_vars:
+                # Get additional properties
+                if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
+                    sql_endpoint = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                    )
+                    sql_endpoint_id = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
+                    )
+                if item_type in [ItemType.EVENTHOUSE.value]:
+                    query_service_uri = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
+                    )
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -880,7 +889,7 @@ class FabricWorkspace:
             item: The Item object.
             publisher: The publisher context required for processing the item files.
         """
-        exclude_path = getattr(publisher, "exclude_path", r"^(?!.*)")
+        exclude_path = constants.EXCLUDE_PATH_REGEX_MAPPING.get(publisher.item_type, r"^(?!.*)")
         func_process_file = getattr(publisher, "func_process_file", None)
 
         # Build the workspace-relative prefix for this item's files, e.g., "/Folder1/Folder2/MyReport.Report"
@@ -890,12 +899,11 @@ class FabricWorkspace:
 
         parts = []
         for file in item.item_files:
-            if not str(file.file_path).endswith(".platform"):
-                if re.match(exclude_path, file.relative_path):
-                    continue
-                if file.type == "text":
-                    file.contents = func_process_file(self, item, file) if func_process_file else file.contents
-                    file.contents = self._replace_parameters(file, item)
+            if re.match(exclude_path, file.relative_path):
+                continue
+            if file.type == "text" and not str(file.file_path).endswith(".platform"):
+                file.contents = func_process_file(self, item, file) if func_process_file else file.contents
+                file.contents = self._replace_parameters(file, item)
 
             payload = file.base64_payload
             payload["path"] = f"{path_prefix}/{file.relative_path}"

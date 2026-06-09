@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from fabric_cicd._common._exceptions import PublishError
+from fabric_cicd import constants
+from fabric_cicd._common._exceptions import InputError, PublishError
 from fabric_cicd._common._item import Item
 from fabric_cicd.constants import PARALLEL_MAX_WORKERS, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -297,7 +298,7 @@ class ItemPublisher(Publisher):
             regex_pattern = re.compile(item_name_exclude_regex)
             return [name for name in to_delete_set if not regex_pattern.match(name)]
         return list(to_delete_set)
-    
+
     @staticmethod
     def publish_all_bulk(fabric_workspace_obj: "FabricWorkspace") -> list["ItemPublisher"]:
         """
@@ -326,6 +327,13 @@ class ItemPublisher(Publisher):
 
         # Phase 2: Single bulk API call (publisher context used inside for per-item transforms)
         if items_with_context:
+            item_count = len(items_with_context)
+            if item_count > constants.BULK_ITEM_COUNT_LIMIT:
+                msg = (
+                    f"Bulk publish item count ({item_count}) exceeds the API limit "
+                    f"of {constants.BULK_ITEM_COUNT_LIMIT} items."
+                )
+                raise InputError(msg, logger)
             fabric_workspace_obj._publish_items(items_with_context)
 
         # Phase 3: Post-hooks per type
