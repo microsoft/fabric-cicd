@@ -29,7 +29,15 @@ class Parameter:
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
             "minimum": {"find_value", "replace_value"},
-            "maximum": {"find_value", "replace_value", "is_regex", "ignore_case", "item_type", "item_name", "file_path"},
+            "maximum": {
+                "find_value",
+                "replace_value",
+                "is_regex",
+                "ignore_case",
+                "item_type",
+                "item_name",
+                "file_path",
+            },
         },
         "spark_pool": {
             "minimum": {"instance_pool_id", "replace_value"},
@@ -393,10 +401,10 @@ class Parameter:
             # Remove original gateway_binding after processing
             del self.environment_parameter["gateway_binding"]
             logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
-    
+
     def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
         """Search for dynamic replacement variables in the parameter file."""
-        dynamic_var_pattern = re.compile(r"^\$(workspace|items)\.")
+        dynamic_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
         dynamic_param_names = {"find_replace", "key_value_replace"}
 
         for param_name, param_values in self.environment_parameter.items():
@@ -404,6 +412,12 @@ class Parameter:
                 continue
             if isinstance(param_values, list):
                 for param_dict in param_values:
+                    # Check find_value for dynamic variables
+                    find_value = param_dict.get("find_value", "")
+                    if isinstance(find_value, str) and dynamic_var_pattern.search(find_value):
+                        return True
+
+                    # Check replace_value for dynamic variables
                     replace_value = param_dict.get("replace_value")
                     if isinstance(replace_value, dict):
                         for env_value in replace_value.values():
@@ -411,7 +425,7 @@ class Parameter:
                                 return True
 
         return False
-        
+
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
         if not is_valid_structure(self.environment_parameter):
@@ -742,9 +756,7 @@ class Parameter:
 
             # Validate is_regex type if present
             if param_dict.get("is_regex") is not None:
-                is_valid, msg = self._validate_data_type(
-                    param_dict["is_regex"], "string", "is_regex", param_name
-                )
+                is_valid, msg = self._validate_data_type(param_dict["is_regex"], "string", "is_regex", param_name)
                 if not is_valid:
                     return False, msg
 
@@ -762,9 +774,7 @@ class Parameter:
 
             # Validate ignore_case type if present
             if param_dict.get("ignore_case") is not None:
-                is_valid, msg = self._validate_data_type(
-                    param_dict["ignore_case"], "string", "ignore_case", param_name
-                )
+                is_valid, msg = self._validate_data_type(param_dict["ignore_case"], "string", "ignore_case", param_name)
                 if not is_valid:
                     return False, msg
 
