@@ -4,26 +4,51 @@ fabric-cicd has an expected default flow; however, there will always be cases wh
 
 ## Feature Flags
 
-For scenarios that aren't supported by default, fabric-cicd offers feature flags. Below is an exhaustive list of currently supported features.
+For scenarios that aren't supported by default, fabric-cicd offers feature flags. Below is an exhaustive list of currently supported features, grouped by category.
 
-| Flag Name                                 | Description                                                                                               | Experimental |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------ |
-| `enable_lakehouse_unpublish`              | Set to enable the deletion of Lakehouses                                                                  |              |
-| `enable_warehouse_unpublish`              | Set to enable the deletion of Warehouses                                                                  |              |
-| `enable_sqldatabase_unpublish`            | Set to enable the deletion of SQL Databases                                                               |              |
-| `enable_eventhouse_unpublish`             | Set to enable the deletion of Eventhouses                                                                 |              |
-| `enable_kqldatabase_unpublish`            | Set to enable the deletion of KQL Databases (attached to Eventhouses)                                     |              |
-| `enable_shortcut_publish`                 | Set to enable deploying shortcuts with the Lakehouse                                                      |              |
-| `enable_environment_variable_replacement` | Set to enable the use of pipeline variables                                                               |              |
-| `disable_workspace_folder_publish`        | Set to disable deploying workspace sub folders                                                            |              |
-| `enable_experimental_features`            | Set to enable experimental features, such as selective deployments                                        |              |
-| `enable_items_to_include`                 | Set to enable selective publishing/unpublishing of items                                                  | ☑️           |
-| `enable_exclude_folder`                   | Set to enable folder-based exclusion during publish operations                                            | ☑️           |
-| `enable_include_folder`                   | Set to enable folder-based inclusion during publish operations                                            | ☑️           |
-| `enable_shortcut_exclude`                 | Set to enable selective publishing of shortcuts in a Lakehouse                                            | ☑️           |
-| `enable_response_collection`              | Set to enable collection of API responses during publish and unpublish operations                         |              |
-| `continue_on_shortcut_failure`            | Set to allow deployment to continue even when shortcuts fail to publish                                   |              |
-| `enable_hard_delete`                      | Set to enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. |              |
+Flags marked as **Experimental** (☑️) require the `enable_experimental_features` flag to be set in addition to the specific flag:
+
+```python
+from fabric_cicd import append_feature_flag
+append_feature_flag("enable_experimental_features")
+append_feature_flag("<specific_flag>")
+```
+
+<span class="md-h3-nonanchor">Publish behavior</span>
+
+| Flag Name                                 | Description                                                                                    | Experimental |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
+| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API) | ☑️           |
+| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                            |              |
+| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                               |              |
+| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                        |              |
+| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                      |              |
+
+<span class="md-h3-nonanchor">Unpublish behavior</span>
+
+| Flag Name                      | Description                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `enable_lakehouse_unpublish`   | Enable the deletion of Lakehouses                                                                  |
+| `enable_warehouse_unpublish`   | Enable the deletion of Warehouses                                                                  |
+| `enable_sqldatabase_unpublish` | Enable the deletion of SQL Databases                                                               |
+| `enable_eventhouse_unpublish`  | Enable the deletion of Eventhouses                                                                 |
+| `enable_kqldatabase_unpublish` | Enable the deletion of KQL Databases (attached to Eventhouses)                                     |
+| `enable_hard_delete`           | Enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. |
+
+<span class="md-h3-nonanchor">Selective deployment</span>
+
+| Flag Name                 | Description                                                | Experimental |
+| ------------------------- | ---------------------------------------------------------- | ------------ |
+| `enable_items_to_include` | Enable selective publishing/unpublishing of specific items | ☑️           |
+| `enable_exclude_folder`   | Enable folder-based exclusion during publish operations    | ☑️           |
+| `enable_include_folder`   | Enable folder-based inclusion during publish operations    | ☑️           |
+| `enable_shortcut_exclude` | Enable selective publishing of shortcuts in a Lakehouse    | ☑️           |
+
+<span class="md-h3-nonanchor">Diagnostics</span>
+
+| Flag Name                    | Description                                                                |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| `enable_response_collection` | Enable collection of API responses during publish and unpublish operations |
 
 <span class="md-h3-nonanchor">Example</span>
 
@@ -34,6 +59,90 @@ append_feature_flag("enable_warehouse_unpublish")
 append_feature_flag("enable_environment_variable_replacement")
 append_feature_flag("enable_response_collection")
 ```
+
+## Debugging
+
+If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal. The logs can also be found in the `fabric_cicd.error.log` file.
+
+```python
+from fabric_cicd import change_log_level
+change_log_level("DEBUG")
+```
+
+**Note:** The `"DEBUG"` parameter can be omitted as it is the default value.
+
+For comprehensive debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](troubleshooting.md).
+
+## Bulk Publish
+
+!!! warning "Experimental"
+
+    Bulk publish deploys all items in a single API call instead of publishing them one at a time. It uses the Fabric [bulk import API](https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)), which is currently in beta. This feature applies to publishing only — unpublishing is not affected.
+
+To enable bulk publish, set both `enable_experimental_features` and `enable_bulk_publish` feature flags:
+
+=== "Programmatic"
+
+    ```python
+    from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+
+    append_feature_flag("enable_experimental_features")
+    append_feature_flag("enable_bulk_publish")
+
+    workspace = FabricWorkspace(
+        workspace_id="your-workspace-id",
+        repository_directory="/path/to/repo",
+        item_type_in_scope=["Notebook", "DataPipeline", "Environment"],
+        token_credential=token_credential,
+    )
+
+    publish_all_items(workspace)
+    ```
+
+=== "Config-based"
+
+    ```yaml
+    core:
+        workspace_id: "your-workspace-id"
+        repository_directory: "/path/to/repo"
+        item_types_in_scope:
+            - Notebook
+            - DataPipeline
+            - Environment
+
+    features:
+        - enable_experimental_features
+        - enable_bulk_publish
+    ```
+
+    ```python
+    from fabric_cicd import deploy_with_config
+    from azure.identity import AzureCliCredential
+
+    deploy_with_config(
+        config_file_path="/path/to/config.yml",
+        token_credential=AzureCliCredential(),
+    )
+    ```
+
+### How it works
+
+With bulk publishing, there is no predefined order of item types. The API leverages a dependency graph under the hood to determine the correct publishing sequence. As long as logical IDs are used to reference Fabric items, the API handles the rest — simplifying dependency management overhead. This may also reduce the complexity of your parameter file, though parameterization remains a key feature for edge cases and environment-specific customizations.
+
+Since this feature is experimental, it is recommended for non-production environments only. We encourage you to use this period to **provide feedback and help shape the bulk publish experience.** The initial release does not support all fabric-cicd item types and lacks support for more advanced parameterization features, specifically dynamic replacement variables (`$workspace`, `$items`).
+
+!!! tip "Items using item IDs instead of logical IDs"
+
+    Item definitions in the same workspace that reference other items by item ID (rather than logical ID) can still be published via bulk publish. However, parameterization is required to ensure references are correctly re-pointed in the target workspace. The recommended approach is to use a `find_replace` parameter where the `find_value` is the referenced item's ID and the `replace_value` is its logical ID. For example, a Dataflow Gen2 item that references a Lakehouse by item ID — use `find_replace` to swap the Lakehouse's item ID with its logical ID so the bulk publish API can resolve the dependency.
+
+    For more details on logical IDs, see [Resolve Logical ID Conflicts in Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/logical-id-conflict-resolution).
+
+### Current Limitations
+
+- **Unsupported item types**: `DataBuildToolJob`, `Ontology`, `SparkJobDefinition`, and `Warehouse` are not supported in bulk publish mode. If any unsupported item type is in scope, the deployment automatically falls back to standard publish mode. If `item_type_in_scope` is not specified, standard publish mode is always used.
+- **Dynamic parameter variables**: Parameter files that use `$workspace` or `$items` dynamic replacement variables are not compatible with bulk publish. The deployment falls back to standard publishing when dynamic variables are detected.
+- **Item count limit**: A maximum of 1,000 items can be published in a single bulk call. Exceeding this limit raises an error. Publish time may increase with higher item counts.
+- **Selective deployment**: Selective deployment parameters (`item_name_exclude_regex`, `folder_path_exclude_regex`, `folder_path_to_include`, `items_to_include`) are not supported in bulk publish mode and will be ignored.
 
 ## Selective Deployment Features
 
@@ -135,16 +244,3 @@ changed = get_changed_items(workspace.repository_directory, git_compare_ref="mai
 ```
 
 **Note:** `get_changed_items()` returns only items that were **modified or added** (i.e., candidates for publishing). It does not return deleted items. Passing `items_to_include` to `publish_all_items()` requires enabling the `enable_experimental_features` and `enable_items_to_include` feature flags.
-
-## Debugging
-
-If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal. The logs can also be found in the `fabric_cicd.error.log` file.
-
-```python
-from fabric_cicd import change_log_level
-change_log_level("DEBUG")
-```
-
-**Note:** The `"DEBUG"` parameter can be omitted as it is the default value.
-
-For comprehensive debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](troubleshooting.md).

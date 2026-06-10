@@ -215,6 +215,9 @@ def publish_all_items(
 
     # Determine publishing mode path
     if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
+        if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
+            msg = "The 'enable_bulk_publish' feature flag requires 'enable_experimental_features' to be enabled."
+            raise InputError(msg, logger)
         unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
         if unsupported or fabric_workspace_obj.contains_param_vars:
             reasons = []
