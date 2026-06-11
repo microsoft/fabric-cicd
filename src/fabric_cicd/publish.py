@@ -192,79 +192,60 @@ def publish_all_items(
         ...     publish_all_items(workspace, items_to_include=changed)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
-    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
-
+    
     # Initialize response collection if feature flag is enabled
+    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
         fabric_workspace_obj.responses = {}
 
     # Check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
-
     response_state = fabric_workspace_obj.endpoint.invoke(
         method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
     )
-
     has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
-
     if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
         set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
 
-    # Determine publishing mode path
+    # Determine publishing mode path (standard vs. bulk) based on feature flags and input parameters
     if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
         if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
             msg = "The 'enable_bulk_publish' feature flag requires 'enable_experimental_features' to be enabled."
             raise InputError(msg, logger)
+        
+        reasons = []
         unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
+        
+        # Fall back to standard deployment if unsupported item types or dynamic parameter variables are detected, otherwise enable bulk publish
         if unsupported or fabric_workspace_obj.contains_param_vars:
-            reasons = []
-            # Contains item types that are not yet supported for bulk publish
             if unsupported:
                 reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
-            # Contains parameter variables that require runtime resolution, which is not compatible with bulk publish
+                
             if fabric_workspace_obj.contains_param_vars:
                 reasons.append(
                     "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
                 )
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
+       
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
 
-    # Ignore selective deployment parameters if bulk publish is enabled
-    if fabric_workspace_obj.bulk_publish_enabled:
-        ignored_params = []
-        if item_name_exclude_regex:
-            ignored_params.append("item_name_exclude_regex")
-        if folder_path_exclude_regex:
-            ignored_params.append("folder_path_exclude_regex")
-        if folder_path_to_include:
-            ignored_params.append("folder_path_to_include")
-        if items_to_include:
-            ignored_params.append("items_to_include")
-        if shortcut_exclude_regex:
-            ignored_params.append("shortcut_exclude_regex")
-        if ignored_params:
-            logger.warning(
-                f"Selective deployment parameters ignored in bulk publish mode: {', '.join(ignored_params)}."
-            )
-
     # Apply selective deployment features
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
-        if not fabric_workspace_obj.bulk_publish_enabled:
-            if folder_path_exclude_regex is not None and folder_path_to_include is not None:
-                msg = "Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include' simultaneously. Choose one filtering strategy."
-                raise InputError(msg, logger)
+        if folder_path_exclude_regex is not None and folder_path_to_include is not None:
+            msg = "Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include' simultaneously. Choose one filtering strategy."
+            raise InputError(msg, logger)
 
-            if folder_path_exclude_regex is not None:
-                validate_folder_path_exclude_regex(folder_path_exclude_regex)
-                fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
+        if folder_path_exclude_regex is not None:
+            validate_folder_path_exclude_regex(folder_path_exclude_regex)
+            fabric_workspace_obj.publish_folder_path_exclude_regex = folder_path_exclude_regex
 
-            if folder_path_to_include is not None:
-                validate_folder_path_to_include(folder_path_to_include)
-                fabric_workspace_obj.publish_folder_path_to_include = folder_path_to_include
+        if folder_path_to_include is not None:
+            validate_folder_path_to_include(folder_path_to_include)
+            fabric_workspace_obj.publish_folder_path_to_include = folder_path_to_include
 
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
@@ -275,20 +256,19 @@ def publish_all_items(
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
 
-    if not fabric_workspace_obj.bulk_publish_enabled:
-        if item_name_exclude_regex:
-            logger.warning(
-                "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-            )
-            fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
+    if items_to_include is not None:
+        validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
+        fabric_workspace_obj.items_to_include = items_to_include
 
-        if items_to_include is not None:
-            validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
-            fabric_workspace_obj.items_to_include = items_to_include
+    if shortcut_exclude_regex:
+        validate_shortcut_exclude_regex(shortcut_exclude_regex)
+        fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-        if shortcut_exclude_regex:
-            validate_shortcut_exclude_regex(shortcut_exclude_regex)
-            fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
+    if item_name_exclude_regex:
+        logger.warning(
+            "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     # Execute chosen publish mode
     if fabric_workspace_obj.bulk_publish_enabled:

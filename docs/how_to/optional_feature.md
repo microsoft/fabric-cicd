@@ -142,11 +142,10 @@ Since this feature is experimental, it is recommended for non-production environ
 - **Unsupported item types**: `DataBuildToolJob`, `Ontology`, `SparkJobDefinition`, and `Warehouse` are not supported in bulk publish mode. If any unsupported item type is in scope, the deployment automatically falls back to standard publish mode. If `item_type_in_scope` is not specified, standard publish mode is always used.
 - **Dynamic parameter variables**: Parameter files that use `$workspace` or `$items` dynamic replacement variables are not compatible with bulk publish. The deployment falls back to standard publishing when dynamic variables are detected.
 - **Item count limit**: A maximum of 1,000 items can be published in a single bulk call. Exceeding this limit raises an error. Publish time may increase with higher item counts.
-- **Selective deployment**: Selective deployment parameters (`item_name_exclude_regex`, `folder_path_exclude_regex`, `folder_path_to_include`, `items_to_include`) are not supported in bulk publish mode and will be ignored.
 
 ## Selective Deployment Features
 
-By default, fabric-cicd performs a full deployment of all repository items. Selective deployment is an experimental feature due to the risk of deploying Fabric items that have dependencies on other items, which can result in broken deployments. These features support a range of filtering options, from broader folder-based selection to more granular item-level and shortcut-level filtering. To use these features, you must enable both the `enable_experimental_features` flag and the specific feature flag (if applicable).
+By default, fabric-cicd performs a full deployment of all repository items. Selective deployment is an experimental feature due to the risk of deploying Fabric items that have dependencies on other items, which can result in broken deployments. These features support a range of filtering options, from broader folder-based selection to more granular item-level and shortcut-level filtering. To use these features, you must enable both the `enable_experimental_features` flag and the specific feature flag (if applicable). **All selective deployment features are supported in both standard and bulk publish modes.**
 
 **Warning:** Selective deployment is not recommended due to potential issues with dependency management.
 

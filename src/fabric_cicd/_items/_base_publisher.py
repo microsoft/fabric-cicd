@@ -322,6 +322,8 @@ class ItemPublisher(Publisher):
             publisher.pre_publish_all()
             type_items = publisher.get_items_to_publish()
             for item_name, item in type_items.items():
+                if fabric_workspace_obj._apply_publish_filters(item, item_name, item_type.value):
+                    continue
                 items_with_context.append((item_name, item, publisher))
             publishers.append(publisher)
 
