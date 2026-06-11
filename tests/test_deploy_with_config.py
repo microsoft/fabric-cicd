@@ -677,6 +677,99 @@ class TestDeployWithConfig:
         )
 
     @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_bulk_publish_via_features(self, mock_unpublish, mock_workspace, tmp_path):
+        """Test that config-based deployment uses the bulk publish path when bulk feature flags are set."""
+        _ = mock_unpublish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+            "features": ["enable_experimental_features", "enable_bulk_publish"],
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = None
+        mock_workspace_instance.unpublish_responses = None
+        mock_workspace_instance.item_type_in_scope = ["Notebook"]
+        mock_workspace_instance.contains_param_vars = False
+        mock_workspace_instance.bulk_publish_enabled = False
+        mock_workspace_instance.workspace_id = "77777777-7777-7777-7777-777777777777"
+        mock_workspace_instance.publish_item_name_exclude_regex = None
+        mock_workspace_instance.publish_folder_path_exclude_regex = None
+        mock_workspace_instance.publish_folder_path_to_include = None
+        mock_workspace_instance.items_to_include = None
+        mock_workspace_instance.shortcut_exclude_regex = None
+        mock_workspace_instance.endpoint.invoke.return_value = {"body": {"capacityId": "test-cap"}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        with patch("fabric_cicd.publish.items.ItemPublisher.publish_all_bulk", return_value=[]) as mock_bulk, patch(
+            "fabric_cicd.publish.validate_fabric_workspace_obj", return_value=mock_workspace_instance
+        ):
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
+
+            # Verify bulk path was taken
+            mock_bulk.assert_called_once_with(mock_workspace_instance)
+            assert mock_workspace_instance.bulk_publish_enabled is True
+
+        # Verify feature flags were restored after scope exit
+        assert "enable_experimental_features" not in constants.FEATURE_FLAG
+        assert "enable_bulk_publish" not in constants.FEATURE_FLAG
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_deploy_with_config_standard_publish_without_bulk_flags(self, mock_unpublish, mock_workspace, tmp_path):
+        """Test that config-based deployment uses the standard path when bulk feature flags are absent."""
+        _ = mock_unpublish
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+                "item_types_in_scope": ["Notebook"],
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = None
+        mock_workspace_instance.unpublish_responses = None
+        mock_workspace_instance.item_type_in_scope = ["Notebook"]
+        mock_workspace_instance.contains_param_vars = False
+        mock_workspace_instance.bulk_publish_enabled = False
+        mock_workspace_instance.workspace_id = "77777777-7777-7777-7777-777777777777"
+        mock_workspace_instance.publish_item_name_exclude_regex = None
+        mock_workspace_instance.publish_folder_path_exclude_regex = None
+        mock_workspace_instance.publish_folder_path_to_include = None
+        mock_workspace_instance.items_to_include = None
+        mock_workspace_instance.shortcut_exclude_regex = None
+        mock_workspace_instance.endpoint.invoke.return_value = {"body": {"capacityId": "test-cap"}}
+        mock_workspace.return_value = mock_workspace_instance
+
+        with patch("fabric_cicd.publish.items.ItemPublisher.publish_all_bulk") as mock_bulk, patch(
+            "fabric_cicd.publish.items.ItemPublisher.get_item_types_to_publish", return_value=[]
+        ), patch("fabric_cicd.publish.validate_fabric_workspace_obj", return_value=mock_workspace_instance):
+            deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
+
+            # Verify bulk path was NOT taken
+            mock_bulk.assert_not_called()
+            assert mock_workspace_instance.bulk_publish_enabled is False
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
     @patch("fabric_cicd.publish.publish_all_items")
     @patch("fabric_cicd.publish.unpublish_all_orphan_items")
     def test_deploy_with_config_skip_operations(self, mock_unpublish, mock_publish, mock_workspace, tmp_path):
