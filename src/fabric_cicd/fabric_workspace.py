@@ -659,7 +659,6 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
-        folder_path = item.folder_path or ""
 
         # Initialize response collection for this item if responses are being tracked
         api_response = None
@@ -1006,10 +1005,7 @@ class FabricWorkspace:
                 return True
 
         # 2. Skip publishing if the item's folder path is excluded or not in the include list
-        if self._apply_folder_path_filters(item, item_name, item_type):
-            return True
-
-        return False
+        return self._apply_folder_path_filters(item, item_name, item_type)
 
     def _apply_folder_path_filters(self, item: "Item", item_name: str, item_type: str) -> bool:
         """
