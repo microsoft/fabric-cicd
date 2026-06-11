@@ -255,7 +255,7 @@ class EnvironmentPublisher(ItemPublisher):
     def post_publish_all_check(self) -> None:
         """Check environment publish state after all environments have been published."""
         _check_environment_publish_state(self.fabric_workspace_obj, False)
-        
+
     def post_publish_all(self) -> None:
         """Submit environment publish for each item after bulk upload."""
         if self.fabric_workspace_obj.bulk_publish_enabled:

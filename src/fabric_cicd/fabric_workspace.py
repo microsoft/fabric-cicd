@@ -307,9 +307,9 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
-            dynamic_variables_found = parameter_obj._search_dynamic_replacement_variables_in_parameter_file()
-            if dynamic_variables_found:
-                self.contains_param_vars = True
+            self.contains_param_vars = bool(
+                parameter_obj._search_dynamic_replacement_variables_in_parameter_file()
+            )
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -820,7 +820,11 @@ class FabricWorkspace:
             if self.responses is not None:
                 if item_type not in self.responses:
                     self.responses[item_type] = {}
-                self.responses[item_type][item_name] = d
+                self.responses[item_type][item_name] = {
+                    "header": response.get("header", {}),
+                    "body": d,
+                    "status_code": response.get("status_code"),
+                }
 
             # Collect logging info
             op = d.get("operationType")

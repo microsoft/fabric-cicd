@@ -210,6 +210,8 @@ def publish_all_items(
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
 
+    # Reset bulk publish flag to False for each publish execution; it will be set to True if conditions are met for bulk publish
+    fabric_workspace_obj.bulk_publish_enabled = False
     # Determine publishing mode path (standard vs. bulk) based on feature flags and input parameters
     if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
         if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
@@ -218,7 +220,6 @@ def publish_all_items(
         
         reasons = []
         unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
-        
         # Fall back to standard deployment if unsupported item types or dynamic parameter variables are detected, otherwise enable bulk publish
         if unsupported or fabric_workspace_obj.contains_param_vars:
             if unsupported:
