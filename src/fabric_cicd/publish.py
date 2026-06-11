@@ -255,7 +255,7 @@ def publish_all_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
-    
+
     if item_name_exclude_regex:
         logger.warning(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
