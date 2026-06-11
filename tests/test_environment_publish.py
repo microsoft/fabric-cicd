@@ -199,6 +199,12 @@ def test_resolve_pool_id_not_found():
         env_module._resolve_pool_id(pools, pool_name="MissingPool", pool_type="Workspace")
 
 
+def test_environment_publisher_exposes_func_process_file_for_bulk():
+    """EnvironmentPublisher class attribute ensures bulk path discovers the file processor."""
+    assert hasattr(env_module.EnvironmentPublisher, "func_process_file")
+    assert env_module.EnvironmentPublisher.func_process_file is env_module._process_environment_file
+
+
 # ---------- Publisher integration tests ----------
 
 
