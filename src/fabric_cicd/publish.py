@@ -255,6 +255,12 @@ def publish_all_items(
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
+    
+    if item_name_exclude_regex:
+        logger.warning(
+            "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
+        )
+        fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     if items_to_include is not None:
         validate_items_to_include(items_to_include, operation=constants.OperationType.PUBLISH)
@@ -263,12 +269,6 @@ def publish_all_items(
     if shortcut_exclude_regex:
         validate_shortcut_exclude_regex(shortcut_exclude_regex)
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
-
-    if item_name_exclude_regex:
-        logger.warning(
-            "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
-        )
-        fabric_workspace_obj.publish_item_name_exclude_regex = item_name_exclude_regex
 
     # Execute chosen publish mode
     if fabric_workspace_obj.bulk_publish_enabled:
