@@ -12,6 +12,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher, Publisher
 from fabric_cicd.constants import FeatureFlag, ItemType
 
@@ -130,11 +131,13 @@ class LakehousePublisher(ItemPublisher):
     def post_publish_all(self) -> None:
         """Publish shortcuts after all lakehouses are published to protect interrelationships."""
         if FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value in constants.FEATURE_FLAG:
+            header_logged = False
             for item_obj in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 # Check if the item is published to avoid any post publish actions
                 if not item_obj.skip_publish and item_obj.guid:
                     shortcut_publisher = ShortcutPublisher(self.fabric_workspace_obj, item_obj)
-                    shortcut_publisher.publish_all()
+                    if shortcut_publisher.publish_all(log_header_flag=not header_logged):
+                        header_logged = True
 
 
 class ShortcutPublisher(Publisher):
@@ -192,12 +195,18 @@ class ShortcutPublisher(Publisher):
             msg = f"Failed to publish '{shortcut['name']}' for lakehouse {self.item_obj.name}"
             raise FailedPublishedItemStatusError(msg, logger) from e
 
-    def publish_all(self) -> None:
+    def publish_all(self, log_header_flag: bool = True) -> bool:
         """
         Publish all shortcuts for the lakehouse item.
 
         Loads shortcuts from metadata, filters based on exclude regex,
         unpublishes orphaned shortcuts, and publishes all remaining shortcuts.
+
+        Args:
+            log_header_flag: If True, log the section header before publishing.
+
+        Returns:
+            True if shortcuts were published, False otherwise.
         """
         from fabric_cicd._common._check_utils import check_regex
 
@@ -233,9 +242,13 @@ class ShortcutPublisher(Publisher):
         shortcuts_to_publish = {f"{shortcut['path']}/{shortcut['name']}": shortcut for shortcut in shortcuts}
 
         if shortcuts_to_publish:
+            if log_header_flag:
+                log_header(logger, "Publishing Lakehouse Shortcuts")
             logger.info(f"Publishing Lakehouse '{self.item_obj.name}' Shortcuts")
             shortcut_paths_to_unpublish = [path for path in deployed_shortcuts if path not in shortcuts_to_publish]
             self._unpublish_shortcuts(shortcut_paths_to_unpublish)
             # Deploy and overwrite shortcuts
             for shortcut_path, shortcut in shortcuts_to_publish.items():
                 self.publish_one(shortcut_path, shortcut)
+            return True
+        return False

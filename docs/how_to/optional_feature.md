@@ -143,6 +143,8 @@ Since this feature is experimental, it is recommended for non-production environ
 - **Dynamic parameter variables**: Parameter files that use `$workspace` or `$items` dynamic replacement variables are not compatible with bulk publish. The deployment falls back to standard publishing when dynamic variables are detected.
 - **Item count limit**: A maximum of 1,000 items can be published in a single bulk call. Exceeding this limit raises an error. Publish time may increase with higher item counts.
 
+For common bulk publish errors and their solutions, see the [Troubleshooting Guide](troubleshooting.md#bulk-publish-failures).
+
 ## Selective Deployment Features
 
 By default, fabric-cicd performs a full deployment of all repository items. Selective deployment is an experimental feature due to the risk of deploying Fabric items that have dependencies on other items, which can result in broken deployments. These features support a range of filtering options, from broader folder-based selection to more granular item-level and shortcut-level filtering. To use these features, you must enable both the `enable_experimental_features` flag and the specific feature flag (if applicable). **All selective deployment features are supported in both standard and bulk publish modes.**
