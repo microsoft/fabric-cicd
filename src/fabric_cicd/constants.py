@@ -180,6 +180,12 @@ PARALLEL_MAX_WORKERS: int = (
 
 # HTTP Headers
 AUTHORIZATION_HEADER = "authorization"
+SENSITIVE_RESPONSE_HEADERS = frozenset({
+    "set-cookie",
+    "www-authenticate",
+    "proxy-authenticate",
+    "x-ms-aad-diagnostic-headers",
+})
 
 # Publish
 SHELL_ONLY_PUBLISH = [
