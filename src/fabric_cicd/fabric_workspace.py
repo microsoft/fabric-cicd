@@ -307,9 +307,7 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
-            self.contains_param_vars = bool(
-                parameter_obj._search_dynamic_replacement_variables_in_parameter_file()
-            )
+            self.contains_param_vars = bool(parameter_obj._search_dynamic_replacement_variables_in_parameter_file())
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -792,6 +790,7 @@ class FabricWorkspace:
             item_parts = self._prepare_bulk_item_parts(item, publisher)
             definition_parts.extend(item_parts)
 
+        logger.info(f"{constants.INDENT}Publishing {len(items_with_context)} items in bulk")
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
         response = self.endpoint.invoke(
             method="POST",
@@ -800,6 +799,7 @@ class FabricWorkspace:
                 "definitionParts": definition_parts,
                 "options": {"allowPairingByName": False},
             },
+            max_duration=1800,  # 30 minutes, as bulk operations can take longer time to complete
         )
 
         # Log results grouped by operation type
@@ -1053,7 +1053,11 @@ class FabricWorkspace:
                     break
 
         # Apply folder path inclusion — exact match only
-        if self.publish_folder_path_to_include and folder_path and folder_path not in self.publish_folder_path_to_include:
+        if (
+            self.publish_folder_path_to_include
+            and folder_path
+            and folder_path not in self.publish_folder_path_to_include
+        ):
             item.skip_publish = True
             logger.info(
                 f"Skipping publishing of {item_type} '{item_name}' under {folder_path} as it is not in the include list."

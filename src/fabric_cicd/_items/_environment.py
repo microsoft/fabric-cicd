@@ -200,8 +200,10 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
             )
             iteration += 1
 
-    if not initial_check:
+    if completed:
         logger.info(f"{constants.INDENT}Published: {completed}")
+    if failed and initial_check:
+        logger.info(f"{constants.INDENT}Failed/Cancelled (pre-existing): {failed}")
 
 
 def _submit_environment_publish(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:

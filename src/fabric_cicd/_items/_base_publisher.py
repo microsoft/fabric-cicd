@@ -321,6 +321,15 @@ class ItemPublisher(Publisher):
             publisher = ItemPublisher.create(item_type, fabric_workspace_obj)
             publisher.pre_publish_all()
             type_items = publisher.get_items_to_publish()
+
+            # Mark excluded items as skip_publish=True so post_publish_all() hooks reliably skip them
+            all_type_items = fabric_workspace_obj.repository_items.get(item_type.value, {})
+            skipped = [name for name in all_type_items if name not in type_items]
+            if skipped:
+                logger.debug(f"Skipping {item_type.value} item(s) due to items_to_include filter: {skipped}")
+                for name in skipped:
+                    all_type_items[name].skip_publish = True
+
             for item_name, item in type_items.items():
                 if fabric_workspace_obj._apply_publish_filters(item, item_name, item_type.value):
                     continue
