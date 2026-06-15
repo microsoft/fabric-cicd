@@ -315,29 +315,43 @@ class ItemPublisher(Publisher):
         """
         publishers: list[ItemPublisher] = []
         items_with_context: list[tuple[str, Item, ItemPublisher]] = []
+        skipped_items: list[str] = []
 
         # Phase 1: Pre-hooks + collect items with their publisher context
         for _order_num, item_type in ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
             publisher = ItemPublisher.create(item_type, fabric_workspace_obj)
-            publisher.pre_publish_all()
             type_items = publisher.get_items_to_publish()
 
-            # Mark excluded items as skip_publish=True so post_publish_all() hooks reliably skip them
+            # Filter 1: items_to_include — mark items not in the include list as skip_publish=True
             all_type_items = fabric_workspace_obj.repository_items.get(item_type.value, {})
             skipped = [name for name in all_type_items if name not in type_items]
             if skipped:
                 logger.debug(f"Skipping {item_type.value} item(s) due to items_to_include filter: {skipped}")
                 for name in skipped:
                     all_type_items[name].skip_publish = True
+                    skipped_items.append(f"{item_type.value}: {name}")
 
+            # Filter 2: publish filters (exclude_regex, folder_exclude_regex, folder_path_to_include)
+            publishable_items = []
             for item_name, item in type_items.items():
                 if fabric_workspace_obj._apply_publish_filters(item, item_name, item_type.value):
+                    skipped_items.append(f"{item_type.value}: {item_name}")
                     continue
-                items_with_context.append((item_name, item, publisher))
+                publishable_items.append((item_name, item, publisher))
+
+            # Skip pre-hooks and registration if no items will actually be published for this type
+            if not publishable_items:
+                continue
+
+            publisher.pre_publish_all()
+            items_with_context.extend(publishable_items)
             publishers.append(publisher)
 
         # Phase 2: Single bulk API call (publisher context used inside for per-item transforms)
         if items_with_context:
+            if skipped_items:
+                logger.info(f"{constants.INDENT}Skipping {len(skipped_items)} item(s) due to publish filters")
+
             item_count = len(items_with_context)
             if item_count > constants.BULK_ITEM_COUNT_LIMIT:
                 msg = (
@@ -345,7 +359,7 @@ class ItemPublisher(Publisher):
                     f"of {constants.BULK_ITEM_COUNT_LIMIT} items."
                 )
                 raise InputError(msg, logger)
-            fabric_workspace_obj._publish_items(items_with_context)
+            fabric_workspace_obj._publish_items(items_with_context, skipped_items=skipped_items)
 
         # Phase 3: Post-hooks per type
         for publisher in publishers:

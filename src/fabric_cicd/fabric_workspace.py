@@ -777,12 +777,15 @@ class FabricWorkspace:
             logger.info(f"{constants.INDENT}Published {item_type} '{item_name}'")
         return
 
-    def _publish_items(self, items_with_context: list[tuple[str, "Item", object]]) -> None:
+    def _publish_items(
+        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: list[str] | None = None
+    ) -> None:
         """
         Publishes or updates items in bulk via the bulk import API.
 
         Args:
             items_with_context: A list of tuples containing item name, Item object, and publisher context required for processing the item files.
+            skipped_items: Optional list of "Type: Name" strings for items skipped by publish filters.
         """
         # Prepare the definition parts for all items to be published in bulk
         definition_parts = []
@@ -790,7 +793,8 @@ class FabricWorkspace:
             item_parts = self._prepare_bulk_item_parts(item, publisher)
             definition_parts.extend(item_parts)
 
-        logger.info(f"{constants.INDENT}Publishing {len(items_with_context)} items in bulk")
+        logger.info(f"{constants.INDENT}Publishing {len(items_with_context)} item(s) in bulk")
+
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
         response = self.endpoint.invoke(
             method="POST",
@@ -839,6 +843,8 @@ class FabricWorkspace:
             logger.info(f"{constants.INDENT}Published items (create): {sorted(created)}")
         if updated:
             logger.info(f"{constants.INDENT}Published items (update): {sorted(updated)}")
+        if skipped_items:
+            logger.info(f"{constants.INDENT}Skipped items: {sorted(skipped_items)}")
 
     def _prepare_bulk_item_parts(self, item: "Item", publisher: object) -> list[dict]:
         """
@@ -1001,11 +1007,13 @@ class FabricWorkspace:
         Returns True if the item should be skipped (sets item.skip_publish = True as a side effect).
         """
         # 1. Skip publishing if the item name matches the exclusion regex
+        log = logger.debug if self.bulk_publish_enabled else logger.info
+
         if self.publish_item_name_exclude_regex:
             regex_pattern = check_regex(self.publish_item_name_exclude_regex)
             if regex_pattern.match(item_name):
                 item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                log(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
                 return True
 
         # 2. Skip publishing if the item's folder path is excluded or not in the include list
@@ -1033,9 +1041,11 @@ class FabricWorkspace:
            Only exact folder match is checked — does NOT walk ancestors.
            (e.g., including /A does NOT include items in /A/B, or including /A/B does NOT include
            items in /A, but the folder /A will still exist in standard mode).
+           Root-level items (empty folder_path) are not impacted by folder path inclusion.
 
         Returns True if the item should be skipped (sets item.skip_publish = True as a side effect).
         """
+        log = logger.debug if self.bulk_publish_enabled else logger.info
         folder_path = item.folder_path or ""
 
         # Apply folder path exclusion — walk up ancestors
@@ -1045,7 +1055,7 @@ class FabricWorkspace:
             while path_to_check:
                 if regex_pattern.search(path_to_check):
                     item.skip_publish = True
-                    logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
+                    log(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
                     return True
                 if "/" in path_to_check and path_to_check != "":
                     path_to_check = path_to_check.rsplit("/", 1)[0]
@@ -1056,10 +1066,10 @@ class FabricWorkspace:
         if (
             self.publish_folder_path_to_include
             and folder_path
-            and folder_path not in self.publish_folder_path_to_include
+            and (folder_path not in self.publish_folder_path_to_include)
         ):
             item.skip_publish = True
-            logger.info(
+            log(
                 f"Skipping publishing of {item_type} '{item_name}' under {folder_path} as it is not in the include list."
             )
             return True

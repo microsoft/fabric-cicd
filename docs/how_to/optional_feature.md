@@ -169,7 +169,7 @@ A subset of items in the repository that exist within a Fabric workspace folder 
     - Folder paths must start with `/` (e.g., `/folder_name` or `/folder_name/nested_folder`). The matching folder path(s) and their contained items will be included in the publish operation; any other items contained within Fabric folders will be excluded.
     - When using `folder_path_to_include` with nested paths (e.g., `/subfolder1/subfolder2`), ancestor folders (e.g., `/subfolder1`) are automatically created to preserve the correct folder hierarchy, but items directly under the ancestor folder are **not** published unless the ancestor folder is also explicitly included in the list.
 
-**Note:** `folder_path_exclude_regex` and `folder_path_to_include` are mutually exclusive and cannot be used together for the same deployment. These filters are ignored when the `disable_workspace_folder_publish` feature flag is set. Folder-based filtering does not impact standalone items.
+**Note:** `folder_path_exclude_regex` and `folder_path_to_include` are mutually exclusive and cannot be used together for the same deployment. These filters are ignored when the `disable_workspace_folder_publish` feature flag is set. Root-level items (items not in any folder) are not impacted by either folder-level filter.
 
 ### Item-Level Filtering
 
@@ -196,7 +196,7 @@ Filters are evaluated in the following order:
 3. **`folder_path_exclude_regex`** — Items in matching folders are excluded
 4. **`folder_path_to_include`** — Only items in specified folders are published
 
-**Note:** `folder_path_exclude_regex` and `folder_path_to_include` are mutually exclusive — only one can be used per deployment. Standalone items (items not in any folder) are not impacted by folder-level filters. When `items_to_include` is combined with exclusion filters, an item must first be in the include list before exclusion filters are evaluated against it.
+**Note:** `folder_path_exclude_regex` and `folder_path_to_include` are mutually exclusive — only one can be used per deployment. Root-level items (items not in any folder) are not impacted by either folder-level filter. When `items_to_include` is combined with exclusion filters, an item must first be in the include list before exclusion filters are evaluated against it.
 
 ### Lakehouse Shortcut Filtering
 

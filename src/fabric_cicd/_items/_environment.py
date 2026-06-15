@@ -162,6 +162,10 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
         )
     ]
 
+    if not filtered_environments:
+        logger.debug("No environments to check publish state for — skipping.")
+        return
+
     logger.info(f"Checking Environment Publish State for {filtered_environments}")
 
     while ongoing_publish:
@@ -200,10 +204,13 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
             )
             iteration += 1
 
+    not_found = [name for name in filtered_environments if name not in completed + running + failed]
     if completed:
         logger.info(f"{constants.INDENT}Published: {completed}")
     if failed and initial_check:
         logger.info(f"{constants.INDENT}Failed/Cancelled (pre-existing): {failed}")
+    if not_found:
+        logger.info(f"{constants.INDENT}Not yet deployed: {not_found}")
 
 
 def _submit_environment_publish(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
