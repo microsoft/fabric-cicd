@@ -413,7 +413,7 @@ def test_publish_all_marks_excluded_items_skip_publish():
     # Track which items get shortcut-published
     shortcut_published_guids = []
 
-    def fake_shortcut_publish_all(self_inner):
+    def fake_shortcut_publish_all(self_inner, **_kwargs):
         shortcut_published_guids.append(self_inner.item_obj.guid)
 
     with (
