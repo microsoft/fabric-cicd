@@ -801,7 +801,7 @@ class FabricWorkspace:
             url=f"{self.base_api_url}/items/bulkImportDefinitions?beta=True",
             body={
                 "definitionParts": definition_parts,
-                "options": {"allowPairingByName": False},
+                "options": {"allowPairingByName": True},
             },
             max_duration=1800,  # 30 minutes, as bulk operations can take longer time to complete
         )
