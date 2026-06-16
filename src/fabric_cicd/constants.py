@@ -166,7 +166,6 @@ UNPUBLISH_FLAG_MAPPING = {
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
 BULK_UNSUPPORTED_ITEM_TYPES = [
     ItemType.DATA_BUILD_TOOL_JOB.value,
-    ItemType.SPARK_JOB_DEFINITION.value,
     ItemType.WAREHOUSE.value,
 ]
 BULK_ACCEPTED_ITEM_TYPES = tuple(

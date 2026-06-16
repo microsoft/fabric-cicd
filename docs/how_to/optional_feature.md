@@ -135,11 +135,13 @@ Since this feature is experimental, it is recommended for non-production environ
 
     Item definitions in the same workspace that reference other items by item ID (rather than logical ID) can still be published via bulk publish. However, parameterization is required to ensure references are correctly re-pointed in the target workspace. The recommended approach is to use a `find_replace` parameter where the `find_value` is the referenced item's ID and the `replace_value` is its logical ID. For example, a Dataflow Gen2 item that references a Lakehouse by item ID — use `find_replace` to swap the Lakehouse's item ID with its logical ID so the bulk publish API can resolve the dependency.
 
+    Note that logical ID replacement may not be a valid solution for all item types. In such cases, you can either use standard publish where dynamic replacement variables are supported, or use a multi-phased bulk publish deployment by applying [selective deployment](#selective-deployment-features) to separate the affected items across phases.
+
     For more details on logical IDs, see [Resolve Logical ID Conflicts in Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/logical-id-conflict-resolution).
 
 ### Current Limitations
 
-- **Unsupported item types**: `DataBuildToolJob`, `Ontology`, `SparkJobDefinition`, and `Warehouse` are not supported in bulk publish mode. If any unsupported item type is in scope, the deployment automatically falls back to standard publish mode. If `item_type_in_scope` is not specified, standard publish mode is always used.
+- **Unsupported item types**: `DataBuildToolJob` and `Warehouse` are not supported in bulk publish mode. If any unsupported item type is in scope, the deployment automatically falls back to standard publish mode. If `item_type_in_scope` is not specified, standard publish mode is always used. Note that supported item types still in preview (e.g., `Ontology`) may produce errors for certain item definitions.
 - **Dynamic parameter variables**: Parameter files that use `$workspace` or `$items` dynamic replacement variables are not compatible with bulk publish. The deployment falls back to standard publishing when dynamic variables are detected.
 - **Item count limit**: A maximum of 1,000 items can be published in a single bulk call. Exceeding this limit raises an error. Publish time may increase with higher item counts.
 
