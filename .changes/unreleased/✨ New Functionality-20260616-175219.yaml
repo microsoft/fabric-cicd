@@ -1,0 +1,8 @@
+kind: ✨ New Functionality
+body: Add support for multiple connection ids in semantic model binding parameters
+time: 2026-06-16T17:52:19.3517174-07:00
+custom:
+  Author: alwortma2
+  AuthorLink: https://github.com/alwortma2
+  Issue: "1003"
+  IssueLink: https://github.com/microsoft/fabric-cicd/issues/1003
