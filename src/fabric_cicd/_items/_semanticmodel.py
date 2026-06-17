@@ -62,18 +62,26 @@ def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic
     return binding_mapping
 
 
-def _normalize_connection_ids(value: object) -> list:
+def _normalize_connection_ids(value: object) -> list[str]:
     """
     Normalize a connection_id value to a list of strings.
 
-    Accepts a single string (returns a one-element list) or a list of strings
-    (returned unchanged).  Any other type is returned as an empty list with a
-    warning so callers can skip the entry gracefully.
+    Accepts a single string (returns a one-element list) or a list (non-string
+    elements are logged and skipped).  Any other outer type is returned as an
+    empty list with a warning so callers can skip the entry gracefully.
     """
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
-        return value
+        result = []
+        for item in value:
+            if isinstance(item, str):
+                result.append(item)
+            else:
+                logger.warning(
+                    f"Skipping non-string connection_id list element: {item!r} (type '{type(item).__name__}')"
+                )
+        return result
     logger.warning(f"Unexpected connection_id type '{type(value).__name__}'; expected str or list. Skipping.")
     return []
 
@@ -208,12 +216,8 @@ def bind_semanticmodel_to_connection(
     item_type = ItemType.SEMANTIC_MODEL.value
 
     for model_name, raw_connection_ids in connection_details.items():
-        # Normalize to list to support both single-string and list values
-        connection_ids = (
-            _normalize_connection_ids(raw_connection_ids)
-            if not isinstance(raw_connection_ids, list)
-            else raw_connection_ids
-        )
+        # Always normalize through the helper so non-string list elements are safely filtered
+        connection_ids = _normalize_connection_ids(raw_connection_ids)
 
         # Validate every connection ID exists before touching the API
         valid_connection_ids = []

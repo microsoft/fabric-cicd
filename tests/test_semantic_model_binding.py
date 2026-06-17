@@ -62,12 +62,22 @@ def _invoke_side_effect(method: str, url: str, **_kwargs):
 
 
 def test_normalize_single_string():
-    assert _normalize_connection_ids("conn-1") == ["conn-1"]
+    assert _normalize_connection_ids("12345678-1234-1234-1234-123456789012") == ["12345678-1234-1234-1234-123456789012"]
 
 
 def test_normalize_list_passthrough():
-    ids = ["conn-1", "conn-2"]
-    assert _normalize_connection_ids(ids) is ids
+    ids = ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+    result = _normalize_connection_ids(ids)
+    assert result == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+    assert isinstance(result, list)
+
+
+def test_normalize_list_filters_non_strings(caplog):
+    """Non-string elements in a list are skipped with a warning."""
+    with caplog.at_level("WARNING"):
+        result = _normalize_connection_ids(["11111111-1111-1111-1111-111111111111", {"id": "bad"}, 42, "22222222-2222-2222-2222-222222222222"])
+    assert result == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+    assert "non-string" in caplog.text.lower() or "skipping" in caplog.text.lower()
 
 
 def test_normalize_invalid_type_returns_empty():
@@ -84,10 +94,10 @@ def test_build_binding_mapping_default_single_string():
     """Default section with a single string connection_id applies to all models."""
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
-        "default": {"connection_id": {"PPE": "conn-default"}},
+        "default": {"connection_id": {"PPE": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
     }
     result = build_binding_mapping(workspace, binding, "PPE")
-    assert result == {"ModelA": ["conn-default"], "ModelB": ["conn-default"]}
+    assert result == {"ModelA": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"], "ModelB": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]}
 
 
 def test_build_binding_mapping_models_single_string():
@@ -95,20 +105,20 @@ def test_build_binding_mapping_models_single_string():
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PPE": "conn-a"}},
+            {"semantic_model_name": "ModelA", "connection_id": {"PPE": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
         ]
     }
     result = build_binding_mapping(workspace, binding, "PPE")
-    assert result == {"ModelA": ["conn-a"]}
+    assert result == {"ModelA": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]}
     assert "ModelB" not in result  # no default set
 
 
 def test_build_binding_mapping_all_key_single_string():
     """_ALL_ key maps to the requested environment."""
     workspace = _make_workspace("ModelA")
-    binding = {"default": {"connection_id": {"_ALL_": "conn-all"}}}
+    binding = {"default": {"connection_id": {"_ALL_": "ffffffff-ffff-ffff-ffff-ffffffffffff"}}}
     result = build_binding_mapping(workspace, binding, "PROD")
-    assert result == {"ModelA": ["conn-all"]}
+    assert result == {"ModelA": ["ffffffff-ffff-ffff-ffff-ffffffffffff"]}
 
 
 # ---------------------------------------------------------------------------
@@ -120,11 +130,11 @@ def test_build_binding_mapping_default_list():
     """Default section with a list of connection IDs assigns all IDs to each model."""
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
-        "default": {"connection_id": {"PPE": ["conn-1", "conn-2"]}},
+        "default": {"connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
     }
     result = build_binding_mapping(workspace, binding, "PPE")
-    assert result["ModelA"] == ["conn-1", "conn-2"]
-    assert result["ModelB"] == ["conn-1", "conn-2"]
+    assert result["ModelA"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+    assert result["ModelB"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
 
 
 def test_build_binding_mapping_models_list():
@@ -132,11 +142,11 @@ def test_build_binding_mapping_models_list():
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["conn-1", "conn-2"]}},
+            {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
         ]
     }
     result = build_binding_mapping(workspace, binding, "PPE")
-    assert result["ModelA"] == ["conn-1", "conn-2"]
+    assert result["ModelA"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
     assert "ModelB" not in result
 
 
@@ -144,14 +154,14 @@ def test_build_binding_mapping_explicit_overrides_default_with_list():
     """Explicit model binding (list) overrides default; other models still get default."""
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
-        "default": {"connection_id": {"PPE": "conn-default"}},
+        "default": {"connection_id": {"PPE": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["conn-a1", "conn-a2"]}},
+            {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
         ],
     }
     result = build_binding_mapping(workspace, binding, "PPE")
-    assert result["ModelA"] == ["conn-a1", "conn-a2"]
-    assert result["ModelB"] == ["conn-default"]
+    assert result["ModelA"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+    assert result["ModelB"] == ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
 
 
 def test_build_binding_mapping_unknown_model_warns(caplog):
@@ -159,7 +169,7 @@ def test_build_binding_mapping_unknown_model_warns(caplog):
     workspace = _make_workspace("ModelA")
     binding = {
         "models": [
-            {"semantic_model_name": "NoSuchModel", "connection_id": {"PPE": ["conn-1"]}},
+            {"semantic_model_name": "NoSuchModel", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111"]}},
         ]
     }
     with caplog.at_level("WARNING"):
@@ -173,7 +183,7 @@ def test_build_binding_mapping_missing_env_skips():
     workspace = _make_workspace("ModelA")
     binding = {
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PROD": "conn-prod"}},
+            {"semantic_model_name": "ModelA", "connection_id": {"PROD": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
         ]
     }
     result = build_binding_mapping(workspace, binding, "PPE")
@@ -190,8 +200,8 @@ def test_bind_single_connection_id_as_string():
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-1")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": "conn-1"})
+    connections = _make_connections("11111111-1111-1111-1111-111111111111")
+    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": "11111111-1111-1111-1111-111111111111"})
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
     assert len(post_calls) == 1
@@ -203,8 +213,8 @@ def test_bind_single_connection_id_as_list():
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-1")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["conn-1"]})
+    connections = _make_connections("11111111-1111-1111-1111-111111111111")
+    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111"]})
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
     assert len(post_calls) == 1
@@ -220,8 +230,8 @@ def test_bind_multiple_connection_ids_calls_bind_n_times():
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-1", "conn-2", "conn-3")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["conn-1", "conn-2", "conn-3"]})
+    connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333")
+    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333"]})
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
     assert len(post_calls) == 3
@@ -232,11 +242,11 @@ def test_bind_multiple_models_multiple_connections():
     workspace = _make_workspace("ModelA", "ModelB")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-1", "conn-2")
+    connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222")
     bind_semanticmodel_to_connection(
         workspace,
         connections,
-        {"ModelA": ["conn-1", "conn-2"], "ModelB": ["conn-1", "conn-2"]},
+        {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"], "ModelB": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]},
     )
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
@@ -248,8 +258,8 @@ def test_bind_item_connections_fetched_once_per_model():
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-1", "conn-2")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["conn-1", "conn-2"]})
+    connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222")
+    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]})
 
     get_item_conn_calls = [
         c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "GET" and "/connections" in c[1]["url"]
@@ -262,13 +272,13 @@ def test_bind_invalid_connection_id_warns_and_skips(caplog):
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-1")
+    connections = _make_connections("11111111-1111-1111-1111-111111111111")
     with caplog.at_level("WARNING"):
-        bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["conn-1", "bad-conn"]})
+        bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"]})
 
-    assert "bad-conn" in caplog.text
+    assert "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" in caplog.text
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
-    # Only the valid conn-1 should produce a POST
+    # Only the valid 11111111-1111-1111-1111-111111111111 should produce a POST
     assert len(post_calls) == 1
 
 
@@ -277,8 +287,8 @@ def test_bind_all_connection_ids_invalid_skips_model():
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("conn-real")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["bad-1", "bad-2"]})
+    connections = _make_connections("11111111-1111-1111-1111-111111111111")
+    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"]})
 
     # No GET or POST calls for ModelA because all IDs are invalid
     assert workspace.endpoint.invoke.call_count == 0
@@ -293,13 +303,28 @@ def test_bind_correct_connection_id_in_request_body():
         if method == "POST":
             captured_bodies.append(kwargs.get("body", {}))
             return {"status_code": 200}
-        return {"body": {"value": [{"id": "old-conn", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
+        return {"body": {"value": [{"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
 
     workspace.endpoint.invoke.side_effect = capture_invoke
 
-    connections = _make_connections("conn-alpha", "conn-beta")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["conn-alpha", "conn-beta"]})
+    connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222")
+    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]})
 
     assert len(captured_bodies) == 2
     bound_ids = {body["connectionBinding"]["id"] for body in captured_bodies}
-    assert bound_ids == {"conn-alpha", "conn-beta"}
+    assert bound_ids == {"11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"}
+
+
+def test_bind_list_with_non_string_elements_does_not_raise(caplog):
+    """A list containing non-string elements (e.g. dicts) must not raise TypeError.
+    Non-string items are filtered by _normalize_connection_ids; valid strings still bind."""
+    workspace = _make_workspace("ModelA")
+    workspace.endpoint.invoke.side_effect = _invoke_side_effect
+
+    connections = _make_connections("11111111-1111-1111-1111-111111111111")
+    with caplog.at_level("WARNING"):
+        # {"id": "bad"} is an unhashable dict — must not cause TypeError
+        bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", {"id": "bad"}, 42]})
+
+    post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
+    assert len(post_calls) == 1  # only the valid "11111111-1111-1111-1111-111111111111" is bound
