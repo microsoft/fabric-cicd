@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 import requests
 
 from fabric_cicd._common._file_lock import FileLock
-from fabric_cicd.constants import AUTHORIZATION_HEADER, SENSITIVE_RESPONSE_HEADERS, EnvVar
+from fabric_cicd.constants import SENSITIVE_REQUEST_HEADERS, SENSITIVE_RESPONSE_HEADERS, EnvVar
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +154,12 @@ class FileTracer:
 
         self.output_file = self._validate_output_path(raw_path)
         self.captures: list[dict] = []
+        logger.warning(
+            "HTTP tracing is enabled. Trace file '%s' may contain sensitive data "
+            "such as connection strings and API request/response bodies. "
+            "Do not commit or share this file.",
+            self.output_file,
+        )
 
     @staticmethod
     def _validate_output_path(raw_path: str) -> str:
@@ -198,7 +204,7 @@ class FileTracer:
         request = HTTPRequest(
             method=method,
             url=url,
-            headers={k: v for k, v in headers.items() if k.lower() not in [AUTHORIZATION_HEADER]},
+            headers={k: v for k, v in headers.items() if k.lower() not in SENSITIVE_REQUEST_HEADERS},
             body=body,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )

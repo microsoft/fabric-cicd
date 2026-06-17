@@ -179,7 +179,11 @@ PARALLEL_MAX_WORKERS: int = (
 )
 
 # HTTP Headers
-AUTHORIZATION_HEADER = "authorization"
+# Headers filtered from HTTP trace output as a defense-in-depth measure.
+SENSITIVE_REQUEST_HEADERS = frozenset({
+    "authorization",
+})
+# These may appear in auth failure, token refresh, or proxy-mediated responses.
 SENSITIVE_RESPONSE_HEADERS = frozenset({
     "set-cookie",
     "www-authenticate",
