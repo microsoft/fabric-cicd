@@ -163,6 +163,8 @@ semantic_model_binding:
             PROD: <PROD-connection_guid>
             # OR use _ALL_ for same connection across environments
             # _ALL_: <connection_guid>
+            # OR supply a list to bind multiple connections per model
+            # PPE: ["<PPE-conn-guid-1>", "<PPE-conn-guid-2>"]
 
     # Explicit bindings override default
     models:
@@ -174,13 +176,19 @@ semantic_model_binding:
         - semantic_model_name: ["<semantic_model_name1>", "<semantic_model_name2>", ...]
           connection_id:
               _ALL_: <connection_guid>
+
+        # Bind multiple connections to a single model
+        - semantic_model_name: "<semantic_model_name>"
+          connection_id:
+              PPE: ["<PPE-conn-guid-1>", "<PPE-conn-guid-2>"]
+              PROD: ["<PROD-conn-guid-1>", "<PROD-conn-guid-2>"]
 ```
 
 **Notes:**
 
 - The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
 - Connection ID values must be valid GUIDs.
-- **Only a single connection binding per Semantic Model is currently supported.** If your Semantic Model uses multiple connections (e.g., connecting to both a SQL database and a Lakehouse), only one can be configured through `semantic_model_binding`. Additional connections must be configured manually after deployment.
+- Each environment value under `connection_id` may be a **single GUID string** or a **list of GUID strings**. When a list is supplied, `bindConnection` is called once per connection ID, allowing models that use multiple data sources (e.g., a SQL database and a Lakehouse) to be fully bound in a single deployment pass.
 
 ## Advanced Find and Replace
 
