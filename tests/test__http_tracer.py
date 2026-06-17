@@ -29,7 +29,7 @@ def test_validate_output_path_subdirectory(tmp_path, monkeypatch):
 
 def test_validate_output_path_rejects_non_json(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(ValueError, match="must have a .json extension"):
+    with pytest.raises(ValueError, match=r"must have a \.json extension"):
         FileTracer._validate_output_path("trace.txt")
 
 

@@ -147,10 +147,7 @@ class FileTracer:
         """
         trace_file_from_env = os.environ.get(EnvVar.HTTP_TRACE_FILE.value)
 
-        if output_file is None:
-            raw_path = trace_file_from_env if trace_file_from_env else "http_trace.json"
-        else:
-            raw_path = output_file
+        raw_path = trace_file_from_env or "http_trace.json" if output_file is None else output_file
 
         self.output_file = self._validate_output_path(raw_path)
         self.captures: list[dict] = []
