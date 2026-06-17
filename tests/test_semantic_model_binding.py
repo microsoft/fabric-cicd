@@ -50,7 +50,7 @@ def _make_connections(*conn_ids: str) -> dict:
 
 def _invoke_side_effect(method: str, url: str, **_kwargs):
     if method == "GET" and url.endswith("/connections"):
-        return {"body": {"value": [{"id": "old-conn", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
+        return {"body": {"value": [{"id": "cccccccc-cccc-cccc-cccc-cccccccccccc", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
     if method == "POST" and "bindConnection" in url:
         return {"status_code": 200}
     return {"body": {}}
@@ -116,9 +116,9 @@ def test_build_binding_mapping_models_single_string():
 def test_build_binding_mapping_all_key_single_string():
     """_ALL_ key maps to the requested environment."""
     workspace = _make_workspace("ModelA")
-    binding = {"default": {"connection_id": {"_ALL_": "ffffffff-ffff-ffff-ffff-ffffffffffff"}}}
+    binding = {"default": {"connection_id": {"_ALL_": "dddddddd-dddd-dddd-dddd-dddddddddddd"}}}
     result = build_binding_mapping(workspace, binding, "PROD")
-    assert result == {"ModelA": ["ffffffff-ffff-ffff-ffff-ffffffffffff"]}
+    assert result == {"ModelA": ["dddddddd-dddd-dddd-dddd-dddddddddddd"]}
 
 
 # ---------------------------------------------------------------------------
@@ -154,14 +154,14 @@ def test_build_binding_mapping_explicit_overrides_default_with_list():
     """Explicit model binding (list) overrides default; other models still get default."""
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
-        "default": {"connection_id": {"PPE": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
+        "default": {"connection_id": {"PPE": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"}},
         "models": [
             {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
         ],
     }
     result = build_binding_mapping(workspace, binding, "PPE")
     assert result["ModelA"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
-    assert result["ModelB"] == ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+    assert result["ModelB"] == ["eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"]
 
 
 def test_build_binding_mapping_unknown_model_warns(caplog):
@@ -169,7 +169,7 @@ def test_build_binding_mapping_unknown_model_warns(caplog):
     workspace = _make_workspace("ModelA")
     binding = {
         "models": [
-            {"semantic_model_name": "NoSuchModel", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111"]}},
+            {"semantic_model_name": "NoSuchModel", "connection_id": {"PPE": ["44444444-4444-4444-4444-444444444444"]}},
         ]
     }
     with caplog.at_level("WARNING"):
@@ -183,7 +183,7 @@ def test_build_binding_mapping_missing_env_skips():
     workspace = _make_workspace("ModelA")
     binding = {
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PROD": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
+            {"semantic_model_name": "ModelA", "connection_id": {"PROD": "55555555-5555-5555-5555-555555555555"}},
         ]
     }
     result = build_binding_mapping(workspace, binding, "PPE")
@@ -303,7 +303,7 @@ def test_bind_correct_connection_id_in_request_body():
         if method == "POST":
             captured_bodies.append(kwargs.get("body", {}))
             return {"status_code": 200}
-        return {"body": {"value": [{"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
+        return {"body": {"value": [{"id": "66666666-6666-6666-6666-666666666666", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
 
     workspace.endpoint.invoke.side_effect = capture_invoke
 
