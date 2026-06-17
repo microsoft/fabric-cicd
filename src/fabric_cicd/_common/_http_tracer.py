@@ -184,7 +184,7 @@ class FileTracer:
             msg = f"HTTP trace file must have a .json extension, got: {resolved.name}"
             raise ValueError(msg)
 
-        if not str(resolved).startswith(str(cwd)):
+        if not resolved.is_relative_to(cwd):
             msg = "HTTP trace file path must be within the current working directory"
             raise ValueError(msg)
 
