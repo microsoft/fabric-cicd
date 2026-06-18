@@ -3,6 +3,7 @@
 
 """Functions to process and deploy Semantic Model item."""
 
+import copy
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
@@ -57,7 +58,7 @@ def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic
             if name not in repository_models:
                 logger.warning(f"Semantic model '{name}' specified in parameter.yml not found in repository")
                 continue
-            binding_mapping[name] = connection_id
+            binding_mapping[name] = [connection_id]
 
     return binding_mapping
 
@@ -244,23 +245,27 @@ def bind_semanticmodel_to_connection(
 
         model_id = item_obj.guid
 
+        # Get the connection details for this semantic model from Fabric API (once per model)
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/list-item-connections
+        item_connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/items/{model_id}/connections"
         try:
-            # Get the connection details for this semantic model from Fabric API (once per model)
-            # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/list-item-connections
-            item_connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}/items/{model_id}/connections"
             connections_response = fabric_workspace_obj.endpoint.invoke(method="GET", url=item_connections_url)
             connections_data = connections_response.get("body", {}).get("value", [])
+        except Exception as e:
+            logger.error(f"Failed to retrieve connections for semantic model '{model_name}': {e!s}")
+            continue
 
-            if not connections_data:
-                logger.debug(f"No existing connections found for semantic model '{model_name}', skipping binding")
-                continue
+        if not connections_data:
+            logger.debug(f"No existing connections found for semantic model '{model_name}', skipping binding")
+            continue
 
-            # Bind each connection ID to the model
-            for connection_id in valid_connection_ids:
+        # Bind each connection ID to the model; an error on one ID does not abort the remaining IDs
+        for connection_id in valid_connection_ids:
+            try:
                 logger.info(f"Binding semantic model '{model_name}' (ID: {model_id}) to connection '{connection_id}'")
 
-                # Use the first existing connection as the template for the binding structure
-                connection_binding = dict(connections_data[0])
+                # Deep-copy the template so nested objects are not shared across iterations
+                connection_binding = copy.deepcopy(connections_data[0])
 
                 # Update the connection binding with the target connection ID from parameter.yml
                 connection_binding["id"] = connection_id
@@ -289,9 +294,9 @@ def bind_semanticmodel_to_connection(
                         f"Status code: {status_code}"
                     )
 
-        except Exception as e:
-            logger.error(f"Failed to bind semantic model '{model_name}' to connection: {e!s}")
-            continue
+            except Exception as e:
+                logger.error(f"Failed to bind '{model_name}' to connection '{connection_id}': {e!s}")
+                continue
 
 
 def build_request_body(body: dict) -> dict:
