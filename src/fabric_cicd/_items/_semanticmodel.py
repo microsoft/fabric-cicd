@@ -15,7 +15,7 @@ from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
 logger = logging.getLogger(__name__)
 
 
-def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic_model_binding: list) -> dict:
+def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic_model_binding: list) -> dict[str, list[str]]:
     """
     Build the connection mapping from legacy list-based semantic_model_binding parameter.
 
@@ -24,7 +24,7 @@ def build_binding_mapping_legacy(fabric_workspace_obj: FabricWorkspace, semantic
         semantic_model_binding: The semantic_model_binding parameter as a list
 
     Returns:
-        Dictionary mapping semantic model names to connection IDs
+        Dictionary mapping semantic model names to a list of connection IDs
     """
     logger.warning(
         "The legacy 'semantic_model_binding' list format is deprecated and will be removed in a future release. "
