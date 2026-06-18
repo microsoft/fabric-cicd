@@ -139,11 +139,20 @@ Since this feature is experimental, it is recommended for non-production environ
 
     For more details on logical IDs, see [Resolve Logical ID Conflicts in Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/logical-id-conflict-resolution).
 
-### Current Limitations
+### Automatic Fallback to Standard Publish
 
-- **Unsupported item types**: `DataBuildToolJob` and `Warehouse` are not supported in bulk publish mode. If any unsupported item type is in scope, the deployment automatically falls back to standard publish mode. If `item_type_in_scope` is not specified, standard publish mode is always used. Note that supported item types still in preview (e.g., `Ontology`) may produce errors for certain item definitions.
-- **Dynamic parameter variables**: Parameter files that use `$workspace` or `$items` dynamic replacement variables are not compatible with bulk publish. The deployment falls back to standard publishing when dynamic variables are detected.
+Bulk publish will automatically fall back to standard publish mode when any of the following conditions are detected. A warning is logged when this occurs.
+
+- **Unsupported item types in scope**: `DataBuildToolJob` and `Warehouse` are not supported. If either is included in `item_type_in_scope`, the entire deployment uses standard publish.
+- **No `item_type_in_scope` specified**: Bulk publish requires an explicit `item_type_in_scope`. When omitted, all supported item types are included — which inevitably contains bulk unsupported types — so standard publish is used instead.
+- **Dynamic parameter variables**: Parameter files containing `$workspace` or `$items` replacement variables require runtime resolution, which is incompatible with bulk publish.
+
+Check your deployment logs for the message `"Falling back to standard deployment..."` to confirm whether bulk publish was actually used.
+
+### Other Limitations
+
 - **Item count limit**: A maximum of 1,000 items can be published in a single bulk call. Exceeding this limit raises an error. Publish time may increase with higher item counts.
+- **Preview item types**: Supported item types still in preview (e.g., `Ontology`) may produce errors for certain item definitions.
 
 For common bulk publish errors and their solutions, see the [Troubleshooting Guide](troubleshooting.md#bulk-publish-failures).
 

@@ -793,7 +793,7 @@ class FabricWorkspace:
             item_parts = self._prepare_bulk_item_parts(item, publisher)
             definition_parts.extend(item_parts)
 
-        logger.info(f"{constants.INDENT}Publishing {len(items_with_context)} item(s) in bulk")
+        logger.info(f"Publishing {len(items_with_context)} item(s) in bulk")
 
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
         response = self.endpoint.invoke(

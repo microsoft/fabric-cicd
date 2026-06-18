@@ -350,7 +350,7 @@ class ItemPublisher(Publisher):
         # Phase 2: Single bulk API call (publisher context used inside for per-item transforms)
         if items_with_context:
             if skipped_items:
-                logger.info(f"{constants.INDENT}Skipping {len(skipped_items)} item(s) due to publish filters")
+                logger.info(f"Skipping {len(skipped_items)} item(s) due to publish filters")
 
             item_count = len(items_with_context)
             if item_count > constants.BULK_ITEM_COUNT_LIMIT:

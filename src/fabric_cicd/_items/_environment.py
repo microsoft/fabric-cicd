@@ -14,6 +14,7 @@ from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import ItemType
 
@@ -268,6 +269,7 @@ class EnvironmentPublisher(ItemPublisher):
     def post_publish_all(self) -> None:
         """Submit environment publish for each item after bulk upload."""
         if self.fabric_workspace_obj.bulk_publish_enabled:
+            log_header(logger, "Publishing Environments")
             for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
                 if not item.skip_publish:
                     _submit_environment_publish(self.fabric_workspace_obj, item_name)
