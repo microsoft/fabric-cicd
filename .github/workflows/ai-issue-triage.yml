@@ -116,6 +116,185 @@ jobs:
                         core.info(`Could not gather recent repository changes: ${e.message}`);
                       }
 
+                      // ------------------------------------------------------------------
+                      // Code awareness: ground the triage model in the actual repository.
+                      //   (B) Repository Facts — a small, stable digest generated from source
+                      //       (item types, public API, module layout) so the model reasons
+                      //       from what the library actually supports instead of guessing.
+                      //   (A) Relevant Code Context — symbols/paths the reporter mentioned are
+                      //       grepped against the checked-out tree and the matching snippets
+                      //       are injected so the model checks the report against real code.
+                      // Both are best-effort and must never fail triage.
+                      // ------------------------------------------------------------------
+                      try {
+                        const fs = require('fs');
+                        const { execFileSync } = require('child_process');
+
+                        const readSafe = (p) => {
+                          try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; }
+                        };
+                        const gitLines = (args) => {
+                          try {
+                            return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 })
+                              .split('\n').filter(Boolean);
+                          } catch (e) {
+                            // git grep exits 1 when there are no matches — that is not an error.
+                            if (e.status === 1) return [];
+                            core.info(`git ${args.join(' ')} failed: ${e.message}`);
+                            return [];
+                          }
+                        };
+
+                        // ---- (B) Repository Facts -----------------------------------------
+                        const factParts = [];
+                        const constantsSrc = readSafe('src/fabric_cicd/constants.py');
+                        if (constantsSrc) {
+                          const verMatch = constantsSrc.match(/^VERSION\s*=\s*["']([^"']+)["']/m);
+                          if (verMatch) factParts.push('- Package version (current `main`): `' + verMatch[1] + '`');
+
+                          const itemStart = constantsSrc.indexOf('class ItemType');
+                          if (itemStart !== -1) {
+                            let itemBlock = constantsSrc.slice(itemStart);
+                            const cut = itemBlock.indexOf('SERIAL_ITEM_PUBLISH_ORDER');
+                            if (cut !== -1) itemBlock = itemBlock.slice(0, cut);
+                            const types = [...itemBlock.matchAll(/=\s*"([A-Za-z0-9]+)"/g)].map(m => m[1]);
+                            if (types.length) {
+                              factParts.push('- Supported `ItemType` values (' + types.length + '): '
+                                + types.map(t => '`' + t + '`').join(', '));
+                            }
+                          }
+                        }
+
+                        const initSrc = readSafe('src/fabric_cicd/__init__.py');
+                        if (initSrc) {
+                          const allMatch = initSrc.match(/__all__\s*=\s*\[([\s\S]*?)\]/);
+                          if (allMatch) {
+                            const exports = [...allMatch[1].matchAll(/["']([^"']+)["']/g)].map(m => m[1]);
+                            if (exports.length) {
+                              factParts.push('- Public API (importable from `fabric_cicd`): '
+                                + exports.map(e => '`' + e + '`').join(', '));
+                            }
+                          }
+                        }
+
+                        const moduleFiles = gitLines(['ls-files', 'src/fabric_cicd']).filter(f => f.endsWith('.py'));
+                        if (moduleFiles.length) {
+                          const base = (f) => f.split('/').pop();
+                          const top = moduleFiles.filter(f => f.split('/').length === 3).map(base);
+                          const itemMods = moduleFiles.filter(f => f.includes('/_items/')).map(base);
+                          const commonMods = moduleFiles.filter(f => f.includes('/_common/')).map(base);
+                          const layout = [];
+                          if (top.length) layout.push('  - top-level: ' + top.join(', '));
+                          if (itemMods.length) layout.push('  - _items/ (per-item publishers): ' + itemMods.join(', '));
+                          if (commonMods.length) layout.push('  - _common/ (shared utilities): ' + commonMods.join(', '));
+                          if (layout.length) factParts.push('- Module layout under `src/fabric_cicd/`:\n' + layout.join('\n'));
+                        }
+
+                        if (factParts.length) {
+                          issueBody = issueBody + '\n\n---\n\n## Repository Facts\n\n'
+                            + 'The facts below are generated from the current `main` branch source. Treat them as authoritative for what the library currently supports. Do not contradict them or invent item types, public functions, or modules that are not listed here.\n\n'
+                            + factParts.join('\n') + '\n';
+                        }
+
+                        // ---- (A) Relevant Code Context ------------------------------------
+                        const sourceText = (issue.title || '') + '\n' + (issue.body || '');
+
+                        // Collect candidate symbols/paths the reporter actually mentioned.
+                        // "strong" tokens come from backtick code spans or file paths (explicitly
+                        // marked as code). "weak" tokens come from free prose and are kept only if
+                        // they look like code (contain _ $ . / or an interior capital), so common
+                        // English words ("does", "expected", "resolved") do not become search terms.
+                        const norm = (t) => t.trim().replace(/^[.\-/]+|[.\-/]+$/g, '');
+                        const codeLike = (t) => /[_$./]/.test(t) || /[A-Z]/.test(t.slice(1));
+                        const strong = [];
+                        const weak = [];
+                        for (const m of sourceText.matchAll(/`([^`]+)`/g)) {
+                          for (const sub of m[1].split(/[^A-Za-z0-9_$./-]+/)) strong.push(norm(sub));
+                        }
+                        for (const m of sourceText.matchAll(/\b[\w./-]+\.(?:py|ya?ml|md|json|toml)\b/g)) strong.push(norm(m[0]));
+                        for (const m of sourceText.matchAll(/\$?[A-Za-z_][A-Za-z0-9_]{3,}(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g)) weak.push(norm(m[0]));
+
+                        const STOP = new Set([
+                          'fabric','cicd','fabric_cicd','python','version','error','errors','issue','github',
+                          'microsoft','workspace','repository','directory','true','false','none','null','import',
+                          'from','self','return','value','values','should','would','could','where','which','there',
+                          'about','using','published','release','branch','assessment','triage','example','description',
+                        ]);
+                        const valid = (t) => /^[A-Za-z0-9_$][A-Za-z0-9_$./-]{2,60}$/.test(t)
+                          && !/^\d+$/.test(t) && !STOP.has(t.toLowerCase());
+                        // Strong tokens kept first so they survive the cap; weak tokens filtered to code-like.
+                        const clean = [...new Set([...strong, ...weak.filter(codeLike)].filter(valid))].slice(0, 24);
+
+                        const fileScores = new Map(); // file -> { tokens:Set, score:number, hits:number, lines:Set }
+                        for (const tok of clean) {
+                          const hits = gitLines(['grep', '--no-color', '-n', '-I', '-F', '-e', tok, '--', 'src', 'docs', 'sample']);
+                          const gh = hits.length;
+                          // Drop only tokens that do not exist or are so common they carry no
+                          // signal (e.g. "name"). Central feature terms stay but are down-weighted.
+                          if (gh === 0 || gh > 300) continue;
+                          const weight = 1 / Math.log2(gh + 2); // rarer terms carry more signal
+                          for (const h of hits.slice(0, 80)) {
+                            const sep1 = h.indexOf(':');
+                            const sep2 = h.indexOf(':', sep1 + 1);
+                            if (sep1 < 0 || sep2 < 0) continue;
+                            const file = h.slice(0, sep1);
+                            const lineNo = parseInt(h.slice(sep1 + 1, sep2), 10);
+                            if (!/\.(py|ya?ml|md)$/.test(file) || file === 'docs/changelog.md') continue;
+                            if (!fileScores.has(file)) fileScores.set(file, { tokens: new Set(), score: 0, hits: 0, lines: new Set() });
+                            const rec = fileScores.get(file);
+                            if (!rec.tokens.has(tok)) { rec.tokens.add(tok); rec.score += weight; }
+                            rec.hits += 1;
+                            if (Number.isFinite(lineNo) && rec.lines.size < 12) rec.lines.add(lineNo);
+                          }
+                        }
+
+                        // Rank by cumulative token weight; nudge implementation files above docs.
+                        const ranked = [...fileScores.entries()]
+                          .map(([f, r]) => [f, r, r.score * (f.startsWith('src/') ? 1.15 : 1)])
+                          .sort((a, b) => (b[2] - a[2]) || (b[1].hits - a[1].hits))
+                          .slice(0, 4)
+                          .map(([f, r]) => [f, r]);
+
+                        const snippetBlocks = [];
+                        let budget = 6000; // total chars of injected code context
+                        for (const [file, rec] of ranked) {
+                          if (budget <= 0) break;
+                          const content = readSafe(file);
+                          if (!content) continue;
+                          const fileLines = content.split('\n');
+                          const wanted = [...rec.lines].sort((a, b) => a - b).slice(0, 2);
+                          // Merge overlapping context windows around the chosen hit lines.
+                          const ranges = [];
+                          for (const ln of wanted) {
+                            const start = Math.max(1, ln - 6);
+                            const end = Math.min(fileLines.length, ln + 6);
+                            const last = ranges[ranges.length - 1];
+                            if (last && start <= last.end + 1) last.end = Math.max(last.end, end);
+                            else ranges.push({ start, end });
+                          }
+                          let snippet = '';
+                          for (const r of ranges) {
+                            for (let i = r.start; i <= r.end; i++) snippet += i + ': ' + fileLines[i - 1] + '\n';
+                            snippet += '...\n';
+                          }
+                          snippet = snippet.slice(0, 2000);
+                          budget -= snippet.length;
+                          const lang = file.endsWith('.py') ? 'python' : (file.endsWith('.md') ? 'markdown' : 'yaml');
+                          snippetBlocks.push(
+                            '### `' + file + '` (matched: ' + [...rec.tokens].slice(0, 6).join(', ') + ')\n\n'
+                            + '```' + lang + '\n' + snippet + '```\n'
+                          );
+                        }
+
+                        if (snippetBlocks.length) {
+                          issueBody = issueBody + '\n\n---\n\n## Relevant Code Context\n\n'
+                            + 'These snippets are from files in the current `main` branch that mention symbols or paths referenced in this issue. Use them to ground your assessment in the real code: confirm whether the reported behavior matches the implementation, and if the code clearly contradicts the report, say so. Only reason about code shown here or in the facts above — do not assume unshown code exists.\n\n'
+                            + snippetBlocks.join('\n');
+                        }
+                      } catch (e) {
+                        core.info(`Could not build code-awareness context: ${e.message}`);
+                      }
+
                       core.setOutput('number', issue.number);
                       core.setOutput('body', issueBody);
                       core.setOutput('title', issue.title);

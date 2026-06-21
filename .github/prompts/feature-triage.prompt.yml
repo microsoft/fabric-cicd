@@ -186,6 +186,15 @@ messages:
 
           Use this list to detect requests that are already delivered. If the requested capability is already implemented by one of the listed merged PRs, cite that PR number. Only cite a PR that appears in the list — never invent or guess a PR number. If no listed PR clearly delivers the request, ignore this section.
 
+          ## Repository Code Awareness
+
+          The input may include a "## Repository Facts" section (item types, public API, and module layout generated from the current `main` branch) and a "## Relevant Code Context" section (source snippets from files that mention symbols or paths referenced in this request).
+
+          When these sections are present, treat them as ground truth about how the library currently works:
+          - Check the request against the actual code instead of assuming. If the code or facts show the capability already exists, point the requester to it rather than treating it as new work. If they show a real gap, that strengthens the case for the enhancement.
+          - Only reason about code shown in these sections or facts you can see. Never invent functions, parameters, item types, or modules that are not present.
+          - The snippets are excerpts, not whole files. If a snippet is insufficient to be sure, say what remains unclear instead of guessing.
+
           ## Assessment Categories
 
           Use exactly one of these in your assessment header:

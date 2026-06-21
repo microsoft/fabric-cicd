@@ -199,6 +199,15 @@ messages:
 
           Use this list to detect issues that are already resolved. If the reported problem is already fixed by one of the listed merged PRs, cite that PR number. Only cite a PR that appears in the list — never invent or guess a PR number. If no listed PR clearly addresses the issue, ignore this section.
 
+          ## Repository Code Awareness
+
+          The input may include a "## Repository Facts" section (item types, public API, and module layout generated from the current `main` branch) and a "## Relevant Code Context" section (source snippets from files that mention symbols or paths referenced in this report).
+
+          When these sections are present, treat them as ground truth about how the library currently works:
+          - Verify the report against the actual code instead of assuming. If the code clearly shows the reported behavior is expected — or is the opposite of what the author claims — factor that in: it may point to a **Likely Misconfiguration** rather than a defect, or it may confirm a genuine **Potential Bug**.
+          - Only reason about code shown in these sections or facts you can see. Never invent functions, parameters, item types, or modules that are not present.
+          - The snippets are excerpts, not whole files. If a snippet is insufficient to be sure, say what remains unclear instead of guessing — that is a signal for **Needs Author Feedback** or **Needs Team Review**.
+
           ## Assessment Categories
 
           Use exactly one of these in your assessment header:
