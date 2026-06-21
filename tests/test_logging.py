@@ -635,10 +635,17 @@ class TestWrapperFunctions:
         assert len([f for f in constants.FEATURE_FLAG if f == "feature_1"]) == 1
 
     @pytest.mark.parametrize("level_input", ["DEBUG", "debug"])
-    def test_change_log_level(self, level_input):
+    def test_change_log_level(self, level_input, temp_log_dir):
         """Test change_log_level sets level correctly."""
-        change_log_level(level_input)
-        assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            change_log_level(level_input)
+            assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        finally:
+            os.chdir(original_cwd)
 
     def test_change_log_level_unsupported(self, capsys):
         """Test change_log_level warns on unsupported level."""
@@ -665,15 +672,22 @@ class TestFileLoggingEnvVar:
     ENV_VAR = "FABRIC_CICD_FILE_LOGGING_ENABLED"
 
     @pytest.mark.parametrize("env_value", ["1", "true", "yes", "True", "YES"])
-    def test_change_log_level_creates_file_handler_with_valid_flags(self, env_value):
+    def test_change_log_level_creates_file_handler_with_valid_flags(self, env_value, temp_log_dir):
         """Test change_log_level('DEBUG') creates file handler for valid enable flag values."""
-        with patch.dict("os.environ", {self.ENV_VAR: env_value}):
-            change_log_level("DEBUG")
+        import os
 
-        root_logger = logging.getLogger()
-        file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
-        assert len(file_handlers) == 1
-        assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            with patch.dict("os.environ", {self.ENV_VAR: env_value}):
+                change_log_level("DEBUG")
+
+            root_logger = logging.getLogger()
+            file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
+            assert len(file_handlers) == 1
+            assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        finally:
+            os.chdir(original_cwd)
 
     @pytest.mark.parametrize("env_value", ["0", "false", "no", "", "disabled", None])
     def test_change_log_level_no_file_handler_with_invalid_flags(self, env_value):
@@ -695,21 +709,26 @@ class TestFileLoggingEnvVar:
         ("env_value", "expect_warning"),
         [("1", True), (None, False)],
     )
-    def test_sensitive_data_warning_depends_on_env_var(self, env_value, expect_warning, capsys):
+    def test_sensitive_data_warning_depends_on_env_var(self, env_value, expect_warning, capsys, temp_log_dir):
         """Test sensitive data warning is shown only when env var is set and DEBUG enabled."""
-        env = {self.ENV_VAR: env_value} if env_value is not None else {}
-        with patch.dict("os.environ", env, clear=False):
-            if env_value is None:
-                import os
+        import os
 
-                os.environ.pop(self.ENV_VAR, None)
-            change_log_level("DEBUG")
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            env = {self.ENV_VAR: env_value} if env_value is not None else {}
+            with patch.dict("os.environ", env, clear=False):
+                if env_value is None:
+                    os.environ.pop(self.ENV_VAR, None)
+                change_log_level("DEBUG")
 
-        captured = capsys.readouterr()
-        if expect_warning:
-            assert "sensitive information" in captured.err
-        else:
-            assert "sensitive information" not in captured.err
+            captured = capsys.readouterr()
+            if expect_warning:
+                assert "sensitive information" in captured.err
+            else:
+                assert "sensitive information" not in captured.err
+        finally:
+            os.chdir(original_cwd)
 
     @pytest.mark.parametrize(
         ("env_value", "expect_file_handler"),
@@ -802,6 +821,8 @@ class TestFileLoggingEnvVar:
         finally:
             os.chdir(original_cwd)
 
+
+class TestConfigureExternalFileLoggingWrapper:
     """Tests for the configure_external_file_logging wrapper function."""
 
     def test_configures_correctly(self, external_logger_with_handler):

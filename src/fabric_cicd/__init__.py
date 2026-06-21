@@ -199,7 +199,6 @@ def configure_fabric_fqdn(workspace_id: str) -> None:
 
 if os.environ.get(EnvVar.FILE_LOGGING_ENABLED.value, "").lower() in constants.VALID_ENABLE_FLAGS:
     configure_logger()
-    logger.info("File logging enabled via %s environment variable", EnvVar.FILE_LOGGING_ENABLED.value)
 else:
     configure_logger(disable_log_file=True)
 sys.excepthook = exception_handler
