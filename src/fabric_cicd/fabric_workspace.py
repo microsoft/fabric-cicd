@@ -906,22 +906,21 @@ class FabricWorkspace:
         root_path = Path(self.repository_directory)
         folder_hierarchy = {}
 
-        # Collect all folders that directly contain a .platform file
-        platform_folders = set(p.parent for p in root_path.rglob(".platform"))
+        # Folders containing .platform represent item roots and should not be published as workspace folders.
+        platform_folders = {p.parent for p in root_path.rglob(".platform")}
+        folders_to_publish = set()
 
-        # Now, for every folder, check if any of its subfolders is in platform_folders
-        for folder in root_path.rglob("*"):
-            if not folder.is_dir() or folder == root_path or folder.name == ".children":
-                continue
+        # Any ancestor of a platform folder (excluding root and .children) should be published.
+        for platform_folder in platform_folders:
+            current = platform_folder.parent
+            while current != root_path:
+                if current.name != ".children" and current not in platform_folders:
+                    folders_to_publish.add(current)
+                current = current.parent
 
-            # Skip folders that directly contain a .platform file
-            if folder in platform_folders:
-                continue
-
-            # Check if any subfolder (at any depth) is in platform_folders
-            if any(sub in platform_folders for sub in folder.rglob("*") if sub.is_dir()):
-                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
-                folder_hierarchy[relative_path] = ""
+        for folder in sorted(folders_to_publish, key=lambda p: p.as_posix()):
+            relative_path = f"/{folder.relative_to(root_path).as_posix()}"
+            folder_hierarchy[relative_path] = ""
 
         self.repository_folders = folder_hierarchy
 
