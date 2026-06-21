@@ -140,7 +140,7 @@ changed = get_changed_items(workspace.repository_directory, git_compare_ref="mai
 
 If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal.
 
-To also capture logs to a file, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable:
+To also capture logs to the `fabric_cicd.error.log` file, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable:
 
 === "Bash"
 
