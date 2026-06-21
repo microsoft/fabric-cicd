@@ -139,9 +139,19 @@ def extract_find_value(
         return {"pattern": find_value, "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
 
     if ignore_case:
-        return {"pattern": find_value, "is_regex": False, "has_matches": find_value.lower() in file_content.lower(), "ignore_case": ignore_case}
+        return {
+            "pattern": find_value,
+            "is_regex": False,
+            "has_matches": find_value.lower() in file_content.lower(),
+            "ignore_case": ignore_case,
+        }
 
-    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content, "ignore_case": ignore_case}
+    return {
+        "pattern": find_value,
+        "is_regex": False,
+        "has_matches": find_value in file_content,
+        "ignore_case": ignore_case,
+    }
 
 
 def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:
@@ -392,11 +402,11 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             raise error
 
 
-def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) -> tuple[str, str, Path]:
+def extract_parameter_filters(item_file_path: str, param_dict: dict) -> tuple[str, str, Path]:
     """Extracts the item type, name, and path filters from the parameter dictionary, if present."""
     item_type = param_dict.get("item_type")
     item_name = param_dict.get("item_name")
-    file_path = process_input_path(workspace_obj.repository_directory, param_dict.get("file_path"))
+    file_path = process_input_path(item_file_path, param_dict.get("file_path"))
 
     return item_type, item_name, file_path
 

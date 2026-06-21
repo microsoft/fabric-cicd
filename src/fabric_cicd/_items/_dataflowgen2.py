@@ -167,7 +167,7 @@ def get_source_dataflow_name(
     # Look for a parameter that contains the dataflow ID
     for param in workspace_obj.environment_parameter.get("find_replace", []):
         # Extract values from the parameter
-        input_type, input_name, input_path = extract_parameter_filters(workspace_obj, param)
+        input_type, input_name, input_path = extract_parameter_filters(file_path, param)
         filter_match = check_replacement(
             input_type, input_name, input_path, ItemType.DATAFLOW.value, item_name, file_path
         )

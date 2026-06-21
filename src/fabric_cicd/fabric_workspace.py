@@ -512,7 +512,7 @@ class FabricWorkspace:
         if "key_value_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("key_value_replace"):
                 # Extract the file filter values and set the match condition
-                input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
+                input_type, input_name, input_path = extract_parameter_filters(file_path, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
                 # Perform replacement if condition is met and file contains valid JSON or YAML
@@ -525,7 +525,7 @@ class FabricWorkspace:
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):
                 # Extract the file filter values and set the match condition
-                input_type, input_name, input_path = extract_parameter_filters(self, parameter_dict)
+                input_type, input_name, input_path = extract_parameter_filters(file_path, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
                 # Extract the find_pattern and replace_value_dict

@@ -614,7 +614,7 @@ class TestParameterUtilities:
             # Return a list of Path objects as expected
             processed_path = Path("processed/path")
             mock_process.return_value = [processed_path]
-            item_type, item_name, file_path = extract_parameter_filters(mock_workspace, param_dict)
+            item_type, item_name, file_path = extract_parameter_filters(mock_workspace.repository_directory, param_dict)
 
             assert item_type == "Notebook"
             assert item_name == "TestNotebook"
@@ -627,7 +627,7 @@ class TestParameterUtilities:
         with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
             # When no file_path in param_dict, process_input_path should return an empty list
             mock_process.return_value = []
-            item_type, item_name, file_path = extract_parameter_filters(mock_workspace, param_dict)
+            item_type, item_name, file_path = extract_parameter_filters(mock_workspace.repository_directory, param_dict)
 
             assert item_type is None
             assert item_name is None
