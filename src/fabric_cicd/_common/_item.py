@@ -3,7 +3,6 @@
 
 """Functions and classes to manage Item operations."""
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
@@ -47,8 +46,5 @@ class Item:
 
     def collect_item_files(self) -> None:
         """Collect all files in the item path."""
-        self.item_files = []
-        for root, _dirs, files in os.walk(self.path):
-            for file in files:
-                full_path = Path(root, file)
-                self.item_files.append(File(self.path, full_path))
+        base_path = Path(self.path)
+        self.item_files = [File(self.path, p) for p in base_path.rglob("*") if p.is_file()]
