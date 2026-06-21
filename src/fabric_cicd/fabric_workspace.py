@@ -5,7 +5,6 @@
 
 import json
 import logging
-import os
 import re
 import threading
 from pathlib import Path
@@ -315,87 +314,85 @@ class FabricWorkspace:
         empty_logical_id_paths = []  # Collect all paths with empty logical IDs
         visited_logical_ids = set()  # Track visited logical IDs to avoid duplicates
 
-        for root, _dirs, files in os.walk(self.repository_directory):
-            directory = Path(root)
-            # valid item directory with .platform file within
-            if ".platform" in files:
-                item_metadata_path = directory / ".platform"
+        repository_root = Path(self.repository_directory)
+        for item_metadata_path in repository_root.rglob(".platform"):
+            directory = item_metadata_path.parent
 
-                # Print a warning and skip directory if empty
-                if not any(directory.iterdir()):
-                    logger.warning(f"Directory {directory.name} is empty.")
-                    continue
+            # Print a warning and skip directory if empty
+            if not any(directory.iterdir()):
+                logger.warning(f"Directory {directory.name} is empty.")
+                continue
 
-                # Attempt to read metadata file
-                try:
-                    with Path.open(item_metadata_path, encoding="utf-8") as file:
-                        item_metadata = json.load(file)
-                except FileNotFoundError as e:
-                    msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"
-                    ParsingError(msg, logger)
-                except json.JSONDecodeError as e:
-                    msg = f"Error decoding JSON in {item_metadata_path}. {e}"
-                    ParsingError(msg, logger)
+            # Attempt to read metadata file
+            try:
+                with Path.open(item_metadata_path, encoding="utf-8") as file:
+                    item_metadata = json.load(file)
+            except FileNotFoundError as e:
+                msg = f"{item_metadata_path} path does not exist in the specified repository. {e}"
+                ParsingError(msg, logger)
+            except json.JSONDecodeError as e:
+                msg = f"Error decoding JSON in {item_metadata_path}. {e}"
+                ParsingError(msg, logger)
 
-                # Ensure required metadata fields are present
-                if "type" not in item_metadata["metadata"] or "displayName" not in item_metadata["metadata"]:
-                    msg = f"displayName & type are required in {item_metadata_path}"
-                    raise ParsingError(msg, logger)
+            # Ensure required metadata fields are present
+            if "type" not in item_metadata["metadata"] or "displayName" not in item_metadata["metadata"]:
+                msg = f"displayName & type are required in {item_metadata_path}"
+                raise ParsingError(msg, logger)
 
-                item_type = item_metadata["metadata"]["type"]
-                item_description = item_metadata["metadata"].get("description", "")
-                item_name = item_metadata["metadata"]["displayName"]
-                item_logical_id = item_metadata["config"]["logicalId"]
+            item_type = item_metadata["metadata"]["type"]
+            item_description = item_metadata["metadata"].get("description", "")
+            item_name = item_metadata["metadata"]["displayName"]
+            item_logical_id = item_metadata["config"]["logicalId"]
 
-                # Check for empty logical ID and collect the path
-                if not item_logical_id or item_logical_id.strip() == "":
-                    empty_logical_id_paths.append(str(item_metadata_path))
-                    continue  # Skip processing this item further
+            # Check for empty logical ID and collect the path
+            if not item_logical_id or item_logical_id.strip() == "":
+                empty_logical_id_paths.append(str(item_metadata_path))
+                continue  # Skip processing this item further
 
-                # Validate duplicate logical IDs (skip default GUID as export API uses it as a placeholder)
-                if item_logical_id != constants.DEFAULT_GUID:
-                    if item_logical_id in visited_logical_ids:
-                        msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
-                        raise FailedPublishedItemStatusError(msg, logger)
-                    visited_logical_ids.add(item_logical_id)
+            # Validate duplicate logical IDs (skip default GUID as export API uses it as a placeholder)
+            if item_logical_id != constants.DEFAULT_GUID:
+                if item_logical_id in visited_logical_ids:
+                    msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
+                    raise FailedPublishedItemStatusError(msg, logger)
+                visited_logical_ids.add(item_logical_id)
 
-                item_path = directory
-                relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
-                # Special handling for KQLDatabase items:
-                # .Eventhouse/.children/ directory structure, requires extracting the
-                # parent folder path before the Eventhouse container, not just
-                # the immediate parent directory
-                if item_type == ItemType.KQL_DATABASE.value:
-                    pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
-                    match = pattern.match(relative_path)
-                    relative_parent_path = match.group(1) if match else None
-                else:
-                    relative_parent_path = "/".join(relative_path.split("/")[:-1])
+            item_path = directory
+            relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
+            # Special handling for KQLDatabase items:
+            # .Eventhouse/.children/ directory structure, requires extracting the
+            # parent folder path before the Eventhouse container, not just
+            # the immediate parent directory
+            if item_type == ItemType.KQL_DATABASE.value:
+                pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
+                match = pattern.match(relative_path)
+                relative_parent_path = match.group(1) if match else None
+            else:
+                relative_parent_path = "/".join(relative_path.split("/")[:-1])
 
-                if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
-                    item_folder_id = self.repository_folders.get(relative_parent_path, "")
-                else:
-                    item_folder_id = ""
+            if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
+                item_folder_id = self.repository_folders.get(relative_parent_path, "")
+            else:
+                item_folder_id = ""
 
-                # Get the GUID if the item is already deployed
-                item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
+            # Get the GUID if the item is already deployed
+            item_guid = self.deployed_items.get(item_type, {}).get(item_name, Item("", "", "", "")).guid
 
-                if item_type not in self.repository_items:
-                    self.repository_items[item_type] = {}
+            if item_type not in self.repository_items:
+                self.repository_items[item_type] = {}
 
-                # Add the item to the repository_items dictionary
-                self.repository_items[item_type][item_name] = Item(
-                    type=item_type,
-                    name=item_name,
-                    description=item_description,
-                    guid=item_guid,
-                    logical_id=item_logical_id,
-                    path=item_path,
-                    folder_id=item_folder_id,
-                    folder_path=relative_parent_path,
-                )
+            # Add the item to the repository_items dictionary
+            self.repository_items[item_type][item_name] = Item(
+                type=item_type,
+                name=item_name,
+                description=item_description,
+                guid=item_guid,
+                logical_id=item_logical_id,
+                path=item_path,
+                folder_id=item_folder_id,
+                folder_path=relative_parent_path,
+            )
 
-                self.repository_items[item_type][item_name].collect_item_files()
+            self.repository_items[item_type][item_name].collect_item_files()
 
         # If we found any empty logical IDs, raise an error with all paths
         if empty_logical_id_paths:
