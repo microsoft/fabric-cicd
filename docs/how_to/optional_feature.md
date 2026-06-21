@@ -138,7 +138,23 @@ changed = get_changed_items(workspace.repository_directory, git_compare_ref="mai
 
 ## Debugging
 
-If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal. The logs can also be found in the `fabric_cicd.error.log` file.
+If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal.
+
+To also capture logs to a file, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable:
+
+=== "Bash"
+
+    ```bash
+    export FABRIC_CICD_FILE_LOGGING_ENABLED=1
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    $env:FABRIC_CICD_FILE_LOGGING_ENABLED = "1"
+    ```
+
+Then enable debug logging in your script:
 
 ```python
 from fabric_cicd import change_log_level

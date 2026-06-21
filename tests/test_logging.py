@@ -759,21 +759,28 @@ class TestExceptionHandler:
             assert "User-facing error" in message
             assert "See" not in message
 
-    def test_removes_console_handler_when_using_default_file(self):
+    def test_removes_console_handler_when_using_default_file(self, temp_log_dir):
         """Test that exception handler removes console handler when using default file handler."""
+        import os
+
         from fabric_cicd._common._exceptions import InputError
 
-        configure_logger()
-        test_logger = logging.getLogger("fabric_cicd.test")
-        exception = InputError("Test error", logger=test_logger)
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            configure_logger()
+            test_logger = logging.getLogger("fabric_cicd.test")
+            exception = InputError("Test error", logger=test_logger)
 
-        package_logger = logging.getLogger("fabric_cicd")
-        assert len(package_logger.handlers) >= 1
+            package_logger = logging.getLogger("fabric_cicd")
+            assert len(package_logger.handlers) >= 1
 
-        exception_handler(InputError, exception, None)
+            exception_handler(InputError, exception, None)
 
-        managed_handlers = [h for h in package_logger.handlers if getattr(h, "_fabric_cicd_managed", False)]
-        assert len(managed_handlers) == 0
+            managed_handlers = [h for h in package_logger.handlers if getattr(h, "_fabric_cicd_managed", False)]
+            assert len(managed_handlers) == 0
+        finally:
+            os.chdir(original_cwd)
 
 
 class TestFileLoggingIntegration:
