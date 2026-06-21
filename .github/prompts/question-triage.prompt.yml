@@ -193,6 +193,12 @@ messages:
           - Only include Python code examples if they directly answer the question.
           - If redirecting, state where and why in one sentence — nothing more.
 
+          ## Recent Repository Changes
+
+          The input may include a "## Recent Repository Changes" section listing pull requests recently merged into the `main` branch. These changes are merged but may not be in a published release yet.
+
+          If a listed merged PR already implements or answers what the user is asking about, mention it and cite the PR number in your answer (it will be available in the upcoming release). Only cite a PR that appears in the list — never invent or guess a PR number. If no listed PR is relevant, ignore this section.
+
           ## Assessment Categories
 
           Use exactly one of these in your assessment header:
@@ -224,7 +230,7 @@ messages:
           Then provide your answer in clearly structured sections.
 
           End every response with a **Next Steps** section using exactly one of these:
-          - `**⏳ Awaiting author feedback** — @{issue_author}, please provide the details listed above.` (when category is "Requires Additional Details")
+          - `**⏳ Awaiting author feedback** — please provide the details listed above so triage can continue.` (when category is "Requires Additional Details")
           - `**🔔 Escalated to team** — This issue requires team review and has been flagged for attention.` (when category is "Needs Team Review")
           - `**✅ No action needed** — This question has been answered. If you need further help, feel free to follow up.` (when category is "Answered" or "Redirect to Docs")
 

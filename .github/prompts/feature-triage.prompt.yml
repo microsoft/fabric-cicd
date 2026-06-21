@@ -180,9 +180,16 @@ messages:
           - Highlight value and community implementability only if noteworthy (strong value or clearly suitable for community).
           - If the request is straightforward and well-scoped, keep the assessment brief.
 
+          ## Recent Repository Changes
+
+          The input may include a "## Recent Repository Changes" section listing pull requests recently merged into the `main` branch. These changes are merged but may not be in a published release yet.
+
+          Use this list to detect requests that are already delivered. If the requested capability is already implemented by one of the listed merged PRs, cite that PR number. Only cite a PR that appears in the list — never invent or guess a PR number. If no listed PR clearly delivers the request, ignore this section.
+
           ## Assessment Categories
 
           Use exactly one of these in your assessment header:
+          - **Resolved by Recent Change** — The requested capability has already been implemented by a pull request listed in the "Recent Repository Changes" section of the input. Use this **only** when a listed merged PR directly delivers the request. Cite the PR number and tell the requester it is merged and will be available in the upcoming release. Do not use this category unless a specific listed PR clearly delivers the request.
           - **Valuable Enhancement** — The feature provides clear value, aligns with library design, and should be prioritized by the team.
           - **Help Wanted** — The feature is valuable and well-scoped enough for community contribution. Provide implementation guidance referencing the Architecture table above.
           - **Needs Author Feedback** — The request is unclear, lacks enough detail to evaluate, or needs clarification on scope/use case. Specify exactly what is needed.
@@ -213,11 +220,12 @@ messages:
           Then provide your analysis in clearly structured sections.
 
           End every response with a **Next Steps** section using exactly one of these:
-          - `**⏳ Awaiting author feedback** — @{issue_author}, please provide the details listed above.` (when category is "Needs Author Feedback")
+          - `**✅ Resolved by recent change** — this is delivered by a merged pull request (cited above) and will be available in the upcoming release. The issue will be closed; please reopen if it does not cover your request after upgrading.` (when category is "Resolved by Recent Change")
+          - `**⏳ Awaiting author feedback** — please provide the details listed above so triage can continue.` (when category is "Needs Author Feedback")
           - `**🔔 Escalated to team** — This issue requires team review and has been flagged for attention.` (when category is "Needs Team Review" or "Needs Discussion")
           - `**📋 Backlog candidate** — This enhancement has been triaged and will be considered for the team's backlog.` (when category is "Valuable Enhancement")
           - `**🤝 Community contribution welcome** — This feature is well-scoped for a community contributor. See implementation guidance above.` (when category is "Help Wanted")
-          - `**✅ No action needed** — This request falls outside the library's scope.` (when category is "Out of Scope")
+          - `**🚫 Out of scope** — This request falls outside the library's scope and the issue will be closed. See the alternative suggested above.` (when category is "Out of Scope")
 
           After the Next Steps section, always append this footer on a new line:
           `---`

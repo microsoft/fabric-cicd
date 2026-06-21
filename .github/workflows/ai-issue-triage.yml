@@ -79,11 +79,49 @@ jobs:
                         }
                       }
 
+                      // Gather recent merged PRs so the model can recognise issues that are
+                      // already fixed by a change merged into main (possibly not yet released).
+                      try {
+                        let latestReleaseTag = null;
+                        let latestReleaseDate = null;
+                        try {
+                          const { data: rel } = await github.rest.repos.getLatestRelease({ owner, repo });
+                          latestReleaseTag = rel.tag_name;
+                          latestReleaseDate = rel.published_at;
+                        } catch (e) {
+                          core.info(`No published release found: ${e.message}`);
+                        }
+
+                        const { data: closedPrs } = await github.rest.pulls.list({
+                          owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 50,
+                        });
+
+                        const merged = closedPrs
+                          .filter(pr => pr.merged_at)
+                          .filter(pr => pr.user?.login !== 'dependabot[bot]' && !/^Bump\s/i.test(pr.title))
+                          .sort((a, b) => new Date(b.merged_at) - new Date(a.merged_at))
+                          .slice(0, 30);
+
+                        if (merged.length) {
+                          const lines = merged
+                            .map(pr => `- #${pr.number} (merged ${pr.merged_at.slice(0, 10)}): ${pr.title}`)
+                            .join('\n');
+                          const releaseNote = latestReleaseTag
+                            ? `Latest published release: ${latestReleaseTag} (${(latestReleaseDate || '').slice(0, 10)}). The pull requests below are merged into the main branch; some may not be in a published release yet.`
+                            : `The pull requests below are recently merged into the main branch.`;
+                          issueBody = `${issueBody}\n\n---\n\n## Recent Repository Changes\n\n${releaseNote}\n\n${lines}\n\n`
+                            + `If the reported issue is already fixed or implemented by one of these merged PRs, identify it and cite the PR number. Only cite a PR from this list — do not invent PR numbers.`;
+                        }
+                      } catch (e) {
+                        core.info(`Could not gather recent repository changes: ${e.message}`);
+                      }
+
                       core.setOutput('number', issue.number);
                       core.setOutput('body', issueBody);
                       core.setOutput('title', issue.title);
                       core.setOutput('html_url', issue.html_url);
                       core.setOutput('labels', issue.labels.map(l => l.name).join(','));
+                      core.setOutput('author', issue.user.login);
                       core.setOutput('is_retriage', isRetriage.toString());
 
             - name: Run AI assessment
@@ -110,41 +148,60 @@ jobs:
                   ASSESSMENT_OUTPUT: ${{ steps.ai-assessment.outputs.ai_assessments }}
                   SUPPRESS_LABELS: ${{ env.SUPPRESS_LABELS }}
                   ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+                  ISSUE_AUTHOR: ${{ steps.issue.outputs.author }}
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |
                       const assessments = JSON.parse(process.env.ASSESSMENT_OUTPUT);
                       const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+                      const issueAuthor = process.env.ISSUE_AUTHOR || '';
                       const owner = context.repo.owner;
                       const repo = context.repo.repo;
                       const suppressLabels = process.env.SUPPRESS_LABELS === 'true';
 
+                      // -------------------------------------------------------------------
+                      // Category → action contract. Every assessment category defined in the
+                      // triage prompts MUST appear in exactly one set below so that no category
+                      // is a dead end. Matching is case-insensitive substring on the category
+                      // text the model emits after "### AI Assessment:".
+                      //   escalate        → flag for the team (label + @team ping), keep open
+                      //   helpWanted      → label for community contribution
+                      //   backlog         → valuable enhancement, team-filterable, keep open
+                      //   authorFeedback  → request info from author (label + @author ping)
+                      //   misconfig       → guidance given; keep open for author to confirm
+                      //   autoClose       → safe to close automatically (never a bug report)
+                      //   resolvedByChange→ already fixed by a merged PR; close as completed with citation
+                      // -------------------------------------------------------------------
+                      const ESCALATE = ['potential bug', 'needs team review', 'needs discussion'];
+                      const HELP_WANTED = ['help wanted'];
+                      const BACKLOG = ['valuable enhancement'];
+                      const AUTHOR_FEEDBACK = ['needs author feedback', 'requires additional details'];
+                      const MISCONFIG = ['likely misconfiguration'];
+                      const RESOLVED_BY_CHANGE = ['resolved by recent change'];
+                      const AUTO_CLOSE = ['answered', 'redirect to docs', 'out of scope'];
+
                       let needsHumanReview = false;
                       let addHelpWanted = false;
+                      let addBacklog = false;
                       let needsAuthorFeedback = false;
+                      let isMisconfig = false;
+                      let isResolvedByChange = false;
                       let canAutoClose = false;
+                      let closeReason = 'completed';
 
                       for (const assessment of assessments) {
                         const label = (assessment.assessmentLabel || '').toLowerCase();
 
-                        // Check if the assessment requires human review
-                        if (label.includes('needs team review') || label.includes('needs maintainer input') || label.includes('potential bug') || label.includes('needs discussion')) {
-                          needsHumanReview = true;
-                        }
-
-                        // Check if feature should be tagged as help wanted
-                        if (label.includes('help wanted')) {
-                          addHelpWanted = true;
-                        }
-
-                        // Check if more information is needed from the issue author
-                        if (label.includes('needs author feedback') || label.includes('requires additional details')) {
-                          needsAuthorFeedback = true;
-                        }
-
-                        // Check if the AI fully resolved the issue (answered question, explained misconfiguration, redirected to docs)
-                        if (label.includes('answered') || label.includes('likely misconfiguration') || label.includes('redirect to docs')) {
+                        if (ESCALATE.some(s => label.includes(s))) needsHumanReview = true;
+                        if (HELP_WANTED.some(s => label.includes(s))) addHelpWanted = true;
+                        if (BACKLOG.some(s => label.includes(s))) addBacklog = true;
+                        if (AUTHOR_FEEDBACK.some(s => label.includes(s))) needsAuthorFeedback = true;
+                        if (MISCONFIG.some(s => label.includes(s))) isMisconfig = true;
+                        if (RESOLVED_BY_CHANGE.some(s => label.includes(s))) isResolvedByChange = true;
+                        if (AUTO_CLOSE.some(s => label.includes(s))) {
                           canAutoClose = true;
+                          // Out-of-scope feature requests close as "not planned" rather than "completed"
+                          if (label.includes('out of scope')) closeReason = 'not_planned';
                         }
 
                         // Log for job summary
@@ -155,56 +212,96 @@ jobs:
                       if (suppressLabels) {
                         core.info('Labels suppressed — logging decisions only.');
                         core.exportVariable('LABEL_DECISIONS', JSON.stringify({
-                          needsHumanReview, addHelpWanted, needsAuthorFeedback, canAutoClose,
+                          needsHumanReview, addHelpWanted, addBacklog, needsAuthorFeedback,
+                          isMisconfig, isResolvedByChange, canAutoClose, closeReason,
                           assessmentLabels: assessments.map(a => a.assessmentLabel),
                         }));
                         return;
                       }
 
-                      // Add 'help wanted' label if AI recommended community contribution
-                      if (addHelpWanted) {
+                      if (needsHumanReview) {
+                        // Highest precedence: a human must look at this. Never auto-close.
                         await github.rest.issues.addLabels({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
-                          labels: ['help wanted']
-                        });
-                        core.info('Added "help wanted" label based on AI assessment.');
-                      }
-
-                      // If AI fully handled the issue without needing team review
-                      if (!needsHumanReview) {
-                        // Auto-close if AI fully resolved (answered, misconfiguration, redirected)
-                        if (canAutoClose && !needsAuthorFeedback && !addHelpWanted) {
-                          await github.rest.issues.update({
-                            owner,
-                            repo,
-                            issue_number: issueNumber,
-                            state: 'closed',
-                            state_reason: 'completed'
-                          });
-                          core.info('Auto-closed issue — AI fully resolved it.');
-                        }
-                      } else {
-                        // Add consolidated label for easy filtering of all issues needing team attention
-                        await github.rest.issues.addLabels({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
+                          owner, repo, issue_number: issueNumber,
                           labels: ['ai:needs team attention']
                         });
-
-                        // Notify team via comment on escalated issues
                         await github.rest.issues.createComment({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
+                          owner, repo, issue_number: issueNumber,
                           body: '🔔 @microsoft/fabric-cicd — This issue has been flagged by AI triage as requiring team attention. Please review the assessment above.'
                         });
                         core.info('Escalated to team.');
+                      } else if (isResolvedByChange) {
+                        // The AI matched this issue to a pull request already merged into main
+                        // (cited in the assessment above). Close as completed with an invitation
+                        // to reopen if the merged change does not actually resolve it.
+                        await github.rest.issues.createComment({
+                          owner, repo, issue_number: issueNumber,
+                          body: '✅ This issue appears to be resolved by a change recently merged into the `main` branch (cited in the assessment above). Closing as completed — the fix will be available in the upcoming release. If the problem persists after upgrading, please reply here or reopen the issue.'
+                        });
+                        await github.rest.issues.update({
+                          owner, repo, issue_number: issueNumber,
+                          state: 'closed', state_reason: 'completed'
+                        });
+                        core.info('Closed as resolved by a recent merged change.');
+                      } else {
+                        // Request more information from the author (plugs into the
+                        // resourceManagement policy loop that re-triages on the author's reply).
+                        if (needsAuthorFeedback) {
+                          await github.rest.issues.addLabels({
+                            owner, repo, issue_number: issueNumber,
+                            labels: ['needs author feedback']
+                          });
+                          const mention = issueAuthor ? `@${issueAuthor} — ` : '';
+                          await github.rest.issues.createComment({
+                            owner, repo, issue_number: issueNumber,
+                            body: `⏳ ${mention}additional information is needed to continue triage. Please review the assessment above and reply with the requested details.`
+                          });
+                          core.info('Requested author feedback.');
+                        }
+
+                        // Community contribution candidate.
+                        if (addHelpWanted) {
+                          await github.rest.issues.addLabels({
+                            owner, repo, issue_number: issueNumber,
+                            labels: ['help wanted']
+                          });
+                          core.info('Added "help wanted" label based on AI assessment.');
+                        }
+
+                        // Valuable enhancement: make it team-filterable without pinging the team.
+                        if (addBacklog) {
+                          await github.rest.issues.addLabels({
+                            owner, repo, issue_number: issueNumber,
+                            labels: ['ai:backlog candidate']
+                          });
+                          core.info('Marked as backlog candidate.');
+                        }
+
+                        // Likely misconfiguration: guidance is in the AI comment. Label for
+                        // visibility but keep the issue open so the author can confirm.
+                        if (isMisconfig) {
+                          await github.rest.issues.addLabels({
+                            owner, repo, issue_number: issueNumber,
+                            labels: ['ai:likely misconfiguration']
+                          });
+                          core.info('Labelled likely misconfiguration — left open for author confirmation.');
+                        }
+
+                        // Auto-close only when the AI fully resolved the issue and nothing
+                        // above requires the issue to stay open. Bug reports never reach here.
+                        if (canAutoClose && !needsAuthorFeedback && !addHelpWanted && !addBacklog && !isMisconfig) {
+                          await github.rest.issues.update({
+                            owner, repo, issue_number: issueNumber,
+                            state: 'closed',
+                            state_reason: closeReason
+                          });
+                          core.info(`Auto-closed issue (${closeReason}) — AI fully resolved it.`);
+                        }
                       }
 
-                      // Always remove 'needs triage' — triage is complete regardless of outcome
+                      // Always remove 'needs triage' — triage is complete regardless of outcome.
+                      // (When author feedback is requested, 'needs author feedback' takes over and
+                      // the resourceManagement policy re-adds 'needs triage' on the author's reply.)
                       try {
                         await github.rest.issues.removeLabel({
                           owner,
@@ -247,14 +344,19 @@ jobs:
                       // Show label decisions
                       const ld = process.env.LABEL_DECISIONS ? JSON.parse(process.env.LABEL_DECISIONS) : null;
                       if (ld) {
+                        const blockedByHigher = ld.needsHumanReview || ld.isResolvedByChange;
+                        const wouldAutoClose = ld.canAutoClose && !ld.needsAuthorFeedback && !ld.addHelpWanted && !ld.addBacklog && !ld.isMisconfig && !blockedByHigher;
                         summary += `### 🏷️ Label Decisions (not applied — testing mode)\n\n`;
                         summary += `| Decision | Value |\n|----------|-------|\n`;
                         summary += `| AI assessment labels | ${(ld.assessmentLabels || []).map(l => '`' + l + '`').join(', ')} |\n`;
-                        summary += `| Would add \`help wanted\` | ${ld.addHelpWanted ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would close as resolved by recent change | ${ld.isResolvedByChange && !ld.needsHumanReview ? '✅ Yes (completed)' : '❌ No'} |\n`;
+                        summary += `| Would add \`help wanted\` | ${ld.addHelpWanted && !blockedByHigher ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would add \`ai:backlog candidate\` | ${ld.addBacklog && !blockedByHigher ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would add \`ai:likely misconfiguration\` | ${ld.isMisconfig && !blockedByHigher ? '✅ Yes' : '❌ No'} |\n`;
                         summary += `| Would add \`ai:needs team attention\` | ${ld.needsHumanReview ? '✅ Yes' : '❌ No'} |\n`;
-                        summary += `| Would request author feedback | ${ld.needsAuthorFeedback ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would request author feedback | ${ld.needsAuthorFeedback && !blockedByHigher ? '✅ Yes' : '❌ No'} |\n`;
                         summary += `| Would remove \`needs triage\` | ✅ Yes (always) |\n`;
-                        summary += `| Would auto-close | ${ld.canAutoClose && !ld.needsAuthorFeedback && !ld.addHelpWanted ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would auto-close | ${wouldAutoClose ? `✅ Yes (${ld.closeReason || 'completed'})` : '❌ No'} |\n`;
                         summary += `| Would notify team | ${ld.needsHumanReview ? '✅ Yes' : '❌ No'} |\n\n`;
                       }
 
