@@ -191,6 +191,33 @@ def test_publish_data_build_tool_job_item(mock_endpoint, temp_workspace_dir):
         mock_dbt_job_instance.publish_all.assert_called_once()
 
 
+def test_publish_paginated_report_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes PaginatedReport items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestPaginatedReport", "PaginatedReport", "test-paginated-report-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._paginatedreport.PaginatedReportPublisher") as mock_paginated_report_cls,
+    ):
+        mock_paginated_report_instance = mock_paginated_report_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "PaginatedReport" in workspace.repository_items
+        mock_paginated_report_cls.assert_called_once_with(workspace)
+        mock_paginated_report_instance.publish_all.assert_called_once()
+
+
 def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint, temp_workspace_dir):
     """Test that when item_type_in_scope is None (default), all available item types are included."""
     with (

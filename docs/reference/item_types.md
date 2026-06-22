@@ -140,6 +140,12 @@
     - Referenced items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
 
+## Paginated Report
+
+- **Parameterization:**
+    - Data sources connected to items outside of the same workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+- **Connections** are not source controlled and must be configured manually after initial deployment.
+
 ## Real-Time Dashboard
 
 - **Parameterization:**

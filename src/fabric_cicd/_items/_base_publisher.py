@@ -158,6 +158,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._mounteddatafactory import MountedDataFactoryPublisher
         from fabric_cicd._items._notebook import NotebookPublisher
         from fabric_cicd._items._ontology import OntologyPublisher
+        from fabric_cicd._items._paginatedreport import PaginatedReportPublisher
         from fabric_cicd._items._report import ReportPublisher
         from fabric_cicd._items._semanticmodel import SemanticModelPublisher
         from fabric_cicd._items._sparkjobdefinition import SparkJobDefinitionPublisher
@@ -179,6 +180,7 @@ class ItemPublisher(Publisher):
             ItemType.NOTEBOOK: NotebookPublisher,
             ItemType.SEMANTIC_MODEL: SemanticModelPublisher,
             ItemType.REPORT: ReportPublisher,
+            ItemType.PAGINATED_REPORT: PaginatedReportPublisher,
             ItemType.COPY_JOB: CopyJobPublisher,
             ItemType.DATA_BUILD_TOOL_JOB: DataBuildToolJobPublisher,
             ItemType.KQL_DATABASE: KQLDatabasePublisher,
