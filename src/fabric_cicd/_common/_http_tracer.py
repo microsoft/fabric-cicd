@@ -174,8 +174,12 @@ class FileTracer:
         Raises:
             ValueError: If the path fails validation.
         """
-        resolved = Path(raw_path).resolve()
-        cwd = Path.cwd().resolve()
+        try:
+            resolved = Path(raw_path).resolve()
+            cwd = Path.cwd().resolve()
+        except (OSError, ValueError) as e:
+            msg = f"Failed to resolve HTTP trace file path '{raw_path}': {e}"
+            raise ValueError(msg) from e
 
         if resolved.suffix != ".json":
             msg = f"HTTP trace file must have a .json extension, got: {resolved.name}"

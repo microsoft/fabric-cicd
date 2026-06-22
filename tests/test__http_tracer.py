@@ -51,6 +51,13 @@ def test_validate_output_path_rejects_sibling_directory_prefix(tmp_path, monkeyp
         FileTracer._validate_output_path(evil_path)
 
 
+def test_validate_output_path_rejects_unresolvable_path(tmp_path, monkeypatch):
+    """Ensure an unresolvable path raises ValueError with context."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match="Failed to resolve HTTP trace file path"):
+        FileTracer._validate_output_path("\x00invalid.json")
+
+
 # --- FileTracer warning log ---
 
 
