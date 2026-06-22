@@ -80,7 +80,7 @@ def extra_flags(*flags):
         constants.FEATURE_FLAG.update(original)
 
 
-def create_test_item(base_path: Path, folder, name: str, item_type: str, logical_id: str) -> Path:
+def create_test_item_dir(base_path: Path, folder, name: str, item_type: str, logical_id: str) -> Path:
     """Helper to create a test item with .platform file."""
     item_dir = base_path / folder / f"{name}.{item_type}" if folder else base_path / f"{name}.{item_type}"
     item_dir.mkdir(parents=True, exist_ok=True)
@@ -197,7 +197,7 @@ class TestBulkPublishFeatureFlags:
     def test_bulk_publish_requires_experimental_flag(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish without enable_experimental_features raises InputError."""
         with extra_flags(FeatureFlag.ENABLE_BULK_PUBLISH):
-            create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
             with (
                 patched_workspace(mock_endpoint, temp_workspace_dir) as workspace,
                 pytest.raises(InputError, match="requires 'enable_experimental_features'"),
@@ -207,7 +207,7 @@ class TestBulkPublishFeatureFlags:
     @pytest.mark.usefixtures("bulk_publish_flags")
     def test_bulk_publish_enabled_with_both_flags(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish is enabled when both feature flags are set with supported item types."""
-        create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
 
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir) as workspace,
@@ -230,7 +230,7 @@ class TestBulkPublishFallback:
 
     def test_fallback_on_unsupported_item_type(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish falls back to standard mode when unsupported item types are in scope."""
-        create_test_item(temp_workspace_dir, None, "TestWarehouse", "Warehouse", "wh-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestWarehouse", "Warehouse", "wh-id-001")
 
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse"]) as workspace,
@@ -241,7 +241,7 @@ class TestBulkPublishFallback:
 
     def test_fallback_on_dynamic_replace_value_variables(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish falls back when replace_value contains dynamic variables."""
-        create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
         create_parameter_file(
             temp_workspace_dir,
             """
@@ -259,7 +259,7 @@ find_replace:
 
     def test_fallback_on_dynamic_find_value_variables(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish falls back when find_value contains dynamic variables."""
-        create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
         create_parameter_file(
             temp_workspace_dir,
             """
@@ -280,7 +280,7 @@ find_replace:
 
     def test_no_fallback_without_dynamic_variables(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish remains enabled when parameter file has no dynamic variables."""
-        create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
         create_parameter_file(
             temp_workspace_dir,
             """
@@ -302,7 +302,7 @@ find_replace:
     def test_item_name_exclude_regex_supported_in_bulk(self, mock_endpoint, temp_workspace_dir, caplog):
         """item_name_exclude_regex does not cause fallback -- filtering is applied in bulk Phase 1."""
         with extra_flags(FeatureFlag.ENABLE_ITEMS_TO_INCLUDE):
-            create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
 
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
                 publish.publish_all_items(workspace, item_name_exclude_regex="Test.*")
@@ -324,7 +324,7 @@ class TestBulkPublishItemCountLimit:
     def test_exceeding_item_count_limit_raises_error(self, mock_endpoint, temp_workspace_dir):
         """Exceeding BULK_ITEM_COUNT_LIMIT raises InputError."""
         for i in range(constants.BULK_ITEM_COUNT_LIMIT + 1):
-            create_test_item(temp_workspace_dir, None, f"Notebook{i}", "Notebook", f"nb-id-{i:04d}")
+            create_test_item_dir(temp_workspace_dir, None, f"Notebook{i}", "Notebook", f"nb-id-{i:04d}")
 
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir) as workspace,
@@ -344,8 +344,8 @@ class TestBulkPublishEndToEnd:
 
     def test_bulk_publish_single_api_call_with_correct_payload(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish sends all items to bulkImportDefinitions in a single POST with allowPairingByName."""
-        create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
-        create_test_item(temp_workspace_dir, None, "TestPipeline", "DataPipeline", "dp-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestPipeline", "DataPipeline", "dp-id-001")
         bodies = capture_bulk_bodies(mock_endpoint)
 
         with patched_workspace(
@@ -362,7 +362,7 @@ class TestBulkPublishEndToEnd:
 
     def test_bulk_publish_assigns_guids_from_response(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish assigns item GUIDs from the API response."""
-        create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
         set_bulk_response(
             mock_endpoint,
             [
@@ -381,9 +381,9 @@ class TestBulkPublishEndToEnd:
 
     def test_bulk_publish_multiple_types_single_call(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish handles multiple supported item types in a single call."""
-        create_test_item(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
-        create_test_item(temp_workspace_dir, None, "NB2", "Notebook", "nb-id-002")
-        create_test_item(temp_workspace_dir, None, "DP1", "DataPipeline", "dp-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "NB2", "Notebook", "nb-id-002")
+        create_test_item_dir(temp_workspace_dir, None, "DP1", "DataPipeline", "dp-id-001")
         bodies = capture_bulk_bodies(mock_endpoint)
 
         with patched_workspace(
@@ -418,7 +418,7 @@ class TestBulkPublishParameterization:
 
     def test_static_parameters_applied_in_bulk_mode(self, mock_endpoint, temp_workspace_dir):
         """Static find_replace parameters are applied to file content in the bulk payload."""
-        item_dir = create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        item_dir = create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
         content_file = item_dir / "notebook-content.py"
         content_file.write_text("connection = 'old-connection-string'", encoding="utf-8")
 
@@ -444,7 +444,7 @@ find_replace:
 
     def test_spark_pool_parameters_applied_in_bulk_mode(self, mock_endpoint, temp_workspace_dir):
         """Spark pool instance_pool_id is replaced in Environment files during bulk publish."""
-        item_dir = create_test_item(temp_workspace_dir, None, "TestEnv", "Environment", "env-id-001")
+        item_dir = create_test_item_dir(temp_workspace_dir, None, "TestEnv", "Environment", "env-id-001")
         setting_dir = item_dir / "Setting"
         setting_dir.mkdir()
         sparkcompute = setting_dir / "Sparkcompute.yml"
@@ -515,7 +515,7 @@ class TestBulkPublishPostPublishHooks:
 
     def test_semantic_model_binding_applied_in_bulk_mode(self, mock_endpoint, temp_workspace_dir):
         """Semantic model binding post-publish hook fires after bulk publish."""
-        create_test_item(temp_workspace_dir, None, "TestModel", "SemanticModel", "sm-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestModel", "SemanticModel", "sm-id-001")
 
         create_parameter_file(
             temp_workspace_dir,
@@ -588,7 +588,7 @@ semantic_model_binding:
 
     def test_variable_library_value_set_activated_in_bulk_mode(self, mock_endpoint, temp_workspace_dir):
         """Variable library value set is activated via post_publish_all hook after bulk publish."""
-        item_dir = create_test_item(temp_workspace_dir, None, "TestVarLib", "VariableLibrary", "vl-id-001")
+        item_dir = create_test_item_dir(temp_workspace_dir, None, "TestVarLib", "VariableLibrary", "vl-id-001")
         settings = {"valueSetsOrder": ["Default value set", "PPE", "PROD"]}
         (item_dir / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
 
@@ -627,7 +627,7 @@ semantic_model_binding:
     def test_lakehouse_shortcuts_published_after_bulk_upload(self, mock_endpoint, temp_workspace_dir):
         """Lakehouse shortcuts are published via post_publish_all Phase 3 after bulk import."""
         with extra_flags(FeatureFlag.ENABLE_SHORTCUT_PUBLISH):
-            item_dir = create_test_item(temp_workspace_dir, None, "TestLH", "Lakehouse", "lh-id-001")
+            item_dir = create_test_item_dir(temp_workspace_dir, None, "TestLH", "Lakehouse", "lh-id-001")
             shortcuts_data = [
                 {
                     "name": "my_shortcut",
@@ -690,9 +690,9 @@ class TestBulkPublishSelectiveFiltering:
 
     def test_item_name_exclude_regex_filters_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """Items matching item_name_exclude_regex are excluded from the bulk API call."""
-        create_test_item(temp_workspace_dir, None, "KeepNotebook", "Notebook", "nb-id-001")
-        create_test_item(temp_workspace_dir, None, "ExcludeMe", "Notebook", "nb-id-002")
-        create_test_item(temp_workspace_dir, None, "ExcludeAlso", "Notebook", "nb-id-003")
+        create_test_item_dir(temp_workspace_dir, None, "KeepNotebook", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "ExcludeMe", "Notebook", "nb-id-002")
+        create_test_item_dir(temp_workspace_dir, None, "ExcludeAlso", "Notebook", "nb-id-003")
         bodies = capture_bulk_bodies(mock_endpoint)
 
         with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
@@ -707,9 +707,9 @@ class TestBulkPublishSelectiveFiltering:
     def test_items_to_include_filters_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """Only items in the items_to_include list are sent to the bulk API call."""
         with extra_flags(FeatureFlag.ENABLE_ITEMS_TO_INCLUDE):
-            create_test_item(temp_workspace_dir, None, "IncludedNB", "Notebook", "nb-id-001")
-            create_test_item(temp_workspace_dir, None, "ExcludedNB", "Notebook", "nb-id-002")
-            create_test_item(temp_workspace_dir, None, "IncludedDP", "DataPipeline", "dp-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "IncludedNB", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "ExcludedNB", "Notebook", "nb-id-002")
+            create_test_item_dir(temp_workspace_dir, None, "IncludedDP", "DataPipeline", "dp-id-001")
             bodies = capture_bulk_bodies(mock_endpoint)
 
             with patched_workspace(
@@ -726,8 +726,8 @@ class TestBulkPublishSelectiveFiltering:
     def test_folder_path_exclude_regex_filters_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """Items in excluded folders are omitted from the bulk API call."""
         with extra_flags(FeatureFlag.ENABLE_EXCLUDE_FOLDER):
-            create_test_item(temp_workspace_dir, "keep_folder", "KeepNB", "Notebook", "nb-id-001")
-            create_test_item(temp_workspace_dir, "exclude_folder", "DropNB", "Notebook", "nb-id-002")
+            create_test_item_dir(temp_workspace_dir, "keep_folder", "KeepNB", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, "exclude_folder", "DropNB", "Notebook", "nb-id-002")
             bodies = capture_bulk_bodies(mock_endpoint)
 
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
@@ -739,8 +739,8 @@ class TestBulkPublishSelectiveFiltering:
     def test_folder_path_exclude_regex_cascades_to_descendants_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """Excluding a parent folder also excludes items in descendant folders."""
         with extra_flags(FeatureFlag.ENABLE_EXCLUDE_FOLDER):
-            create_test_item(temp_workspace_dir, None, "RootNB", "Notebook", "nb-id-001")
-            create_test_item(temp_workspace_dir, "parent/child", "ChildNB", "Notebook", "nb-id-002")
+            create_test_item_dir(temp_workspace_dir, None, "RootNB", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, "parent/child", "ChildNB", "Notebook", "nb-id-002")
             bodies = capture_bulk_bodies(mock_endpoint)
 
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
@@ -752,8 +752,8 @@ class TestBulkPublishSelectiveFiltering:
     def test_folder_path_to_include_filters_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """Only items in included folders are sent to the bulk API call."""
         with extra_flags(FeatureFlag.ENABLE_INCLUDE_FOLDER):
-            create_test_item(temp_workspace_dir, "included_folder", "IncNB", "Notebook", "nb-id-001")
-            create_test_item(temp_workspace_dir, "other_folder", "OtherNB", "Notebook", "nb-id-002")
+            create_test_item_dir(temp_workspace_dir, "included_folder", "IncNB", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, "other_folder", "OtherNB", "Notebook", "nb-id-002")
             bodies = capture_bulk_bodies(mock_endpoint)
 
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
@@ -765,9 +765,9 @@ class TestBulkPublishSelectiveFiltering:
     def test_combined_item_exclude_and_folder_exclude_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """item_name_exclude_regex and folder_path_exclude_regex work together in bulk mode."""
         with extra_flags(FeatureFlag.ENABLE_EXCLUDE_FOLDER):
-            create_test_item(temp_workspace_dir, "good_folder", "KeepNB", "Notebook", "nb-id-001")
-            create_test_item(temp_workspace_dir, "good_folder", "DropByName", "Notebook", "nb-id-002")
-            create_test_item(temp_workspace_dir, "bad_folder", "DropByFolder", "Notebook", "nb-id-003")
+            create_test_item_dir(temp_workspace_dir, "good_folder", "KeepNB", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, "good_folder", "DropByName", "Notebook", "nb-id-002")
+            create_test_item_dir(temp_workspace_dir, "bad_folder", "DropByFolder", "Notebook", "nb-id-003")
             bodies = capture_bulk_bodies(mock_endpoint)
 
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
@@ -782,7 +782,7 @@ class TestBulkPublishSelectiveFiltering:
 
     def test_all_items_excluded_skips_bulk_api_call(self, mock_endpoint, temp_workspace_dir):
         """When all items are excluded by filters, no bulk API call is made."""
-        create_test_item(temp_workspace_dir, None, "OnlyItem", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "OnlyItem", "Notebook", "nb-id-001")
         bodies = capture_bulk_bodies(mock_endpoint)
 
         with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
@@ -803,8 +803,8 @@ class TestBulkPublishIdPreservation:
 
     def test_logical_ids_preserved_in_bulk_payload(self, mock_endpoint, temp_workspace_dir):
         """Logical IDs in file content are sent as-is to bulk API (not replaced with GUIDs)."""
-        create_test_item(temp_workspace_dir, None, "RefPipeline", "DataPipeline", "dp-logical-id-001")
-        item_dir = create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-logical-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "RefPipeline", "DataPipeline", "dp-logical-id-001")
+        item_dir = create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-logical-id-001")
         (item_dir / "notebook-content.py").write_text(
             'pipeline_ref = "dp-logical-id-001"  # reference to RefPipeline', encoding="utf-8"
         )
@@ -839,7 +839,7 @@ class TestBulkPublishIdPreservation:
 
     def test_workspace_id_placeholder_preserved_in_bulk_payload(self, mock_endpoint, temp_workspace_dir):
         """Default workspace ID placeholder (00000000-...) is preserved in bulk payload (API handles it)."""
-        item_dir = create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-logical-id-001")
+        item_dir = create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-logical-id-001")
         (item_dir / "notebook-content.py").write_text(
             'workspace_ref = "00000000-0000-0000-0000-000000000000"  # placeholder', encoding="utf-8"
         )
@@ -865,8 +865,8 @@ class TestBulkPublishResponseCollection:
     def test_response_collection_populates_responses_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """enable_response_collection populates workspace.responses with per-item details from bulk import."""
         with extra_flags(FeatureFlag.ENABLE_RESPONSE_COLLECTION):
-            create_test_item(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
-            create_test_item(temp_workspace_dir, None, "DP1", "DataPipeline", "dp-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "DP1", "DataPipeline", "dp-id-001")
 
             set_bulk_response(
                 mock_endpoint,
@@ -906,7 +906,7 @@ class TestBulkPublishResponseCollection:
 
     def test_no_response_collection_without_flag_in_bulk(self, mock_endpoint, temp_workspace_dir):
         """Without enable_response_collection, publish_all_items returns None and responses stay None."""
-        create_test_item(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
         set_bulk_response(
             mock_endpoint,
             [
@@ -924,7 +924,7 @@ class TestBulkPublishResponseCollection:
     def test_response_collection_empty_when_all_items_filtered(self, mock_endpoint, temp_workspace_dir):
         """Response collection returns None when all items are filtered out (empty dict is falsy)."""
         with extra_flags(FeatureFlag.ENABLE_RESPONSE_COLLECTION):
-            create_test_item(temp_workspace_dir, None, "FilteredNB", "Notebook", "nb-id-001")
+            create_test_item_dir(temp_workspace_dir, None, "FilteredNB", "Notebook", "nb-id-001")
 
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
                 result = publish.publish_all_items(workspace, item_name_exclude_regex="^FilteredNB$")
