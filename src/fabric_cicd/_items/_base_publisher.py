@@ -323,13 +323,10 @@ class ItemPublisher(Publisher):
             type_items = publisher.get_items_to_publish()
 
             # Filter 1: items_to_include — mark items not in the include list as skip_publish=True
-            all_type_items = fabric_workspace_obj.repository_items.get(item_type.value, {})
-            skipped = [name for name in all_type_items if name not in type_items]
+            skipped = ItemPublisher._mark_skipped_items(fabric_workspace_obj, item_type.value, type_items)
             if skipped:
                 logger.debug(f"Skipping {item_type.value} item(s) due to items_to_include filter: {skipped}")
-                for name in skipped:
-                    all_type_items[name].skip_publish = True
-                    skipped_items.append(f"{item_type.value}: {name}")
+                skipped_items.extend(f"{item_type.value}: {name}" for name in skipped)
 
             # Filter 2: publish filters (exclude_regex, folder_exclude_regex, folder_path_to_include)
             publishable_items = []
@@ -390,16 +387,13 @@ class ItemPublisher(Publisher):
             PublishError: If one or more items failed to publish.
         """
         self.pre_publish_all()
-        all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items = self.get_items_to_publish()
 
         # Mark excluded items as skip_publish=True so post_publish_all() hooks
         # can reliably skip them. Included items are left unchanged (False).
-        skipped = [name for name in all_items if name not in items]
+        skipped = self._mark_skipped_items(self.fabric_workspace_obj, self.item_type, items)
         if skipped:
             logger.info(f"Skipping {self.item_type} item(s) due to items_to_include filter: {skipped}")
-            for name in skipped:
-                all_items[name].skip_publish = True
 
         if not items:
             self.post_publish_all()
@@ -587,5 +581,27 @@ class ItemPublisher(Publisher):
                     errors.append((item_name, e))
 
         return errors
+
+    @staticmethod
+    def _mark_skipped_items(
+        fabric_workspace_obj: "FabricWorkspace",
+        item_type_value: str,
+        items_to_publish: dict[str, "Item"],
+    ) -> list[str]:
+        """Mark repository items not in items_to_publish as skip_publish=True.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object containing repository items.
+            item_type_value: The item type string value.
+            items_to_publish: The filtered dict of items that will be published.
+
+        Returns:
+            List of skipped item names.
+        """
+        all_items = fabric_workspace_obj.repository_items.get(item_type_value, {})
+        skipped = [name for name in all_items if name not in items_to_publish]
+        for name in skipped:
+            all_items[name].skip_publish = True
+        return skipped
 
     # endregion

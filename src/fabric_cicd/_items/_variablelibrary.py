@@ -61,10 +61,7 @@ class VariableLibraryPublisher(ItemPublisher):
     def post_publish_all(self) -> None:
         """Activate value sets after bulk upload."""
         if self.fabric_workspace_obj.bulk_publish_enabled:
-            header_logged = False
+            log_header(logger, "Activating Variable Library Value Sets")
             for item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 if not item.skip_publish:
-                    if not header_logged:
-                        log_header(logger, "Activating Variable Library Value Sets")
-                        header_logged = True
                     activate_value_set(self.fabric_workspace_obj, item)

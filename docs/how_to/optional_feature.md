@@ -152,6 +152,7 @@ Check your deployment logs for the message `"Falling back to standard deployment
 ### Other Limitations
 
 - **Item count limit**: A maximum of 1,000 items can be published in a single bulk call. Exceeding this limit raises an error. Publish time may increase with higher item counts.
+- **Items without logical IDs**: Items that do not have a logical ID assigned (indicated by an all-zeros GUID in the item's `.platform` file) are not supported by bulk publish. Connect your workspace via [git integration](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/intro-to-git-integration) to ensure logical IDs are properly assigned before using bulk publish.
 - **Preview item types**: Supported item types still in preview (e.g., `Ontology`) may produce errors for certain item definitions.
 
 For common bulk publish errors and their solutions, see the [Troubleshooting Guide](troubleshooting.md#bulk-publish-failures).
