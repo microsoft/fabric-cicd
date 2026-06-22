@@ -139,7 +139,6 @@ class LakehousePublisher(ItemPublisher):
                     shortcut_publisher.publish_all()
 
 
-
 class ShortcutPublisher(Publisher):
     """Publisher for Lakehouse shortcuts."""
 

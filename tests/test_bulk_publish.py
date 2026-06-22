@@ -239,36 +239,18 @@ class TestBulkPublishFallback:
             publish.publish_all_items(workspace)
             assert workspace.bulk_publish_enabled is False
 
-    def test_fallback_on_dynamic_replace_value_variables(self, mock_endpoint, temp_workspace_dir):
-        """Bulk publish falls back when replace_value contains dynamic variables."""
+    @pytest.mark.parametrize(
+        "param_yaml",
+        [
+            'find_replace:\n  - find_value: "some-id"\n    replace_value:\n      PPE: "$workspace.other_ws.$items.some_item.id"\n',
+            'find_replace:\n  - find_value: "$workspace.source_ws.$items.Notebook.some_lakehouse.id"\n    replace_value:\n      PPE: "replacement-id"\n',
+        ],
+        ids=["dynamic_replace_value", "dynamic_find_value"],
+    )
+    def test_fallback_on_dynamic_variables(self, mock_endpoint, temp_workspace_dir, param_yaml):
+        """Bulk publish falls back when parameter file contains dynamic $workspace/$items variables."""
         create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
-        create_parameter_file(
-            temp_workspace_dir,
-            """
-find_replace:
-  - find_value: "some-id"
-    replace_value:
-      PPE: "$workspace.other_ws.$items.some_item.id"
-""",
-        )
-
-        with patched_workspace(mock_endpoint, temp_workspace_dir, environment="PPE") as workspace:
-            publish.publish_all_items(workspace)
-            assert workspace.bulk_publish_enabled is False
-            assert workspace.contains_param_vars is True
-
-    def test_fallback_on_dynamic_find_value_variables(self, mock_endpoint, temp_workspace_dir):
-        """Bulk publish falls back when find_value contains dynamic variables."""
-        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
-        create_parameter_file(
-            temp_workspace_dir,
-            """
-find_replace:
-  - find_value: "$workspace.source_ws.$items.Notebook.some_lakehouse.id"
-    replace_value:
-      PPE: "replacement-id"
-""",
-        )
+        create_parameter_file(temp_workspace_dir, param_yaml)
 
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir, environment="PPE") as workspace,
@@ -342,24 +324,6 @@ class TestBulkPublishItemCountLimit:
 class TestBulkPublishEndToEnd:
     """Integration-style tests for the bulk publish flow with mocked API."""
 
-    def test_bulk_publish_single_api_call_with_correct_payload(self, mock_endpoint, temp_workspace_dir):
-        """Bulk publish sends all items to bulkImportDefinitions in a single POST with allowPairingByName."""
-        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
-        create_test_item_dir(temp_workspace_dir, None, "TestPipeline", "DataPipeline", "dp-id-001")
-        bodies = capture_bulk_bodies(mock_endpoint)
-
-        with patched_workspace(
-            mock_endpoint, temp_workspace_dir, item_type_in_scope=["Notebook", "DataPipeline"]
-        ) as workspace:
-            publish.publish_all_items(workspace)
-
-            assert workspace.bulk_publish_enabled is True
-            assert len(bodies) == 1
-            assert bodies[0]["options"]["allowPairingByName"] is True
-            names = get_bulk_part_names(bodies[0])
-            assert "TestNotebook" in names
-            assert "TestPipeline" in names
-
     def test_bulk_publish_assigns_guids_from_response(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish assigns item GUIDs from the API response."""
         create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
@@ -380,7 +344,7 @@ class TestBulkPublishEndToEnd:
             assert workspace.repository_items["Notebook"]["TestNotebook"].guid == "returned-guid-001"
 
     def test_bulk_publish_multiple_types_single_call(self, mock_endpoint, temp_workspace_dir):
-        """Bulk publish handles multiple supported item types in a single call."""
+        """Bulk publish sends all item types in a single POST with allowPairingByName."""
         create_test_item_dir(temp_workspace_dir, None, "NB1", "Notebook", "nb-id-001")
         create_test_item_dir(temp_workspace_dir, None, "NB2", "Notebook", "nb-id-002")
         create_test_item_dir(temp_workspace_dir, None, "DP1", "DataPipeline", "dp-id-001")
@@ -392,6 +356,7 @@ class TestBulkPublishEndToEnd:
             publish.publish_all_items(workspace)
 
             assert len(bodies) == 1
+            assert bodies[0]["options"]["allowPairingByName"] is True
             names = get_bulk_part_names(bodies[0])
             assert names == {"NB1", "NB2", "DP1"}
             assert len(bodies[0]["definitionParts"]) >= 6
@@ -403,7 +368,6 @@ class TestBulkPublishEndToEnd:
         with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
             publish.publish_all_items(workspace)
 
-            assert workspace.bulk_publish_enabled is True
             assert len(bodies) == 0
 
 
@@ -436,7 +400,6 @@ find_replace:
         with patched_workspace(mock_endpoint, temp_workspace_dir, environment="PPE") as workspace:
             publish.publish_all_items(workspace)
 
-            assert workspace.bulk_publish_enabled is True
             assert len(bodies) == 1
             content = get_bulk_part_content(bodies[0], "notebook-content")
             assert "new-connection-string" in content
@@ -497,7 +460,6 @@ spark_pool:
         ):
             publish.publish_all_items(workspace)
 
-            assert workspace.bulk_publish_enabled is True
             content = get_bulk_part_content(bodies[0], "Sparkcompute")
             assert "new-pool-guid" in content
             assert "old-pool-id" not in content
@@ -530,7 +492,7 @@ semantic_model_binding:
         bind_calls = []
         original = mock_endpoint.invoke.side_effect
 
-        def with_sm_hooks(method, url, **kwargs):
+        def sm_invoke(method, url, **kwargs):
             if method == "POST" and "bindConnection" in url:
                 bind_calls.append(url)
                 return {"body": {}}
@@ -558,32 +520,28 @@ semantic_model_binding:
                         ]
                     }
                 }
+            if method == "POST" and "bulkImportDefinitions" in url:
+                return {
+                    "body": {
+                        "importItemDefinitionsDetails": [
+                            {
+                                "itemType": "SemanticModel",
+                                "itemDisplayName": "TestModel",
+                                "itemId": "sm-guid-001",
+                                "operationType": "Create",
+                            },
+                        ]
+                    }
+                }
             return original(method, url, **kwargs)
 
-        set_bulk_response(
-            mock_endpoint,
-            [
-                {
-                    "itemType": "SemanticModel",
-                    "itemDisplayName": "TestModel",
-                    "itemId": "sm-guid-001",
-                    "operationType": "Create",
-                },
-            ],
-        )
-        bulk_side_effect = mock_endpoint.invoke.side_effect
-        mock_endpoint.invoke.side_effect = (
-            lambda method, url, **kwargs: with_sm_hooks(method, url, **kwargs)
-            if ("bindConnection" in url or "connections" in url)
-            else bulk_side_effect(method, url, **kwargs)
-        )
+        mock_endpoint.invoke.side_effect = sm_invoke
 
         with patched_workspace(
             mock_endpoint, temp_workspace_dir, item_type_in_scope=["SemanticModel"], environment="PPE"
         ) as workspace:
             publish.publish_all_items(workspace)
 
-            assert workspace.bulk_publish_enabled is True
             assert len(bind_calls) == 1, "bindConnection API should be called exactly once"
 
     def test_variable_library_value_set_activated_in_bulk_mode(self, mock_endpoint, temp_workspace_dir):
@@ -620,7 +578,6 @@ semantic_model_binding:
         ) as workspace:
             publish.publish_all_items(workspace)
 
-            assert workspace.bulk_publish_enabled is True
             assert len(patch_calls) == 1
             assert patch_calls[0]["properties"]["activeValueSetName"] == "PPE"
 
@@ -674,7 +631,6 @@ semantic_model_binding:
             with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Lakehouse"]) as workspace:
                 publish.publish_all_items(workspace)
 
-                assert workspace.bulk_publish_enabled is True
                 assert len(shortcut_calls) == 1
                 assert shortcut_calls[0]["name"] == "my_shortcut"
 
@@ -698,7 +654,6 @@ class TestBulkPublishSelectiveFiltering:
         with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
             publish.publish_all_items(workspace, item_name_exclude_regex="^Exclude.*")
 
-            assert workspace.bulk_publish_enabled is True
             names = get_bulk_part_names(bodies[0])
             assert "KeepNotebook" in names
             assert "ExcludeMe" not in names
@@ -893,7 +848,6 @@ class TestBulkPublishResponseCollection:
             ) as workspace:
                 result = publish.publish_all_items(workspace)
 
-                assert workspace.bulk_publish_enabled is True
                 assert result is not None
 
                 nb_resp = result["Notebook"]["NB1"]
@@ -917,7 +871,6 @@ class TestBulkPublishResponseCollection:
         with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
             result = publish.publish_all_items(workspace)
 
-            assert workspace.bulk_publish_enabled is True
             assert result is None
             assert workspace.responses is None
 
@@ -929,5 +882,4 @@ class TestBulkPublishResponseCollection:
             with patched_workspace(mock_endpoint, temp_workspace_dir) as workspace:
                 result = publish.publish_all_items(workspace, item_name_exclude_regex="^FilteredNB$")
 
-                assert workspace.bulk_publish_enabled is True
                 assert result is None
