@@ -742,7 +742,9 @@ class TestFileLoggingEnvVar:
         with patch.dict("os.environ", env, clear=False):
             if env_value is None:
                 os.environ.pop(self.ENV_VAR, None)
-            file_logging_enabled = os.environ.get(self.ENV_VAR, "").lower() in constants.VALID_ENABLE_FLAGS
+            from fabric_cicd._common._validate_env_vars import is_env_flag_enabled
+
+            file_logging_enabled = is_env_flag_enabled(self.ENV_VAR)
             configure_logger(disable_log_file=not file_logging_enabled)
 
         root_logger = logging.getLogger()

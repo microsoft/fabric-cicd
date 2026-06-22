@@ -11,7 +11,7 @@ import fabric_cicd.constants as constants
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
 from fabric_cicd._common._git_diff_utils import get_changed_items
 from fabric_cicd._common._logging import configure_logger, exception_handler, get_file_handler
-from fabric_cicd._common._validate_env_vars import _get_fabric_fqdn_url, validate_api_url
+from fabric_cicd._common._validate_env_vars import _get_fabric_fqdn_url, is_env_flag_enabled, validate_api_url
 from fabric_cicd._common._validate_input import validate_workspace_id
 from fabric_cicd.constants import EnvVar, FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -58,9 +58,7 @@ def change_log_level(level: str = "DEBUG") -> None:
         >>> change_log_level("DEBUG")
     """
     if level.upper() == "DEBUG":
-        file_logging_enabled = (
-            os.environ.get(EnvVar.FILE_LOGGING_ENABLED.value, "").lower() in constants.VALID_ENABLE_FLAGS
-        )
+        file_logging_enabled = is_env_flag_enabled(EnvVar.FILE_LOGGING_ENABLED.value)
         configure_logger(logging.DEBUG, disable_log_file=not file_logging_enabled)
         logger.info("Changed log level to DEBUG")
         if file_logging_enabled:
@@ -197,7 +195,7 @@ def configure_fabric_fqdn(workspace_id: str) -> None:
     constants.DEFAULT_API_ROOT_URL = fqdn_url
 
 
-if os.environ.get(EnvVar.FILE_LOGGING_ENABLED.value, "").lower() in constants.VALID_ENABLE_FLAGS:
+if is_env_flag_enabled(EnvVar.FILE_LOGGING_ENABLED.value):
     configure_logger()
 else:
     configure_logger(disable_log_file=True)
