@@ -66,6 +66,13 @@ find_replace:
         PROD: "$items.SemanticModel.ABC.$id"
       # Optional fields:
       file_path: "/ByConnection.Report/definition.pbir"
+    # Paginated Report - semantic model id in connection string using dynamic replacement
+    - find_value: "4febdc09-e283-4a4f-9658-38bab81bab2d"
+      replace_value:
+        PPE: "$items.SemanticModel.ABC.$id"
+        PROD: "$items.SemanticModel.ABC.$id"
+      item_type: "PaginatedReport"
+      file_path: "/ABC Paginated.PaginatedReport/ABC Paginated.rdl"
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
