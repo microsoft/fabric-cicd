@@ -4,7 +4,6 @@
 """Provides tools for managing and publishing items in a Fabric workspace."""
 
 import logging
-import os
 import sys
 
 import fabric_cicd.constants as constants
