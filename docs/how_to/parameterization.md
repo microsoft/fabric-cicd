@@ -164,7 +164,7 @@ semantic_model_binding:
             # OR use _ALL_ for same connection across environments
             # _ALL_: <connection_guid>
             # OR supply a list to bind multiple connections per model
-            # _ALL_: ["<PPE-conn-guid-1>", "<PPE-conn-guid-2>"]
+            # _ALL_: ["<conn-guid-1>", "<conn-guid-2>"]
 
     # Explicit bindings override default
     models:
