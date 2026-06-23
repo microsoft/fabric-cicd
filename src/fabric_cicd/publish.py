@@ -192,27 +192,49 @@ def publish_all_items(
         ...     publish_all_items(workspace, items_to_include=changed)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
-    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
-
+    
     # Initialize response collection if feature flag is enabled
+    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
         fabric_workspace_obj.responses = {}
 
     # Check if workspace has assigned capacity, if not, exit
     has_assigned_capacity = None
-
     response_state = fabric_workspace_obj.endpoint.invoke(
         method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
     )
-
     has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
-
     if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
         set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
     ):
         msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
         raise FailedPublishedItemStatusError(msg, logger)
 
+    # Reset bulk publish flag to False for each publish execution; it will be set to True if conditions are met for bulk publish
+    fabric_workspace_obj.bulk_publish_enabled = False
+    # Determine publishing mode path (standard vs. bulk) based on feature flags and input parameters
+    if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
+        if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
+            msg = "The 'enable_bulk_publish' feature flag requires 'enable_experimental_features' to be enabled."
+            raise InputError(msg, logger)
+        
+        reasons = []
+        unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
+        # Fall back to standard deployment if unsupported item types or dynamic parameter variables are detected, otherwise enable bulk publish
+        if unsupported or fabric_workspace_obj.contains_param_vars:
+            if unsupported:
+                reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
+                
+            if fabric_workspace_obj.contains_param_vars:
+                reasons.append(
+                    "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
+                )
+            logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
+       
+        else:
+            fabric_workspace_obj.bulk_publish_enabled = True
+
+    # Apply selective deployment features
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
         if folder_path_exclude_regex is not None and folder_path_to_include is not None:
             msg = "Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include' simultaneously. Choose one filtering strategy."
@@ -228,7 +250,9 @@ def publish_all_items(
 
         fabric_workspace_obj._refresh_deployed_folders()
         fabric_workspace_obj._refresh_repository_folders()
-        fabric_workspace_obj._publish_folders()
+
+        if not fabric_workspace_obj.bulk_publish_enabled:
+            fabric_workspace_obj._publish_folders()
 
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_repository_items()
@@ -247,15 +271,21 @@ def publish_all_items(
         validate_shortcut_exclude_regex(shortcut_exclude_regex)
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
-    # Publish items in the defined order synchronously
-    total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
-    publishers_with_async_check: list[items.ItemPublisher] = []
-    for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
-        log_header(logger, f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
-        publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
-        publisher.publish_all()
-        if publisher.has_async_publish_check:
-            publishers_with_async_check.append(publisher)
+    # Execute chosen publish mode
+    if fabric_workspace_obj.bulk_publish_enabled:
+        # Publish all items in bulk (experimental)
+        log_header(logger, "Publishing Items in Bulk")
+        publishers_with_async_check = items.ItemPublisher.publish_all_bulk(fabric_workspace_obj)
+    else:
+        # Publish items in the defined order synchronously (standard)
+        total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
+        publishers_with_async_check: list[items.ItemPublisher] = []
+        for order_num, item_type in items.ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
+            log_header(logger, f"Publishing Item {order_num}/{total_item_types}: {item_type.value}")
+            publisher = items.ItemPublisher.create(item_type, fabric_workspace_obj)
+            publisher.publish_all()
+            if publisher.has_async_publish_check:
+                publishers_with_async_check.append(publisher)
 
     # Check asynchronous publish status for relevant item types
     for publisher in publishers_with_async_check:

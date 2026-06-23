@@ -8,6 +8,7 @@ import logging
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import ItemType
 
@@ -56,3 +57,11 @@ class VariableLibraryPublisher(ItemPublisher):
         self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
         if not item.skip_publish:
             activate_value_set(self.fabric_workspace_obj, item)
+
+    def post_publish_all(self) -> None:
+        """Activate value sets after bulk upload."""
+        if self.fabric_workspace_obj.bulk_publish_enabled:
+            log_header(logger, "Activating Variable Library Value Sets")
+            for item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
+                if not item.skip_publish:
+                    activate_value_set(self.fabric_workspace_obj, item)

@@ -14,6 +14,7 @@ from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import ItemType
 
@@ -162,6 +163,10 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
         )
     ]
 
+    if not filtered_environments:
+        logger.debug("No environments to check publish state for — skipping.")
+        return
+
     logger.info(f"Checking Environment Publish State for {filtered_environments}")
 
     while ongoing_publish:
@@ -200,8 +205,13 @@ def _check_environment_publish_state(fabric_workspace_obj: FabricWorkspace, init
             )
             iteration += 1
 
-    if not initial_check:
+    not_found = [name for name in filtered_environments if name not in completed + running + failed]
+    if completed:
         logger.info(f"{constants.INDENT}Published: {completed}")
+    if failed and initial_check:
+        logger.info(f"{constants.INDENT}Failed/Cancelled (pre-existing): {failed}")
+    if not_found:
+        logger.info(f"{constants.INDENT}Not yet deployed: {not_found}")
 
 
 def _submit_environment_publish(fabric_workspace_obj: FabricWorkspace, item_name: str) -> None:
@@ -234,6 +244,7 @@ class EnvironmentPublisher(ItemPublisher):
 
     item_type = ItemType.ENVIRONMENT.value
     has_async_publish_check = True
+    func_process_file = staticmethod(_process_environment_file)
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Environment item."""
@@ -254,3 +265,11 @@ class EnvironmentPublisher(ItemPublisher):
     def post_publish_all_check(self) -> None:
         """Check environment publish state after all environments have been published."""
         _check_environment_publish_state(self.fabric_workspace_obj, False)
+
+    def post_publish_all(self) -> None:
+        """Submit environment publish for each item after bulk upload."""
+        if self.fabric_workspace_obj.bulk_publish_enabled:
+            log_header(logger, "Publishing Environments")
+            for item_name, item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).items():
+                if not item.skip_publish:
+                    _submit_environment_publish(self.fabric_workspace_obj, item_name)
