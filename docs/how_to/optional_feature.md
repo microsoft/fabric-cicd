@@ -139,6 +139,10 @@ Since this feature is experimental, it is recommended for non-production environ
 
     For more details on logical IDs, see [Resolve Logical ID Conflicts in Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/logical-id-conflict-resolution).
 
+### Authentication Requirements
+
+When authenticating with a service principal or managed identity, all item types in a bulk call must support non-interactive authentication. If any item type in the batch does not, the entire call fails. Ensure your `item_type_in_scope` only includes item types with matching auth support.
+
 ### Automatic Fallback to Standard Publish
 
 Bulk publish will automatically fall back to standard publish mode when any of the following conditions are detected. A warning is logged when this occurs.
