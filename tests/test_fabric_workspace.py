@@ -601,7 +601,9 @@ find_replace:
     assert "ppe-replacement-value" in replaced_content_with_env, "Replacement should occur with matching environment"
 
 
-def test_environment_parameter_replacement_ignore_case(patched_fabric_workspace, temp_workspace_dir, valid_workspace_id):
+def test_environment_parameter_replacement_ignore_case(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
     """Test that find_replace with ignore_case performs case-insensitive replacement."""
     parameter_content = """
 find_replace:
@@ -1529,6 +1531,179 @@ def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace
         result = workspace._get_item_attribute("ws1", "UnsupportedType", "guid1", "name1", "someattr")
         assert result == ""
         assert mock_endpoint.invoke.call_count == 0  # No API call made
+
+
+def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, valid_workspace_id):
+    """When find_value contains dynamic variables, _refresh_deployed_items collects extra attributes."""
+    # Create a parameter file with dynamic variable in find_value
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text(
+        """
+find_replace:
+  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
+    replace_value:
+      PPE: "replacement-id"
+""",
+        encoding="utf-8",
+    )
+
+    # Create a minimal item so workspace init succeeds
+    item_dir = temp_workspace_dir / "MyNotebook.Notebook"
+    item_dir.mkdir()
+    platform = item_dir / ".platform"
+    platform.write_text(
+        json.dumps({
+            "metadata": {"type": "Notebook", "displayName": "MyNotebook", "description": ""},
+            "config": {"logicalId": "nb-001"},
+        }),
+        encoding="utf-8",
+    )
+
+    mock_ep = MagicMock()
+
+    items_response = {
+        "body": {
+            "value": [
+                {
+                    "type": "Lakehouse",
+                    "displayName": "TestLH",
+                    "description": "",
+                    "id": "lh-guid-001",
+                    "folderId": "",
+                }
+            ],
+            "capacityId": "test-cap",
+        }
+    }
+    lakehouse_detail = {
+        "body": {"properties": {"sqlEndpointProperties": {"connectionString": "server.db", "id": "sqlep-id"}}}
+    }
+
+    def mock_invoke(method, url, **_kwargs):
+        if method == "GET" and url.endswith("/items"):
+            return items_response
+        if method == "GET" and "lakehouses/" in url:
+            return lakehouse_detail
+        return {"body": {"value": [], "capacityId": "test-cap"}}
+
+    mock_ep.invoke.side_effect = mock_invoke
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_ep),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            token_credential=DummyTokenCredential(),
+        )
+
+        assert workspace.contains_param_vars is True
+
+        # Now call _refresh_deployed_items to exercise the contains_param_vars guard
+        workspace._refresh_deployed_items()
+
+        # Verify _get_item_attribute was called (lakehouse detail API)
+        lakehouse_calls = [c for c in mock_ep.invoke.call_args_list if "lakehouses/" in str(c)]
+        assert len(lakehouse_calls) > 0
+
+        # Verify workspace_items has the resolved attributes
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpoint"] == "server.db"
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == "sqlep-id"
+
+
+def test_static_params_skip_attribute_collection(temp_workspace_dir, valid_workspace_id):
+    """When only static parameters are present, _refresh_deployed_items skips extra attribute calls."""
+    # Create a parameter file with only static values
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text(
+        """
+find_replace:
+  - find_value: "old-connection"
+    replace_value:
+      PPE: "new-connection"
+""",
+        encoding="utf-8",
+    )
+
+    item_dir = temp_workspace_dir / "MyNotebook.Notebook"
+    item_dir.mkdir()
+    platform = item_dir / ".platform"
+    platform.write_text(
+        json.dumps({
+            "metadata": {"type": "Notebook", "displayName": "MyNotebook", "description": ""},
+            "config": {"logicalId": "nb-001"},
+        }),
+        encoding="utf-8",
+    )
+
+    mock_ep = MagicMock()
+
+    items_response = {
+        "body": {
+            "value": [
+                {
+                    "type": "Lakehouse",
+                    "displayName": "TestLH",
+                    "description": "",
+                    "id": "lh-guid-001",
+                    "folderId": "",
+                }
+            ],
+            "capacityId": "test-cap",
+        }
+    }
+
+    def mock_invoke(method, url, **_kwargs):
+        if method == "GET" and url.endswith("/items"):
+            return items_response
+        return {"body": {"value": [], "capacityId": "test-cap"}}
+
+    mock_ep.invoke.side_effect = mock_invoke
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_ep),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            token_credential=DummyTokenCredential(),
+        )
+
+        assert workspace.contains_param_vars is False
+
+        # Now call _refresh_deployed_items
+        workspace._refresh_deployed_items()
+
+        # Verify NO lakehouse detail API calls were made
+        lakehouse_calls = [c for c in mock_ep.invoke.call_args_list if "lakehouses/" in str(c)]
+        assert len(lakehouse_calls) == 0
+
+        # workspace_items should have empty attribute values
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpoint"] == ""
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == ""
+
+
+def test_get_item_attribute_unsupported_and_empty(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test edge cases: unsupported attribute and empty attribute value."""
+    mock_endpoint = MagicMock()
+    mock_endpoint.invoke.return_value = {"body": {}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
 
         # Test unsupported attribute for supported item type - should return empty string without API call
         result = workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "unsupportedattr")

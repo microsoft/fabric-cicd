@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from fabric_cicd._common._exceptions import PublishError
+from fabric_cicd import constants
+from fabric_cicd._common._exceptions import InputError, PublishError
 from fabric_cicd._common._item import Item
 from fabric_cicd.constants import PARALLEL_MAX_WORKERS, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -153,6 +154,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._kqldatabase import KQLDatabasePublisher
         from fabric_cicd._items._kqlqueryset import KQLQuerysetPublisher
         from fabric_cicd._items._lakehouse import LakehousePublisher
+        from fabric_cicd._items._map import MapPublisher
         from fabric_cicd._items._mirroreddatabase import MirroredDatabasePublisher
         from fabric_cicd._items._mlexperiment import MLExperimentPublisher
         from fabric_cicd._items._mounteddatafactory import MountedDataFactoryPublisher
@@ -194,6 +196,7 @@ class ItemPublisher(Publisher):
             ItemType.DATA_AGENT: DataAgentPublisher,
             ItemType.ML_EXPERIMENT: MLExperimentPublisher,
             ItemType.ONTOLOGY: OntologyPublisher,
+            ItemType.MAP: MapPublisher,
         }
 
         publisher_class = publisher_mapping.get(item_type)
@@ -298,6 +301,71 @@ class ItemPublisher(Publisher):
             return [name for name in to_delete_set if not regex_pattern.match(name)]
         return list(to_delete_set)
 
+    @staticmethod
+    def publish_all_bulk(fabric_workspace_obj: "FabricWorkspace") -> list["ItemPublisher"]:
+        """
+        Execute a single bulk publish across all item types in scope.
+
+        Lifecycle:
+            1. pre_publish_all() — per type
+            2. get_items_to_publish() — per type, collect into one pool
+            3. _publish_items() — single cross-type API call
+            4. post_publish_all() — per type
+
+        Returns:
+            List of publishers that have async checks pending.
+        """
+        publishers: list[ItemPublisher] = []
+        items_with_context: list[tuple[str, Item, ItemPublisher]] = []
+        skipped_items: list[str] = []
+
+        # Phase 1: Pre-hooks + collect items with their publisher context
+        for _order_num, item_type in ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
+            publisher = ItemPublisher.create(item_type, fabric_workspace_obj)
+            type_items = publisher.get_items_to_publish()
+
+            # Filter 1: items_to_include — mark items not in the include list as skip_publish=True
+            skipped = ItemPublisher._mark_skipped_items(fabric_workspace_obj, item_type.value, type_items)
+            if skipped:
+                logger.debug(f"Skipping {item_type.value} item(s) due to items_to_include filter: {skipped}")
+                skipped_items.extend(f"{item_type.value}: {name}" for name in skipped)
+
+            # Filter 2: publish filters (exclude_regex, folder_exclude_regex, folder_path_to_include)
+            publishable_items = []
+            for item_name, item in type_items.items():
+                if fabric_workspace_obj._apply_publish_filters(item, item_name, item_type.value):
+                    skipped_items.append(f"{item_type.value}: {item_name}")
+                    continue
+                publishable_items.append((item_name, item, publisher))
+
+            # Skip pre-hooks and registration if no items will actually be published for this type
+            if not publishable_items:
+                continue
+
+            publisher.pre_publish_all()
+            items_with_context.extend(publishable_items)
+            publishers.append(publisher)
+
+        # Phase 2: Single bulk API call (publisher context used inside for per-item transforms)
+        if items_with_context:
+            if skipped_items:
+                logger.info(f"Skipping {len(skipped_items)} item(s) due to publish filters")
+
+            item_count = len(items_with_context)
+            if item_count > constants.BULK_ITEM_COUNT_LIMIT:
+                msg = (
+                    f"Bulk publish item count ({item_count}) exceeds the API limit "
+                    f"of {constants.BULK_ITEM_COUNT_LIMIT} items."
+                )
+                raise InputError(msg, logger)
+            fabric_workspace_obj._publish_items(items_with_context, skipped_items=skipped_items)
+
+        # Phase 3: Post-hooks per type
+        for publisher in publishers:
+            publisher.post_publish_all()
+
+        return [p for p in publishers if p.has_async_publish_check]
+
     # endregion
 
     # region Public Methods
@@ -321,16 +389,13 @@ class ItemPublisher(Publisher):
             PublishError: If one or more items failed to publish.
         """
         self.pre_publish_all()
-        all_items = self.fabric_workspace_obj.repository_items.get(self.item_type, {})
         items = self.get_items_to_publish()
 
         # Mark excluded items as skip_publish=True so post_publish_all() hooks
         # can reliably skip them. Included items are left unchanged (False).
-        skipped = [name for name in all_items if name not in items]
+        skipped = self._mark_skipped_items(self.fabric_workspace_obj, self.item_type, items)
         if skipped:
             logger.info(f"Skipping {self.item_type} item(s) due to items_to_include filter: {skipped}")
-            for name in skipped:
-                all_items[name].skip_publish = True
 
         if not items:
             self.post_publish_all()
@@ -518,5 +583,27 @@ class ItemPublisher(Publisher):
                     errors.append((item_name, e))
 
         return errors
+
+    @staticmethod
+    def _mark_skipped_items(
+        fabric_workspace_obj: "FabricWorkspace",
+        item_type_value: str,
+        items_to_publish: dict[str, "Item"],
+    ) -> list[str]:
+        """Mark repository items not in items_to_publish as skip_publish=True.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object containing repository items.
+            item_type_value: The item type string value.
+            items_to_publish: The filtered dict of items that will be published.
+
+        Returns:
+            List of skipped item names.
+        """
+        all_items = fabric_workspace_obj.repository_items.get(item_type_value, {})
+        skipped = [name for name in all_items if name not in items_to_publish]
+        for name in skipped:
+            all_items[name].skip_publish = True
+        return skipped
 
     # endregion

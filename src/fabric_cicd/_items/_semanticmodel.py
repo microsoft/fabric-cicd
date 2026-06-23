@@ -7,6 +7,7 @@ import logging
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._parameter._utils import process_environment_key
 from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
@@ -283,6 +284,8 @@ class SemanticModelPublisher(ItemPublisher):
         semantic_model_binding = self.fabric_workspace_obj.environment_parameter.get("semantic_model_binding", {})
         if not semantic_model_binding:
             return
+
+        log_header(logger, "Binding Semantic Model Connections")
 
         # Build connection mapping from semantic_model_binding parameter (support legacy or new formats)
         environment = self.fabric_workspace_obj.environment
