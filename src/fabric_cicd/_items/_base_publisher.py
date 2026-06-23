@@ -153,6 +153,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._kqldatabase import KQLDatabasePublisher
         from fabric_cicd._items._kqlqueryset import KQLQuerysetPublisher
         from fabric_cicd._items._lakehouse import LakehousePublisher
+        from fabric_cicd._items._map import MapPublisher
         from fabric_cicd._items._mirroreddatabase import MirroredDatabasePublisher
         from fabric_cicd._items._mlexperiment import MLExperimentPublisher
         from fabric_cicd._items._mounteddatafactory import MountedDataFactoryPublisher
@@ -196,6 +197,7 @@ class ItemPublisher(Publisher):
             ItemType.DATA_AGENT: DataAgentPublisher,
             ItemType.ML_EXPERIMENT: MLExperimentPublisher,
             ItemType.ONTOLOGY: OntologyPublisher,
+            ItemType.MAP: MapPublisher,
         }
 
         publisher_class = publisher_mapping.get(item_type)
