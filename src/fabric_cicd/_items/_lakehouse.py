@@ -12,6 +12,7 @@ from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher, Publisher
 from fabric_cicd.constants import FeatureFlag, ItemType
 
@@ -130,6 +131,7 @@ class LakehousePublisher(ItemPublisher):
     def post_publish_all(self) -> None:
         """Publish shortcuts after all lakehouses are published to protect interrelationships."""
         if FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value in constants.FEATURE_FLAG:
+            log_header(logger, "Publishing Lakehouse Shortcuts")
             for item_obj in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 # Check if the item is published to avoid any post publish actions
                 if not item_obj.skip_publish and item_obj.guid:
@@ -238,4 +240,7 @@ class ShortcutPublisher(Publisher):
             self._unpublish_shortcuts(shortcut_paths_to_unpublish)
             # Deploy and overwrite shortcuts
             for shortcut_path, shortcut in shortcuts_to_publish.items():
-                self.publish_one(shortcut_path, shortcut)
+                self.publish_one(shortcut_path, shortcut)     
+        else:
+            logger.info(f"{constants.INDENT}No shortcuts found for Lakehouse '{self.item_obj.name}'")
+           
