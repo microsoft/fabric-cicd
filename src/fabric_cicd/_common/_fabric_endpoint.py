@@ -218,10 +218,26 @@ def _handle_response(
 
             elif status == "Failed":
                 response_error = response_json["error"]
+                # Extract more details from the error message if available
+                more_details = response_error.get("moreDetails", [])
+                detail_messages = []
+                for detail in more_details:
+                    detail_msg = detail.get("message", "")
+                    related = detail.get("relatedResource", {})
+                    resource_id = related.get("resourceId", "")
+                    resource_type = related.get("resourceType", "")
+                    entry = f"[{detail.get('errorCode', '')}] {detail_msg}"
+                    if resource_type:
+                        entry += f" (Resource: {resource_type} {resource_id})"
+                    detail_messages.append(entry)
+                details_str = " | ".join(detail_messages) if detail_messages else ""
                 msg = (
                     f"Operation failed. Error Code: {response_error['errorCode']}. "
                     f"Error Message: {response_error['message']}"
                 )
+                # Add more details to the error message when available
+                if details_str:
+                    msg += f". Details: {details_str}"
                 raise Exception(msg)
             elif status == "Undefined":
                 msg = f"Operation is in an undefined state. Full Body: {response_json}"
