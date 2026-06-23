@@ -1,0 +1,8 @@
+kind: new-items
+body: Add support for Map item
+time: 2026-06-21T18:10:20.8802849+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "874"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/874
