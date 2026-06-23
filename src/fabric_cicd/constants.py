@@ -59,6 +59,7 @@ class ItemType(str, Enum):
     KQL_DATABASE = "KQLDatabase"
     KQL_QUERYSET = "KQLQueryset"
     LAKEHOUSE = "Lakehouse"
+    MAP = "Map"
     MIRRORED_DATABASE = "MirroredDatabase"
     ML_EXPERIMENT = "MLExperiment"
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
@@ -104,6 +105,7 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     25: ItemType.DATA_AGENT,
     26: ItemType.ML_EXPERIMENT,
     27: ItemType.ONTOLOGY,
+    28: ItemType.MAP,
 }
 
 
