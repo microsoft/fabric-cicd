@@ -141,6 +141,8 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
+        self.contains_param_vars = False
+        self.bulk_publish_enabled = False
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
@@ -305,6 +307,7 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
+            self.contains_param_vars = bool(parameter_obj._search_dynamic_replacement_variables_in_parameter_file())
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -358,6 +361,13 @@ class FabricWorkspace:
                         msg = f"Duplicate logicalId '{item_logical_id}' found in {item_metadata_path}"
                         raise FailedPublishedItemStatusError(msg, logger)
                     visited_logical_ids.add(item_logical_id)
+
+                elif self.bulk_publish_enabled:
+                    msg = (
+                        f"Item '{item_name}.{item_type}' has the default logicalId '{constants.DEFAULT_GUID}' "
+                        f"in the .platform file. The bulk import API only accepts a unique logicalId. "
+                    )
+                    raise InputError(msg, logger)
 
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
@@ -432,18 +442,20 @@ class FabricWorkspace:
             if item_type not in self.workspace_items:
                 self.workspace_items[item_type] = {}
 
-            # Get additional properties
-            if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
-                sql_endpoint = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
-                )
-                sql_endpoint_id = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
-                )
-            if item_type in [ItemType.EVENTHOUSE.value]:
-                query_service_uri = self._get_item_attribute(
-                    self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
-                )
+            # Only collect attribute values when parameterization with dynamic variables is in use
+            if self.contains_param_vars:
+                # Get additional properties
+                if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
+                    sql_endpoint = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                    )
+                    sql_endpoint_id = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
+                    )
+                if item_type in [ItemType.EVENTHOUSE.value]:
+                    query_service_uri = self._get_item_attribute(
+                        self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
+                    )
 
             # Add item details to the deployed_items dictionary
             self.deployed_items[item_type][item_name] = Item(
@@ -645,59 +657,14 @@ class FabricWorkspace:
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
-        folder_path = item.folder_path or ""
 
         # Initialize response collection for this item if responses are being tracked
         api_response = None
 
-        # ===== FILTER ORDER (applied in _publish_item): Item Exclusion → Folder Exclusion → Folder Inclusion =====
+        # Skip publishing if the item matches any exclusion/inclusion filter
+        # FILTER ORDER: Item Exclusion → Folder Exclusion → Folder Inclusion
         # Note: items_to_include filtering is applied upstream in publish_all() via get_items_to_publish().
-
-        # 1. Skip publishing if the item is excluded by the regex
-        if self.publish_item_name_exclude_regex:
-            regex_pattern = check_regex(self.publish_item_name_exclude_regex)
-            if regex_pattern.match(item_name):
-                item.skip_publish = True
-                logger.info(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
-                return
-
-        # 2. Skip publishing if the item's folder path is excluded by the regex
-        if self.publish_folder_path_exclude_regex and folder_path:
-            regex_pattern = check_regex(self.publish_folder_path_exclude_regex)
-            # Walk up the folder hierarchy checking each level against the exclusion regex.
-            # Cases handled:
-            #   1. Direct match — item's folder matches the regex (e.g., item in /A/B, regex matches /A/B)
-            #   2. Ancestor match — item's ancestor folder matches (e.g., item in /A/B/C, regex matches /A)
-            #   3. No match at any level — no exclusion applied, continue to next checks
-            # Note: Root-level items (empty folder_path) are not impacted by folder path exclusion.
-            # This ensures excluding a parent folder cascades to all descendants.
-            path_to_check = folder_path
-            while path_to_check:
-                # If the current path (or ancestor) matches the exclusion pattern, skip this item
-                if regex_pattern.search(path_to_check):
-                    item.skip_publish = True
-                    logger.info(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
-                    return
-                # Move one level up by stripping the last path segment (e.g., "/a/b/c" -> "/a/b")
-                if "/" in path_to_check and path_to_check != "":
-                    path_to_check = path_to_check.rsplit("/", 1)[0]
-                else:
-                    # Reached the root level with no match; stop checking
-                    break
-
-        # 3. Skip publishing if the item's folder path is not in the include list
-        # If the item's folder is not in the explicit include list, skip item publish (even though folder has been created).
-        # Note: unlike exclusion, this does NOT walk ancestors — only exact folder match is checked.
-        # (e.g., including /A does NOT include items in /A/B, or including /A/B does NOT include items in /A, but the folder /A will still exist).
-        if (
-            self.publish_folder_path_to_include
-            and folder_path
-            and folder_path not in self.publish_folder_path_to_include
-        ):
-            item.skip_publish = True
-            logger.info(
-                f"Skipping publishing of {item_type} '{item_name}' under {folder_path} as it is not in the include list."
-            )
+        if self._apply_publish_filters(item, item_name, item_type):
             return
 
         item_guid = item.guid
@@ -809,6 +776,105 @@ class FabricWorkspace:
         if not kwargs.get("skip_publish_logging", False):
             logger.info(f"{constants.INDENT}Published {item_type} '{item_name}'")
         return
+
+    def _publish_items(
+        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: list[str] | None = None
+    ) -> None:
+        """
+        Publishes or updates items in bulk via the bulk import API.
+
+        Args:
+            items_with_context: A list of tuples containing item name, Item object, and publisher context required for processing the item files.
+            skipped_items: Optional list of "Type: Name" strings for items skipped by publish filters.
+        """
+        # Prepare the definition parts for all items to be published in bulk
+        definition_parts = []
+        for _item_name, item, publisher in items_with_context:
+            item_parts = self._prepare_bulk_item_parts(item, publisher)
+            definition_parts.extend(item_parts)
+
+        logger.info(f"Publishing {len(items_with_context)} item(s) in bulk")
+
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
+        response = self.endpoint.invoke(
+            method="POST",
+            url=f"{self.base_api_url}/items/bulkImportDefinitions?beta=True",
+            body={
+                "definitionParts": definition_parts,
+                "options": {"allowPairingByName": True},
+            },
+            max_duration=1800,  # 30 minutes, as bulk operations can take longer time to complete
+        )
+
+        # Log results grouped by operation type
+        details = response.get("body", {}).get("importItemDefinitionsDetails", [])
+        created = []
+        updated = []
+
+        for d in details:
+            item_type = d["itemType"]
+            item_name = d["itemDisplayName"]
+            item_id = d.get("itemId")
+
+            # Assign GUIDs from the response
+            if (item_id and item_type in self.repository_items) and (item_name in self.repository_items[item_type]):
+                self.repository_items[item_type][item_name].guid = item_id
+
+            # Store response if responses are being tracked
+            if self.responses is not None:
+                if item_type not in self.responses:
+                    self.responses[item_type] = {}
+                self.responses[item_type][item_name] = {
+                    "header": response.get("header", {}),
+                    "body": d,
+                    "status_code": response.get("status_code"),
+                }
+
+            # Collect logging info
+            op = d.get("operationType")
+            label = f"{item_type}: {item_name}"
+            if op == "Create":
+                created.append(label)
+            elif op == "Update":
+                updated.append(label)
+
+        # Log after the loop
+        if created:
+            logger.info(f"{constants.INDENT}Published items (create): {sorted(created)}")
+        if updated:
+            logger.info(f"{constants.INDENT}Published items (update): {sorted(updated)}")
+        if skipped_items:
+            logger.info(f"{constants.INDENT}Skipped items: {sorted(skipped_items)}")
+
+    def _prepare_bulk_item_parts(self, item: "Item", publisher: object) -> list[dict]:
+        """
+        Prepare all file payload parts for a single item in bulk import format.
+
+        Args:
+            item: The Item object.
+            publisher: The publisher context required for processing the item files.
+        """
+        exclude_path = constants.EXCLUDE_PATH_REGEX_MAPPING.get(publisher.item_type, r"^(?!.*)")
+        func_process_file = getattr(publisher, "func_process_file", None)
+
+        # Build the workspace-relative prefix for this item's files, e.g., "/Folder1/Folder2/MyReport.Report"
+        item_dir_name = item.path.name
+        folder_path = item.folder_path or ""
+        path_prefix = f"{folder_path}/{item_dir_name}"
+
+        parts = []
+        for file in item.item_files:
+            if re.match(exclude_path, file.relative_path):
+                continue
+            if file.type == "text" and not str(file.file_path).endswith(".platform"):
+                file.contents = func_process_file(self, item, file) if func_process_file else file.contents
+                file.contents = self._replace_parameters(file, item)
+
+            payload = file.base64_payload
+            payload["path"] = f"{path_prefix}/{file.relative_path}"
+            parts.append(payload)
+
+        return parts
 
     def _unpublish_item(self, item_name: str, item_type: str) -> None:
         """
@@ -927,6 +993,88 @@ class FabricWorkspace:
                 folder_hierarchy[relative_path] = ""
 
         self.repository_folders = folder_hierarchy
+
+    def _apply_publish_filters(self, item: "Item", item_name: str, item_type: str) -> bool:
+        """
+        Check if an item should be skipped based on all item-level publish filters.
+
+        Applies filters in order:
+        1. Item name exclusion (publish_item_name_exclude_regex)
+        2. Folder path exclusion / inclusion (via _apply_folder_path_filters)
+
+        Note: items_to_include filtering is applied upstream via get_items_to_publish().
+
+        Returns True if the item should be skipped (sets item.skip_publish = True as a side effect).
+        """
+        # 1. Skip publishing if the item name matches the exclusion regex
+        log = logger.debug if self.bulk_publish_enabled else logger.info
+
+        if self.publish_item_name_exclude_regex:
+            regex_pattern = check_regex(self.publish_item_name_exclude_regex)
+            if regex_pattern.match(item_name):
+                item.skip_publish = True
+                log(f"Skipping publishing of {item_type} '{item_name}' due to exclusion regex.")
+                return True
+
+        # 2. Skip publishing if the item's folder path is excluded or not in the include list
+        return self._apply_folder_path_filters(item, item_name, item_type)
+
+    def _apply_folder_path_filters(self, item: "Item", item_name: str, item_type: str) -> bool:
+        """
+        Check if an item should be skipped based on folder path filters.
+
+        Only one folder filter can be active per deployment — using both raises an error
+        (validated upstream in publish_all_items / deploy_with_config).
+
+        Supported filters:
+
+        1. Folder path exclusion (publish_folder_path_exclude_regex):
+           Walks up the folder hierarchy checking each level against the exclusion regex.
+           Cases handled:
+             - Direct match — item's folder matches the regex (e.g., item in /A/B, regex matches /A/B)
+             - Ancestor match — item's ancestor folder matches (e.g., item in /A/B/C, regex matches /A)
+             - No match at any level — no exclusion applied
+           Root-level items (empty folder_path) are not impacted by folder path exclusion.
+           This ensures excluding a parent folder cascades to all descendants.
+
+        2. Folder path inclusion (publish_folder_path_to_include):
+           Only exact folder match is checked — does NOT walk ancestors.
+           (e.g., including /A does NOT include items in /A/B, or including /A/B does NOT include
+           items in /A, but the folder /A will still exist in standard mode).
+           Root-level items (empty folder_path) are not impacted by folder path inclusion.
+
+        Returns True if the item should be skipped (sets item.skip_publish = True as a side effect).
+        """
+        log = logger.debug if self.bulk_publish_enabled else logger.info
+        folder_path = item.folder_path or ""
+
+        # Apply folder path exclusion — walk up ancestors
+        if self.publish_folder_path_exclude_regex and folder_path:
+            regex_pattern = check_regex(self.publish_folder_path_exclude_regex)
+            path_to_check = folder_path
+            while path_to_check:
+                if regex_pattern.search(path_to_check):
+                    item.skip_publish = True
+                    log(f"Skipping publishing of {item_type} '{item_name}' due to folder path exclusion regex.")
+                    return True
+                if "/" in path_to_check and path_to_check != "":
+                    path_to_check = path_to_check.rsplit("/", 1)[0]
+                else:
+                    break
+
+        # Apply folder path inclusion — exact match only
+        if (
+            self.publish_folder_path_to_include
+            and folder_path
+            and (folder_path not in self.publish_folder_path_to_include)
+        ):
+            item.skip_publish = True
+            log(
+                f"Skipping publishing of {item_type} '{item_name}' under {folder_path} as it is not in the include list."
+            )
+            return True
+
+        return False
 
     def _publish_folders(self) -> None:
         """Publishes all folders from the repository."""

@@ -199,6 +199,12 @@ def test_resolve_pool_id_not_found():
         env_module._resolve_pool_id(pools, pool_name="MissingPool", pool_type="Workspace")
 
 
+def test_environment_publisher_exposes_func_process_file_for_bulk():
+    """EnvironmentPublisher class attribute ensures bulk path discovers the file processor."""
+    assert hasattr(env_module.EnvironmentPublisher, "func_process_file")
+    assert env_module.EnvironmentPublisher.func_process_file is env_module._process_environment_file
+
+
 # ---------- Publisher integration tests ----------
 
 
@@ -224,6 +230,7 @@ def test_publish_environments_passes_func_process_file(tmp_path):
             self.endpoint = FakeEndpoint()
             self.repository_directory = tmp_path
             self.responses = None
+            self.bulk_publish_enabled = False
 
         def _get_workspace_pools(self):
             return []
@@ -280,6 +287,7 @@ def test_end_to_end_environment_setting_only(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
             self.environment_parameter = {}
+            self.bulk_publish_enabled = False
 
         def _get_workspace_pools(self):
             return []
@@ -342,6 +350,7 @@ def test_end_to_end_environment_with_libraries(tmp_path):
             self.repository_directory = tmp_path
             self.responses = None
             self.environment_parameter = {}
+            self.bulk_publish_enabled = False
 
         def _get_workspace_pools(self):
             return []

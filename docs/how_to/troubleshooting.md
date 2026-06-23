@@ -180,6 +180,30 @@ Traceback (most recent call last):
 5. Ensure item dependencies exist (e.g., a Data Pipeline referencing a Notebook must be deployed along with the Notebook)
 6. If deleting and recreating an item with the same name, wait 5 minutes between operations due to Fabric API item name reservation
 
+#### Bulk Publish Failures
+
+**Symptom**: The publish operation fails when bulk publish mode is used
+
+Bulk publishing uses the Fabric [bulk import API](<https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)>), which is currently in beta. Different error messages may surface depending on the scenario. Below are common errors and their solutions.
+
+**"Dependencies could not be resolved"**
+
+The deployment batch is missing one or more items that other items depend on. For example, deploying a Report without its connected Semantic Model will fail. Note that dependency requirements may vary for pre-existing versus new items.
+
+**Solution**: Include all dependent items in the same deployment batch and verify that referenced logical IDs are associated with the correct items.
+
+**"Failed to perform the item definitions operation"**
+
+This generic error typically wraps a more specific per-item error. A partial deployment may occur — some items in the batch succeed while others fail. The root cause is usually an item definition issue during creation or update of a specific item. Check the error details for the underlying message and the affected resource.
+
+**Solution**: Identify the problematic item from the error details, resolve the item definition issue, or remove the item from the deployment batch to unblock the remaining items.
+
+**"Unsupported Item Type"**
+
+Certain item types are explicitly unsupported by the bulk import API due to lacking definition support. Additionally, some item types that the API generally supports may be intentionally disabled in fabric-cicd's bulk publish mode due to known issues. This error should not be reached in practice, as fabric-cicd automatically falls back to standard publish mode when unsupported types are detected.
+
+**Solution**: Only include currently supported item types in `item_type_in_scope`. If the list is omitted or contains unsupported types, the deployment automatically falls back to standard publish mode. See [Current Limitations](optional_feature.md#current-limitations) for the full list of unsupported types.
+
 #### Parameter Substitution Issues
 
 **Symptom**: Deployed items contain literal find value instead of the proper replace value
