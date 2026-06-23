@@ -164,6 +164,33 @@ def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
         mock_ontology_instance.publish_all.assert_called_once()
 
 
+def test_publish_map_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes Map items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestMap", "Map", "test-map-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._map.MapPublisher") as mock_map_cls,
+    ):
+        mock_map_instance = mock_map_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "Map" in workspace.repository_items
+        mock_map_cls.assert_called_once_with(workspace)
+        mock_map_instance.publish_all.assert_called_once()
+
+
 def test_publish_data_build_tool_job_item(mock_endpoint, temp_workspace_dir):
     """Test that publish_all_items publishes DataBuildToolJob items when present in repository."""
     create_test_item(temp_workspace_dir, None, "TestDbtJob", "DataBuildToolJob", "test-dbt-job-id")
