@@ -149,7 +149,7 @@
 ## Paginated Report
 
 - **Parameterization:**
-    - Data sources connected to items outside of the same workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - Data sources connected to items outside of the same workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file. For more guidance, see [Parameterization -> Paginated Reports](../how_to/parameterization.md#paginated-reports).
 - **Connections** are not source controlled and must be configured manually after initial deployment.
 
 ## Real-Time Dashboard
