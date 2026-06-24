@@ -12,6 +12,13 @@ from fabric_cicd._common._exceptions import InputError
 
 logger = logging.getLogger(__name__)
 
+
+def is_env_flag_enabled(env_var: str) -> bool:
+    """Check if an environment variable is set to an enabled value (case-insensitive)."""
+    from fabric_cicd.constants import VALID_ENABLE_FLAGS
+
+    return os.environ.get(env_var, "").lower() in VALID_ENABLE_FLAGS
+
 # Define a regular expression for valid hostnames
 # Matches: any subdomain of [<word>]api.fabric.microsoft.com or [<word>]api.powerbi.com
 _VALID_HOSTNAME_REGEX = re.compile(r"^([\w-]+\.)*[\w-]*api\.(fabric\.microsoft\.com|powerbi\.com)\Z", re.IGNORECASE)

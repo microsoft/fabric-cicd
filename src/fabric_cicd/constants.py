@@ -38,6 +38,8 @@ class EnvVar(str, Enum):
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
     PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
     """Override max parallel workers for concurrent item publishing. Defaults to 8."""
+    FILE_LOGGING_ENABLED = "FABRIC_CICD_FILE_LOGGING_ENABLED"
+    """Set to '1', 'true', or 'yes' to enable file logging for fabric-cicd. Defaults to disabled."""
 
 
 class ItemType(str, Enum):
