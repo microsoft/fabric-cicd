@@ -62,7 +62,7 @@ append_feature_flag("enable_response_collection")
 
 ## Debugging
 
-If an error arises, or you want full transparency to all calls being made outside the library, enable debugging. Enabling debugging will write all API calls to the terminal. The logs can also be found in the `fabric_cicd.error.log` file.
+If an error arises, or you want full visibility into the API calls the library makes, enable debug logging:
 
 ```python
 from fabric_cicd import change_log_level
@@ -70,6 +70,20 @@ change_log_level("DEBUG")
 ```
 
 **Note:** The `"DEBUG"` parameter can be omitted as it is the default value.
+
+This writes all API calls to the terminal. To additionally capture logs and full stack traces to a `fabric_cicd.error.log` file, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable:
+
+=== "Bash"
+
+    ```bash
+    export FABRIC_CICD_FILE_LOGGING_ENABLED=1
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    $env:FABRIC_CICD_FILE_LOGGING_ENABLED = "1"
+    ```
 
 For comprehensive debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](troubleshooting.md).
 
