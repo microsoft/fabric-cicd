@@ -44,6 +44,7 @@ item_type_in_scope = [
     "Environment",
     "SemanticModel",
     "Report",
+    "PaginatedReport",
     "Eventhouse",
     "KQLDatabase",
     "KQLQueryset",

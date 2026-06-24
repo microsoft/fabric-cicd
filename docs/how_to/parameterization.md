@@ -1255,3 +1255,40 @@ key_value_replace:
     }
 }
 ```
+
+### Paginated Reports
+
+#### `find_replace` Parameterization Case
+
+**Case:** A Paginated Report (`.rdl` file) is connected to a Semantic Model via the `ConnectString` element in the `DataSources` section. The connection string contains an `Initial Catalog` value in the format `sobe_wowvirtualserver-<semantic-model-id>`, where the GUID is the Semantic Model's item ID. When deploying to a target environment (PPE/PROD/etc), this GUID must be updated to point to the corresponding Semantic Model in the target workspace.
+
+**Solution:** Use `find_replace` in the `parameter.yml` file to replace the Semantic Model ID embedded in the connection string with the dynamically resolved ID of the Semantic Model in the target environment.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    # Semantic Model ID in Paginated Report connection string
+    - find_value: "4febdc09-e283-4a4f-9658-38bab81bab2d"
+      replace_value:
+          PPE: "$items.SemanticModel.ABC.$id" # PPE Semantic Model ID (dynamic)
+          PROD: "$items.SemanticModel.ABC.$id" # PROD Semantic Model ID (dynamic)
+      item_type: "PaginatedReport"
+      file_path: "/ABC Paginated.PaginatedReport/ABC Paginated.rdl"
+```
+
+<span class="md-h4-nonanchor">ABC Paginated.rdl file</span>
+
+```xml
+<DataSources>
+    <DataSource Name="ABC">
+        <ConnectionProperties>
+            <DataProvider>PBIDATASET</DataProvider>
+            <ConnectString>Data Source=pbiazure://api.powerbi.com/;Identity Provider="https://login.microsoftonline.com/common, https://analysis.windows.net/powerbi/api, f0b72488-7082-488a-a7e8-eada97bd842d";Initial Catalog=sobe_wowvirtualserver-4febdc09-e283-4a4f-9658-38bab81bab2d;Integrated Security=ClaimsToken</ConnectString>
+        </ConnectionProperties>
+        <rd:SecurityType>None</rd:SecurityType>
+    </DataSource>
+</DataSources>
+```
+
+**Note:** The `Initial Catalog` value follows the format `sobe_wowvirtualserver-<semantic-model-id>`. Only the GUID portion needs to be parameterized.
