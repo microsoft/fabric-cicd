@@ -674,10 +674,29 @@ class Parameter:
                 return False, f"{context_name} must be a non-empty dictionary"
 
             for env_key, guid_value in connection_id.items():
-                if not isinstance(guid_value, str):
-                    return False, f"connection_id value for environment '{env_key}' must be a string (GUID)"
-                if not re.match(constants.VALID_GUID_REGEX, guid_value):
-                    return False, f"connection_id for environment '{env_key}' is not a valid GUID: '{guid_value}'"
+                # Accept a single GUID string or a list of GUID strings
+                if isinstance(guid_value, list):
+                    if not guid_value:
+                        return False, f"connection_id value for environment '{env_key}' must not be an empty list"
+                    for item in guid_value:
+                        if not isinstance(item, str):
+                            return (
+                                False,
+                                f"connection_id list for environment '{env_key}' contains a non-string value: '{item}'",
+                            )
+                        if not re.match(constants.VALID_GUID_REGEX, item):
+                            return (
+                                False,
+                                f"connection_id list for environment '{env_key}' contains an invalid GUID: '{item}'",
+                            )
+                elif isinstance(guid_value, str):
+                    if not re.match(constants.VALID_GUID_REGEX, guid_value):
+                        return False, f"connection_id for environment '{env_key}' is not a valid GUID: '{guid_value}'"
+                else:
+                    return (
+                        False,
+                        f"connection_id value for environment '{env_key}' must be a string (GUID) or a list of strings",
+                    )
 
             # Validate environment exists
             is_valid_env, env_type = self._validate_environment(connection_id)
