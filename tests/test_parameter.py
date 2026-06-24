@@ -2894,6 +2894,46 @@ config:
             id="new_default_and_models",
         ),
         pytest.param(
+            {
+                "default": {
+                    "connection_id": {
+                        "DEV": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                    }
+                }
+            },
+            True,
+            "parameter is valid",
+            id="new_default_list_of_guids",
+        ),
+        pytest.param(
+            {
+                "models": [
+                    {
+                        "semantic_model_name": "MyModel",
+                        "connection_id": {
+                            "DEV": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                        },
+                    }
+                ]
+            },
+            True,
+            "parameter is valid",
+            id="new_models_list_of_guids",
+        ),
+        pytest.param(
+            {
+                "models": [
+                    {
+                        "semantic_model_name": "MyModel",
+                        "connection_id": {"DEV": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "not-a-guid"]},
+                    }
+                ]
+            },
+            False,
+            "invalid GUID",
+            id="new_models_list_contains_invalid_guid",
+        ),
+        pytest.param(
             {},
             False,
             "requires 'default' or 'models'",
@@ -3039,6 +3079,42 @@ def test_semantic_model_binding_validation(empty_parameter, param_value, expecte
             "must be a dictionary",
             id="new_string_not_supported",
         ),
+        # --- List of GUIDs per environment (new multi-binding support) ---
+        pytest.param(
+            {
+                "PPE": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "a1b2c3d4-5678-90ab-cdef-1234567890ab"],
+                "PROD": ["c3d4e5f6-7890-12ab-cdef-234567890abc"],
+            },
+            False,
+            True,
+            True,
+            "Valid",
+            id="new_valid_list_of_guids",
+        ),
+        pytest.param(
+            {"PPE": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "not-a-guid"]},
+            False,
+            True,
+            False,
+            "invalid GUID",
+            id="new_list_contains_invalid_guid",
+        ),
+        pytest.param(
+            {"PPE": []},
+            False,
+            True,
+            False,
+            "empty list",
+            id="new_empty_list_not_allowed",
+        ),
+        pytest.param(
+            {"PPE": [{"id": "bad"}]},
+            False,
+            True,
+            False,
+            "non-string",
+            id="new_list_contains_non_string",
+        ),
     ],
 )
 def test_validate_connection_id(
@@ -3049,7 +3125,7 @@ def test_validate_connection_id(
         connection_id, "semantic_model_binding", require_string=require_string, require_dict=require_dict
     )
     assert ok is expected_ok
-    assert expected_msg_contains in msg
+    assert expected_msg_contains.lower() in msg.lower()
 
 
 def test_semantic_model_binding_new_format_models_invalid_connection_guid(empty_parameter):

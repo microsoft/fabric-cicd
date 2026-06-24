@@ -61,7 +61,7 @@ def test_bind_skips_model_with_skip_publish_true():
     }
 
     connections = _make_connections("conn-001")
-    connection_details = {"SalesModel": "conn-001", "DevModel": "conn-001"}
+    connection_details = {"SalesModel": ["conn-001"], "DevModel": ["conn-001"]}
 
     bind_semanticmodel_to_connection(workspace, connections, connection_details)
 
@@ -100,7 +100,7 @@ def test_bind_skips_model_without_guid():
     }
 
     connections = _make_connections("conn-001")
-    connection_details = {"SalesModel": "conn-001", "DevModel": "conn-001"}
+    connection_details = {"SalesModel": ["conn-001"], "DevModel": ["conn-001"]}
 
     bind_semanticmodel_to_connection(workspace, connections, connection_details)
 
@@ -129,7 +129,7 @@ def test_bind_processes_included_models_normally():
     }
 
     connections = _make_connections("conn-001")
-    connection_details = {"ModelA": "conn-001", "ModelB": "conn-001"}
+    connection_details = {"ModelA": ["conn-001"], "ModelB": ["conn-001"]}
 
     bind_semanticmodel_to_connection(workspace, connections, connection_details)
 
