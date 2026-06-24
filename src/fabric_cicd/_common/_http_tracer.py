@@ -257,7 +257,7 @@ class HTTPTracerFactory:
         Returns:
             FileTracer if tracing is enabled via environment variable, NoOpTracer otherwise.
         """
-        from fabric_cicd.constants import VALID_ENABLE_FLAGS
+        from fabric_cicd._common._validate_env_vars import is_env_flag_enabled
 
-        trace_enabled = os.environ.get(EnvVar.HTTP_TRACE_ENABLED.value, "").lower() in VALID_ENABLE_FLAGS
+        trace_enabled = is_env_flag_enabled(EnvVar.HTTP_TRACE_ENABLED.value)
         return FileTracer() if trace_enabled else NoOpTracer()

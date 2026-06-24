@@ -11,7 +11,7 @@ fabric-cicd includes a debug logging feature that provides detailed visibility i
 **Default Behavior:**
 
 - Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings, and errors
-- The `fabric_cicd.error.log` file will contain the same lines printed to the console along with stack traces for any errors
+- File logging is disabled by default. To enable it, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable (see [Understanding Error Logs](#understanding-error-logs))
 
 **Enabling Debug Logging:**
 
@@ -24,7 +24,7 @@ from fabric_cicd import change_log_level
 change_log_level()
 ```
 
-When debug logging is enabled, all API calls are logged with detailed request/response information, and additional context about internal operations is displayed. Both the console and the `fabric_cicd.error.log` file will contain the detailed information.
+When debug logging is enabled, all API calls are logged with detailed request/response information, and additional context about internal operations is displayed on the console. If file logging is also enabled, the `fabric_cicd.error.log` file will contain the same detailed information.
 
 **Important:** Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration. See [Understanding Error Logs](#understanding-error-logs) for details on interpreting log output.
 
@@ -75,9 +75,25 @@ Use this sample structure as a template for organizing your Fabric items. To tes
 
 ### Understanding Error Logs
 
-When running a deployment, fabric-cicd automatically creates a `fabric_cicd.error.log` file in your working directory. The level of detail captured depends on whether [debug logging is enabled](#enable-debug-logging).
+File logging is opt-in. To enable it, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable before running your deployment:
 
-**Tip:** Always enable debug logging when troubleshooting deployment issues to capture full API traces in the log file.
+=== "Bash"
+
+    ```bash
+    export FABRIC_CICD_FILE_LOGGING_ENABLED=1
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    $env:FABRIC_CICD_FILE_LOGGING_ENABLED = "1"
+    ```
+
+When enabled, fabric-cicd creates a `fabric_cicd.error.log` file in your working directory. The level of detail captured depends on whether [debug logging is enabled](#enable-debug-logging).
+
+**Important:** Full stack traces are only written to the log file — they are not displayed on the console. Without file logging enabled, you will only see the error message on the console without the traceback.
+
+**Tip:** Always enable both file logging and debug logging when troubleshooting deployment issues to capture full API traces and stack traces in the log file.
 
 #### Accessing API Traces
 
