@@ -635,10 +635,17 @@ class TestWrapperFunctions:
         assert len([f for f in constants.FEATURE_FLAG if f == "feature_1"]) == 1
 
     @pytest.mark.parametrize("level_input", ["DEBUG", "debug"])
-    def test_change_log_level(self, level_input):
+    def test_change_log_level(self, level_input, temp_log_dir):
         """Test change_log_level sets level correctly."""
-        change_log_level(level_input)
-        assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            change_log_level(level_input)
+            assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        finally:
+            os.chdir(original_cwd)
 
     def test_change_log_level_unsupported(self, capsys):
         """Test change_log_level warns on unsupported level."""
@@ -659,7 +666,165 @@ class TestWrapperFunctions:
         assert len(file_handlers) == 0
 
 
-class TestConfigureExternalFileLogging:
+class TestFileLoggingEnvVar:
+    """Tests for the FABRIC_CICD_FILE_LOGGING_ENABLED environment variable behavior."""
+
+    ENV_VAR = "FABRIC_CICD_FILE_LOGGING_ENABLED"
+
+    @pytest.mark.parametrize("env_value", ["1", "true", "yes", "True", "YES"])
+    def test_change_log_level_creates_file_handler_with_valid_flags(self, env_value, temp_log_dir):
+        """Test change_log_level('DEBUG') creates file handler for valid enable flag values."""
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            with patch.dict("os.environ", {self.ENV_VAR: env_value}):
+                change_log_level("DEBUG")
+
+            root_logger = logging.getLogger()
+            file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
+            assert len(file_handlers) == 1
+            assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+        finally:
+            os.chdir(original_cwd)
+
+    @pytest.mark.parametrize("env_value", ["0", "false", "no", "", "disabled", None])
+    def test_change_log_level_no_file_handler_with_invalid_flags(self, env_value):
+        """Test change_log_level('DEBUG') does not create file handler for non-truthy or unset values."""
+        env = {self.ENV_VAR: env_value} if env_value is not None else {}
+        with patch.dict("os.environ", env, clear=False):
+            if env_value is None:
+                import os
+
+                os.environ.pop(self.ENV_VAR, None)
+            change_log_level("DEBUG")
+
+        root_logger = logging.getLogger()
+        file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
+        assert len(file_handlers) == 0
+        assert logging.getLogger("fabric_cicd").level == logging.DEBUG
+
+    @pytest.mark.parametrize(
+        ("env_value", "expect_warning"),
+        [("1", True), (None, False)],
+    )
+    def test_sensitive_data_warning_depends_on_env_var(self, env_value, expect_warning, capsys, temp_log_dir):
+        """Test sensitive data warning is shown only when env var is set and DEBUG enabled."""
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            env = {self.ENV_VAR: env_value} if env_value is not None else {}
+            with patch.dict("os.environ", env, clear=False):
+                if env_value is None:
+                    os.environ.pop(self.ENV_VAR, None)
+                change_log_level("DEBUG")
+
+            captured = capsys.readouterr()
+            if expect_warning:
+                assert "sensitive information" in captured.err
+            else:
+                assert "sensitive information" not in captured.err
+        finally:
+            os.chdir(original_cwd)
+
+    @pytest.mark.parametrize(
+        ("env_value", "expect_file_handler"),
+        [("1", True), (None, False)],
+    )
+    def test_import_time_file_handler_depends_on_env_var(self, env_value, expect_file_handler):
+        """Test import-time configure_logger creates file handler only when env var is set."""
+        import os
+
+        env = {self.ENV_VAR: env_value} if env_value is not None else {}
+        with patch.dict("os.environ", env, clear=False):
+            if env_value is None:
+                os.environ.pop(self.ENV_VAR, None)
+            from fabric_cicd._common._validate_env_vars import is_env_flag_enabled
+
+            file_logging_enabled = is_env_flag_enabled(self.ENV_VAR)
+            configure_logger(disable_log_file=not file_logging_enabled)
+
+        root_logger = logging.getLogger()
+        file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
+        assert (len(file_handlers) == 1) is expect_file_handler
+
+    def test_file_captures_info_not_debug_at_default_level(self, temp_log_dir):
+        """Test file logging at default INFO level captures INFO+ but not DEBUG messages."""
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            with patch.dict("os.environ", {self.ENV_VAR: "1"}):
+                # Simulate import-time: env var set, no change_log_level
+                configure_logger()
+
+            fabric_logger = logging.getLogger("fabric_cicd")
+            fabric_logger.debug("Debug should not appear")
+            fabric_logger.info("Info should appear")
+            fabric_logger.error("Error should appear")
+
+            for handler in logging.getLogger().handlers:
+                if hasattr(handler, "flush"):
+                    handler.flush()
+
+            log_file = temp_log_dir / "fabric_cicd.error.log"
+            content = log_file.read_text(encoding="utf-8")
+            assert "Debug should not appear" not in content
+            assert "Info should appear" in content
+            assert "Error should appear" in content
+        finally:
+            os.chdir(original_cwd)
+
+    def test_file_captures_debug_after_change_log_level(self, temp_log_dir):
+        """Test file logging at DEBUG level captures all messages including DEBUG."""
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            with patch.dict("os.environ", {self.ENV_VAR: "1"}):
+                change_log_level("DEBUG")
+
+            fabric_logger = logging.getLogger("fabric_cicd")
+            fabric_logger.debug("Debug should appear")
+            fabric_logger.info("Info should appear")
+
+            for handler in logging.getLogger().handlers:
+                if hasattr(handler, "flush"):
+                    handler.flush()
+
+            log_file = temp_log_dir / "fabric_cicd.error.log"
+            content = log_file.read_text(encoding="utf-8")
+            assert "Debug should appear" in content
+            assert "Info should appear" in content
+        finally:
+            os.chdir(original_cwd)
+
+    def test_no_file_created_without_env_var(self, temp_log_dir):
+        """Test no log file is created when env var is not set, even with errors logged."""
+        import os
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            with patch.dict("os.environ", {}, clear=False):
+                os.environ.pop(self.ENV_VAR, None)
+                configure_logger(disable_log_file=True)
+
+            fabric_logger = logging.getLogger("fabric_cicd")
+            fabric_logger.error("This error should not create a file")
+
+            log_file = temp_log_dir / "fabric_cicd.error.log"
+            assert not log_file.exists()
+        finally:
+            os.chdir(original_cwd)
+
+
+class TestConfigureExternalFileLoggingWrapper:
     """Tests for the configure_external_file_logging wrapper function."""
 
     def test_configures_correctly(self, external_logger_with_handler):
@@ -759,21 +924,28 @@ class TestExceptionHandler:
             assert "User-facing error" in message
             assert "See" not in message
 
-    def test_removes_console_handler_when_using_default_file(self):
+    def test_removes_console_handler_when_using_default_file(self, temp_log_dir):
         """Test that exception handler removes console handler when using default file handler."""
+        import os
+
         from fabric_cicd._common._exceptions import InputError
 
-        configure_logger()
-        test_logger = logging.getLogger("fabric_cicd.test")
-        exception = InputError("Test error", logger=test_logger)
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(temp_log_dir)
+            configure_logger()
+            test_logger = logging.getLogger("fabric_cicd.test")
+            exception = InputError("Test error", logger=test_logger)
 
-        package_logger = logging.getLogger("fabric_cicd")
-        assert len(package_logger.handlers) >= 1
+            package_logger = logging.getLogger("fabric_cicd")
+            assert len(package_logger.handlers) >= 1
 
-        exception_handler(InputError, exception, None)
+            exception_handler(InputError, exception, None)
 
-        managed_handlers = [h for h in package_logger.handlers if getattr(h, "_fabric_cicd_managed", False)]
-        assert len(managed_handlers) == 0
+            managed_handlers = [h for h in package_logger.handlers if getattr(h, "_fabric_cicd_managed", False)]
+            assert len(managed_handlers) == 0
+        finally:
+            os.chdir(original_cwd)
 
 
 class TestFileLoggingIntegration:
