@@ -40,8 +40,8 @@ class EnvVar(str, Enum):
     """Override max parallel workers for concurrent item publishing. Defaults to 8."""
     FILE_LOGGING_ENABLED = "FABRIC_CICD_FILE_LOGGING_ENABLED"
     """Set to '1', 'true', or 'yes' to enable file logging for fabric-cicd. Defaults to disabled."""
-    LRO_MAX_DURATION_SECONDS = "FABRIC_CICD_LRO_MAX_DURATION_SECONDS"
-    """Override the maximum duration in seconds for long-running operation (LRO) polling. Defaults to 300 seconds."""
+    MAX_DURATION_SECONDS = "FABRIC_CICD_MAX_DURATION_SECONDS"
+    """Override the maximum duration in seconds for API request execution, including long-running operation polling and retries. Defaults to 300 seconds."""
 
 
 class ItemType(str, Enum):

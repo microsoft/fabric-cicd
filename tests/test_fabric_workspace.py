@@ -2057,17 +2057,17 @@ def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(
     assert workspace_a.base_api_url.startswith(expected_fqdn_a)
 
 
-def test_lro_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monkeypatch):
-    """Test that lro_max_duration is read from environment variable by FabricEndpoint."""
+def test_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monkeypatch):
+    """Test that max_duration is read from environment variable by FabricEndpoint."""
     from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 
-    monkeypatch.setenv("FABRIC_CICD_LRO_MAX_DURATION_SECONDS", "600")
+    monkeypatch.setenv("FABRIC_CICD_MAX_DURATION_SECONDS", "600")
 
     created_endpoints = []
 
     def capture_endpoint(**kwargs):
         ep = FabricEndpoint.__new__(FabricEndpoint)
-        ep.lro_max_duration = int(os.environ.get("FABRIC_CICD_LRO_MAX_DURATION_SECONDS", 300))
+        ep.max_duration = int(os.environ.get("FABRIC_CICD_MAX_DURATION_SECONDS", 300))
         ep._token = None
         ep._token_expiry = None
         created_endpoints.append(ep)
@@ -2086,5 +2086,5 @@ def test_lro_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, m
         )
 
     assert len(created_endpoints) == 1
-    assert created_endpoints[0].lro_max_duration == 600
-    assert workspace.endpoint.lro_max_duration == 600
+    assert created_endpoints[0].max_duration == 600
+    assert workspace.endpoint.max_duration == 600
