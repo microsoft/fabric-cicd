@@ -2054,3 +2054,35 @@ def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(
     # workspace_a should still use fqdn_a, not fqdn_b
     assert workspace_a._api_root_url == expected_fqdn_a
     assert workspace_a.base_api_url.startswith(expected_fqdn_a)
+
+
+def test_lro_max_duration_passed_to_endpoint(temp_workspace_dir, valid_workspace_id):
+    """Test that lro_max_duration is passed through from FabricWorkspace to FabricEndpoint."""
+    from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+
+    created_endpoints = []
+
+    def capture_endpoint(**kwargs):
+        ep = FabricEndpoint.__new__(FabricEndpoint)
+        ep.lro_max_duration = kwargs.get("lro_max_duration", 300)
+        ep._token = None
+        ep._token_expiry = None
+        created_endpoints.append(ep)
+        return ep
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", side_effect=capture_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", lambda self: setattr(self, "deployed_items", {})),
+        patch.object(FabricWorkspace, "_refresh_deployed_folders", lambda self: setattr(self, "deployed_folders", {})),
+        patch.object(FabricWorkspace, "_refresh_repository_items"),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+            lro_max_duration=600,
+        )
+
+    assert len(created_endpoints) == 1
+    assert created_endpoints[0].lro_max_duration == 600
+    assert workspace.endpoint.lro_max_duration == 600

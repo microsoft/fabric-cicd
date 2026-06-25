@@ -240,7 +240,6 @@ class ShortcutPublisher(Publisher):
             self._unpublish_shortcuts(shortcut_paths_to_unpublish)
             # Deploy and overwrite shortcuts
             for shortcut_path, shortcut in shortcuts_to_publish.items():
-                self.publish_one(shortcut_path, shortcut)     
+                self.publish_one(shortcut_path, shortcut)
         else:
             logger.info(f"{constants.INDENT}No shortcuts found for Lakehouse '{self.item_obj.name}'")
-           

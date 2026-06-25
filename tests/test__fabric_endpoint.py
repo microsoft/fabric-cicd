@@ -304,6 +304,75 @@ def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
         endpoint.invoke("GET", "http://example.com", max_duration=0)
 
 
+def test_lro_max_duration_default(setup_mocks):
+    """Test that FabricEndpoint uses 300s as the default lro_max_duration."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    assert endpoint.lro_max_duration == 300
+
+
+def test_lro_max_duration_constructor_parameter(setup_mocks):
+    """Test that FabricEndpoint respects lro_max_duration passed via constructor."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, lro_max_duration=600)
+    assert endpoint.lro_max_duration == 600
+
+
+def test_lro_max_duration_env_var(setup_mocks, monkeypatch):
+    """Test that FabricEndpoint reads lro_max_duration from environment variable."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setenv("FABRIC_CICD_LRO_MAX_DURATION_SECONDS", "900")
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+    assert endpoint.lro_max_duration == 900
+
+
+def test_lro_max_duration_constructor_overrides_env_var(setup_mocks, monkeypatch):
+    """Test that constructor lro_max_duration takes precedence over environment variable."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setenv("FABRIC_CICD_LRO_MAX_DURATION_SECONDS", "900")
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, lro_max_duration=600)
+    assert endpoint.lro_max_duration == 600
+
+
+def test_invoke_uses_instance_lro_max_duration(setup_mocks, monkeypatch):
+    """Test that invoke uses the instance-level lro_max_duration when max_duration is not passed."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = requests.exceptions.Timeout("Request timed out")
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    # lro_max_duration=0 means any delay exceeds the limit → should raise immediately
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, lro_max_duration=0)
+
+    with pytest.raises(InvokeError):
+        endpoint.invoke("GET", "http://example.com")
+
+
 def test_invoke_calls_http_tracer(setup_mocks):
     """Test that invoke calls http_tracer capture methods and save."""
     _, mock_requests = setup_mocks

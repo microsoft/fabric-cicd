@@ -37,6 +37,7 @@ class FabricWorkspace:
         environment: str = "N/A",
         workspace_id: Optional[str] = None,
         workspace_name: Optional[str] = None,
+        lro_max_duration: Optional[int] = None,
         **kwargs: object,
     ) -> None:
         """
@@ -49,6 +50,9 @@ class FabricWorkspace:
             environment: The environment to be used for parameterization.
             workspace_id: The ID of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
             workspace_name: The name of the workspace to interact with. Either `workspace_id` or `workspace_name` must be provided. Considers only `workspace_id` if both are specified.
+            lro_max_duration: Maximum duration in seconds for long-running operation (LRO) polling.
+                If not provided, reads from the FABRIC_CICD_LRO_MAX_DURATION_SECONDS environment
+                variable, falling back to 300 seconds.
             kwargs: Additional keyword arguments.
 
         Examples:
@@ -111,7 +115,7 @@ class FabricWorkspace:
         token_credential = validate_token_credential(token_credential)
 
         # Initialize endpoint
-        self.endpoint = FabricEndpoint(token_credential=token_credential)
+        self.endpoint = FabricEndpoint(token_credential=token_credential, lro_max_duration=lro_max_duration)
 
         # Snapshot at construction so subsequent configure_fabric_fqdn calls for a
         # different workspace don't retarget this instance.
