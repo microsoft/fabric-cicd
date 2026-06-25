@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 import requests
 
 from fabric_cicd._common._file_lock import FileLock
-from fabric_cicd.constants import AUTHORIZATION_HEADER, EnvVar
+from fabric_cicd.constants import SENSITIVE_REQUEST_HEADERS, SENSITIVE_RESPONSE_HEADERS, EnvVar
 
 logger = logging.getLogger(__name__)
 
@@ -147,12 +147,49 @@ class FileTracer:
         """
         trace_file_from_env = os.environ.get(EnvVar.HTTP_TRACE_FILE.value)
 
-        if output_file is None:
-            self.output_file = trace_file_from_env if trace_file_from_env else "http_trace.json"
-        else:
-            self.output_file = output_file
+        raw_path = trace_file_from_env or "http_trace.json" if output_file is None else output_file
 
+        self.output_file = self._validate_output_path(raw_path)
         self.captures: list[dict] = []
+        logger.warning(
+            "HTTP tracing is enabled. Trace file '%s' may contain sensitive data "
+            "such as connection strings and API request/response bodies. "
+            "Do not commit or share this file.",
+            self.output_file,
+        )
+
+    @staticmethod
+    def _validate_output_path(raw_path: str) -> str:
+        """Validate and normalize the output file path.
+
+        Ensures the resolved path uses a .json extension and does not escape
+        the current working directory via path traversal.
+
+        Args:
+            raw_path: The raw file path string to validate.
+
+        Returns:
+            The resolved absolute path as a string.
+
+        Raises:
+            ValueError: If the path fails validation.
+        """
+        try:
+            resolved = Path(raw_path).resolve()
+            cwd = Path.cwd().resolve()
+        except (OSError, ValueError) as e:
+            msg = f"Failed to resolve HTTP trace file path '{raw_path}': {e}"
+            raise ValueError(msg) from e
+
+        if resolved.suffix != ".json":
+            msg = f"HTTP trace file must have a .json extension, got: {resolved.name}"
+            raise ValueError(msg)
+
+        if not resolved.is_relative_to(cwd):
+            msg = "HTTP trace file path must be within the current working directory"
+            raise ValueError(msg)
+
+        return str(resolved)
 
     def capture_request(self, method: str, url: str, headers: dict, body: str, files: Optional[dict]) -> None:  # noqa: ARG002
         """
@@ -168,7 +205,7 @@ class FileTracer:
         request = HTTPRequest(
             method=method,
             url=url,
-            headers={k: v for k, v in headers.items() if k.lower() not in [AUTHORIZATION_HEADER]},
+            headers={k: v for k, v in headers.items() if k.lower() not in SENSITIVE_REQUEST_HEADERS},
             body=body,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
@@ -195,7 +232,7 @@ class FileTracer:
 
         http_response = HTTPResponse(
             status_code=response.status_code,
-            headers=dict(response.headers),
+            headers={k: v for k, v in response.headers.items() if k.lower() not in SENSITIVE_RESPONSE_HEADERS},
             body=response_body,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
