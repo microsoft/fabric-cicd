@@ -524,12 +524,15 @@ class FabricWorkspace:
                 input_type, input_name, input_path = extract_parameter_filters(file_path, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
-                # Perform replacement if condition is met and file contains valid JSON or YAML
-                if filter_match:
-                    if check_valid_json_content(raw_file):
-                        raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
-                    elif check_valid_yaml_content(raw_file):
-                        raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
+                # If no match is found, skip to the next parameter_dict
+                if not filter_match:
+                    continue
+
+                # Perform replacement if file contains valid JSON or YAML
+                if check_valid_json_content(raw_file):
+                    raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
+                elif check_valid_yaml_content(raw_file):
+                    raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):
@@ -537,12 +540,16 @@ class FabricWorkspace:
                 input_type, input_name, input_path = extract_parameter_filters(file_path, parameter_dict)
                 filter_match = check_replacement(input_type, input_name, input_path, item_type, item_name, file_path)
 
+                # If no match is found, skip to the next parameter_dict
+                if not filter_match:
+                    continue
+
                 # Extract the find_pattern and replace_value_dict
                 find_info = extract_find_value(parameter_dict, raw_file, filter_match, workspace_obj=self)
                 replace_value_dict = process_environment_key(self.environment, parameter_dict.get("replace_value", {}))
 
                 # Replace any found references with specified environment value if conditions are met
-                if filter_match and self.environment in replace_value_dict and find_info["has_matches"]:
+                if self.environment in replace_value_dict and find_info["has_matches"]:
                     replace_value = extract_replace_value(self, replace_value_dict[self.environment])
                     if replace_value:
                         pattern = find_info["pattern"]
