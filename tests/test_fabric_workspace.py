@@ -2065,7 +2065,7 @@ def test_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monke
 
     created_endpoints = []
 
-    def capture_endpoint(**kwargs):
+    def capture_endpoint(**_kwargs):
         ep = FabricEndpoint.__new__(FabricEndpoint)
         ep.max_duration = int(os.environ.get("FABRIC_CICD_MAX_DURATION_SECONDS", 300))
         ep._token = None
