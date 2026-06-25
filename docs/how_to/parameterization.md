@@ -163,6 +163,8 @@ semantic_model_binding:
             PROD: <PROD-connection_guid>
             # OR use _ALL_ for same connection across environments
             # _ALL_: <connection_guid>
+            # OR supply a list to bind multiple connections per model
+            # _ALL_: ["<conn-guid-1>", "<conn-guid-2>"]
 
     # Explicit bindings override default
     models:
@@ -174,13 +176,19 @@ semantic_model_binding:
         - semantic_model_name: ["<semantic_model_name1>", "<semantic_model_name2>", ...]
           connection_id:
               _ALL_: <connection_guid>
+
+        # Bind multiple connections to a single model
+        - semantic_model_name: "<semantic_model_name>"
+          connection_id:
+              PPE: ["<PPE-conn-guid-1>", "<PPE-conn-guid-2>"]
+              PROD: ["<PROD-conn-guid-1>", "<PROD-conn-guid-2>"]
 ```
 
 **Notes:**
 
 - The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
 - Connection ID values must be valid GUIDs.
-- **Only a single connection binding per Semantic Model is currently supported.** If your Semantic Model uses multiple connections (e.g., connecting to both a SQL database and a Lakehouse), only one can be configured through `semantic_model_binding`. Additional connections must be configured manually after deployment.
+- Each environment value under `connection_id` may be a **single GUID string** or a **list of GUID strings**. When a list is supplied, `bindConnection` is called once per connection ID, allowing models that use multiple data sources (e.g., a SQL database and a Lakehouse) to be fully bound in a single deployment pass.
 
 ## Advanced Find and Replace
 
@@ -224,6 +232,10 @@ The `find_replace` and `key_value_replace` parameters support fabric-cicd define
     - Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched
     - **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both
 - **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
+
+!!! note "Bulk Publish Limitation"
+
+    Dynamic replacement variables (`$workspace`, `$items`) are not supported when using [bulk publish](optional_feature.md#bulk-publish) mode. When dynamic variables are detected in the parameter file, the deployment automatically falls back to standard publishing. To use bulk publish, replace dynamic variables with static values or use logical IDs directly.
 
 Additional notes:
 
@@ -1243,3 +1255,40 @@ key_value_replace:
     }
 }
 ```
+
+### Paginated Reports
+
+#### `find_replace` Parameterization Case
+
+**Case:** A Paginated Report (`.rdl` file) is connected to a Semantic Model via the `ConnectString` element in the `DataSources` section. The connection string contains an `Initial Catalog` value in the format `sobe_wowvirtualserver-<semantic-model-id>`, where the GUID is the Semantic Model's item ID. When deploying to a target environment (PPE/PROD/etc), this GUID must be updated to point to the corresponding Semantic Model in the target workspace.
+
+**Solution:** Use `find_replace` in the `parameter.yml` file to replace the Semantic Model ID embedded in the connection string with the dynamically resolved ID of the Semantic Model in the target environment.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    # Semantic Model ID in Paginated Report connection string
+    - find_value: "4febdc09-e283-4a4f-9658-38bab81bab2d"
+      replace_value:
+          PPE: "$items.SemanticModel.ABC.$id" # PPE Semantic Model ID (dynamic)
+          PROD: "$items.SemanticModel.ABC.$id" # PROD Semantic Model ID (dynamic)
+      item_type: "PaginatedReport"
+      file_path: "/ABC Paginated.PaginatedReport/ABC Paginated.rdl"
+```
+
+<span class="md-h4-nonanchor">ABC Paginated.rdl file</span>
+
+```xml
+<DataSources>
+    <DataSource Name="ABC">
+        <ConnectionProperties>
+            <DataProvider>PBIDATASET</DataProvider>
+            <ConnectString>Data Source=pbiazure://api.powerbi.com/;Identity Provider="https://login.microsoftonline.com/common, https://analysis.windows.net/powerbi/api, f0b72488-7082-488a-a7e8-eada97bd842d";Initial Catalog=sobe_wowvirtualserver-4febdc09-e283-4a4f-9658-38bab81bab2d;Integrated Security=ClaimsToken</ConnectString>
+        </ConnectionProperties>
+        <rd:SecurityType>None</rd:SecurityType>
+    </DataSource>
+</DataSources>
+```
+
+**Note:** The `Initial Catalog` value follows the format `sobe_wowvirtualserver-<semantic-model-id>`. Only the GUID portion needs to be parameterized.

@@ -107,6 +107,12 @@
 - **Schemas are not deployed** unless the schema has a shortcut present.
 - **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`.
 
+## Map
+
+- **Parameterization:**
+    - Referenced items (e.g., Lakehouse, KQL Database, Ontology) that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
+
 ## Mirrored Database
 
 - **Parameterization:**
@@ -139,6 +145,12 @@
 - **Parameterization:**
     - Referenced items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
+
+## Paginated Report
+
+- **Parameterization:**
+    - Data sources connected to items outside of the same workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file. For more guidance, see [Parameterization -> Paginated Reports](../how_to/parameterization.md#paginated-reports).
+- **Connections** are not source controlled and must be configured manually after initial deployment.
 
 ## Real-Time Dashboard
 

@@ -2894,6 +2894,46 @@ config:
             id="new_default_and_models",
         ),
         pytest.param(
+            {
+                "default": {
+                    "connection_id": {
+                        "DEV": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                    }
+                }
+            },
+            True,
+            "parameter is valid",
+            id="new_default_list_of_guids",
+        ),
+        pytest.param(
+            {
+                "models": [
+                    {
+                        "semantic_model_name": "MyModel",
+                        "connection_id": {
+                            "DEV": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                        },
+                    }
+                ]
+            },
+            True,
+            "parameter is valid",
+            id="new_models_list_of_guids",
+        ),
+        pytest.param(
+            {
+                "models": [
+                    {
+                        "semantic_model_name": "MyModel",
+                        "connection_id": {"DEV": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "not-a-guid"]},
+                    }
+                ]
+            },
+            False,
+            "invalid GUID",
+            id="new_models_list_contains_invalid_guid",
+        ),
+        pytest.param(
             {},
             False,
             "requires 'default' or 'models'",
@@ -3039,6 +3079,42 @@ def test_semantic_model_binding_validation(empty_parameter, param_value, expecte
             "must be a dictionary",
             id="new_string_not_supported",
         ),
+        # --- List of GUIDs per environment (new multi-binding support) ---
+        pytest.param(
+            {
+                "PPE": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "a1b2c3d4-5678-90ab-cdef-1234567890ab"],
+                "PROD": ["c3d4e5f6-7890-12ab-cdef-234567890abc"],
+            },
+            False,
+            True,
+            True,
+            "Valid",
+            id="new_valid_list_of_guids",
+        ),
+        pytest.param(
+            {"PPE": ["76e05dfe-9855-4e3d-a410-1dda048dbe99", "not-a-guid"]},
+            False,
+            True,
+            False,
+            "invalid GUID",
+            id="new_list_contains_invalid_guid",
+        ),
+        pytest.param(
+            {"PPE": []},
+            False,
+            True,
+            False,
+            "empty list",
+            id="new_empty_list_not_allowed",
+        ),
+        pytest.param(
+            {"PPE": [{"id": "bad"}]},
+            False,
+            True,
+            False,
+            "non-string",
+            id="new_list_contains_non_string",
+        ),
     ],
 )
 def test_validate_connection_id(
@@ -3049,7 +3125,7 @@ def test_validate_connection_id(
         connection_id, "semantic_model_binding", require_string=require_string, require_dict=require_dict
     )
     assert ok is expected_ok
-    assert expected_msg_contains in msg
+    assert expected_msg_contains.lower() in msg.lower()
 
 
 def test_semantic_model_binding_new_format_models_invalid_connection_guid(empty_parameter):
@@ -3185,3 +3261,112 @@ def test_check_duplicate_semantic_model_names(empty_parameter, param_value, is_n
         assert not any("Duplicate semantic model names found" in m for m in caplog.messages), (
             f"Unexpected duplicate warning found in messages: {caplog.messages}"
         )
+
+
+# =============================================================================
+# Dynamic Variable Detection Tests
+# =============================================================================
+
+
+class TestSearchDynamicReplacementVariables:
+    """Unit tests for _search_dynamic_replacement_variables_in_parameter_file."""
+
+    @staticmethod
+    def _make_parameter(tmp_path, yaml_content):
+        """Create a Parameter instance from YAML content."""
+        param_file = tmp_path / "parameter.yml"
+        param_file.write_text(yaml_content, encoding="utf-8")
+        return Parameter(
+            repository_directory=tmp_path,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+        )
+
+    def test_detects_workspace_variable_in_replace_value(self, tmp_path):
+        """Dynamic variable $workspace.* in replace_value is detected."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+find_replace:
+  - find_value: "old-id"
+    replace_value:
+      PPE: "$workspace.my_ws.$items.my_item.id"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+
+    def test_detects_items_variable_in_replace_value(self, tmp_path):
+        """Dynamic variable $items.* in replace_value is detected."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+find_replace:
+  - find_value: "old-id"
+    replace_value:
+      PPE: "$items.my_lakehouse.id"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+
+    def test_detects_workspace_variable_in_find_value(self, tmp_path):
+        """Dynamic variable $workspace.* in find_value is detected."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+find_replace:
+  - find_value: "$workspace.source_ws.$items.my_item.id"
+    replace_value:
+      PPE: "replacement-id"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+
+    def test_no_detection_for_static_values(self, tmp_path):
+        """Static find/replace values are not flagged as dynamic."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+find_replace:
+  - find_value: "static-old-value"
+    replace_value:
+      PPE: "static-new-value"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
+
+    def test_no_detection_in_non_dynamic_params(self, tmp_path):
+        """Dynamic variable patterns in spark_pool are not checked."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+spark_pool:
+  - instance_pool_id: "pool-id"
+    replace_value:
+      PPE:
+        type: "Capacity"
+        name: "$workspace.something"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
+
+    def test_detects_dynamic_variable_in_key_value_replace(self, tmp_path):
+        """Dynamic variable in key_value_replace replace_value is detected."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+key_value_replace:
+  - find_key: "$.connectionId"
+    replace_value:
+      PPE: "$workspace.my_ws.$items.my_item.id"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+
+    def test_empty_parameter_file_returns_false(self, tmp_path):
+        """No parameters means no dynamic variables detected."""
+        param = Parameter(
+            repository_directory=tmp_path,
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is False

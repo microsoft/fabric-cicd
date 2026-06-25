@@ -29,7 +29,15 @@ class Parameter:
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
             "minimum": {"find_value", "replace_value"},
-            "maximum": {"find_value", "replace_value", "is_regex", "ignore_case", "item_type", "item_name", "file_path"},
+            "maximum": {
+                "find_value",
+                "replace_value",
+                "is_regex",
+                "ignore_case",
+                "item_type",
+                "item_name",
+                "file_path",
+            },
         },
         "spark_pool": {
             "minimum": {"instance_pool_id", "replace_value"},
@@ -394,6 +402,30 @@ class Parameter:
             del self.environment_parameter["gateway_binding"]
             logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
 
+    def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
+        """Search for dynamic replacement variables in the parameter file."""
+        dynamic_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
+        dynamic_param_names = {"find_replace", "key_value_replace"}
+
+        for param_name, param_values in self.environment_parameter.items():
+            if param_name not in dynamic_param_names:
+                continue
+            if isinstance(param_values, list):
+                for param_dict in param_values:
+                    # Check find_value for dynamic variables
+                    find_value = param_dict.get("find_value", "")
+                    if isinstance(find_value, str) and dynamic_var_pattern.search(find_value):
+                        return True
+
+                    # Check replace_value for dynamic variables
+                    replace_value = param_dict.get("replace_value")
+                    if isinstance(replace_value, dict):
+                        for env_value in replace_value.values():
+                            if isinstance(env_value, str) and dynamic_var_pattern.search(env_value):
+                                return True
+
+        return False
+
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
         if not is_valid_structure(self.environment_parameter):
@@ -642,10 +674,29 @@ class Parameter:
                 return False, f"{context_name} must be a non-empty dictionary"
 
             for env_key, guid_value in connection_id.items():
-                if not isinstance(guid_value, str):
-                    return False, f"connection_id value for environment '{env_key}' must be a string (GUID)"
-                if not re.match(constants.VALID_GUID_REGEX, guid_value):
-                    return False, f"connection_id for environment '{env_key}' is not a valid GUID: '{guid_value}'"
+                # Accept a single GUID string or a list of GUID strings
+                if isinstance(guid_value, list):
+                    if not guid_value:
+                        return False, f"connection_id value for environment '{env_key}' must not be an empty list"
+                    for item in guid_value:
+                        if not isinstance(item, str):
+                            return (
+                                False,
+                                f"connection_id list for environment '{env_key}' contains a non-string value: '{item}'",
+                            )
+                        if not re.match(constants.VALID_GUID_REGEX, item):
+                            return (
+                                False,
+                                f"connection_id list for environment '{env_key}' contains an invalid GUID: '{item}'",
+                            )
+                elif isinstance(guid_value, str):
+                    if not re.match(constants.VALID_GUID_REGEX, guid_value):
+                        return False, f"connection_id for environment '{env_key}' is not a valid GUID: '{guid_value}'"
+                else:
+                    return (
+                        False,
+                        f"connection_id value for environment '{env_key}' must be a string (GUID) or a list of strings",
+                    )
 
             # Validate environment exists
             is_valid_env, env_type = self._validate_environment(connection_id)
@@ -724,9 +775,7 @@ class Parameter:
 
             # Validate is_regex type if present
             if param_dict.get("is_regex") is not None:
-                is_valid, msg = self._validate_data_type(
-                    param_dict["is_regex"], "string", "is_regex", param_name
-                )
+                is_valid, msg = self._validate_data_type(param_dict["is_regex"], "string", "is_regex", param_name)
                 if not is_valid:
                     return False, msg
 
@@ -744,9 +793,7 @@ class Parameter:
 
             # Validate ignore_case type if present
             if param_dict.get("ignore_case") is not None:
-                is_valid, msg = self._validate_data_type(
-                    param_dict["ignore_case"], "string", "ignore_case", param_name
-                )
+                is_valid, msg = self._validate_data_type(param_dict["ignore_case"], "string", "ignore_case", param_name)
                 if not is_valid:
                     return False, msg
 
