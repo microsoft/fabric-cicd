@@ -1,0 +1,8 @@
+kind: fixed
+body: Fixing performance on parametrization and refresh of items
+time: 2026-06-25T15:00:57.074785+02:00
+custom:
+    Author: 10bas10
+    AuthorLink: https://github.com/10bas10
+    Issue: "1044"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1044
