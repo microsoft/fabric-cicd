@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 import json
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -2056,15 +2057,17 @@ def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(
     assert workspace_a.base_api_url.startswith(expected_fqdn_a)
 
 
-def test_lro_max_duration_passed_to_endpoint(temp_workspace_dir, valid_workspace_id):
-    """Test that lro_max_duration is passed through from FabricWorkspace to FabricEndpoint."""
+def test_lro_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monkeypatch):
+    """Test that lro_max_duration is read from environment variable by FabricEndpoint."""
     from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+
+    monkeypatch.setenv("FABRIC_CICD_LRO_MAX_DURATION_SECONDS", "600")
 
     created_endpoints = []
 
     def capture_endpoint(**kwargs):
         ep = FabricEndpoint.__new__(FabricEndpoint)
-        ep.lro_max_duration = kwargs.get("lro_max_duration", 300)
+        ep.lro_max_duration = int(os.environ.get("FABRIC_CICD_LRO_MAX_DURATION_SECONDS", 300))
         ep._token = None
         ep._token_expiry = None
         created_endpoints.append(ep)
@@ -2080,7 +2083,6 @@ def test_lro_max_duration_passed_to_endpoint(temp_workspace_dir, valid_workspace
             workspace_id=valid_workspace_id,
             repository_directory=str(temp_workspace_dir),
             token_credential=DummyTokenCredential(),
-            lro_max_duration=600,
         )
 
     assert len(created_endpoints) == 1

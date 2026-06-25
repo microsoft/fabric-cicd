@@ -34,7 +34,6 @@ class FabricEndpoint:
         token_credential: TokenCredential,
         requests_module: requests = requests,
         http_tracer: Optional[HTTPTracer] = None,
-        lro_max_duration: Optional[int] = None,
     ) -> None:
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
@@ -43,9 +42,6 @@ class FabricEndpoint:
             token_credential: The token credential.
             requests_module: The requests module.
             http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
-            lro_max_duration: Maximum duration in seconds for long-running operation (LRO) polling.
-                If not provided, reads from the FABRIC_CICD_LRO_MAX_DURATION_SECONDS environment
-                variable, falling back to 300 seconds.
         """
         self.token_credential = token_credential
         self.requests = requests_module
@@ -53,11 +49,8 @@ class FabricEndpoint:
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime.datetime] = None
 
-        # Set lro_max_duration from parameter, env var, or default (300 seconds)
-        if lro_max_duration is not None:
-            self.lro_max_duration = lro_max_duration
-        else:
-            self.lro_max_duration = int(os.environ.get(constants.EnvVar.LRO_MAX_DURATION_SECONDS.value, 300))
+        # Set lro_max_duration from env var or default (300 seconds)
+        self.lro_max_duration = int(os.environ.get(constants.EnvVar.LRO_MAX_DURATION_SECONDS.value, 300))
 
         # Eagerly validate credentials at init and cache the token
         self._get_token()
@@ -82,8 +75,8 @@ class FabricEndpoint:
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
             max_duration: Maximum execution duration in seconds. Defaults to the instance-level
-                ``lro_max_duration`` (set via constructor parameter or the
-                ``FABRIC_CICD_LRO_MAX_DURATION_SECONDS`` environment variable, otherwise 300).
+                ``lro_max_duration`` (set via the ``FABRIC_CICD_LRO_MAX_DURATION_SECONDS``
+                environment variable, otherwise 300).
             **kwargs: Additional keyword arguments to pass to the method.
         """
         # Resolve max_duration: use provided value or fall back to instance-level default
