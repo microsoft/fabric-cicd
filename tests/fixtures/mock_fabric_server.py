@@ -169,7 +169,14 @@ class MockFabricAPIHandler(BaseHTTPRequestHandler):
             return traces[-1][1]
 
         if traces := self.trace_index.by_route.get(normalized_key):
-            return traces[-1][1]
+            # Prefer responses with 200/201 status and dict body over 202/empty responses.
+            # This handles cases where provisioning polls (202 with null body) are indexed
+            # under the same normalized route as the actual item detail responses.
+            best = None
+            for _, response in traces:
+                if response.status_code in (200, 201) and isinstance(response.body, dict) and response.body:
+                    best = response
+            return best if best else traces[-1][1]
 
         return None
 
@@ -214,24 +221,63 @@ class MockFabricAPIHandler(BaseHTTPRequestHandler):
             if op_data["result"]:
                 logger.info(f"Returning operation result for {operation_id}")
                 return op_data["result"][1]
-            return None
+            msg = (
+                f"No operation result trace found for operation {operation_id}. "
+                "The trace file is incomplete — the /result response for this long-running operation is missing. "
+                "To fix: re-record the HTTP trace by running the deployment with tracing enabled, "
+                "or manually add the missing operation result entry to the trace JSON with the correct item ID."
+            )
+            raise ValueError(msg)
 
         with self.route_lock:
             poll_count = self.operation_poll_counts.get(operation_id, 0)
             self.operation_poll_counts[operation_id] = poll_count + 1
 
+        target_status = "Running" if poll_count == 0 else "Succeeded"
+
         poll_traces = op_data.get("poll", [])
         if not poll_traces:
-            logger.warning(f"No poll traces for operation {operation_id}")
-            return None
+            # No poll traces at all: synthesize based on target status
+            poll_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}/v1/operations/{operation_id}"
+            if target_status == "Running":
+                logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Running (no poll traces)")
+                return HTTPResponse(
+                    status_code=200,
+                    headers={"Content-Type": "application/json", "Location": poll_url},
+                    body={"status": "Running"},
+                    timestamp=None,
+                )
+            logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Succeeded (no poll traces)")
+            return HTTPResponse(
+                status_code=200,
+                headers={"Content-Type": "application/json", "Location": f"{poll_url}/result"},
+                body={"status": "Succeeded"},
+                timestamp=None,
+            )
 
-        target_status = "Running" if poll_count == 0 else "Succeeded"
         for _, response in poll_traces:
             if isinstance(response.body, dict) and response.body.get("status") == target_status:
                 logger.info(f"Operation {operation_id} poll #{poll_count}: {target_status}")
                 return response
 
-        return poll_traces[-1][1]
+        # No trace matching target_status: synthesize to maintain Running→Succeeded state machine
+        poll_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}/v1/operations/{operation_id}"
+        if target_status == "Running":
+            logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Running (no trace found)")
+            return HTTPResponse(
+                status_code=200,
+                headers={"Content-Type": "application/json", "Location": poll_url},
+                body={"status": "Running"},
+                timestamp=None,
+            )
+
+        logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Succeeded (no trace found)")
+        return HTTPResponse(
+            status_code=200,
+            headers={"Content-Type": "application/json", "Location": f"{poll_url}/result"},
+            body={"status": "Succeeded"},
+            timestamp=None,
+        )
 
     def _send_response(self, response: HTTPResponse, route_key: str):
         """Send HTTP response, rewriting Location headers for operations."""

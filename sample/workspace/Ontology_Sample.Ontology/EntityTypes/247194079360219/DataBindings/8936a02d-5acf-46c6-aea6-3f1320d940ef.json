@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/ontology/dataBinding/1.0.0/schema.json",
+  "id": "8936a02d-5acf-46c6-aea6-3f1320d940ef",
+  "dataBindingConfiguration": {
+    "dataBindingType": "NonTimeSeries",
+    "propertyBindings": [
+      {
+        "sourceColumnName": "countryOrRegion",
+        "targetPropertyId": "6709179571133381707"
+      },
+      {
+        "sourceColumnName": "countryRegionCode",
+        "targetPropertyId": "6709179567498310423"
+      },
+      {
+        "sourceColumnName": "date",
+        "targetPropertyId": "6709179569387015363"
+      },
+      {
+        "sourceColumnName": "holidayName",
+        "targetPropertyId": "6709179571217152248"
+      },
+      {
+        "sourceColumnName": "isPaidTimeOff",
+        "targetPropertyId": "6709179567390968679"
+      },
+      {
+        "sourceColumnName": "normalizeHolidayName",
+        "targetPropertyId": "6709179567651381239"
+      }
+    ],
+    "sourceTableProperties": {
+      "sourceType": "LakehouseTable",
+      "workspaceId": "00000000-0000-0000-0000-000000000000",
+      "itemId": "2d52199c-34c0-88ce-4bcc-733e00514253",
+      "sourceTableName": "publicholidays",
+      "sourceSchema": null
+    }
+  }
+}
