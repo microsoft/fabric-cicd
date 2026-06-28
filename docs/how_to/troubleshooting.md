@@ -11,7 +11,7 @@ fabric-cicd includes a debug logging feature that provides detailed visibility i
 **Default Behavior:**
 
 - Without debug logging enabled, fabric-cicd displays only high-level progress messages, warnings, and errors
-- The `fabric_cicd.error.log` file will contain the same lines printed to the console along with stack traces for any errors
+- File logging is disabled by default. To enable it, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable (see [Understanding Error Logs](#understanding-error-logs))
 
 **Enabling Debug Logging:**
 
@@ -24,7 +24,7 @@ from fabric_cicd import change_log_level
 change_log_level()
 ```
 
-When debug logging is enabled, all API calls are logged with detailed request/response information, and additional context about internal operations is displayed. Both the console and the `fabric_cicd.error.log` file will contain the detailed information.
+When debug logging is enabled, all API calls are logged with detailed request/response information, and additional context about internal operations is displayed on the console. If file logging is also enabled, the `fabric_cicd.error.log` file will contain the same detailed information.
 
 **Important:** Always enable debug logging when troubleshooting deployment issues. The additional output helps identify whether problems originate from API calls, authentication, or configuration. See [Understanding Error Logs](#understanding-error-logs) for details on interpreting log output.
 
@@ -75,9 +75,25 @@ Use this sample structure as a template for organizing your Fabric items. To tes
 
 ### Understanding Error Logs
 
-When running a deployment, fabric-cicd automatically creates a `fabric_cicd.error.log` file in your working directory. The level of detail captured depends on whether [debug logging is enabled](#enable-debug-logging).
+File logging is opt-in. To enable it, set the `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable before running your deployment:
 
-**Tip:** Always enable debug logging when troubleshooting deployment issues to capture full API traces in the log file.
+=== "Bash"
+
+    ```bash
+    export FABRIC_CICD_FILE_LOGGING_ENABLED=1
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    $env:FABRIC_CICD_FILE_LOGGING_ENABLED = "1"
+    ```
+
+When enabled, fabric-cicd creates a `fabric_cicd.error.log` file in your working directory. The level of detail captured depends on whether [debug logging is enabled](#enable-debug-logging).
+
+**Important:** Full stack traces are only written to the log file — they are not displayed on the console. Without file logging enabled, you will only see the error message on the console without the traceback.
+
+**Tip:** Always enable both file logging and debug logging when troubleshooting deployment issues to capture full API traces and stack traces in the log file.
 
 #### Accessing API Traces
 
@@ -163,6 +179,30 @@ Traceback (most recent call last):
 4. Check if the item type is included in your `item_type_in_scope` list
 5. Ensure item dependencies exist (e.g., a Data Pipeline referencing a Notebook must be deployed along with the Notebook)
 6. If deleting and recreating an item with the same name, wait 5 minutes between operations due to Fabric API item name reservation
+
+#### Bulk Publish Failures
+
+**Symptom**: The publish operation fails when bulk publish mode is used
+
+Bulk publishing uses the Fabric [bulk import API](<https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)>), which is currently in beta. Different error messages may surface depending on the scenario. Below are common errors and their solutions.
+
+**"Dependencies could not be resolved"**
+
+The deployment batch is missing one or more items that other items depend on. For example, deploying a Report without its connected Semantic Model will fail. Note that dependency requirements may vary for pre-existing versus new items.
+
+**Solution**: Include all dependent items in the same deployment batch and verify that referenced logical IDs are associated with the correct items.
+
+**"Failed to perform the item definitions operation"**
+
+This generic error typically wraps a more specific per-item error. A partial deployment may occur — some items in the batch succeed while others fail. The root cause is usually an item definition issue during creation or update of a specific item. Check the error details for the underlying message and the affected resource.
+
+**Solution**: Identify the problematic item from the error details, resolve the item definition issue, or remove the item from the deployment batch to unblock the remaining items.
+
+**"Unsupported Item Type"**
+
+Certain item types are explicitly unsupported by the bulk import API due to lacking definition support. Additionally, some item types that the API generally supports may be intentionally disabled in fabric-cicd's bulk publish mode due to known issues. This error should not be reached in practice, as fabric-cicd automatically falls back to standard publish mode when unsupported types are detected.
+
+**Solution**: Only include currently supported item types in `item_type_in_scope`. If the list is omitted or contains unsupported types, the deployment automatically falls back to standard publish mode. See [Current Limitations](optional_feature.md#current-limitations) for the full list of unsupported types.
 
 #### Parameter Substitution Issues
 

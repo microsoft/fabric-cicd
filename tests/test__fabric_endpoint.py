@@ -338,7 +338,10 @@ def test_get_token(setup_mocks):
     ("raise_exception", "expected_msg"),
     [
         (ClientAuthenticationError("Auth failed"), "Failed to acquire Microsoft Entra token. Auth failed"),
-        (Exception("Unexpected error"), "An unexpected error occurred when generating the Microsoft Entra token. Unexpected error"),
+        (
+            Exception("Unexpected error"),
+            "An unexpected error occurred when generating the Microsoft Entra token. Unexpected error",
+        ),
     ],
     ids=["auth_error", "unexpected_exception"],
 )

@@ -34,7 +34,7 @@
 
 - **Parameterization:**
     - Source/destination items (e.g., Dataflow, Lakehouse, Warehouse) will always reference the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
-    - The recommended approach for re-pointing source/destination items that exist in the _same_ workspace as the Dataflow is to use **`replace_value` variables** in the `find_replace` parameter along with a `find_value` regex (literal string works too). For more guidance, see [Parameterization -> Dataflows](parameterization.md#dataflows).
+    - The recommended approach for re-pointing source/destination items that exist in the _same_ workspace as the Dataflow is to use **`replace_value` variables** in the `find_replace` parameter along with a `find_value` regex (literal string works too). For more guidance, see [Parameterization -> Dataflows](../how_to/parameterization.md#dataflows).
     - **Important** for Dataflows that reference another Dataflow in the _same_ workspace, ONLY parameterize the referenced **dataflowId** in the `mashup.pq` file (workspaceId re-pointing is handled automatically in this approach) using the following `replace_value`: `$items.Dataflow.<The Source Dataflow Name>.id`. This ensures proper dependency resolution and ordered publishing.
 - **Initial deployment** will require a manual publish and refresh of the dataflow. After re-pointing dataflows during deployment, temporary errors may appear but should resolve after refreshing and allowing time for processing (especially when a dataflow sources from another dataflow in the target workspace).
 - `fabric ci-cd` automatically manages ordered deployment of dataflows that source from other dataflows in the same workspace.
@@ -107,6 +107,12 @@
 - **Schemas are not deployed** unless the schema has a shortcut present.
 - **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`.
 
+## Map
+
+- **Parameterization:**
+    - Referenced items (e.g., Lakehouse, KQL Database, Ontology) that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
+
 ## Mirrored Database
 
 - **Parameterization:**
@@ -140,6 +146,12 @@
     - Referenced items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
 
+## Paginated Report
+
+- **Parameterization:**
+    - Data sources connected to items outside of the same workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file. For more guidance, see [Parameterization -> Paginated Reports](../how_to/parameterization.md#paginated-reports).
+- **Connections** are not source controlled and must be configured manually after initial deployment.
+
 ## Real-Time Dashboard
 
 - **Parameterization:**
@@ -151,7 +163,7 @@
 - **Parameterization:**
     - Reports connected to Semantic Models outside of the same workspace always point to the original Semantic Model unless parameterized in the `parameter.yml` file.
     - Reports with `byPath` references to Semantic Models within the same workspace are automatically re-pointed to the new item in the target workspace.
-    - Reports with `byConnection` references to Semantic Models within or outside of the same workspace can be parameterized using `find_replace` or `key_value_replace` parameters to update workspace IDs, semantic model names, and semantic model IDs in the connection string. See [Reports Parameterization Example](parameterization.md#reports).
+    - Reports with `byConnection` references to Semantic Models within or outside of the same workspace can be parameterized using `find_replace` or `key_value_replace` parameters to update workspace IDs, semantic model names, and semantic model IDs in the connection string. See [Reports Parameterization Example](../how_to/parameterization.md#reports).
 
 ## Semantic Model
 
@@ -161,7 +173,7 @@
 - **Automatic Connection Binding:**
     - Use the `semantic_model_binding` parameter in `parameter.yml` to automatically bind Semantic Model connections after deployment, removing the need for manual connection configuration on initial deployment.
     - **Note:** Only a single connection binding per Semantic Model is currently supported. If your Semantic Model uses multiple connections, additional connections must be configured manually after deployment.
-    - See [Parameterization -> semantic_model_binding](parameterization.md#semantic_model_binding) for configuration details.
+    - See [Parameterization -> semantic_model_binding](../how_to/parameterization.md#semantic_model_binding) for configuration details.
 - **Initial deployment** requires manual configuration of the connection after deployment **unless** `semantic_model_binding` is configured in the `parameter.yml` file.
 
 ## Spark Job Definition

@@ -1,0 +1,8 @@
+kind: added
+body: Support case-insensitive matching option in `find_replace` parameter
+time: 2026-06-03T10:26:04.0288657+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "929"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/929

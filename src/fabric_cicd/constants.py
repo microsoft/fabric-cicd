@@ -38,6 +38,8 @@ class EnvVar(str, Enum):
     """Override max duration for item name conflict retries. Defaults to 300 seconds."""
     PARALLEL_MAX_WORKERS = "FABRIC_CICD_PARALLEL_MAX_WORKERS"
     """Override max parallel workers for concurrent item publishing. Defaults to 8."""
+    FILE_LOGGING_ENABLED = "FABRIC_CICD_FILE_LOGGING_ENABLED"
+    """Set to '1', 'true', or 'yes' to enable file logging for fabric-cicd. Defaults to disabled."""
 
 
 class ItemType(str, Enum):
@@ -57,11 +59,13 @@ class ItemType(str, Enum):
     KQL_DATABASE = "KQLDatabase"
     KQL_QUERYSET = "KQLQueryset"
     LAKEHOUSE = "Lakehouse"
+    MAP = "Map"
     MIRRORED_DATABASE = "MirroredDatabase"
     ML_EXPERIMENT = "MLExperiment"
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
     NOTEBOOK = "Notebook"
     ONTOLOGY = "Ontology"
+    PAGINATED_REPORT = "PaginatedReport"
     REFLEX = "Reflex"
     REPORT = "Report"
     SEMANTIC_MODEL = "SemanticModel"
@@ -87,21 +91,23 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     10: ItemType.NOTEBOOK,
     11: ItemType.SEMANTIC_MODEL,
     12: ItemType.REPORT,
-    13: ItemType.COPY_JOB,
-    14: ItemType.DATA_BUILD_TOOL_JOB,
-    15: ItemType.KQL_DATABASE,
-    16: ItemType.KQL_QUERYSET,
-    17: ItemType.REFLEX,
-    18: ItemType.EVENTSTREAM,
-    19: ItemType.KQL_DASHBOARD,
-    20: ItemType.DATAFLOW,
-    21: ItemType.DATA_PIPELINE,
-    22: ItemType.GRAPHQL_API,
-    23: ItemType.APACHE_AIRFLOW_JOB,
-    24: ItemType.MOUNTED_DATA_FACTORY,
-    25: ItemType.DATA_AGENT,
-    26: ItemType.ML_EXPERIMENT,
-    27: ItemType.ONTOLOGY,
+    13: ItemType.PAGINATED_REPORT,
+    14: ItemType.COPY_JOB,
+    15: ItemType.DATA_BUILD_TOOL_JOB,
+    16: ItemType.KQL_DATABASE,
+    17: ItemType.KQL_QUERYSET,
+    18: ItemType.DATAFLOW,
+    19: ItemType.DATA_PIPELINE,
+    20: ItemType.REFLEX,
+    21: ItemType.EVENTSTREAM,
+    22: ItemType.KQL_DASHBOARD,
+    23: ItemType.GRAPHQL_API,
+    24: ItemType.APACHE_AIRFLOW_JOB,
+    25: ItemType.MOUNTED_DATA_FACTORY,
+    26: ItemType.DATA_AGENT,
+    27: ItemType.ML_EXPERIMENT,
+    28: ItemType.ONTOLOGY,
+    29: ItemType.MAP,
 }
 
 
@@ -140,6 +146,8 @@ class FeatureFlag(str, Enum):
     """Set to enable collection of API responses during publish operations."""
     ENABLE_HARD_DELETE = "enable_hard_delete"
     """Set to enable hard deletion of items, bypassing the workspace recycle bin."""
+    ENABLE_BULK_PUBLISH = "enable_bulk_publish"
+    """Set to enable publishing of items using the bulk import API."""
 
 
 class OperationType(str, Enum):
@@ -162,6 +170,13 @@ UNPUBLISH_FLAG_MAPPING = {
 
 # Item Type
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
+BULK_UNSUPPORTED_ITEM_TYPES = [
+    ItemType.DATA_BUILD_TOOL_JOB.value,
+    ItemType.WAREHOUSE.value,
+]
+BULK_ACCEPTED_ITEM_TYPES = tuple(
+    item_type.value for item_type in ItemType if item_type.value not in BULK_UNSUPPORTED_ITEM_TYPES
+)
 
 # API URLs
 DEFAULT_API_ROOT_URL = validate_env_var_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
@@ -179,7 +194,17 @@ PARALLEL_MAX_WORKERS: int = (
 )
 
 # HTTP Headers
-AUTHORIZATION_HEADER = "authorization"
+# Headers filtered from HTTP trace output as a defense-in-depth measure
+SENSITIVE_REQUEST_HEADERS = frozenset({
+    "authorization",
+})
+# These may appear in auth failure, token refresh, or proxy-mediated responses
+SENSITIVE_RESPONSE_HEADERS = frozenset({
+    "set-cookie",
+    "www-authenticate",
+    "proxy-authenticate",
+    "x-ms-aad-diagnostic-headers",
+})
 
 # Publish
 SHELL_ONLY_PUBLISH = [
@@ -189,8 +214,11 @@ SHELL_ONLY_PUBLISH = [
     ItemType.ML_EXPERIMENT.value,
 ]
 
+# Item count limit for bulk publish API (as per current API documentation)
+BULK_ITEM_COUNT_LIMIT = 1000
+
 # Items that do not require assigned capacity
-NO_ASSIGNED_CAPACITY_REQUIRED = [ItemType.SEMANTIC_MODEL.value, ItemType.REPORT.value]
+NO_ASSIGNED_CAPACITY_REQUIRED = [ItemType.SEMANTIC_MODEL.value, ItemType.REPORT.value, ItemType.PAGINATED_REPORT.value]
 
 # Exclude Path Regex Patterns for filtering files during publish
 EXCLUDE_PATH_REGEX_MAPPING = {
@@ -213,6 +241,7 @@ DATAFLOW_SOURCE_REGEX = (
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
+DYNAMIC_VARIABLES_REGEX = r"^\$(workspace|items)\."
 
 # Well known file names
 DATA_PIPELINE_CONTENT_FILE_JSON = "pipeline-content.json"
@@ -303,6 +332,9 @@ PARAMETER_MSGS = {
     "validation_complete": "Parameter file validation passed",
     "gateway_deprecated": "The 'gateway_binding' parameter is deprecated and will be removed in future releases. Please use 'semantic_model_binding' instead.",
     "duplicate_semantic_model": "Duplicate semantic model names found: {}. Each semantic model should only appear once in the configuration as only one connection can be bound per semantic model. Please remove duplicate entries to avoid unpredictable binding behavior.",
+    "unsupported_find_value_variable": "Dynamic replacement variable '{}' is not supported in find_value. Same-workspace item attributes ($items.*) resolve to the target environment's item ID, which cannot be present in the source file",
+    "find_value_variable_warning": "Dynamic replacement variable '{}' in find_value references a cross-workspace item attribute. Ensure the referenced item exists in workspace '{}' at deployment time",
+    "incompatible_find_value_regex_variable": "Dynamic replacement variable '{}' in find_value cannot be combined with is_regex. Use either a dynamic variable OR a regex pattern, not both",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
     "template_file_invalid": "Invalid template parameter file {}: {}",
