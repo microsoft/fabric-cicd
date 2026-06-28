@@ -1,12 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Eventhouse",
-    "displayName": "HelloEventhouse",
-    "description": "HelloEventhouse"
+    "type": "CopyJob",
+    "displayName": "Sample_CopyJob"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "50adae54-3e43-9fda-464a-757b7f9fb86b"
+    "logicalId": "09025161-3298-a423-4fce-7c0227e3df52"
   }
 }
