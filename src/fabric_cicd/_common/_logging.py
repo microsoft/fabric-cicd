@@ -130,14 +130,13 @@ class _RestrictedFileHandler(logging.FileHandler):
     """FileHandler that creates log files with owner-only permissions (0o600) on POSIX."""
 
     def _open(self) -> io.TextIOWrapper:
-        from fabric_cicd._common._secure_io import IS_POSIX, restrict_file, restricted_opener
+        from fabric_cicd._common._secure_io import restrict_file, restricted_opener
 
         # Tighten pre-existing files before truncation (handles upgrades from
         # older versions that created the log with default permissions).
         restrict_file(self.baseFilename)
 
-        opener = restricted_opener if IS_POSIX else None
-        return open(self.baseFilename, self.mode, encoding=self.encoding, errors=self.errors, opener=opener)  # noqa: SIM115
+        return open(self.baseFilename, self.mode, encoding=self.encoding, errors=self.errors, opener=restricted_opener)  # noqa: SIM115
 
 
 def _configure_default_file_handler() -> logging.Handler:

@@ -279,14 +279,13 @@ class FileTracer:
             "traces": existing_traces,
         }
 
-        from fabric_cicd._common._secure_io import IS_POSIX, restrict_file, restricted_opener
+        from fabric_cicd._common._secure_io import restrict_file, restricted_opener
 
         # Tighten pre-existing files before writing (so truncation doesn't
         # expose content through a previously world-readable fd).
         restrict_file(self.output_file)
 
-        opener = restricted_opener if IS_POSIX else None
-        with open(self.output_file, "w", opener=opener) as f:
+        with open(self.output_file, "w", opener=restricted_opener) as f:
             json.dump(output_data, f, indent=2)
 
 
