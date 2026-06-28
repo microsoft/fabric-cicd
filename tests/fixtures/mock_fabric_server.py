@@ -221,14 +221,13 @@ class MockFabricAPIHandler(BaseHTTPRequestHandler):
             if op_data["result"]:
                 logger.info(f"Returning operation result for {operation_id}")
                 return op_data["result"][1]
-            # Synthesize a minimal result response if no trace exists
-            logger.info(f"Synthesizing operation result for {operation_id}")
-            return HTTPResponse(
-                status_code=200,
-                headers={"Content-Type": "application/json"},
-                body={"id": operation_id},
-                timestamp=None,
+            msg = (
+                f"No operation result trace found for operation {operation_id}. "
+                "The trace file is incomplete — the /result response for this long-running operation is missing. "
+                "To fix: re-record the HTTP trace by running the deployment with tracing enabled, "
+                "or manually add the missing operation result entry to the trace JSON with the correct item ID."
             )
+            raise ValueError(msg)
 
         with self.route_lock:
             poll_count = self.operation_poll_counts.get(operation_id, 0)
@@ -261,28 +260,24 @@ class MockFabricAPIHandler(BaseHTTPRequestHandler):
                 logger.info(f"Operation {operation_id} poll #{poll_count}: {target_status}")
                 return response
 
-        # If no "Succeeded" trace exists, synthesize one to prevent infinite polling
-        if target_status == "Succeeded":
-            logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Succeeded (no trace found)")
-            result_location = f"http://127.0.0.1:{MOCK_SERVER_PORT}/v1/operations/{operation_id}/result"
+        # No trace matching target_status: synthesize to maintain Running→Succeeded state machine
+        poll_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}/v1/operations/{operation_id}"
+        if target_status == "Running":
+            logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Running (no trace found)")
             return HTTPResponse(
                 status_code=200,
-                headers={"Content-Type": "application/json", "Location": result_location},
-                body={"status": "Succeeded"},
+                headers={"Content-Type": "application/json", "Location": poll_url},
+                body={"status": "Running"},
                 timestamp=None,
             )
 
-        # Fallback: return last poll trace, ensuring Location header is present for polling continuity
-        fallback = poll_traces[-1][1]
-        if "Location" not in fallback.headers:
-            poll_url = f"http://127.0.0.1:{MOCK_SERVER_PORT}/v1/operations/{operation_id}"
-            fallback = HTTPResponse(
-                status_code=fallback.status_code,
-                headers={**fallback.headers, "Location": poll_url},
-                body=fallback.body,
-                timestamp=fallback.timestamp,
-            )
-        return fallback
+        logger.info(f"Operation {operation_id} poll #{poll_count}: synthesizing Succeeded (no trace found)")
+        return HTTPResponse(
+            status_code=200,
+            headers={"Content-Type": "application/json", "Location": f"{poll_url}/result"},
+            body={"status": "Succeeded"},
+            timestamp=None,
+        )
 
     def _send_response(self, response: HTTPResponse, route_key: str):
         """Send HTTP response, rewriting Location headers for operations."""
