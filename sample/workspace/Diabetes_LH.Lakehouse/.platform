@@ -1,11 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "CopyJob",
-    "displayName": "Hello Copy Job"
+    "type": "Lakehouse",
+    "displayName": "Diabetes_LH"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "b0eb37b3-73d6-bae9-40a6-d47ae162a23b"
+    "logicalId": "62b8e502-9ac5-a3fb-4dd5-fd03e80c0b5e"
   }
 }

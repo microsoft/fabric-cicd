@@ -1,0 +1,104 @@
+{
+  "schema_version": 75,
+  "tiles": [
+    {
+      "id": "09dc1d18-39a3-452d-9355-b97fd5d2a62f",
+      "title": "Door openings over time",
+      "visualType": "line",
+      "pageId": "ce423b8d-8203-4dda-b4a4-e5fdbca2dedd",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 9,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "6d7d4c94-1ba5-4936-89db-276ffe897b01"
+      },
+      "visualOptions": {
+        "multipleYAxes": {
+          "base": {
+            "id": "-1",
+            "label": "Door openings",
+            "columns": [],
+            "yAxisScale": "linear",
+            "yAxisMaximumValue": null,
+            "yAxisMinimumValue": null,
+            "horizontalLines": []
+          },
+          "additional": [],
+          "showMultiplePanels": false
+        },
+        "seriesColors": {},
+        "hideLegend": false,
+        "legendLocation": "bottom",
+        "xColumnTitle": "Time",
+        "xColumn": "timestamp",
+        "yColumns": [
+          "doorOpenCount"
+        ],
+        "seriesColumns": null,
+        "xAxisScale": "linear",
+        "verticalLine": "",
+        "crossFilter": [],
+        "crossFilterDisabled": false,
+        "drillthroughDisabled": false,
+        "forceAxisTicks": false,
+        "drillthrough": [],
+        "selectedDataOnLoad": {
+          "all": true,
+          "limit": 10
+        }
+      }
+    }
+  ],
+  "baseQueries": [],
+  "parameters": [
+    {
+      "kind": "duration",
+      "id": "1a5db512-16e3-4f27-a328-a8911effb8a8",
+      "displayName": "Time range",
+      "description": "",
+      "beginVariableName": "_startTime",
+      "endVariableName": "_endTime",
+      "defaultValue": {
+        "kind": "dynamic",
+        "count": 1,
+        "unit": "hours"
+      },
+      "showOnPages": {
+        "kind": "all"
+      }
+    }
+  ],
+  "dataSources": [
+    {
+      "kind": "kusto-trident",
+      "clusterUri": "",
+      "name": "TelemetryDataEH",
+      "databaseArtifactId": "214b4411-65cc-49a4-85ef-8b6265341627",
+      "database": "65341627-8b62-85ef-49a4-65cc214b4411",
+      "workspace": "00000000-0000-0000-0000-000000000000",
+      "id": "2363802e-dced-4c7b-83e5-a120b6c9b853"
+    }
+  ],
+  "pages": [
+    {
+      "name": "Page 1",
+      "id": "ce423b8d-8203-4dda-b4a4-e5fdbca2dedd"
+    }
+  ],
+  "queries": [
+    {
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "2363802e-dced-4c7b-83e5-a120b6c9b853"
+      },
+      "text": "FreezerTelemetry\r\n| where doorOpen == 1\r\n| summarize doorOpenCount=count() by bin(timestamp, 5m)\r\n| order by timestamp asc",
+      "id": "6d7d4c94-1ba5-4936-89db-276ffe897b01",
+      "usedVariables": []
+    }
+  ],
+  "embeddedApps": []
+}
