@@ -1,8 +1,0 @@
-kind: fixed
-body: Fix management of Activator item dependencies
-time: 2026-06-25T12:48:32.5045607+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "1013"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1013
