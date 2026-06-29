@@ -15,7 +15,12 @@ import dpath
 from azure.core.credentials import TokenCredential
 
 from fabric_cicd import constants
-from fabric_cicd._common._check_utils import check_regex, check_valid_json_content, check_valid_yaml_content
+from fabric_cicd._common._check_utils import (
+    check_regex,
+    check_tmdl_file,
+    check_valid_json_content,
+    check_valid_yaml_content,
+)
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 from fabric_cicd._common._item import Item
@@ -513,6 +518,7 @@ class FabricWorkspace:
             extract_replace_value,
             process_environment_key,
             replace_key_value,
+            replace_key_value_tmdl,
         )
 
         # Parse the file_obj and item_obj
@@ -533,6 +539,8 @@ class FabricWorkspace:
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
                     elif check_valid_yaml_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
+                    elif check_tmdl_file(file_obj.file_path):
+                        raw_file = replace_key_value_tmdl(self, parameter_dict, raw_file, self.environment)
 
         if "find_replace" in self.environment_parameter:
             for parameter_dict in self.environment_parameter.get("find_replace"):

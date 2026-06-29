@@ -475,6 +475,139 @@ def replace_key_value(
     return yaml.dump(data, default_flow_style=False, allow_unicode=True) if is_yaml else json.dumps(data)
 
 
+def replace_key_value_tmdl(workspace_obj: FabricWorkspace, param_dict: dict, content: str, env: str) -> str:
+    """
+    Replace values in TMDL content for supported expression and dataSource paths.
+
+    Supported find_key formats:
+    - expression.<ExpressionName>
+    - dataSource.<DataSourceName>.<nested>.<property>
+    """
+    find_key = param_dict.get("find_key", "")
+    find_key_parts = find_key.split(".") if find_key else []
+    if len(find_key_parts) < 2:
+        logger.debug(f"No TMDL nodes found for find_key: {find_key}")
+        return content
+
+    replace_value_dict = process_environment_key(workspace_obj.environment, param_dict["replace_value"])
+    if env not in replace_value_dict:
+        return content
+
+    processed_value = replace_value_dict[env]
+    if isinstance(processed_value, str):
+        processed_value = extract_replace_value(workspace_obj, processed_value)
+    replacement_text = str(processed_value)
+
+    lines = content.splitlines(keepends=True)
+    block_type = find_key_parts[0]
+    block_name = find_key_parts[1]
+    nested_path = find_key_parts[2:]
+    replacement_count = 0
+    expression_meta_pattern = re.compile(r"^(.*?)(\s+meta\s+\[.*)$")
+    expression_value_spacing_pattern = re.compile(r"^(\s*)(.*?)(\s*)$")
+
+    def _split_line(line: str) -> tuple[str, str]:
+        if line.endswith("\r\n"):
+            return line[:-2], "\r\n"
+        if line.endswith("\n"):
+            return line[:-1], "\n"
+        return line, ""
+
+    def _indent_level(line_body: str) -> int:
+        return len(line_body) - len(line_body.lstrip("\t "))
+
+    def _replace_expression_line(line: str) -> str:
+        line_body, line_ending = _split_line(line)
+        value_part = line_body
+        meta_part = ""
+
+        meta_match = expression_meta_pattern.match(line_body)
+        if meta_match:
+            value_part = meta_match.group(1)
+            meta_part = meta_match.group(2)
+
+        stripped_value = value_part.strip()
+        replacement_value = replacement_text
+        if stripped_value.startswith('"') and stripped_value.endswith('"') and not replacement_value.startswith('"'):
+            replacement_value = f'"{replacement_value}"'
+
+        value_spacing_match = expression_value_spacing_pattern.match(value_part)
+        leading_value_ws = value_spacing_match.group(1) if value_spacing_match else ""
+        trailing_value_ws = value_spacing_match.group(3) if value_spacing_match else ""
+
+        return f"{leading_value_ws}{replacement_value}{trailing_value_ws}{meta_part}{line_ending}"
+
+    if block_type == "expression" and not nested_path:
+        expression_regex = re.compile(r"^(\s*)expression\s+(\S+)\s*=\s*(.*?)\s*$")
+        for i, line in enumerate(lines):
+            line_body, _ = _split_line(line)
+            expression_match = expression_regex.match(line_body)
+            if not expression_match or expression_match.group(2) != block_name:
+                continue
+
+            expression_indent = len(expression_match.group(1))
+            inline_value = expression_match.group(3)
+            if inline_value:
+                prefix = line_body[: line_body.index("=") + 1]
+                _, line_ending = _split_line(line)
+                lines[i] = f"{prefix}{_replace_expression_line(inline_value)}{line_ending}"
+                replacement_count += 1
+                continue
+
+            for j in range(i + 1, len(lines)):
+                candidate_body, _ = _split_line(lines[j])
+                if not candidate_body.strip():
+                    continue
+                if _indent_level(candidate_body) <= expression_indent:
+                    break
+                lines[j] = _replace_expression_line(lines[j])
+                replacement_count += 1
+                break
+
+    elif block_type == "dataSource" and nested_path:
+        datasource_regex = re.compile(r"^(\s*)dataSource\s+(\S+)\s*$")
+        for i, line in enumerate(lines):
+            line_body, _ = _split_line(line)
+            datasource_match = datasource_regex.match(line_body)
+            if not datasource_match or datasource_match.group(2) != block_name:
+                continue
+
+            datasource_indent = len(datasource_match.group(1))
+            stack: list[tuple[int, str]] = []
+
+            j = i + 1
+            while j < len(lines):
+                candidate_body, candidate_ending = _split_line(lines[j])
+                stripped_candidate = candidate_body.strip()
+                if stripped_candidate and _indent_level(candidate_body) <= datasource_indent:
+                    break
+
+                if not stripped_candidate:
+                    j += 1
+                    continue
+
+                current_indent = _indent_level(candidate_body)
+                while stack and stack[-1][0] >= current_indent:
+                    stack.pop()
+
+                if ":" in stripped_candidate:
+                    key, _, _ = stripped_candidate.partition(":")
+                    current_path = [path_key for _, path_key in stack] + [key.strip()]
+                    if current_path == nested_path:
+                        prefix, _, suffix = candidate_body.partition(":")
+                        spaces = len(suffix) - len(suffix.lstrip(" "))
+                        lines[j] = f"{prefix}:{' ' * spaces}{replacement_text}{candidate_ending}"
+                        replacement_count += 1
+                else:
+                    stack.append((current_indent, stripped_candidate))
+                j += 1
+
+    if replacement_count == 0:
+        logger.debug(f"No TMDL nodes found for find_key: {find_key}")
+
+    return "".join(lines)
+
+
 def replace_variables_in_parameter_file(raw_file: str) -> str:
     """
     A function to replace tokens in the parameter.yml file with environment variables.
