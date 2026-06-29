@@ -1,8 +1,0 @@
-kind: optimization
-body: Make log file creation opt-in via `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable
-time: 2026-06-21T17:16:33.520628+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "1032"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1032

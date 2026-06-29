@@ -1,8 +1,0 @@
-kind: docs
-body: Add devcontainer and a section about contributing to documentation
-time: 2026-05-05T13:56:11.528913824Z
-custom:
-    Author: cmaneu
-    AuthorLink: https://github.com/cmaneu
-    Issue: "946"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/946

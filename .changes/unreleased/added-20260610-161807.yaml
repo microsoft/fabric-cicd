@@ -1,8 +1,0 @@
-kind: added
-body: Add bulk publish mode to deploy items in a single API call via the Fabric bulk import API
-time: 2026-06-10T16:18:07.997547+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "1020"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1020
