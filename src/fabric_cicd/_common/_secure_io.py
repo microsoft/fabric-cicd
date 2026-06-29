@@ -19,9 +19,10 @@ OWNER_ONLY_FILE_MODE = 0o600
 def restricted_opener(path: str, flags: int) -> int:
     """Open a file with owner-only permissions (0o600).
 
-    Intended for use as the ``opener`` argument to :func:`open` so that
-    new files are created with restricted permissions from the start,
-    eliminating any race window.
+    Intended for use as the opener argument to open() so that new files
+    are created with restricted permissions from the start, eliminating
+    any race window. Only effective for new files; use restrict_file()
+    for pre-existing files.
     """
     return os.open(path, flags, OWNER_ONLY_FILE_MODE)
 
