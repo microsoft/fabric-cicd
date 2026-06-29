@@ -1,0 +1,8 @@
+kind: optimization
+body: Enforce owner-only file permissions on sensitive files created by the library on POSIX systems
+time: 2026-06-24T17:23:48.0497198+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1040"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1040
