@@ -1,0 +1,8 @@
+kind: docs
+body: Move Git flow guidance out of Getting Started and add next steps
+time: 2026-06-30T14:35:00Z
+custom:
+    Issue: 1019
+    Author: nkwork9999
+    AuthorLink: https://github.com/nkwork9999
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1019
