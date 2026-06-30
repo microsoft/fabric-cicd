@@ -54,7 +54,7 @@ def test_validate_output_path_rejects_sibling_directory_prefix(tmp_path, monkeyp
 def test_validate_output_path_rejects_embedded_null_byte(tmp_path, monkeypatch):
     """Ensure an unresolvable path raises ValueError with context."""
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(ValueError, match="Failed to resolve HTTP trace file path"):
+    with pytest.raises(ValueError, match="embedded null character"):
         FileTracer._validate_output_path("\x00invalid.json")
 
 
