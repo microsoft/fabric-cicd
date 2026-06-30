@@ -1,0 +1,8 @@
+kind: added
+body: Allow installation on Python 3.14 and later versions
+time: 2026-06-30T15:15:00Z
+custom:
+    Issue: 868
+    Author: nkwork9999
+    AuthorLink: https://github.com/nkwork9999
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/868

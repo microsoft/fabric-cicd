@@ -13,7 +13,7 @@ fabric-cicd is a Python library designed for use with [Microsoft Fabric](https:/
 
 ## Installation
 
-**Requirements**: Python <!--MIN-PYTHON-VERSION--> to <!--MAX-PYTHON-VERSION-->
+**Requirements**: Python <!--PYTHON-VERSION-RANGE-->
 
 To install fabric-cicd, run:
 
