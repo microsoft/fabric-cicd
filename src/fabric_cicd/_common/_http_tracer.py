@@ -174,11 +174,15 @@ class FileTracer:
         Raises:
             ValueError: If the path fails validation.
         """
+        if "\x00" in raw_path:
+            msg = f"Failed to resolve HTTP trace file path {raw_path!r}: embedded null character"
+            raise ValueError(msg)
+
         try:
             resolved = Path(raw_path).resolve()
             cwd = Path.cwd().resolve()
         except (OSError, ValueError) as e:
-            msg = f"Failed to resolve HTTP trace file path '{raw_path}': {e}"
+            msg = f"Failed to resolve HTTP trace file path {raw_path!r}: {e}"
             raise ValueError(msg) from e
 
         if resolved.suffix != ".json":
