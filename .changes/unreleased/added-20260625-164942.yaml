@@ -1,0 +1,8 @@
+kind: added
+body: Add `FABRIC_CICD_MAX_DURATION_SECONDS` environment variable to configure the maximum duration for API request execution, including long-running operation polling and retries (default 300 seconds)
+time: 2026-06-25T16:49:42.0887102+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1022"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1022

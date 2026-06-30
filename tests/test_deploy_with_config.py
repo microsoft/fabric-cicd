@@ -712,8 +712,9 @@ class TestDeployWithConfig:
         mock_workspace_instance.endpoint.invoke.return_value = {"body": {"capacityId": "test-cap"}}
         mock_workspace.return_value = mock_workspace_instance
 
-        with patch("fabric_cicd.publish.items.ItemPublisher.publish_all_bulk", return_value=[]) as mock_bulk, patch(
-            "fabric_cicd.publish.validate_fabric_workspace_obj", return_value=mock_workspace_instance
+        with (
+            patch("fabric_cicd.publish.items.ItemPublisher.publish_all_bulk", return_value=[]) as mock_bulk,
+            patch("fabric_cicd.publish.validate_fabric_workspace_obj", return_value=mock_workspace_instance),
         ):
             deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
@@ -760,9 +761,11 @@ class TestDeployWithConfig:
         mock_workspace_instance.endpoint.invoke.return_value = {"body": {"capacityId": "test-cap"}}
         mock_workspace.return_value = mock_workspace_instance
 
-        with patch("fabric_cicd.publish.items.ItemPublisher.publish_all_bulk") as mock_bulk, patch(
-            "fabric_cicd.publish.items.ItemPublisher.get_item_types_to_publish", return_value=[]
-        ), patch("fabric_cicd.publish.validate_fabric_workspace_obj", return_value=mock_workspace_instance):
+        with (
+            patch("fabric_cicd.publish.items.ItemPublisher.publish_all_bulk") as mock_bulk,
+            patch("fabric_cicd.publish.items.ItemPublisher.get_item_types_to_publish", return_value=[]),
+            patch("fabric_cicd.publish.validate_fabric_workspace_obj", return_value=mock_workspace_instance),
+        ):
             deploy_with_config(config_file_path=str(config_file), token_credential=MagicMock(), environment="dev")
 
             # Verify bulk path was NOT taken
