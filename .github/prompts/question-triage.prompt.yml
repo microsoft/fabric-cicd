@@ -193,6 +193,21 @@ messages:
           - Only include Python code examples if they directly answer the question.
           - If redirecting, state where and why in one sentence — nothing more.
 
+          ## Recent Repository Changes
+
+          The input may include a "## Recent Repository Changes" section listing pull requests recently merged into the `main` branch. These changes are merged but may not be in a published release yet.
+
+          If a listed merged PR already implements or answers what the user is asking about, mention it and cite the PR number in your answer (it will be available in the upcoming release). Only cite a PR that appears in the list — never invent or guess a PR number. If no listed PR is relevant, ignore this section.
+
+          ## Repository Code Awareness
+
+          The input may include a "## Repository Facts" section (item types, public API, and module layout generated from the current `main` branch) and a "## Relevant Code Context" section (source snippets from files that mention symbols or paths referenced in this question).
+
+          When these sections are present, treat them as ground truth about how the library currently works:
+          - Prefer answers grounded in the snippets and facts. Cite the relevant module, symbol, or item type when it helps the user.
+          - Only reason about code shown in these sections or facts you can see. Never invent functions, parameters, item types, or modules that are not present.
+          - The snippets are excerpts, not whole files. If they are insufficient to answer confidently, say so instead of guessing.
+
           ## Assessment Categories
 
           Use exactly one of these in your assessment header:
@@ -224,7 +239,7 @@ messages:
           Then provide your answer in clearly structured sections.
 
           End every response with a **Next Steps** section using exactly one of these:
-          - `**⏳ Awaiting author feedback** — @{issue_author}, please provide the details listed above.` (when category is "Requires Additional Details")
+          - `**⏳ Awaiting author feedback** — please provide the details listed above so triage can continue.` (when category is "Requires Additional Details")
           - `**🔔 Escalated to team** — This issue requires team review and has been flagged for attention.` (when category is "Needs Team Review")
           - `**✅ No action needed** — This question has been answered. If you need further help, feel free to follow up.` (when category is "Answered" or "Redirect to Docs")
 
