@@ -39,6 +39,10 @@ workspace = FabricWorkspace(
 
 See the [Authentication Examples](../example/authentication.md) for specific implementation patterns.
 
+## Prefer the Command Line?
+
+If you'd rather not write Python, the [Microsoft Fabric CLI](https://microsoft.github.io/fabric-cli/) (`fab`) includes a [`deploy` command](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) that runs fabric-cicd under the hood. It deploys Fabric items to a workspace directly from the command line using a shared `config.yml` file. See [Deploying with the Fabric CLI](config_deployment.md#deploying-with-the-fabric-cli) for details.
+
 ## Directory Structure
 
 This library deploys from a directory containing files and directories committed via the Fabric Source Control UI. Ensure the `repository_directory` includes only these committed items, with the exception of the `parameter.yml` file.
