@@ -139,9 +139,19 @@ def extract_find_value(
         return {"pattern": find_value, "is_regex": False, "has_matches": False, "ignore_case": ignore_case}
 
     if ignore_case:
-        return {"pattern": find_value, "is_regex": False, "has_matches": find_value.lower() in file_content.lower(), "ignore_case": ignore_case}
+        return {
+            "pattern": find_value,
+            "is_regex": False,
+            "has_matches": find_value.lower() in file_content.lower(),
+            "ignore_case": ignore_case,
+        }
 
-    return {"pattern": find_value, "is_regex": False, "has_matches": find_value in file_content, "ignore_case": ignore_case}
+    return {
+        "pattern": find_value,
+        "is_regex": False,
+        "has_matches": find_value in file_content,
+        "ignore_case": ignore_case,
+    }
 
 
 def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, get_dataflow_name: bool = False) -> str:

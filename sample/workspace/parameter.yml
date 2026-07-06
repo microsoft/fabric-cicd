@@ -68,7 +68,7 @@ find_replace:
       file_path: "/ByConnection.Report/definition.pbir"
 
 key_value_replace:
-    - find_key: $.variables[?(@.name=="SQL_Server")].value
+    - find_key: $.variables[?(@.name=="SQL_Server")].value # No Filepath
       replace_value:
         PPE: "contoso-ppe.database.windows.net"
         PROD: "contoso-prod.database.windows.net"
@@ -76,7 +76,7 @@ key_value_replace:
       # Optional fields:
       item_type: "VariableLibrary"
       item_name: "Vars"
-    - find_key: $.variables[?(@.name=="Environment")].value
+    - find_key: $.variables[?(@.name=="Environment")].value # No Filepath
       replace_value:
         PPE: "PPE"
         PROD: "PROD"
@@ -84,16 +84,18 @@ key_value_replace:
       # Optional fields:
       item_type: "VariableLibrary"
       item_name: "Vars"
-    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value # No match found
       replace_value:
+        PPE: "contoso-ppe-override.database.windows.net"
         PROD: "contoso-production-override.database.windows.net"
       file_path: Vars.VariableLibrary/valueSets/PROD.json
       item_type: "VariableLibrary"
       item_name: "Vars"
-    - find_key: $.variableOverrides[?(@.name=="Environment")].value
+    - find_key: $.variableOverrides[?(@.name=="Environment")].value # No Match found
       replace_value:
-        PROD: "PROD_ENV"
-      file_path: Vars.VariableLibrary/valueSets/PROD.json
+        PPE: "PPE_ENV"
+        # PROD: "PROD_ENV"
+      file_path: Vars.VariableLibrary/PROD.json
       item_type: "VariableLibrary"
       item_name: "Vars"
     - find_key: $.schedules[?(@.jobType=="Execute")].enabled

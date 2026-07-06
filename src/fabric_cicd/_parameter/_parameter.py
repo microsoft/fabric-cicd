@@ -29,7 +29,15 @@ class Parameter:
     PARAMETER_KEYS: ClassVar[dict] = {
         "find_replace": {
             "minimum": {"find_value", "replace_value"},
-            "maximum": {"find_value", "replace_value", "is_regex", "ignore_case", "item_type", "item_name", "file_path"},
+            "maximum": {
+                "find_value",
+                "replace_value",
+                "is_regex",
+                "ignore_case",
+                "item_type",
+                "item_name",
+                "file_path",
+            },
         },
         "spark_pool": {
             "minimum": {"instance_pool_id", "replace_value"},
@@ -80,6 +88,198 @@ class Parameter:
 
         self._set_parameter_file_path()
         self._refresh_parameter_file()
+
+    def _validate_key_value_replacements(
+        self, environment: Optional[str] = None, as_dict: bool = True
+    ) -> list[dict] | str:
+        """
+        Dry-run all key_value_replace rules against repository files.
+
+        Scans every JSON/YAML file under repository_directory and reports
+        what each rule would change, without touching any file.
+
+        Args:
+            environment: Optional filter - consider items of this environment (and not the default of the workspace).
+            as_dict: If True, return results as a list of dicts, otherwise return as a human-readable string.
+
+        Returns:
+            A list of result dicts, one per (rule, match) pair, plus one for each
+            rule that produced zero matches.  Each dict has the keys:
+
+            For a match:
+                rule_index    int      - 0-based index in key_value_replace list
+                find_key      str      - the JSONPath expression
+                item_type     str      - item type of the matched file's parent item
+                item_name     str      - display name of the matched file's parent item
+                file_path     str      - relative path of the file inside the item dir
+                match_path    str      - resolved JSONPath of the matched node
+                current_value any      - value currently in the file
+                new_value     any      - value that would be written (None if env key absent)
+                found         bool     - True
+
+            For a rule with no matches:
+                rule_index    int
+                find_key      str
+                item_type_filter  str | list | None
+                item_name_filter  str | list | None
+                found         bool     - False
+                error         str      - "No matches found"
+        """
+        from jsonpath_ng.ext import parse
+
+        from fabric_cicd._common._check_utils import check_valid_json_content, check_valid_yaml_content
+
+        rules = self.environment_parameter.get("key_value_replace", [])
+
+        if environment is None:
+            environment = self.environment
+
+        # Pre-compile each rule's JSONPath expression once
+        compiled_rules = []
+        for idx, rule in enumerate(rules):
+            find_key = rule.get("find_key", "")
+            try:
+                compiled = parse(find_key)
+            except Exception as exc:
+                logger.warning(f"Rule {idx}: could not compile JSONPath '{find_key}': {exc}")
+                compiled = None
+            compiled_rules.append({
+                "rule_index": idx,
+                "find_key": find_key,
+                "compiled": compiled,
+                # rule-level optional filters (may be str or list)
+                "rule_item_type": rule.get("item_type"),
+                "rule_item_name": rule.get("item_name"),
+                "rule_file_path": rule.get("file_path"),
+                "new_value": (rule.get("replace_value") or {}).get(environment),
+                "matches_found": 0,
+            })
+
+        results: list[dict] = []
+
+        # Walk through all files in the repository_directory, looking for JSON/YAML files to apply the rules to
+        # First pass: find all item root directories (those containing the .platform file)
+        item_roots = []
+        for root, _dirs, files in os.walk(self.repository_directory):
+            if ".platform" in files:
+                item_roots.append(Path(root))
+
+        # Second pass: for each item root, walk all its subdirectories for files
+        for item_root in item_roots:
+            # Read item metadata
+            try:
+                meta = json.loads((item_root / ".platform").read_text(encoding="utf-8"))
+                this_item_type = meta["metadata"]["type"]
+                this_item_name = meta["metadata"]["displayName"]
+            except Exception:
+                continue
+
+            # Examine every file in the item directory and subdirectories
+            # Walk the entire item directory tree for JSON/YAML files
+            for root, _dirs, files in os.walk(item_root):
+                for file_name in files:
+                    if file_name == ".platform":
+                        continue
+
+                    file_path_abs = Path(root) / file_name
+                    rel_path = str(file_path_abs.relative_to(self.repository_directory))
+
+                    try:
+                        raw = file_path_abs.read_text(encoding="utf-8")
+                    except Exception:
+                        continue
+
+                    # Determine data format
+                    if check_valid_json_content(raw):
+                        try:
+                            data = json.loads(raw)
+                        except Exception:
+                            continue
+                    elif check_valid_yaml_content(raw):
+                        try:
+                            data = yaml.safe_load(raw)
+                        except Exception:
+                            continue
+                    else:
+                        continue  # not JSON or YAML - skip
+
+                    for cr in compiled_rules:
+                        if cr["compiled"] is None:
+                            continue
+
+                        # Apply rule-level item_type / item_name / file_path filters
+                        if not self._rule_filter_matches(cr, this_item_type, this_item_name, rel_path):
+                            continue
+
+                        matches = cr["compiled"].find(data)
+                        for match in matches:
+                            cr["matches_found"] += 1
+                            results.append({
+                                "rule_index": cr["rule_index"],
+                                "find_key": cr["find_key"],
+                                "item_type": this_item_type,
+                                "item_name": this_item_name,
+                                "file_path": rel_path,
+                                "match_path": str(match.full_path),
+                                "current_value": match.value,
+                                "new_value": cr["new_value"],
+                                "found": True,
+                            })
+
+        # Append a "not found" record for each rule that matched nothing
+        for cr in compiled_rules:
+            if cr["matches_found"] == 0:
+                results.append({
+                    "rule_index": cr["rule_index"],
+                    "find_key": cr["find_key"],
+                    "item_type_filter": cr["rule_item_type"],
+                    "item_name_filter": cr["rule_item_name"],
+                    "new_value": cr["new_value"],
+                    "found": False,
+                    "error": "No matches found",
+                })
+
+        # print(results[0])
+
+        if not as_dict:
+            # Return results as human-readable string e.g., "3/5 rules matched, 2 rules had no matches"
+            total_rules = len(compiled_rules)
+            rules_without_new_value = sum(1 for cr in compiled_rules if cr["new_value"] is None)
+            rules_without_matches = sum(1 for cr in compiled_rules if cr["matches_found"] == 0)
+            rules_with_matches = total_rules - rules_without_matches
+            return f"{rules_with_matches}/{total_rules} rules matched, {rules_without_matches} rules had no matches. For {rules_without_new_value} rules, the new value was not defined for environment {environment}."
+
+        return results
+
+    def _rule_filter_matches(
+        self,
+        compiled_rule: dict,
+        item_type: Optional[str],
+        item_name: Optional[str],
+        file_path: Optional[str],
+    ) -> bool:
+        """Return True if the item/file satisfies the rule's optional filters."""
+
+        def _matches_filter(filter_val: any, actual: Optional[str]) -> bool:
+            if filter_val is None:
+                return True
+            if isinstance(filter_val, list):
+                return actual in filter_val
+            return actual == filter_val
+
+        if not _matches_filter(compiled_rule["rule_item_type"], item_type):
+            return False
+        if not _matches_filter(compiled_rule["rule_item_name"], item_name):
+            return False
+
+        rule_fp = compiled_rule["rule_file_path"]
+        if rule_fp is not None:
+            import fnmatch
+
+            if not fnmatch.fnmatch(file_path.replace("\\", "/"), rule_fp.replace("\\", "/")):
+                return False
+
+        return True
 
     def _set_parameter_file_path(self) -> None:
         """Set the parameter file path based on the provided path or default name."""
@@ -724,9 +924,7 @@ class Parameter:
 
             # Validate is_regex type if present
             if param_dict.get("is_regex") is not None:
-                is_valid, msg = self._validate_data_type(
-                    param_dict["is_regex"], "string", "is_regex", param_name
-                )
+                is_valid, msg = self._validate_data_type(param_dict["is_regex"], "string", "is_regex", param_name)
                 if not is_valid:
                     return False, msg
 
@@ -744,9 +942,7 @@ class Parameter:
 
             # Validate ignore_case type if present
             if param_dict.get("ignore_case") is not None:
-                is_valid, msg = self._validate_data_type(
-                    param_dict["ignore_case"], "string", "ignore_case", param_name
-                )
+                is_valid, msg = self._validate_data_type(param_dict["ignore_case"], "string", "ignore_case", param_name)
                 if not is_valid:
                     return False, msg
 

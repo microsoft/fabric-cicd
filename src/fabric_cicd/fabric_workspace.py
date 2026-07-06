@@ -287,6 +287,34 @@ class FabricWorkspace:
 
             return self._workspace_pools_cache
 
+    def validate_parameter_replace(self, environment: Optional[str] = None, as_dict: bool = True) -> list[dict] | str:
+        """
+        Validate key-value replacements in the repository based on the parameter file.
+
+        Args:
+            environment: Optional filter - consider items of this environment (and not the default of the workspace).
+            as_dict: If True, return results as a list of dictionaries; if False, return as a JSON string.
+        """
+        from fabric_cicd._parameter._parameter import Parameter
+
+        parameter_obj = (
+            self.environment_parameter
+            if hasattr(self, "environment_parameter")
+            else Parameter(
+                repository_directory=self.repository_directory,
+                item_type_in_scope=self.item_type_in_scope,
+                environment=self.environment,
+                parameter_file_name=constants.PARAMETER_FILE_NAME,
+                parameter_file_path=self.parameter_file_path,
+            )
+        )
+
+        validated_results = parameter_obj._validate_key_value_replacements(environment=environment, as_dict=as_dict)
+        if as_dict == False:
+            print(validated_results)
+
+        return validated_results
+
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
         from fabric_cicd._parameter._parameter import Parameter

@@ -163,9 +163,7 @@ class FabricEndpoint:
         try:
             access_token = self.token_credential.get_token(_RESOURCE_URL)
             self._token = access_token.token
-            self._token_expiry = datetime.datetime.fromtimestamp(
-                access_token.expires_on, tz=datetime.timezone.utc
-            )
+            self._token_expiry = datetime.datetime.fromtimestamp(access_token.expires_on, tz=datetime.timezone.utc)
             return self._token
         except ClientAuthenticationError as e:
             msg = f"Failed to acquire Microsoft Entra token. {e}"
