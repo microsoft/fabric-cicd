@@ -12,7 +12,8 @@ from fabric_cicd._common._git_diff_utils import get_changed_items
 from fabric_cicd._common._logging import configure_logger, exception_handler, get_file_handler
 from fabric_cicd._common._validate_env_vars import _get_fabric_fqdn_url, validate_api_url
 from fabric_cicd._common._validate_input import validate_workspace_id
-from fabric_cicd._common._validate_parameter import validate_key_value_replace
+
+# from fabric_cicd._common._validate_parameter import validate_key_value_replace
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 from fabric_cicd.publish import deploy_with_config, publish_all_items, unpublish_all_orphan_items
@@ -208,5 +209,5 @@ __all__ = [
     "get_changed_items",
     "publish_all_items",
     "unpublish_all_orphan_items",
-    "validate_key_value_replace",
+    # "validate_key_value_replace",
 ]

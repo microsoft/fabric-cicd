@@ -91,20 +91,27 @@ class Parameter:
 
     def _validate_key_value_replacements(
         self, environment: Optional[str] = None, as_dict: bool = True
-    ) -> list[dict] | str:
+    ) -> tuple[bool, list[dict] | str]:
         """
-        Dry-run all key_value_replace rules against repository files.
+        Dry-run all key_value_replace rules against repository item files.
 
-        Scans every JSON/YAML file under repository_directory and reports
-        what each rule would change, without touching any file.
+        Compiles each rule's JSONPath expression, locates Fabric item root
+        directories by their .platform file, and scans JSON/YAML files within
+        those item directories.  Rule-level item_type, item_name, and file_path
+        filters are honored.  Files are not modified.
 
         Args:
-            environment: Optional filter - consider items of this environment (and not the default of the workspace).
-            as_dict: If True, return results as a list of dicts, otherwise return as a human-readable string.
+            environment: Environment used to resolve replace_value entries. Defaults to self.environment.
+            as_dict: If True, return detailed result dictionaries; otherwise return a summary string.
 
         Returns:
-            A list of result dicts, one per (rule, match) pair, plus one for each
-            rule that produced zero matches.  Each dict has the keys:
+            A tuple of (all_matched, results). all_matched is True when every
+            rule produced at least one match. If as_dict is False, results is a
+            summary string with match counts and missing replacement-value count.
+            If as_dict is True, results is a list of dictionaries: one per
+            (rule, match) pair, plus one for each rule that produced zero matches.
+
+            Match result keys:
 
             For a match:
                 rule_index    int      - 0-based index in key_value_replace list
@@ -114,14 +121,15 @@ class Parameter:
                 file_path     str      - relative path of the file inside the item dir
                 match_path    str      - resolved JSONPath of the matched node
                 current_value any      - value currently in the file
-                new_value     any      - value that would be written (None if env key absent)
+                new_value     any      - replacement value for the environment (None if absent)
                 found         bool     - True
 
-            For a rule with no matches:
+            No-match result keys:
                 rule_index    int
                 find_key      str
                 item_type_filter  str | list | None
                 item_name_filter  str | list | None
+                new_value     any      - replacement value for the environment (None if absent)
                 found         bool     - False
                 error         str      - "No matches found"
         """
@@ -239,17 +247,21 @@ class Parameter:
                     "error": "No matches found",
                 })
 
-        # print(results[0])
+        # Determine summary statistics
+        total_rules = len(compiled_rules)
+        rules_without_new_value = sum(1 for cr in compiled_rules if cr["new_value"] is None)
+        rules_without_matches = sum(1 for cr in compiled_rules if cr["matches_found"] == 0)
+        rules_with_matches = total_rules - rules_without_matches
+        all_matched = total_rules == rules_with_matches
 
         if not as_dict:
-            # Return results as human-readable string e.g., "3/5 rules matched, 2 rules had no matches"
-            total_rules = len(compiled_rules)
-            rules_without_new_value = sum(1 for cr in compiled_rules if cr["new_value"] is None)
-            rules_without_matches = sum(1 for cr in compiled_rules if cr["matches_found"] == 0)
-            rules_with_matches = total_rules - rules_without_matches
-            return f"{rules_with_matches}/{total_rules} rules matched, {rules_without_matches} rules had no matches. For {rules_without_new_value} rules, the new value was not defined for environment {environment}."
+            # Return results as human-readable string e.g., "3/5 rules matched, 2 rules had no matches. For 1 rules, the new value was not defined for environment PPE."
+            return (
+                all_matched,
+                f"{rules_with_matches}/{total_rules} rules matched, {rules_without_matches} rules had no matches. For {rules_without_new_value} rules, the new value was not defined for environment {environment}.",
+            )
 
-        return results
+        return all_matched, results
 
     def _rule_filter_matches(
         self,

@@ -325,6 +325,214 @@ find_replace:
 """
 
 
+SAMPLE_PARAMETER_FILE_ALL_MATCHING_KEYS = """
+key_value_replace:
+    - find_key: $.variables[?(@.name=="SQL_Server")].value # No file_path or item_type
+      replace_value:
+        PPE: "contoso-ppe.database.windows.net"
+        PROD: "contoso-prod.database.windows.net"
+        UAT: "contoso-uat.database.windows.net"
+      item_name: "Vars"
+    - find_key: $.variables[?(@.name=="Environment")].value # No file_path
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+        UAT: "UAT"
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value # No file_path or item_name
+      replace_value:
+        PPE: "contoso-ppe-override.database.windows.net"
+        PROD: "contoso-production-override.database.windows.net"
+      item_type: "VariableLibrary"
+    - find_key: $.variableOverrides[?(@.name=="Environment")].value # All selectors provided
+      replace_value:
+        PPE: "PPE_ENV"
+        PROD: "PROD_ENV"
+      file_path: Vars.VariableLibrary/valueSets/PPE.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.schedules[?(@.jobType=="Execute")].enabled
+      replace_value:
+        PPE: false
+        PROD: true
+      file_path: "**/.schedules"  
+    - find_key: $.properties.activities[?(@.type=="TridentNotebook")].name
+      replace_value:
+        PPE: "Run Hello World PPE"
+        PROD: "Run Hello World PROD"
+"""
+
+SAMPLE_PARAMETER_FILE_NO_TARGET_MATCHING_VALUES = """
+key_value_replace:
+    - find_key: $.variables[?(@.name=="Environment")].value # No Filepath
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+      item_type: "VariableLibrary"
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value # No target value for PPE, match found for PROD
+      replace_value:
+        PROD: "contoso-production-override.database.windows.net"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+"""
+
+SAMPLE_PARAMETER_FILE_PARTIAL_MATCHING_KEYS = """
+key_value_replace:
+    - find_key: $.variables[?(@.name=="Environment")].value # Match found
+      replace_value:
+        PPE: "PPE"
+        PROD: "PROD"
+      item_type: "VariableLibrary"
+      item_name: "Vars"
+    - find_key: $.variableOverrides[?(@.name=="KQL_Server")].value # No match found
+      replace_value:
+        PPE: "contoso-ppe-override.database.windows.net"
+        PROD: "contoso-production-override.database.windows.net"
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
+      item_type: "VariableLibrary"
+      item_name: "Vars"      
+"""
+
+
+SAMPLE_PLATFORM_FILE_VARIABLE_LIBRARY = """
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "VariableLibrary",
+    "displayName": "Vars",
+    "description": "Sample Variable Library"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "b2380160-e03e-a112-414f-13442f7f96af"
+  }
+}
+"""
+
+
+SAMPLE_PLATFORM_FILE_PIPELINE = """
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataPipeline",
+    "displayName": "Run Hello World",
+    "description": "Sample Data Pipeline"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "70a8992d-af56-801f-4046-ad0813bac453"
+  }
+}
+"""
+
+
+SAMPLE_VARIABLE_LIBRARY_VARS = """
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "Environment",
+      "note": "",
+      "type": "String",
+      "value": "PROD"
+    },
+    {
+      "name": "SQL_Server",
+      "note": "",
+      "type": "String",
+      "value": "contoso-prod.database.windows.net"
+    }
+  ]
+}
+"""
+
+SAMPLE_VARIABLE_LIBRARY_PROD = """
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
+  "name": "PROD",
+  "variableOverrides": [
+    {
+      "name": "Environment",
+      "value": "Prod"
+    },
+    {
+      "name": "SQL_Server",
+      "value": "contoso-prod.database.windows.net"
+    }
+  ]
+}
+"""
+
+SAMPLE_VARIABLE_LIBRARY_PPE = """
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
+  "name": "PROD",
+  "variableOverrides": [
+    {
+      "name": "Environment",
+      "value": "Prod"
+    },
+    {
+      "name": "SQL_Server",
+      "value": "contoso-prod.database.windows.net"
+    }
+  ]
+}
+
+"""
+
+SAMPLE_PIPELINE_METADATA = """{
+  "displayName": "Pipeline With Schedule",
+  "type": "DataPipeline"
+}"""
+
+SAMPLE_PIPELINE_CONTENT = """
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Run Hello World",
+        "dependsOn": []
+      }
+    ]
+  }
+}
+"""
+
+SAMPLE_PIPELINE_SCHEDULES = """
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/schedules/1.0.0/schema.json",
+  "schedules": [
+    {
+      "enabled": true,
+      "jobType": "Execute",
+      "configuration": {
+        "type": "Cron",
+        "startDateTime": "2025-07-01T12:00:00Z",
+        "endDateTime": "2029-07-01T12:00:00Z",
+        "localTimeZoneId": "Pacific Standard Time",
+        "interval": 15
+      }
+    }
+  ]
+}
+"""
+
+
 @pytest.fixture
 def item_type_in_scope():
     return ["Notebook", "DataPipeline", "Environment"]
@@ -397,6 +605,16 @@ def repository_directory(tmp_path):
     multiple_parameter_file_path = workspace_dir / "multiple_parameter.yml"
     multiple_parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_MULTIPLE)
 
+    # Create the sample parameter file with all matching keys
+    all_matching_keys_parameter_file_path = workspace_dir / "all_matching_keys_parameter.yml"
+    all_matching_keys_parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_ALL_MATCHING_KEYS)
+
+    no_target_matching_keys_parameter_file_path = workspace_dir / "no_target_matching_values_parameter.yml"
+    no_target_matching_keys_parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_NO_TARGET_MATCHING_VALUES)
+
+    partial_matching_keys_parameter_file_path = workspace_dir / "partial_matching_keys_parameter.yml"
+    partial_matching_keys_parameter_file_path.write_text(SAMPLE_PARAMETER_FILE_PARTIAL_MATCHING_KEYS)
+
     # Create the sample notebook files
     notebook_dir = workspace_dir / "Hello World.Notebook"
     notebook_dir.mkdir(parents=True, exist_ok=True)
@@ -406,6 +624,38 @@ def repository_directory(tmp_path):
 
     notebook_file_path = notebook_dir / "notebook-content.py"
     notebook_file_path.write_text(SAMPLE_NOTEBOOK_FILE)
+
+    # Create the sample Variable Library with variables
+    variable_library_dir = workspace_dir / "Vars.VariableLibrary"
+    variable_library_dir.mkdir(parents=True, exist_ok=True)
+
+    variable_library_platform_file = variable_library_dir / ".platform"
+    variable_library_platform_file.write_text(SAMPLE_PLATFORM_FILE_VARIABLE_LIBRARY)
+
+    variable_library_metadata_file = variable_library_dir / "variables.json"
+    variable_library_metadata_file.write_text(SAMPLE_VARIABLE_LIBRARY_VARS)
+
+    variable_library_definition_dir = variable_library_dir / "valueSets"
+    variable_library_definition_dir.mkdir(parents=True, exist_ok=True)
+
+    variable_library_prod_file = variable_library_definition_dir / "PROD.json"
+    variable_library_prod_file.write_text(SAMPLE_VARIABLE_LIBRARY_PROD)
+
+    variable_library_ppe_file = variable_library_definition_dir / "PPE.json"
+    variable_library_ppe_file.write_text(SAMPLE_VARIABLE_LIBRARY_PPE)
+
+    # Create the sample Pipeline with schedules and content
+    pipeline_dir = workspace_dir / "Pipeline With Schedule.DataPipeline"
+    pipeline_dir.mkdir(parents=True, exist_ok=True)
+
+    pipeline_platform_file = pipeline_dir / ".platform"
+    pipeline_platform_file.write_text(SAMPLE_PLATFORM_FILE_PIPELINE)
+
+    pipeline_definition_file = pipeline_dir / "pipeline-content.json"
+    pipeline_definition_file.write_text(SAMPLE_PIPELINE_CONTENT)
+
+    pipeline_schedule_file = pipeline_dir / ".schedules"
+    pipeline_schedule_file.write_text(SAMPLE_PIPELINE_SCHEDULES)
 
     return workspace_dir
 
@@ -602,6 +852,97 @@ def test_validate_key_value_replace_replace_value(parameter_object, replace_valu
         # For mixed types, check that the message contains the expected content
         assert is_valid == result
         assert "Inconsistent data types in key_value_replace replace_value" in actual_msg
+
+
+def test_validate_key_value_replacements_no_key_value_replace(repository_directory, target_environment):
+    """Test the _validate_key_value_replace_replacements method when key_value_replace is not present."""
+    item_type_in_scope = ["DataPipeline", "Notebook", "VariableLibrary"]
+
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        environment=target_environment,
+        item_type_in_scope=item_type_in_scope,
+        parameter_file_name=constants.PARAMETER_FILE_NAME,
+    )
+
+    is_matched, result_dicts = param_obj._validate_key_value_replacements(as_dict=True)
+    _, result_str = param_obj._validate_key_value_replacements(as_dict=False)
+
+    assert result_dicts == []
+    assert (
+        result_str
+        == f"0/0 rules matched, 0 rules had no matches. For 0 rules, the new value was not defined for environment {target_environment}."
+    )
+    assert is_matched == True
+
+
+def test_validate_key_value_replacements_with_key_value_replace_all_match(repository_directory, target_environment):
+    """Test the _validate_key_value_replace_replacements method when key_value_replace is present and all rules match."""
+    item_type_in_scope = ["DataPipeline", "Notebook", "VariableLibrary"]
+
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        environment=target_environment,
+        item_type_in_scope=item_type_in_scope,
+        parameter_file_name="all_matching_keys_parameter.yml",
+    )
+
+    is_matched, result_dicts = param_obj._validate_key_value_replacements(as_dict=True)
+    _, result_str = param_obj._validate_key_value_replacements(as_dict=False)
+
+    assert len(result_dicts) == 7
+    assert all(rule["found"] for rule in result_dicts)
+    assert (
+        result_str
+        == f"6/6 rules matched, 0 rules had no matches. For 0 rules, the new value was not defined for environment {target_environment}."
+    )
+    assert is_matched == True
+
+
+def test_validate_key_value_replacements_with_key_value_replace_no_target_value(repository_directory):
+    """Test the _validate_key_value_replace_replacements method when key_value_replace is present and but there is no replace value for the specified environment."""
+    item_type_in_scope = ["DataPipeline", "Notebook", "VariableLibrary"]
+
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        environment="PPE",
+        item_type_in_scope=item_type_in_scope,
+        parameter_file_name="no_target_matching_values_parameter.yml",
+    )
+
+    is_matched, result_dicts = param_obj._validate_key_value_replacements(as_dict=True)
+    _, result_str = param_obj._validate_key_value_replacements(as_dict=False)
+
+    assert sum(rule["new_value"] == None for rule in result_dicts) == 1
+    assert len(result_dicts) == 2
+    assert (
+        result_str
+        == "2/2 rules matched, 0 rules had no matches. For 1 rules, the new value was not defined for environment PPE."
+    )
+    assert is_matched == True
+
+
+def test_validate_key_value_replacements_with_key_value_replace_partial_match(repository_directory):
+    """Test the _validate_key_value_replace_replacements method when key_value_replace is present and but there is no replace value for the specified environment."""
+    item_type_in_scope = ["DataPipeline", "Notebook", "VariableLibrary"]
+
+    param_obj = Parameter(
+        repository_directory=repository_directory,
+        environment="PPE",
+        item_type_in_scope=item_type_in_scope,
+        parameter_file_name="partial_matching_keys_parameter.yml",
+    )
+
+    is_matched, result_dicts = param_obj._validate_key_value_replacements(as_dict=True)
+    _, result_str = param_obj._validate_key_value_replacements(as_dict=False)
+
+    assert sum(rule["found"] == False for rule in result_dicts) == 1
+    assert len(result_dicts) == 2
+    assert (
+        result_str
+        == "1/2 rules matched, 1 rules had no matches. For 0 rules, the new value was not defined for environment PPE."
+    )
+    assert is_matched == False
 
 
 @pytest.mark.parametrize(
