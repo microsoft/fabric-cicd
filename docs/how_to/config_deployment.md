@@ -31,8 +31,6 @@ deploy_with_config(
 )
 ```
 
-> **Tip:** Prefer a command-line experience over writing Python? The [Microsoft Fabric CLI](https://microsoft.github.io/fabric-cli/) exposes a `fab deploy` command that runs this same configuration-based deployment under the hood using fabric-cicd. See [Deploying with the Fabric CLI](#deploying-with-the-fabric-cli) below.
-
 Raise a [feature request](https://github.com/microsoft/fabric-cicd/issues/new?template=2-feature.yml) for additional capabilities or a [bug report](https://github.com/microsoft/fabric-cicd/issues/new?template=1-bug.yml) for issues.
 
 ## Configuration File Setup
@@ -529,14 +527,7 @@ pip install ms-fabric-cli
 fab deploy --config <config_file> [--target_env <environment>] [--params <parameters>] [--force]
 ```
 
-| Option | Description |
-| ------ | ----------- |
-| `--config <file>` | Path to the deployment configuration YAML file. **Required**. |
-| `--target_env, -tenv <env>` | Environment name used to select environment-specific settings from the configuration and parameter files. Optional. |
-| `--params, -P <params>` | JSON-formatted configuration overrides applied at runtime. Optional. |
-| `--force, -f` | Run the deployment without interactive confirmation prompts. Optional. |
-
-> **Note:** The `--config`, `--target_env`, and `--params` options map directly to the `config_file_path`, `environment`, and `config_override` parameters of [`deploy_with_config()`](#configuration-file-deployment). Any `config.yml` and `parameter.yml` files that work with the Python API also work with the CLI.
+Refer to the [Fabric CLI `deploy` command documentation](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) for the complete list of behaviors and options.
 
 ### Examples
 
@@ -557,8 +548,6 @@ fab deploy --config config.yml --target_env test -P config_override='{"core":{"i
 ```bash
 fab deploy --config config.yml --target_env dev --force
 ```
-
-Refer to the [Fabric CLI `deploy` command documentation](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) for the complete list of behaviors and options.
 
 ## Troubleshooting Guide
 

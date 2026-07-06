@@ -49,13 +49,3 @@ unpublish_all_orphan_items(target_workspace)
 >
 > - All parameters for `FabricWorkspace` must be passed as keyword arguments.
 > - The `environment` parameter is required for parameter replacement to work properly. It must match one of the environment keys defined in your `parameter.yml` file (e.g., "PPE", "PROD", "DEV"). If you don't need parameter replacement, you can omit this parameter.
-
-## Using the Fabric CLI
-
-Prefer the command line over Python? The [Microsoft Fabric CLI](https://microsoft.github.io/fabric-cli/) (`fab`) provides a [`deploy` command](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) that runs fabric-cicd under the hood, deploying Fabric items to a workspace from a shared `config.yml` file — no Python required.
-
-```bash
-fab deploy --config config.yml --target_env dev
-```
-
-See [Deploying with the Fabric CLI](how_to/config_deployment.md#deploying-with-the-fabric-cli) to get started.
