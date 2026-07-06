@@ -101,8 +101,13 @@ key_value_replace:
     - find_key: $.variableOverrides[?(@.name=="Environment")].value # No Match found
       replace_value:
         PPE: "PPE_ENV"
+<<<<<<< HEAD
         PROD: "PROD_ENV"
       # file_path: Vars.VariableLibrary/PROD.json
+=======
+        # PROD: "PROD_ENV"
+      file_path: Vars.VariableLibrary/PROD.json
+>>>>>>> ef35041 (Add method to validate the key_value_replace values inside items)
       item_type: "VariableLibrary"
       item_name: "Vars"
     - find_key: $.schedules[?(@.jobType=="Execute")].enabled

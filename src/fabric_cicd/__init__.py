@@ -235,4 +235,5 @@ __all__ = [
     "get_supported_feature_flags",
     "publish_all_items",
     "unpublish_all_orphan_items",
+    "validate_key_value_replace",
 ]
