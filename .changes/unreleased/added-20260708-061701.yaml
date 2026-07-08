@@ -1,0 +1,8 @@
+kind: added
+body: Add `$sqlendpoint` and `$sqlendpointid` dynamic replacement variable support for MirroredDatabase items
+time: 2026-07-08T06:17:01Z
+custom:
+    Author: ecgang
+    AuthorLink: https://github.com/ecgang
+    Issue: "1055"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1055

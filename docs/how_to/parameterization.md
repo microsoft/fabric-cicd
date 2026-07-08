@@ -263,12 +263,12 @@ Additional notes:
     
     - **Item attribute variables:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
 
-        | Attribute Variable                                | Supported Items                   | Example                                           | Sample Replace Value                                           |
-        | ------------------------------------------------- | --------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
-        | `$items.<item_type>.<item_name>.$id`              | All                               | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
-        | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
-        | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
-        | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                        | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+        | Attribute Variable                                | Supported Items                                     | Example                                           | Sample Replace Value                                           |
+        | ------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+        | `$items.<item_type>.<item_name>.$id`              | All                                                 | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
+        | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, MirroredDatabase, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
+        | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse, MirroredDatabase                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
+        | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                                          | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
         
         > **Notes:**
         >
@@ -276,6 +276,7 @@ Additional notes:
         > - The legacy format without `$` prefix on the attribute is also supported
         > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
         > - Item type must be valid and in scope.
+        > - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` and `$sqlendpointid` are resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning (not yet available), the deployment fails before any item is published, even if that item is not referenced by a variable. Ensure these items are fully provisioned in the target workspace before deploying.
         
         <br>
         
