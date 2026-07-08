@@ -633,6 +633,55 @@ class TestParameterUtilities:
             assert item_name is None
             assert file_path == []
 
+    def test_extract_parameter_filters_memoizes_path_resolution(self):
+        """Resolved file_path filters are cached so the repository is not re-globbed per file."""
+        import threading
+
+        # Lightweight workspace stub carrying the real dict-backed cache from FabricWorkspace.
+        workspace = MagicMock()
+        workspace.repository_directory = Path("/mock/repository")
+        workspace._parameter_filter_path_cache = {}
+        workspace._parameter_filter_path_cache_lock = threading.Lock()
+
+        wildcard_param = {"file_path": "**/definition.pbir"}
+
+        with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
+            mock_process.return_value = [Path("/mock/repository/report/definition.pbir")]
+
+            # Simulate the per-file loop invoking the same parameter entry many times.
+            results = [extract_parameter_filters(workspace, wildcard_param)[2] for _ in range(50)]
+
+            # Resolution happens once despite 50 calls, and every call returns the same result.
+            mock_process.assert_called_once_with(workspace.repository_directory, "**/definition.pbir")
+            assert all(result == [Path("/mock/repository/report/definition.pbir")] for result in results)
+
+    def test_extract_parameter_filters_caches_per_unique_filter(self):
+        """Each distinct file_path filter is resolved exactly once."""
+        import threading
+
+        workspace = MagicMock()
+        workspace.repository_directory = Path("/mock/repository")
+        workspace._parameter_filter_path_cache = {}
+        workspace._parameter_filter_path_cache_lock = threading.Lock()
+
+        filters = [
+            {"file_path": "**/a.json"},
+            {"file_path": "**/b.json"},
+            {"file_path": ["**/a.json", "**/b.json"]},
+            {},  # None filter
+        ]
+
+        with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
+            mock_process.return_value = []
+
+            # Resolve each unique filter three times.
+            for _ in range(3):
+                for param in filters:
+                    extract_parameter_filters(workspace, param)
+
+            # 4 unique filters (two strings, one list, one None) -> 4 resolutions total.
+            assert mock_process.call_count == len(filters)
+
     def test_check_parameter_structure(self):
         """Tests _check_parameter_structure function."""
         # Test with valid list
