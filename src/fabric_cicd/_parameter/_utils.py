@@ -402,7 +402,9 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             raise error
 
 
-def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) -> tuple[str, str, Path]:
+def extract_parameter_filters(
+    workspace_obj: FabricWorkspace, param_dict: dict
+) -> tuple[Optional[str], Optional[str], Optional[list[Path]]]:
     """Extracts the item type, name, and path filters from the parameter dictionary, if present."""
     item_type = param_dict.get("item_type")
     item_name = param_dict.get("item_name")

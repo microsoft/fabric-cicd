@@ -672,7 +672,16 @@ class TestParameterUtilities:
         ]
 
         with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
-            mock_process.return_value = []
+
+            def fake_process(_repository_directory, input_path):
+                # Mirror production: a missing/empty filter resolves to None, otherwise concrete paths.
+                if input_path is None:
+                    return None
+                if isinstance(input_path, list):
+                    return [Path(f"/mock/repository/{entry}") for entry in input_path]
+                return [Path(f"/mock/repository/{input_path}")]
+
+            mock_process.side_effect = fake_process
 
             # Resolve each unique filter three times.
             for _ in range(3):
