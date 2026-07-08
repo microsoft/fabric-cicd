@@ -1,8 +1,0 @@
-kind: docs
-body: Move item type documentation under "Reference" section
-time: 2026-05-06T13:43:00.248034399Z
-custom:
-    Author: cmaneu
-    AuthorLink: https://github.com/cmaneu
-    Issue: "838"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/838

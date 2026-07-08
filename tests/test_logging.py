@@ -30,6 +30,7 @@ from fabric_cicd._common._logging import (
     _configure_external_file_handler,
     _mark_external_handler,
     _mark_handler,
+    _RestrictedFileHandler,
     configure_logger,
     exception_handler,
     get_file_handler,
@@ -293,6 +294,7 @@ class TestConfigureDefaultFileHandler:
         """Test default file handler has correct configuration."""
         handler = _configure_default_file_handler()
         try:
+            assert isinstance(handler, _RestrictedFileHandler)
             assert isinstance(handler, logging.FileHandler)
             assert not isinstance(handler, RotatingFileHandler)
             assert getattr(handler, "_fabric_cicd_managed", False) is True
@@ -303,6 +305,27 @@ class TestConfigureDefaultFileHandler:
             assert isinstance(handler.filters[0], PackageFilter)
             assert handler.filters[0].debug_only is False
             assert handler.formatter is not None
+        finally:
+            handler.close()
+
+    def test_restricted_handler_calls_restrict_file_on_open(self, temp_log_dir):
+        """Test that _RestrictedFileHandler._open() calls restrict_file before writing."""
+        log_file = temp_log_dir / "fabric_cicd.error.log"
+        handler = _RestrictedFileHandler(str(log_file), mode="w", delay=True)
+        try:
+            with patch("fabric_cicd._common._secure_io.restrict_file") as mock_restrict:
+                handler.emit(
+                    logging.LogRecord(
+                        name="fabric_cicd",
+                        level=logging.ERROR,
+                        pathname="",
+                        lineno=0,
+                        msg="test",
+                        args=(),
+                        exc_info=None,
+                    )
+                )
+                mock_restrict.assert_called_once_with(handler.baseFilename)
         finally:
             handler.close()
 
