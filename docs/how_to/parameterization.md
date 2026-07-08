@@ -276,7 +276,9 @@ Additional notes:
         > - The legacy format without `$` prefix on the attribute is also supported
         > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
         > - Item type must be valid and in scope.
-        > - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` and `$sqlendpointid` are resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning (not yet available), the deployment fails before any item is published, even if that item is not referenced by a variable. Ensure these items are fully provisioned in the target workspace before deploying.
+> - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace — not only the items referenced in your parameter file.
+> - Additionally, `$sqlendpointid` is resolved for **every** Lakehouse and MirroredDatabase.
+> - If any such item's SQL analytics endpoint is still provisioning (not yet available), the deployment fails before any item is published, even if that item is not referenced by a variable. Ensure these items are fully provisioned in the target workspace before deploying.
         
         <br>
         
