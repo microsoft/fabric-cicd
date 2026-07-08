@@ -26,8 +26,3 @@ This project uses [GitHub Issues](https://github.com/microsoft/fabric-cicd/issue
 - For debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](how_to/troubleshooting.md).
 - Connect with the community on [r/MicrosoftFabric](https://www.reddit.com/r/MicrosoftFabric/)
 - Join the [Microsoft Developer Community](https://community.fabric.microsoft.com/t5/Developer/bd-p/Developer)
-
-**Need enterprise assistance?**
-
-- Contact your Microsoft account manager or:
-- Open a ticket with the [Fabric Support Team](https://support.fabric.microsoft.com/)
