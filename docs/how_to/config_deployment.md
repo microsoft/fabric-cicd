@@ -524,7 +524,7 @@ pip install ms-fabric-cli
 ### Usage
 
 ```bash
-fab deploy --config <config_file> [--target_env <environment>] [--params <parameters>] [--force]
+fab deploy --config <config_file> [--target_env <environment>] [--params <parameters>] [--bulk_publish] [--force]
 ```
 
 Refer to the [Fabric CLI `deploy` command documentation](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) for the complete list of behaviors and options.
@@ -548,6 +548,14 @@ fab deploy --config config.yml --target_env test -P config_override='{"core":{"i
 ```bash
 fab deploy --config config.yml --target_env dev --force
 ```
+
+<span class="md-h4-nonanchor">Deploy using bulk publish (experimental):</span>
+
+```bash
+fab deploy --config config.yml --target_env dev --bulk_publish
+```
+
+The `--bulk_publish` flag enables [bulk publish](optional_feature.md#bulk-publish) mode, which deploys all items in a single bulk import API call instead of one at a time. When set, the CLI automatically turns on the required `enable_experimental_features` and `enable_bulk_publish` fabric-cicd feature flags for you — no need to add them to the `features` section of your `config.yml`. As this relies on the fabric-cicd bulk import (beta) API, it is experimental and recommended for non-production environments only.
 
 ## Troubleshooting Guide
 
