@@ -1,5 +1,5 @@
 kind: optimization
-body: Improve parameter file_path filter and repository folder refresh performance
+body: Improve performance of the `file_path` parameter filter and repository folder refresh
 time: 2026-07-08T14:35:54.402+03:00
 custom:
     Author: ayeshurun
