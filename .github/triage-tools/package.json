@@ -1,0 +1,16 @@
+{
+    "name": "fabric-cicd-triage-tools",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Tool skills and orchestrator for the fabric-cicd AI issue triage workflow. First-party GitHub Models only.",
+    "engines": {
+        "node": ">=20"
+    },
+    "dependencies": {
+        "js-yaml": "^4.1.0"
+    },
+    "scripts": {
+        "check": "node --check lib/gh.mjs && node --check verify_symbol.mjs && node --check parse_error_log.mjs && node --check check_version.mjs && node --check search_issues.mjs && node --check orchestrate.mjs"
+    }
+}

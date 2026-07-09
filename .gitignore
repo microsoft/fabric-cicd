@@ -166,3 +166,8 @@ cython_debug/
 /http_trace.json
 /http_trace.json.lock
 /http_trace.json.gz
+
+# fabric-cicd AI triage tools (JavaScript) — re-include the JS lib dir that the
+# generic Python `lib/` rule above would otherwise ignore, and drop installed deps.
+!/.github/triage-tools/lib/
+/.github/triage-tools/node_modules/

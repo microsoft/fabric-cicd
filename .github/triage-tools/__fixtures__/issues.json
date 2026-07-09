@@ -1,0 +1,26 @@
+[
+    {
+        "number": 101,
+        "title": "DataPipeline fails with PublishError: dependency not published",
+        "body": "When I run publish_all_items my DataPipeline errors because the referenced Notebook dependency has not been published yet. item_type_in_scope only lists DataPipeline.",
+        "state": "closed",
+        "html_url": "https://github.com/microsoft/fabric-cicd/issues/101",
+        "labels": ["bug"]
+    },
+    {
+        "number": 87,
+        "title": "How to authenticate with a service principal in Azure DevOps",
+        "body": "Looking for guidance on ClientSecretCredential setup in an Azure DevOps pipeline.",
+        "state": "closed",
+        "html_url": "https://github.com/microsoft/fabric-cicd/issues/87",
+        "labels": ["question"]
+    },
+    {
+        "number": 64,
+        "title": "Support incremental git-diff based deployment",
+        "body": "Feature request to only deploy items changed since the last commit instead of full deployment.",
+        "state": "open",
+        "html_url": "https://github.com/microsoft/fabric-cicd/issues/64",
+        "labels": ["enhancement"]
+    }
+]

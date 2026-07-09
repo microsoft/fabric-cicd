@@ -1,8 +1,18 @@
 name: "AI Issue Triage"
 
+# Agentic, tool-grounded triage on first-party GitHub Models.
+#
+# The heavy lifting lives in .github/triage-tools/orchestrate.mjs, which runs a deterministic
+# pipeline (classify -> tools -> analyze/answer/misconfig -> comment-draft -> critique) and
+# emits a single decision JSON. This workflow only wires I/O: resolve the issue, run the
+# orchestrator, then label / comment / close based on the decision (respecting the dry-run
+# flags below). No third-party marketplace actions and no external model providers.
+
 on:
     issues:
-        types: [labeled]
+        # `opened`  -> triage brand-new issues automatically.
+        # `labeled` -> manual/humans re-enter triage by adding `needs triage`.
+        types: [opened, labeled]
     workflow_dispatch:
         inputs:
             issue_number:
@@ -10,9 +20,18 @@ on:
                 required: true
                 type: number
 
+# One triage run per issue at a time; a newer event supersedes an in-flight run.
+concurrency:
+    group: ai-triage-${{ github.event.issue.number || github.event.inputs.issue_number }}
+    cancel-in-progress: true
+
 jobs:
     ai-triage:
-        if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'needs triage'
+        # Run for: manual dispatch, any newly opened issue, or the `needs triage` label.
+        if: >-
+            github.event_name == 'workflow_dispatch' ||
+            github.event.action == 'opened' ||
+            (github.event.action == 'labeled' && github.event.label.name == 'needs triage')
         runs-on: ubuntu-latest
         permissions:
             issues: write
@@ -21,16 +40,26 @@ jobs:
 
         env:
             # -------------------------------------------------------
-            # Phase control — toggle these two flags to switch phases:
+            # Phase control — toggle these flags to switch phases:
             #   Testing (fork):   suppress both  → true  / true
             #   Production:       enable both    → false / false
             # -------------------------------------------------------
             SUPPRESS_LABELS: "false"
             SUPPRESS_COMMENTS: "false"
+            # Tier-2 handoff to the Copilot coding agent (off by default — opt-in only).
+            ENABLE_CODING_AGENT_HANDOFF: "false"
 
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: Install triage tool dependencies
+              run: npm install --prefix .github/triage-tools --no-audit --no-fund
 
             - name: Resolve issue details
               id: issue
@@ -45,10 +74,8 @@ jobs:
                         owner, repo, issue_number: issueNumber,
                       });
 
-                      // Detect re-triage: check if any ai: labels exist from a prior assessment
-                      const hasAiLabels = issue.labels.some(l => l.name.startsWith('ai:'));
-
-                      // Check for prior AI assessment comments
+                      // Detect re-triage: prior ai: labels or a prior AI assessment comment.
+                      const hasAiLabels = issue.labels.some(l => (l.name || l).startsWith('ai:'));
                       const { data: comments } = await github.rest.issues.listComments({
                         owner, repo, issue_number: issueNumber, per_page: 100,
                       });
@@ -60,17 +87,13 @@ jobs:
                       let issueBody = issue.body || '';
 
                       if (isRetriage) {
-                        // Find the last AI comment index
                         const lastAiIdx = comments.reduce((acc, c, i) =>
                           c.body && c.body.includes('### AI Assessment:') ? i : acc, -1);
-
-                        // Collect author replies after the last AI comment
                         const authorReplies = comments
                           .slice(lastAiIdx + 1)
                           .filter(c => c.user.login === issue.user.login)
                           .map(c => c.body)
                           .join('\n\n---\n\n');
-
                         if (authorReplies) {
                           issueBody = `[RE-TRIAGE] The author has provided additional information in response to a prior AI assessment.\n\n`
                             + `## Original Issue Summary\n${issue.title}\n\n`
@@ -80,198 +103,235 @@ jobs:
                       }
 
                       core.setOutput('number', issue.number);
-                      core.setOutput('body', issueBody);
                       core.setOutput('title', issue.title);
+                      core.setOutput('author', issue.user.login);
                       core.setOutput('html_url', issue.html_url);
-                      core.setOutput('labels', issue.labels.map(l => l.name).join(','));
                       core.setOutput('is_retriage', isRetriage.toString());
+                      // Body can be large / multiline — pass via env file rather than an output.
+                      const fs = require('fs');
+                      fs.writeFileSync('triage-issue-body.txt', issueBody);
 
-            - name: Run AI assessment
-              id: ai-assessment
-              uses: github/ai-assessment-comment-labeler@v1.0.1
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  issue_number: ${{ steps.issue.outputs.number }}
-                  issue_body: ${{ steps.issue.outputs.body }}
-                  repo_name: ${{ github.event.repository.name || github.repository }}
-                  owner: ${{ github.repository_owner }}
-                  ai_review_label: "needs triage"
-                  prompts_directory: ".github/prompts"
-                  labels_to_prompts_mapping: "bug,bug-triage.prompt.yml|enhancement,feature-triage.prompt.yml|question,question-triage.prompt.yml"
-                  model: "openai/gpt-4.1"
-                  max_tokens: 2000
-                  suppress_comments: ${{ env.SUPPRESS_COMMENTS }}
-                  suppress_labels: ${{ env.SUPPRESS_LABELS }}
+            - name: Run orchestrator
+              id: orchestrate
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+                  ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+                  ISSUE_AUTHOR: ${{ steps.issue.outputs.author }}
+                  DECISION_OUT: triage-decision.json
+              run: |
+                  ISSUE_BODY="$(cat triage-issue-body.txt)" \
+                    node .github/triage-tools/orchestrate.mjs > /dev/null
+                  echo "Decision written to triage-decision.json"
+                  test -s triage-decision.json && echo "have_decision=true" >> "$GITHUB_OUTPUT"
 
-            - name: Post-process triage results
-              if: steps.ai-assessment.outputs.ai_assessments != ''
+            - name: Apply triage decision
+              if: steps.orchestrate.outputs.have_decision == 'true'
               uses: actions/github-script@v7
               env:
-                  ASSESSMENT_OUTPUT: ${{ steps.ai-assessment.outputs.ai_assessments }}
                   SUPPRESS_LABELS: ${{ env.SUPPRESS_LABELS }}
+                  SUPPRESS_COMMENTS: ${{ env.SUPPRESS_COMMENTS }}
                   ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |
-                      const assessments = JSON.parse(process.env.ASSESSMENT_OUTPUT);
+                      const fs = require('fs');
+                      const decision = JSON.parse(fs.readFileSync('triage-decision.json', 'utf8'));
                       const issueNumber = parseInt(process.env.ISSUE_NUMBER);
                       const owner = context.repo.owner;
                       const repo = context.repo.repo;
                       const suppressLabels = process.env.SUPPRESS_LABELS === 'true';
+                      const suppressComments = process.env.SUPPRESS_COMMENTS === 'true';
 
-                      let needsHumanReview = false;
-                      let addHelpWanted = false;
-                      let needsAuthorFeedback = false;
-                      let canAutoClose = false;
+                      core.info(`Decision: category=${decision.category} confidence=${decision.confidence} ` +
+                        `resolution=${decision.resolution} can_auto_close=${decision.can_auto_close}`);
 
-                      for (const assessment of assessments) {
-                        const label = (assessment.assessmentLabel || '').toLowerCase();
+                      // Persist the decision for the summary/handoff steps.
+                      core.exportVariable('TRIAGE_DECISION', JSON.stringify(decision));
 
-                        // Check if the assessment requires human review
-                        if (label.includes('needs team review') || label.includes('needs maintainer input') || label.includes('potential bug') || label.includes('needs discussion')) {
-                          needsHumanReview = true;
-                        }
-
-                        // Check if feature should be tagged as help wanted
-                        if (label.includes('help wanted')) {
-                          addHelpWanted = true;
-                        }
-
-                        // Check if more information is needed from the issue author
-                        if (label.includes('needs author feedback') || label.includes('requires additional details')) {
-                          needsAuthorFeedback = true;
-                        }
-
-                        // Check if the AI fully resolved the issue (answered question, explained misconfiguration, redirected to docs)
-                        if (label.includes('answered') || label.includes('likely misconfiguration') || label.includes('redirect to docs')) {
-                          canAutoClose = true;
-                        }
-
-                        // Log for job summary
-                        core.info(`Prompt: ${assessment.prompt}, Label: ${assessment.assessmentLabel}`);
+                      // --- Comment (respect dry-run) ---
+                      if (!suppressComments && decision.comment_markdown) {
+                        await github.rest.issues.createComment({
+                          owner, repo, issue_number: issueNumber, body: decision.comment_markdown,
+                        });
+                        core.info('Posted AI assessment comment.');
+                      } else {
+                        core.info('Comments suppressed — skipping comment.');
                       }
 
-                      // Skip label changes in summary-only mode (Phase 3)
                       if (suppressLabels) {
                         core.info('Labels suppressed — logging decisions only.');
-                        core.exportVariable('LABEL_DECISIONS', JSON.stringify({
-                          needsHumanReview, addHelpWanted, needsAuthorFeedback, canAutoClose,
-                          assessmentLabels: assessments.map(a => a.assessmentLabel),
-                        }));
                         return;
                       }
 
-                      // Add 'help wanted' label if AI recommended community contribution
-                      if (addHelpWanted) {
-                        await github.rest.issues.addLabels({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
-                          labels: ['help wanted']
-                        });
-                        core.info('Added "help wanted" label based on AI assessment.');
+                      // --- Labels ---
+                      const labels = Array.isArray(decision.labels) ? decision.labels : [];
+                      if (labels.length) {
+                        try {
+                          await github.rest.issues.addLabels({ owner, repo, issue_number: issueNumber, labels });
+                          core.info(`Added labels: ${labels.join(', ')}`);
+                        } catch (e) { core.info(`Could not add labels: ${e.message}`); }
                       }
 
-                      // If AI fully handled the issue without needing team review
-                      if (!needsHumanReview) {
-                        // Auto-close if AI fully resolved (answered, misconfiguration, redirected)
-                        if (canAutoClose && !needsAuthorFeedback && !addHelpWanted) {
-                          await github.rest.issues.update({
-                            owner,
-                            repo,
-                            issue_number: issueNumber,
-                            state: 'closed',
-                            state_reason: 'completed'
+                      // --- Escalate to team ---
+                      if (decision.needs_human_review) {
+                        try {
+                          await github.rest.issues.addLabels({
+                            owner, repo, issue_number: issueNumber, labels: ['ai:needs team attention'],
                           });
-                          core.info('Auto-closed issue — AI fully resolved it.');
+                        } catch (e) { core.info(`Could not add attention label: ${e.message}`); }
+                        if (!suppressComments) {
+                          await github.rest.issues.createComment({
+                            owner, repo, issue_number: issueNumber,
+                            body: '🔔 @microsoft/fabric-cicd — This issue has been flagged by AI triage as requiring team attention. Please review the assessment above.',
+                          });
                         }
-                      } else {
-                        // Add consolidated label for easy filtering of all issues needing team attention
-                        await github.rest.issues.addLabels({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
-                          labels: ['ai:needs team attention']
-                        });
-
-                        // Notify team via comment on escalated issues
-                        await github.rest.issues.createComment({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
-                          body: '🔔 @microsoft/fabric-cicd — This issue has been flagged by AI triage as requiring team attention. Please review the assessment above.'
-                        });
                         core.info('Escalated to team.');
                       }
 
-                      // Always remove 'needs triage' — triage is complete regardless of outcome
-                      try {
-                        await github.rest.issues.removeLabel({
-                          owner,
-                          repo,
-                          issue_number: issueNumber,
-                          name: 'needs triage'
+                      // --- Auto-close (confidence-gated inside the orchestrator) ---
+                      if (decision.can_auto_close) {
+                        await github.rest.issues.update({
+                          owner, repo, issue_number: issueNumber, state: 'closed', state_reason: 'completed',
                         });
-                        core.info('Removed "needs triage" — triage complete.');
+                        core.info('Auto-closed — AI fully resolved it above the confidence threshold.');
+                      }
+
+                      // --- Always remove 'needs triage' — triage is complete ---
+                      try {
+                        await github.rest.issues.removeLabel({ owner, repo, issue_number: issueNumber, name: 'needs triage' });
+                        core.info("Removed 'needs triage' — triage complete.");
                       } catch (e) {
-                        core.info(`Could not remove "needs triage" label: ${e.message}`);
+                        core.info(`Could not remove 'needs triage' label: ${e.message}`);
+                      }
+
+            - name: Hand off to coding agent (Tier-2, opt-in)
+              if: steps.orchestrate.outputs.have_decision == 'true' && env.ENABLE_CODING_AGENT_HANDOFF == 'true' && env.SUPPRESS_LABELS != 'true'
+              uses: actions/github-script@v7
+              env:
+                  ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const fs = require('fs');
+                      const decision = JSON.parse(fs.readFileSync('triage-decision.json', 'utf8'));
+                      const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+
+                      // Only hand off clear, non-critical, high-confidence bugs with a reproduction and
+                      // a concrete failure signal — never features, questions, or duplicates.
+                      const hasRepro = Boolean(decision.tool_findings?.error_log?.primary_exception)
+                        || Boolean(decision.tool_findings?.error_log?.has_error);
+                      const eligible = decision.category === 'bug'
+                        && decision.severity !== 'critical'
+                        && (decision.confidence || 0) >= 0.85
+                        && !decision.is_duplicate_of
+                        && decision.resolution !== 'misconfiguration'
+                        && hasRepro;
+
+                      if (!eligible) {
+                        core.info('Not eligible for coding-agent handoff — skipping.');
+                        return;
+                      }
+
+                      // Best-effort assignment of the Copilot coding agent via GraphQL. Falls back to a
+                      // label + comment if the agent is unavailable in this repo. Never fails the run.
+                      try {
+                        const q = `query($owner:String!,$repo:String!){
+                          repository(owner:$owner,name:$repo){
+                            id
+                            suggestedActors(capabilities:[CAN_BE_ASSIGNED], first:50){
+                              nodes { login __typename ... on Bot { id } ... on User { id } }
+                            }
+                          }
+                        }`;
+                        const data = await github.graphql(q, { owner, repo });
+                        const bot = data.repository.suggestedActors.nodes.find(n => n.login === 'copilot-swe-agent' || n.login === 'Copilot');
+                        const issueNode = await github.graphql(
+                          `query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){issue(number:$n){id}}}`,
+                          { owner, repo, n: issueNumber });
+                        if (bot && issueNode.repository.issue.id) {
+                          await github.graphql(
+                            `mutation($assignable:ID!,$actor:ID!){replaceActorsForAssignable(input:{assignableId:$assignable,actorIds:[$actor]}){clientMutationId}}`,
+                            { assignable: issueNode.repository.issue.id, actor: bot.id });
+                          core.info('Assigned issue to the Copilot coding agent.');
+                          return;
+                        }
+                        throw new Error('Copilot coding agent not available as an assignable actor.');
+                      } catch (e) {
+                        core.info(`Coding-agent assignment unavailable (${e.message}); labelling for manual pickup.`);
+                        try {
+                          await github.rest.issues.addLabels({ owner, repo, issue_number: issueNumber, labels: ['ready for coding agent'] });
+                        } catch (e2) { core.info(`Could not add handoff label: ${e2.message}`); }
                       }
 
             - name: Generate triage summary
-              if: always() && steps.ai-assessment.outputs.ai_assessments != ''
+              if: always() && steps.orchestrate.outputs.have_decision == 'true'
               uses: actions/github-script@v7
               env:
-                  ASSESSMENT_OUTPUT: ${{ steps.ai-assessment.outputs.ai_assessments }}
-                  LABEL_DECISIONS: ${{ env.LABEL_DECISIONS }}
                   ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
                   ISSUE_TITLE: ${{ steps.issue.outputs.title }}
                   ISSUE_URL: ${{ steps.issue.outputs.html_url }}
+                  SUPPRESS_LABELS: ${{ env.SUPPRESS_LABELS }}
               with:
                   script: |
-                      const assessments = JSON.parse(process.env.ASSESSMENT_OUTPUT);
+                      const fs = require('fs');
+                      const decision = JSON.parse(fs.readFileSync('triage-decision.json', 'utf8'));
                       const issueNumber = process.env.ISSUE_NUMBER;
                       const issueTitle = process.env.ISSUE_TITLE;
                       const issueUrl = process.env.ISSUE_URL;
+                      const suppressLabels = process.env.SUPPRESS_LABELS === 'true';
 
+                      const tf = decision.tool_findings || {};
+                      const exc = tf.error_log?.primary_exception;
                       let summary = `## 🤖 AI Triage Report\n\n`;
                       summary += `**Issue:** [#${issueNumber} — ${issueTitle}](${issueUrl})\n\n`;
+                      summary += `| Field | Value |\n|-------|-------|\n`;
+                      summary += `| Category | \`${decision.category}\` |\n`;
+                      summary += `| Confidence | ${decision.confidence} (threshold ${decision.confidence_threshold}) |\n`;
+                      summary += `| Severity | \`${decision.severity}\` |\n`;
+                      summary += `| Resolution | \`${decision.resolution}\` |\n`;
+                      summary += `| Labels | ${(decision.labels||[]).map(l => '`'+l+'`').join(', ') || '—'} |\n`;
+                      summary += `| Duplicate of | ${decision.is_duplicate_of ? '#'+decision.is_duplicate_of : '—'} |\n`;
+                      summary += `| Auto-close | ${decision.can_auto_close ? '✅ Yes' : '❌ No'} |\n`;
+                      summary += `| Escalated | ${decision.needs_human_review ? '✅ Yes' : '❌ No'} |\n\n`;
 
-                      for (const assessment of assessments) {
-                        summary += `### Prompt: \`${assessment.prompt}\`\n`;
-                        summary += `**Assessment:** \`${assessment.assessmentLabel}\`\n\n`;
-                        summary += `<details><summary>Full AI Response</summary>\n\n`;
-                        summary += `${assessment.response}\n\n`;
-                        summary += `</details>\n\n`;
-                      }
+                      summary += `### 🔧 Tool grounding\n\n`;
+                      summary += `- Exception: ${exc ? '`'+exc.type+'`: '+exc.message : '—'}\n`;
+                      summary += `- HTTP status: ${tf.error_log?.http_status ?? '—'}\n`;
+                      summary += `- Version: reported \`${tf.version?.reported_version ?? '—'}\`, latest \`${tf.version?.latest_version ?? '—'}\`${tf.version?.is_stale ? ' (stale)' : ''}\n`;
+                      summary += `- Duplicate candidate: ${tf.duplicates?.likely_duplicate_of ? '#'+tf.duplicates.likely_duplicate_of : '—'}\n`;
+                      const unknown = (tf.symbols||[]).filter(s => !s.exists);
+                      summary += `- Unknown symbols flagged: ${unknown.length ? unknown.map(s => '`'+s.name+'`').join(', ') : '—'}\n\n`;
 
-                      // Show label decisions
-                      const ld = process.env.LABEL_DECISIONS ? JSON.parse(process.env.LABEL_DECISIONS) : null;
-                      if (ld) {
+                      summary += `### 🧠 Pipeline\n\n`;
+                      summary += `- Stages: ${(decision.stages||[]).join(' → ') || '—'}\n`;
+                      summary += `- Models: ${(decision.models_used||[]).map(m => '`'+m+'`').join(', ') || '—'}\n`;
+                      if (decision.degraded) summary += `- ⚠️ Ran in degraded mode (no model token).\n`;
+                      summary += `\n`;
+
+                      if (suppressLabels) {
                         summary += `### 🏷️ Label Decisions (not applied — testing mode)\n\n`;
                         summary += `| Decision | Value |\n|----------|-------|\n`;
-                        summary += `| AI assessment labels | ${(ld.assessmentLabels || []).map(l => '`' + l + '`').join(', ')} |\n`;
-                        summary += `| Would add \`help wanted\` | ${ld.addHelpWanted ? '✅ Yes' : '❌ No'} |\n`;
-                        summary += `| Would add \`ai:needs team attention\` | ${ld.needsHumanReview ? '✅ Yes' : '❌ No'} |\n`;
-                        summary += `| Would request author feedback | ${ld.needsAuthorFeedback ? '✅ Yes' : '❌ No'} |\n`;
-                        summary += `| Would remove \`needs triage\` | ✅ Yes (always) |\n`;
-                        summary += `| Would auto-close | ${ld.canAutoClose && !ld.needsAuthorFeedback && !ld.addHelpWanted ? '✅ Yes' : '❌ No'} |\n`;
-                        summary += `| Would notify team | ${ld.needsHumanReview ? '✅ Yes' : '❌ No'} |\n\n`;
+                        summary += `| Would add labels | ${(decision.labels||[]).map(l => '`'+l+'`').join(', ') || '—'} |\n`;
+                        summary += `| Would add \`help wanted\` | ${decision.add_help_wanted ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would add \`ai:needs team attention\` | ${decision.needs_human_review ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would request author feedback | ${decision.needs_author_feedback ? '✅ Yes' : '❌ No'} |\n`;
+                        summary += `| Would auto-close | ${decision.can_auto_close ? '✅ Yes' : '❌ No'} |\n\n`;
                       }
 
-                      summary += `---\n\n`;
+                      summary += `<details><summary>Proposed comment</summary>\n\n${decision.comment_markdown || '_none_'}\n\n</details>\n\n---\n\n`;
 
                       core.summary.addRaw(summary);
                       await core.summary.write();
 
-                      const fs = require('fs');
                       fs.mkdirSync('triage-reports', { recursive: true });
-                      fs.writeFileSync(
-                        `triage-reports/issue-${issueNumber}-triage.md`,
-                        summary
-                      );
+                      fs.writeFileSync(`triage-reports/issue-${issueNumber}-triage.md`, summary);
+                      fs.copyFileSync('triage-decision.json', `triage-reports/issue-${issueNumber}-decision.json`);
 
             - name: Upload triage report
-              if: always() && steps.ai-assessment.outputs.ai_assessments != ''
+              if: always() && steps.orchestrate.outputs.have_decision == 'true'
               uses: actions/upload-artifact@v4
               with:
                   name: triage-report-issue-${{ steps.issue.outputs.number }}

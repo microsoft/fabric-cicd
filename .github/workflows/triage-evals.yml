@@ -1,0 +1,73 @@
+name: Triage Evals
+
+# Regression tests for the AI issue-triage prompts and the classify golden set.
+# Runs on PRs that touch the prompts, tools, or evals so prompt changes can't silently
+# regress classification quality. Uses first-party GitHub Models only.
+
+on:
+  pull_request:
+    paths:
+      - ".github/prompts/**"
+      - ".github/triage-tools/**"
+      - ".github/evals/**"
+      - ".github/workflows/triage-evals.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  models: read
+
+concurrency:
+  group: triage-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prompt-evals:
+    name: Prompt eval (${{ matrix.skill }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        skill:
+          - classify
+          - bug-analyze
+          - answer
+          - misconfig-resolve
+          - comment-draft
+          - critique
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install gh-models extension
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh extension install github/gh-models || true
+
+      - name: Evaluate ${{ matrix.skill }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh models eval ".github/prompts/skills/${{ matrix.skill }}.prompt.yml"
+
+  golden-set:
+    name: Classify golden-set accuracy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install triage-tools deps
+        working-directory: .github/triage-tools
+        run: npm install --no-audit --no-fund
+
+      - name: Run golden-set eval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          THRESHOLD: "0.80"
+          NODE_PATH: ".github/triage-tools/node_modules"
+        run: node .github/evals/run-golden.mjs

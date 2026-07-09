@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/runner/deploy.py", line 12, in <module>
+    publish_all_items(workspace)
+  File "/opt/venv/lib/python3.11/site-packages/fabric_cicd/publish.py", line 88, in publish_all_items
+    raise PublishError(msg)
+fabric_cicd._common._exceptions.PublishError: Failed to publish item 'SalesPipeline.DataPipeline': dependency 'SalesNotebook.Notebook' has not been published.
+[2024-05-01 10:22:41] ERROR fabric_cicd: HTTP response status code 400 from https://api.fabric.microsoft.com/v1/workspaces/abc/items
+[2024-05-01 10:22:41] ERROR fabric_cicd: x-ms-request-id: 7f3c9a12-4b8e-4c2a-9d10-2f6b1e5a8c44
