@@ -1360,7 +1360,7 @@ def test_get_item_attribute_caching_basic(patched_fabric_workspace, valid_worksp
 
 
 def test_get_item_attribute_mirrored_database(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
-    """Test that _get_item_attribute resolves sqlendpoint and sqlendpointid for MirroredDatabase items (issue #1055)."""
+    """Test that _get_item_attribute resolves sqlendpoint and sqlendpointid for MirroredDatabase items."""
     mock_endpoint = MagicMock()
 
     # Mock response mirrors the Fabric "Get Mirrored Database" API shape

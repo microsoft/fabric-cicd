@@ -276,15 +276,13 @@ Additional notes:
         > - The legacy format without `$` prefix on the attribute is also supported
         > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
         > - Item type must be valid and in scope.
-> - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace — not only the items referenced in your parameter file.
-> - Additionally, `$sqlendpointid` is resolved for **every** Lakehouse and MirroredDatabase.
-> - If any such item's SQL analytics endpoint is still provisioning (not yet available), the deployment fails before any item is published, even if that item is not referenced by a variable. Ensure these items are fully provisioned in the target workspace before deploying.
         
         <br>
         
         - **Example:** `$items.Notebook.Hello World.$id` → returns the item ID of the "Hello World" Notebook in the target workspace.
         - **Important**: Deployment will fail if the variable contains any error — including a typo in the syntax (e.g., `$item` instead of `$items`), a non-existent item type or name, or an unsupported attribute for the given item type.
         - See the **Notebook/Dataflow Advanced `find_replace` Parameterization Case** for examples.
+        - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace (and `$sqlendpointid` for every Lakehouse and MirroredDatabase) — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning, the deployment fails before any item is published; ensure these items are fully provisioned in the target workspace before deploying.
 
 ### Environment Variable Replacement
 
