@@ -1,0 +1,8 @@
+kind: added
+body: Add `get_supported_feature_flags` function to return all supported feature flags
+time: 2026-07-12T12:02:17.006+03:00
+custom:
+    Author: ayeshurun
+    AuthorLink: https://github.com/ayeshurun
+    Issue: "1059"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1059
