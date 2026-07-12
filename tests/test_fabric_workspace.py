@@ -1359,6 +1359,56 @@ def test_get_item_attribute_caching_basic(patched_fabric_workspace, valid_worksp
         )
 
 
+def test_get_item_attribute_mirrored_database(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that _get_item_attribute resolves sqlendpoint and sqlendpointid for MirroredDatabase items."""
+    mock_endpoint = MagicMock()
+
+    # Mock response mirrors the Fabric "Get Mirrored Database" API shape
+    mock_response = {
+        "body": {
+            "properties": {
+                "sqlEndpointProperties": {
+                    "connectionString": "mirrored-connection-string",
+                    "id": "mirrored-endpoint-id",
+                }
+            }
+        }
+    }
+    mock_endpoint.invoke.return_value = mock_response
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        sqlendpoint = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="MirroredDatabase",
+            item_guid="test-item-guid",
+            item_name="Test Mirrored Database",
+            attribute_name="sqlendpoint",
+        )
+        sqlendpointid = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="MirroredDatabase",
+            item_guid="test-item-guid",
+            item_name="Test Mirrored Database",
+            attribute_name="sqlendpointid",
+        )
+
+        # Both attributes resolve from the mirrored database's sqlEndpointProperties
+        assert sqlendpoint == "mirrored-connection-string"
+        assert sqlendpointid == "mirrored-endpoint-id"
+
+        # Endpoint is queried via the (case-insensitive) mirroreddatabases collection segment
+        mock_endpoint.invoke.assert_called_with(
+            method="GET",
+            url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/test-workspace-id/mirroreddatabases/test-item-guid",
+        )
+
+
 def test_get_item_attribute_caching_prevents_api_call(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
     """Test that fetching the same attribute again uses cache and doesn't make API call."""
     mock_endpoint = MagicMock()

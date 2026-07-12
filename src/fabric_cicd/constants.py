@@ -255,6 +255,10 @@ PROPERTY_PATH_ATTR_MAPPING = {
         "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
         "sqlendpointid": "body/properties/sqlEndpointProperties/id",
     },
+    ItemType.MIRRORED_DATABASE.value: {
+        "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+        "sqlendpointid": "body/properties/sqlEndpointProperties/id",
+    },
     ItemType.WAREHOUSE.value: {
         "sqlendpoint": "body/properties/connectionString",
     },

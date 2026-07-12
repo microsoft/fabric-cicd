@@ -452,7 +452,12 @@ class FabricWorkspace:
             # Only collect attribute values when parameterization with dynamic variables is in use
             if self.contains_param_vars:
                 # Get additional properties
-                if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
+                if item_type in [
+                    ItemType.LAKEHOUSE.value,
+                    ItemType.MIRRORED_DATABASE.value,
+                    ItemType.WAREHOUSE.value,
+                    ItemType.SQL_DATABASE.value,
+                ]:
                     sql_endpoint = self._get_item_attribute(
                         self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                     )
