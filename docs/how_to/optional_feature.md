@@ -60,6 +60,16 @@ append_feature_flag("enable_environment_variable_replacement")
 append_feature_flag("enable_response_collection")
 ```
 
+<span class="md-h3-nonanchor">Listing supported flags</span>
+
+To discover the supported feature flags programmatically, use `get_supported_feature_flags()`. It returns a sorted list of the flag string identifiers accepted by `append_feature_flag`, derived directly from the supported set so it always stays in sync with the charts above.
+
+```python
+from fabric_cicd import get_supported_feature_flags
+get_supported_feature_flags()
+# ['continue_on_shortcut_failure', 'disable_workspace_folder_publish', 'enable_bulk_publish', ...]
+```
+
 ## Debugging
 
 If an error arises, or you want full visibility into the API calls the library makes, enable debug logging:

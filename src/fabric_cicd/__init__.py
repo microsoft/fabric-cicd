@@ -34,6 +34,25 @@ def append_feature_flag(feature: str) -> None:
     constants.FEATURE_FLAG.add(feature)
 
 
+def get_supported_feature_flags() -> list[str]:
+    """
+    Return all feature flags supported by fabric-cicd.
+
+    The returned values are the string identifiers accepted by
+    ``append_feature_flag`` and the ``features`` section of a config file.
+
+    Returns:
+        A sorted list of supported feature flag string values.
+
+    Examples:
+        Basic usage
+        >>> from fabric_cicd import get_supported_feature_flags
+        >>> get_supported_feature_flags()
+        ['continue_on_shortcut_failure', 'disable_workspace_folder_publish', ...]
+    """
+    return sorted(flag.value for flag in FeatureFlag)
+
+
 def change_log_level(level: str = "DEBUG") -> None:
     """
     Sets the log level for all loggers within the fabric_cicd package. Currently only supports DEBUG.
@@ -213,6 +232,7 @@ __all__ = [
     "deploy_with_config",
     "disable_file_logging",
     "get_changed_items",
+    "get_supported_feature_flags",
     "publish_all_items",
     "unpublish_all_orphan_items",
 ]

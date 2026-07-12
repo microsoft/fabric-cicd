@@ -18,6 +18,7 @@ from fabric_cicd import (
     configure_external_file_logging,
     constants,
     disable_file_logging,
+    get_supported_feature_flags,
 )
 from fabric_cicd._common._logging import (
     CustomFormatter,
@@ -656,6 +657,35 @@ class TestWrapperFunctions:
         assert "feature_1" in constants.FEATURE_FLAG
         assert "feature_2" in constants.FEATURE_FLAG
         assert len([f for f in constants.FEATURE_FLAG if f == "feature_1"]) == 1
+
+    def test_get_supported_feature_flags_returns_all_enum_values(self):
+        """Test get_supported_feature_flags returns every FeatureFlag value."""
+        flags = get_supported_feature_flags()
+
+        expected = {flag.value for flag in constants.FeatureFlag}
+        assert set(flags) == expected
+        assert len(flags) == len(expected)
+
+    def test_get_supported_feature_flags_is_sorted_string_list(self):
+        """Test get_supported_feature_flags returns a sorted list of strings."""
+        flags = get_supported_feature_flags()
+
+        assert isinstance(flags, list)
+        assert all(isinstance(flag, str) for flag in flags)
+        assert flags == sorted(flags)
+
+    def test_get_supported_feature_flags_unaffected_by_append(self):
+        """Test get_supported_feature_flags reflects supported flags, not runtime-appended ones."""
+        append_feature_flag("some_unsupported_flag")
+
+        flags = get_supported_feature_flags()
+        assert "some_unsupported_flag" not in flags
+
+    def test_get_supported_feature_flags_values_are_appendable(self):
+        """Test every supported flag is accepted by append_feature_flag."""
+        for flag in get_supported_feature_flags():
+            append_feature_flag(flag)
+            assert flag in constants.FEATURE_FLAG
 
     @pytest.mark.parametrize("level_input", ["DEBUG", "debug"])
     def test_change_log_level(self, level_input, temp_log_dir):
