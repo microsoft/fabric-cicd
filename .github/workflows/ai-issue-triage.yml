@@ -48,6 +48,9 @@ jobs:
             SUPPRESS_COMMENTS: "false"
             # Tier-2 handoff to the Copilot coding agent (off by default — opt-in only).
             ENABLE_CODING_AGENT_HANDOFF: "false"
+            # Silence Node's harmless DEP0040 punycode deprecation warning (emitted by Node core's
+            # URL/fetch stack, not our code) so it doesn't clutter the triage logs.
+            NODE_OPTIONS: "--no-deprecation"
 
         steps:
             - name: Checkout
