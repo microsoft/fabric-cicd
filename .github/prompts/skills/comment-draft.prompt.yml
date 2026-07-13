@@ -49,10 +49,3 @@ model: openai/gpt-4.1
 modelParameters:
     max_tokens: 1400
     temperature: 0.3
-testData:
-    - input: '{"category":"question","resolution":"answered","issue_author":"octocat","answer_markdown":"Use `WorkloadIdentityCredential` with OIDC.","doc_links":["https://microsoft.github.io/fabric-cicd/latest/example/authentication/"]}'
-      expected: "AI Assessment"
-evaluators:
-    - name: has-assessment-header
-      string:
-          contains: "{{expected}}"

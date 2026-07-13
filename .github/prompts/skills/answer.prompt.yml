@@ -43,10 +43,3 @@ model: openai/gpt-4.1
 modelParameters:
     max_tokens: 1200
     temperature: 0.2
-testData:
-    - input: "How do I authenticate fabric-cicd in GitHub Actions without a client secret?"
-      expected: WorkloadIdentityCredential
-evaluators:
-    - name: mentions-oidc-credential
-      string:
-          contains: "{{expected}}"

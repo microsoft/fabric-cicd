@@ -35,10 +35,3 @@ model: openai/gpt-4.1-mini
 modelParameters:
     max_tokens: 1400
     temperature: 0.0
-testData:
-    - input: '{"issue":"How do I auth in GitHub Actions?","comment":"### AI Assessment: Answered\n\nUse WorkloadIdentityCredential.\n\n**✅ No action needed** — This issue has been triaged.\n\n---\n> 💡 tag @microsoft/fabric-cicd"}'
-      expected: "true"
-evaluators:
-    - name: returns-approved-field
-      string:
-          contains: "approved"

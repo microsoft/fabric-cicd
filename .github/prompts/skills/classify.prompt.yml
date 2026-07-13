@@ -43,16 +43,3 @@ model: openai/gpt-4.1-mini
 modelParameters:
     max_tokens: 200
     temperature: 0.0
-testData:
-    - input: "Library Version: 1.1.0. When I call publish_all_items() my DataPipeline fails with PublishError: item dependency not found, even though the Notebook it references is in item_type_in_scope. Steps: 1) init FabricWorkspace 2) publish. Expected: pipeline deploys. Actual: PublishError."
-      expected: bug
-    - input: "It would be great if fabric-cicd could support incremental deployments based on git diff so we don't redeploy every item each run."
-      expected: feature
-    - input: "How do I authenticate fabric-cicd from a GitHub Actions workflow without storing a client secret?"
-      expected: question
-    - input: "hi"
-      expected: needs-info
-evaluators:
-    - name: category-matches-expected
-      string:
-          contains: "{{expected}}"

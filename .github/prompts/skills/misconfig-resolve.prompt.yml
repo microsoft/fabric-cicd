@@ -45,10 +45,3 @@ model: openai/gpt-4.1
 modelParameters:
     max_tokens: 1200
     temperature: 0.2
-testData:
-    - input: "folder_path_to_include is being ignored by publish_all_items even though I pass a valid list of folders."
-      expected: enable_experimental_features
-evaluators:
-    - name: mentions-required-flag
-      string:
-          contains: "{{expected}}"

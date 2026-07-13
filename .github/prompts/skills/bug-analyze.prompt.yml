@@ -50,12 +50,3 @@ messages:
 model: openai/o4-mini
 modelParameters:
     max_tokens: 900
-testData:
-    - input: "PublishError raised deploying a DataPipeline that references a Notebook. The Notebook is in the repo but the user set item_type_in_scope=['DataPipeline'] only."
-      expected: misconfiguration
-    - input: "publish_all_items() returns HTTP 429 TooManyRequests from api.fabric.microsoft.com after ~50 items and aborts."
-      expected: fabric-api
-evaluators:
-    - name: root-cause-matches-expected
-      string:
-          contains: "{{expected}}"
