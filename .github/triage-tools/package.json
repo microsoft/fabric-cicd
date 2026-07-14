@@ -11,6 +11,6 @@
         "js-yaml": "^4.1.0"
     },
     "scripts": {
-        "check": "node --check lib/gh.mjs && node --check verify_symbol.mjs && node --check parse_error_log.mjs && node --check check_version.mjs && node --check search_issues.mjs && node --check orchestrate.mjs"
+        "check": "node --check lib/gh.mjs && node --check verify_symbol.mjs && node --check parse_error_log.mjs && node --check check_version.mjs && node --check search_issues.mjs && node --check changelog_relevance.mjs && node --check search_code.mjs && node --check orchestrate.mjs"
     }
 }
