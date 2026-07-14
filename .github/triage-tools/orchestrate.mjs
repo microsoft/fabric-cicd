@@ -102,7 +102,10 @@ function extractSymbols(text) {
 function signalsFor(resolution, category, severity) {
     const r = resolution || "none";
     const needs_author_feedback = r === "needs-info";
-    const add_help_wanted = r === "community";
+    // Features that aren't obviously core work (backlog/community) are good community candidates —
+    // mirror how the team labels them `help wanted`. Without this, features never got the flag
+    // because they run no analysis skill, so `scope` was never "community".
+    const add_help_wanted = r === "community" || (category === "feature" && r === "backlog");
     const needs_human_review =
         r === "potential-bug" || r === "escalate" || severity === "critical" || (category === "bug" && r !== "duplicate");
     const can_auto_close = ["answered", "misconfiguration", "redirect-docs", "duplicate"].includes(r);
@@ -195,6 +198,10 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
 
     // 5) Draft comment
     const draftSkill = await loadSkill("comment-draft");
+    // Only surface a "stale version" signal when the issue actually reported a version AND it's
+    // genuinely behind latest — otherwise the drafter tends to invent an unsupported "your version
+    // is stale" claim.
+    const versionStale = Boolean(version.reported_version) && version.is_stale === true;
     const bundle = {
         category,
         confidence: classification.confidence,
@@ -205,8 +212,8 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
         tool_findings: {
             primary_exception: errorLog.primary_exception,
             http_status: errorLog.http_status,
-            version_is_stale: version.is_stale,
-            latest_version: version.latest_version,
+            version_is_stale: versionStale,
+            latest_version: versionStale ? version.latest_version : null,
             likely_duplicate_of: dupes.likely_duplicate_of,
             unknown_symbols: symbols.filter((s) => !s.exists).map((s) => ({ name: s.name, suggestions: s.suggestions })),
         },
@@ -231,6 +238,11 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
     const sig = signalsFor(resolution, category, classification.severity);
     const confident = (classification.confidence || 0) >= confidenceThreshold;
     const can_auto_close = sig.can_auto_close && confident && !sig.needs_human_review && !sig.needs_author_feedback && !sig.add_help_wanted;
+
+    // Make the comment's status line authoritative: replace whatever status the model narrated with
+    // one derived from the actual decision flags, so the text can't contradict the labels/flags
+    // (e.g. saying "awaiting author feedback" when needs_author_feedback is false).
+    commentMarkdown = withStatusFooter(commentMarkdown, { sig, can_auto_close, resolution, author: issue.author });
 
     return {
         category,
@@ -295,6 +307,56 @@ function unwrapComment(value) {
         return trimmed;
     }
     return typeof v === "string" ? v.trim() : "";
+}
+
+// Authoritative status line derived purely from the decision flags (never from model prose).
+function statusLine({ sig, can_auto_close, resolution, author }) {
+    const who = author ? `@${author}` : "the author";
+    if (can_auto_close) {
+        const why =
+            resolution === "answered"
+                ? "answered above"
+                : resolution === "redirect-docs"
+                  ? "covered by the documentation linked above"
+                  : resolution === "misconfiguration"
+                    ? "a configuration fix (see above)"
+                    : resolution === "duplicate"
+                      ? "a duplicate of an existing issue"
+                      : "resolved";
+        return `**✅ Resolved** — this looks like ${why}. Auto-closing; please reopen if that's not right.`;
+    }
+    if (sig.needs_author_feedback) return `**⏳ Awaiting author feedback** — ${who}, please share the details requested above.`;
+    if (sig.needs_human_review) return `**🔔 Escalated to the team** — flagged for maintainer review.`;
+    if (sig.add_help_wanted) return `**🙌 Help wanted** — a good candidate for a community contribution.`;
+    return `**👀 Triaged** — a maintainer will follow up.`;
+}
+
+// Strip whatever status/footer the model wrote and append a single deterministic footer whose
+// status line matches the decision flags. Prevents narrative-vs-flags contradictions.
+function withStatusFooter(md, ctx) {
+    const STATUS_RE =
+        /awaiting author feedback|needs author feedback|escalated to|help wanted|auto-clos|\*\*✅ resolved/i;
+    const HINT_RE = /tag @microsoft\/fabric-cicd/i;
+    let lines = String(md || "")
+        .split("\n")
+        .filter((ln) => {
+            const t = ln.trim().replace(/^>\s*/, "");
+            if (HINT_RE.test(ln)) return false;
+            if (t.startsWith("**") && STATUS_RE.test(t)) return false;
+            return true;
+        });
+    // Trim trailing blank lines and a dangling `---` separator so we can add one clean footer.
+    while (lines.length && (lines[lines.length - 1].trim() === "" || lines[lines.length - 1].trim() === "---")) {
+        lines.pop();
+    }
+    const body = lines.join("\n").trim();
+    return [
+        body,
+        ``,
+        `---`,
+        statusLine(ctx),
+        `> 💡 If this issue requires the team's attention and was not escalated, you can tag @microsoft/fabric-cicd to notify the team.`,
+    ].join("\n");
 }
 
 function fallbackComment(category, resolution, issue) {
