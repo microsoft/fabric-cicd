@@ -3,7 +3,8 @@
 // Runs a deterministic, tool-grounded pipeline over a single issue and emits one decision JSON
 // object (the Phase-1 contract) that the workflow consumes to label / comment / close.
 //
-//   classify ──► tools (parse_error_log, verify_symbol, check_version, search_issues)
+//   classify ──► tools (parse_error_log, verify_symbol, check_version, search_issues,
+//                       search_code, changelog_relevance)
 //            └─► branch: bug-analyze | answer | misconfig-resolve | (feature/dup/spam: none)
 //            └─► comment-draft ──► critique (one reflection pass) ──► decision JSON
 //
@@ -22,6 +23,18 @@ import { parseErrorLog } from "./parse_error_log.mjs";
 import { verifySymbol } from "./verify_symbol.mjs";
 import { checkVersion } from "./check_version.mjs";
 import { searchIssues } from "./search_issues.mjs";
+import { changelogRelevanceFromFile, recentChangesFromFile } from "./changelog_relevance.mjs";
+import { searchCode } from "./search_code.mjs";
+
+// Canonical live documentation the assessment can cite so its pointers are verifiable.
+const DOC_LINKS = {
+    fabric_cicd_docs: "https://microsoft.github.io/fabric-cicd/latest/",
+    fabric_cicd_ms_learn: "https://learn.microsoft.com/en-us/fabric/cicd/",
+    fabric_rest_api: "https://learn.microsoft.com/en-us/rest/api/fabric/",
+    item_definition_overview:
+        "https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/item-definition-overview",
+    changelog: "https://microsoft.github.io/fabric-cicd/latest/changelog/",
+};
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..");
@@ -97,6 +110,27 @@ function extractSymbols(text) {
     return [...new Set([...camel, ...flags])].slice(0, 12);
 }
 
+const STOP_WORDS = new Set(
+    ("the a an and or of to in is on for with as at by be this that it you we my our error issue bug when then " +
+        "from into using use get got not no yes fabric cicd item items fail fails failed does doesnt cant could would " +
+        "should have has was were are but if while about after before what which why how run running work working").split(
+        " "
+    )
+);
+
+// Salient lower-cased keywords from the issue text, used to score changelog entries and code hits.
+function keywordSignals(text) {
+    return [
+        ...new Set(
+            String(text || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9_]+/g, " ")
+                .split(/\s+/)
+                .filter((t) => t.length > 3 && !STOP_WORDS.has(t))
+        ),
+    ].slice(0, 12);
+}
+
 // ---- Resolution → workflow signals --------------------------------------------------------
 
 function signalsFor(resolution, category, severity) {
@@ -147,12 +181,31 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
     const symbolNames = extractSymbols(composite);
     const symbols = symbolNames.map((n) => verifySymbol(n)).filter((s) => s.kind || s.suggestions.length);
     const dupes = await searchIssues(composite, { excludeNumber: issue.number });
-    const toolFindings = { error_log: errorLog, version, symbols, duplicates: dupes };
+
+    // Signal tokens shared by the codebase + changelog grounding. "strong" = exception types and
+    // confirmed symbols (matched verbatim); keywords = salient words (title weighted by repetition).
+    const strongSignals = [
+        ...new Set([...errorLog.exceptions.map((e) => e.type), ...symbols.filter((s) => s.exists).map((s) => s.canonical || s.name)]),
+    ].filter(Boolean);
+    const keywordSig = keywordSignals(`${issue.title || ""} ${issue.title || ""}\n${issue.body || ""}`).filter(
+        (k) => !strongSignals.some((s) => s.toLowerCase() === k)
+    );
+    const signals = { strong: strongSignals, keywords: keywordSig };
+
+    // Ground the assessment in the real source tree and the changelog (recent changes / "already
+    // fixed in a newer release?"). Both are local file operations, so they run even without a token.
+    const codePointers = searchCode(signals).pointers;
+    const changelog = changelogRelevanceFromFile(version.reported_version, signals, { latestVersion: version.latest_version });
+    const recent = recentChangesFromFile({ versions: 1 });
+
+    const toolFindings = { error_log: errorLog, version, symbols, duplicates: dupes, changelog, code_pointers: codePointers };
 
     const toolSummary = JSON.stringify({
         error_log: { primary_exception: errorLog.primary_exception, http_status: errorLog.http_status },
-        version: { reported: version.reported_version, latest: version.latest_version, is_stale: version.is_stale },
+        version: { reported: version.reported_version, latest: version.latest_version, upgrade_may_help: changelog.upgrade_may_help },
         symbols: symbols.map((s) => ({ name: s.name, exists: s.exists, kind: s.kind, suggestions: s.suggestions })),
+        code_pointers: codePointers.map((p) => ({ file: p.file, line: p.line, url: p.blob_url, snippet: p.snippet })),
+        upgrade_candidate: changelog.upgrade_may_help ? changelog.relevant_entries[0] : null,
         likely_duplicate_of: dupes.likely_duplicate_of,
     });
 
@@ -161,8 +214,14 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
         `## Issue`,
         composite,
         ``,
-        `## Tool findings`,
+        `## Tool findings (grounded — cite these, do not invent)`,
         toolSummary,
+        ``,
+        `## Recent releases (what changed lately, for "is this already addressed?" reasoning)`,
+        JSON.stringify(recent),
+        ``,
+        `## Live documentation (cite when relevant)`,
+        JSON.stringify(DOC_LINKS),
         ``,
         `## Codebase reference`,
         context,
@@ -198,10 +257,12 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
 
     // 5) Draft comment
     const draftSkill = await loadSkill("comment-draft");
-    // Only surface a "stale version" signal when the issue actually reported a version AND it's
-    // genuinely behind latest — otherwise the drafter tends to invent an unsupported "your version
-    // is stale" claim.
-    const versionStale = Boolean(version.reported_version) && version.is_stale === true;
+    // Surface a version/upgrade suggestion ONLY when a newer release actually contains a change
+    // that plausibly addresses THIS issue (changelog-grounded) — never on bare semver staleness.
+    // This is the fix for the old "you're on X, latest is Y, review again" noise.
+    const upgrade = changelog.upgrade_may_help
+        ? { suggested_version: changelog.suggested_version, entries: changelog.relevant_entries.slice(0, 2) }
+        : null;
     const bundle = {
         category,
         confidence: classification.confidence,
@@ -209,13 +270,16 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
         resolution,
         issue_author: issue.author || "",
         analysis,
-        tool_findings: {
+        // Concrete, linkable evidence for the assessment — the comment must build its "why" from
+        // these (code pointers, changelog entry, duplicate, docs), not restate the issue.
+        evidence: {
             primary_exception: errorLog.primary_exception,
             http_status: errorLog.http_status,
-            version_is_stale: versionStale,
-            latest_version: versionStale ? version.latest_version : null,
-            likely_duplicate_of: dupes.likely_duplicate_of,
+            code_pointers: codePointers.slice(0, 4).map((p) => ({ file: p.file, line: p.line, url: p.blob_url, snippet: p.snippet })),
+            upgrade,
+            likely_duplicate: dupes.likely_duplicate || null,
             unknown_symbols: symbols.filter((s) => !s.exists).map((s) => ({ name: s.name, suggestions: s.suggestions })),
+            doc_links: DOC_LINKS,
         },
     };
     const draft = await runSkill(draftSkill, { input: JSON.stringify(bundle), issue_author: issue.author || "" });
@@ -297,12 +361,16 @@ function unwrapComment(value) {
             return "";
         }
         const trimmed = String(v).trim();
-        if (trimmed.startsWith("{") && trimmed.includes("comment_markdown")) {
+        if (trimmed.startsWith("{")) {
+            // Looks like a JSON object. Use its comment_markdown if present; otherwise treat it as
+            // an unusable model response (e.g. an empty "{}") and fall through to the caller's
+            // fallback rather than surfacing raw braces as the comment body.
             const parsed = extractJson(trimmed);
             if (parsed && typeof parsed.comment_markdown === "string") {
                 v = parsed.comment_markdown;
                 continue;
             }
+            return "";
         }
         return trimmed;
     }
