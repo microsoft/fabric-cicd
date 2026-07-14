@@ -12,7 +12,11 @@ const GITHUB_API = process.env.GITHUB_API_URL || "https://api.github.com";
 // Phase 6 — model tiering. Each tier lists primary first, then 429/5xx fallbacks.
 export const MODEL_TIERS = {
     fast: ["openai/gpt-4.1-mini", "microsoft/phi-4"],
-    reasoning: ["openai/o4-mini", "deepseek/deepseek-r1"],
+    // Reasoning tier uses GPT-4.1 (large context, accepts standard params) with GPT-4o as fallback.
+    // Earlier choices caused real failures: openai/o4-mini (an o-series model) rejects `max_tokens`
+    // (needs `max_completion_tokens`), and its silent fallback deepseek/deepseek-r1 caps requests at
+    // 4000 tokens, so real triage inputs overflowed it with a 413 tokens_limit_reached.
+    reasoning: ["openai/gpt-4.1", "openai/gpt-4o"],
     mid: ["openai/gpt-4.1", "openai/gpt-4o"],
     embeddings: ["openai/text-embedding-3-small"],
 };
@@ -66,7 +70,9 @@ export async function ghRest(path, { params } = {}) {
 }
 
 // Call a GitHub Model. `tier` may be a tier name (see MODEL_TIERS) or an explicit array of
-// model slugs. Falls back through the list on 429/5xx. Returns the assistant text content.
+// model slugs. Falls back through the list on 413/429/5xx (payload-too-large, rate limit, server
+// error) and retries a model once on a network hang / timeout before moving on. Returns the
+// assistant text content.
 export async function callModel(tier, messages, opts = {}) {
     const token = getToken();
     if (!token) {
@@ -76,36 +82,70 @@ export async function callModel(tier, messages, opts = {}) {
     }
     const models = Array.isArray(tier) ? tier : MODEL_TIERS[tier] || MODEL_TIERS.mid;
     const { maxTokens = 1000, temperature, jsonObject = false } = opts;
+    // Per-attempt hard timeout so a hung connection can't stall the whole job (undici's default
+    // headers timeout is ~5 min, which previously hard-failed runs with UND_ERR_HEADERS_TIMEOUT).
+    const timeoutMs = Number(process.env.TRIAGE_MODEL_TIMEOUT_MS) || 90000;
 
     let lastErr;
     for (const model of models) {
         const body = { model, messages, max_tokens: maxTokens };
         if (typeof temperature === "number") body.temperature = temperature;
         if (jsonObject) body.response_format = { type: "json_object" };
-        try {
-            const res = await fetch(`${MODELS_ENDPOINT}/chat/completions`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                    "User-Agent": "fabric-cicd-triage",
-                },
-                body: JSON.stringify(body),
-            });
-            if (res.status === 429 || res.status >= 500) {
+
+        // Give each model one retry on a transient network hang before falling back.
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            let res;
+            try {
+                res = await fetch(`${MODELS_ENDPOINT}/chat/completions`, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                        "User-Agent": "fabric-cicd-triage",
+                    },
+                    body: JSON.stringify(body),
+                    signal: controller.signal,
+                });
+            } catch (err) {
+                // Network hang / abort / DNS blip — retry the same model once, then fall through.
+                const transient =
+                    err.name === "AbortError" ||
+                    err.code === "UND_ERR_HEADERS_TIMEOUT" ||
+                    /fetch failed|timeout|network|socket|ECONN/i.test(err.message || "");
+                lastErr =
+                    err.name === "AbortError"
+                        ? new Error(`Model ${model} timed out after ${timeoutMs}ms; trying fallback.`)
+                        : err;
+                if (transient && attempt === 0) continue; // retry same model
+                break; // give up on this model → next in the tier
+            } finally {
+                clearTimeout(timer);
+            }
+
+            // 413 (payload/token limit), 429 (rate limit), 5xx (server) → try the next model.
+            if (res.status === 413 || res.status === 429 || res.status >= 500) {
                 lastErr = new Error(`Model ${model} returned ${res.status}; trying fallback.`);
-                continue;
+                break; // next model — retrying the same one won't help
             }
             if (!res.ok) {
                 const text = await res.text();
+                // Some models (OpenAI o-series) reject `max_tokens` and require `max_completion_tokens`.
+                // Swap the param on the body and retry the same model once instead of hard-failing.
+                if (res.status === 400 && /max_completion_tokens/i.test(text) && "max_tokens" in body) {
+                    body.max_completion_tokens = body.max_tokens;
+                    delete body.max_tokens;
+                    lastErr = new Error(`Model ${model} needs max_completion_tokens; retrying.`);
+                    if (attempt === 0) continue; // retry same model with the corrected param
+                    break; // already retried → next model
+                }
                 throw new Error(`Model ${model} failed (${res.status}): ${text.slice(0, 300)}`);
             }
             const data = await res.json();
             const content = data?.choices?.[0]?.message?.content ?? "";
             return { model, content };
-        } catch (e) {
-            lastErr = e;
         }
     }
     throw lastErr || new Error("All models in tier failed.");
