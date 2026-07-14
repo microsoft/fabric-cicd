@@ -275,7 +275,7 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
         evidence: {
             primary_exception: errorLog.primary_exception,
             http_status: errorLog.http_status,
-            code_pointers: codePointers.slice(0, 4).map((p) => ({ file: p.file, line: p.line, url: p.blob_url, snippet: p.snippet })),
+            code_pointers: codePointers.slice(0, 4).map((p) => ({ file: p.file, line: p.line, url: p.blob_url, snippet: p.snippet, code: p.code || [] })),
             upgrade,
             likely_duplicate: dupes.likely_duplicate || null,
             unknown_symbols: symbols.filter((s) => !s.exists).map((s) => ({ name: s.name, suggestions: s.suggestions })),
@@ -284,6 +284,9 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
     };
     const draft = await runSkill(draftSkill, { input: JSON.stringify(bundle), issue_author: issue.author || "" });
     record("comment-draft", draft);
+    if (process.env.TRIAGE_DEBUG_DRAFT) {
+        writeFileSync(process.env.TRIAGE_DEBUG_DRAFT, JSON.stringify({ model: draft?.model, json: draft?.json, raw: draft?.raw, finish: draft?.finish_reason }, null, 2));
+    }
     let commentMarkdown =
         unwrapComment(draft?.json?.comment_markdown) ||
         unwrapComment(draft?.raw) ||
@@ -370,11 +373,41 @@ function unwrapComment(value) {
                 v = parsed.comment_markdown;
                 continue;
             }
+            // Salvage a TRUNCATED response: the model produced valid-looking JSON but hit the token
+            // limit mid-string, so JSON.parse failed. Recover the comment body (which always starts
+            // with the "### AI Assessment" header) by decoding the partial JSON string value.
+            const salvaged = salvageCommentMarkdown(trimmed);
+            if (salvaged) return salvaged;
             return "";
         }
         return trimmed;
     }
     return typeof v === "string" ? v.trim() : "";
+}
+
+// Best-effort recovery of a `comment_markdown` value from a JSON blob that was cut off before its
+// closing quote/brace. Grabs everything after the key and JSON-unescapes it up to the last complete
+// escape, tolerating the missing terminator. Only accepts results that look like our comment.
+function salvageCommentMarkdown(text) {
+    const m = text.match(/"comment_markdown"\s*:\s*"/);
+    if (!m) return "";
+    let body = text.slice(m.index + m[0].length);
+    // Drop a trailing unterminated escape so JSON.parse of the reconstructed string won't choke.
+    if (/(^|[^\\])(\\\\)*\\$/.test(body)) body = body.replace(/\\+$/, (s) => (s.length % 2 ? s.slice(1) : s));
+    let decoded;
+    try {
+        decoded = JSON.parse(`"${body}"`);
+    } catch {
+        // Trim to the last safe boundary and retry once.
+        const cut = body.replace(/\\?"?[^"\\]*$/, "");
+        try {
+            decoded = JSON.parse(`"${cut}"`);
+        } catch {
+            return "";
+        }
+    }
+    const out = String(decoded || "").trim();
+    return out.startsWith("###") ? out : "";
 }
 
 // Authoritative status line derived purely from the decision flags (never from model prose).

@@ -92,7 +92,16 @@ export function searchCode(signals = {}, { srcRoot = resolveSrcRoot(), limit = 6
                 }
             }
             if (strongOnLine || kwOnLine) {
-                hits.push({ line: i + 1, snippet: line.trim().slice(0, 160), strong: strongOnLine });
+                // Capture a small window around the match so the comment can quote the ACTUAL code
+                // (e.g. an invalid call / offending line), not just link to it. Kept tight so the
+                // evidence bundle stays small; each line is length-capped.
+                const from = Math.max(0, i - 2);
+                const to = Math.min(lines.length - 1, i + 2);
+                const code = [];
+                for (let j = from; j <= to; j++) {
+                    code.push({ n: j + 1, text: lines[j].replace(/\t/g, "    ").slice(0, 200), hit: j === i });
+                }
+                hits.push({ line: i + 1, snippet: line.trim().slice(0, 160), strong: strongOnLine, code });
             }
         }
         if (!hits.length) continue;
@@ -108,6 +117,7 @@ export function searchCode(signals = {}, { srcRoot = resolveSrcRoot(), limit = 6
                 file: rel,
                 line: h.line,
                 snippet: h.snippet,
+                code: h.code || [],
                 strong: h.strong,
                 matched: [...matchedTerms],
                 distinct: matchedTerms.size,

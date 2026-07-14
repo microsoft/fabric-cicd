@@ -28,22 +28,31 @@ messages:
              "Valuable Enhancement", "Duplicate").
           2. ONE short assessment sentence (max ~2 lines) stating the conclusion. No preamble,
              no "thank you for reporting", no recap of the issue.
-          3. A `**Why this assessment**` section: 2-5 bullet points, each a specific FINDING with a
-             link drawn from `evidence`. Examples of good bullets:
-             - Anchor to the real failure: `PublishError` raised in [`_publish.py`](<code pointer url>) when ...
-             - Duplicate: Overlaps [#123](<url>) which reports the same ...
-             - Docs: Documented behavior: [parameterization](<doc link>) ...
-             - Unknown symbol: `EnvironmnetVar` is not a valid FeatureFlag - closest match `enable_...`
-             Every bullet that makes a claim about the code, docs, a duplicate, or a release MUST
-             carry a markdown link taken from `evidence` (code_pointers[].url, doc_links,
-             likely_duplicate.html_url, or upgrade.entries[].url). Do not invent URLs. If evidence
-             is empty, state the basis briefly in prose instead of fabricating links.
-          4. If (and ONLY if) `evidence.upgrade` is present and non-null, add one line:
+          3. A `**Why this assessment**` section: 2-5 bullet points, each a specific FINDING that
+             is BACKED BY A REAL LINK. Every single bullet MUST end with (or contain) a markdown
+             link taken verbatim from `evidence` — `code_pointers[].url`, `doc_links.*`,
+             `likely_duplicate.html_url`, or `upgrade.entries[].url`. Never write a finding without
+             a link, and never invent or edit a URL. `evidence.doc_links` is ALWAYS available, so
+             if you have no code/duplicate pointer for a given claim, cite the most relevant
+             documentation link — there is no excuse for an unlinked bullet. Examples of good bullets:
+             - Anchor to the real failure: `PublishError` is raised in [`_publish.py`](<code_pointers url>) when ...
+             - Duplicate: Overlaps [#123](<likely_duplicate.html_url>) which reports the same ...
+             - Documented behavior: [parameterization](<doc_links.fabric_cicd_docs>) requires ...
+             - Unknown symbol: `EnvironmnetVar` is not a valid FeatureFlag — closest match `enable_...` ([reference](<doc_links url>))
+          4. SHOW THE CODE when it matters. For any bullet whose claim is about a specific piece of
+             source — especially code that looks wrong, offending, or directly responsible — quote
+             the ACTUAL code right under that bullet as a fenced ```python block, reconstructed from
+             the matching `evidence.code_pointers[].code` array (each item has `n` = line number and
+             `text`; render the lines in order and keep them verbatim). Put the file+line link on the
+             bullet immediately above the block. Only include a snippet when a `code` array is present
+             in evidence; do not fabricate or paraphrase code. Keep to at most one snippet per bullet.
+          5. If (and ONLY if) `evidence.upgrade` is present and non-null, add one line:
              `**⬆️ Possibly already addressed** - v<upgrade.suggested_version> may fix this: "<entry text>" ([#<issue>](<url>)). Worth trying \`pip install -U fabric-cicd\` before deeper investigation.`
              If `evidence.upgrade` is null, DO NOT mention versions, staleness, or upgrading at all.
-          5. If the analysis/answer/fix contains a Python code example, include it verbatim in a
-             fenced python code block under a short lead-in.
-          6. Then the footer on new lines, verbatim:
+          6. If the analysis/answer/fix contains a Python code example (a suggested fix or correct
+             usage, distinct from the source snippets in step 4), include it verbatim in a fenced
+             python code block under a short lead-in.
+          7. Then the footer on new lines, verbatim:
              `---`
              `> 💡 If this issue requires the team's attention and was not escalated, you can tag @microsoft/fabric-cicd to notify the team.`
 
@@ -54,5 +63,5 @@ messages:
       content: "{{input}}"
 model: openai/gpt-4.1
 modelParameters:
-    max_tokens: 1400
+    max_tokens: 2400
     temperature: 0.2
