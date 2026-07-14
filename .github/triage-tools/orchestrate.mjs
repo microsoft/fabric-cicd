@@ -278,6 +278,15 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
             code_pointers: codePointers.slice(0, 4).map((p) => ({ file: p.file, line: p.line, url: p.blob_url, snippet: p.snippet, code: p.code || [] })),
             upgrade,
             likely_duplicate: dupes.likely_duplicate || null,
+            // Symbols confirmed to EXIST in the current codebase (e.g. a valid ItemType / FeatureFlag).
+            // Lets the assessment affirmatively confirm "X is supported" instead of guessing — attach a
+            // code pointer to its definition when one was found so the claim is clickable.
+            verified_symbols: symbols
+                .filter((s) => s.exists)
+                .map((s) => {
+                    const hit = codePointers.find((p) => p.snippet && p.snippet.includes(s.canonical || s.name));
+                    return { name: s.canonical || s.name, kind: s.kind, url: hit ? hit.blob_url : null };
+                }),
             unknown_symbols: symbols.filter((s) => !s.exists).map((s) => ({ name: s.name, suggestions: s.suggestions })),
             doc_links: DOC_LINKS,
         },
