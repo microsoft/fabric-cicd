@@ -32,6 +32,11 @@ messages:
             parameters, item types, or feature flags.
           - If an error/stack trace was parsed by a tool, anchor your reasoning to the real
             exception type.
+          - When the appended tool findings include `code_pointers` (real file:line with URLs),
+            base your reasoning on that actual source, and reference the file/symbol in `reasoning`.
+          - Consult the appended "Recent releases" digest: if a newer release plausibly already
+            addresses this, say so in `reasoning` (the drafter will surface the upgrade). Do not
+            recommend upgrading merely because a newer version exists.
 
           --- Condensed reference (full reference injected by the orchestrator when available) ---
           Item types: ApacheAirflowJob, CopyJob, DataAgent, DataBuildToolJob, DataPipeline,

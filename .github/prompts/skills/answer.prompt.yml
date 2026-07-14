@@ -27,6 +27,9 @@ messages:
           - "needs-info": you cannot answer without more detail; state exactly what is missing.
           - Never invent API surface. If unsure whether something exists, do not claim it does.
           - Keep answer_markdown to 1–3 short paragraphs plus at most one code block.
+          - Prefer the specific "Live documentation" URLs appended by the orchestrator (Fabric
+            REST API, Fabric CI/CD docs, item-definition overview) in `doc_links` when they fit;
+            otherwise use the fabric-cicd docs root. Only cite links that were provided.
           - Do not add a "### AI Assessment" header or any footer — the comment-draft stage adds those.
 
           --- Condensed reference (full reference injected by the orchestrator when available) ---

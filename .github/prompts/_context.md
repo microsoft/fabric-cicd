@@ -33,6 +33,12 @@ documented here. If unsure, direct the user to the official docs.
 - Official docs: https://microsoft.github.io/fabric-cicd/latest/
 - Fabric REST API docs: https://learn.microsoft.com/en-us/rest/api/fabric/
 
+## Live Microsoft docs (authoritative for Fabric behavior — cite for API/platform questions)
+
+- Fabric CI/CD (Microsoft Learn): https://learn.microsoft.com/en-us/fabric/cicd/
+- Fabric REST API reference: https://learn.microsoft.com/en-us/rest/api/fabric/
+- Item definition overview (definition payloads / formats): https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/item-definition-overview
+
 ## Documentation Pages (use for citations)
 
 - PyPI: https://pypi.org/project/fabric-cicd/

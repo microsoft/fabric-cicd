@@ -25,6 +25,9 @@ messages:
           - Include a minimal, runnable Python snippet using only documented API surface.
           - If required feature flags are involved, show `append_feature_flag(...)` with the exact flag name.
           - Use "needs-info" only if you genuinely cannot give a fix without one specific missing detail.
+          - Prefer the specific "Live documentation" URLs appended by the orchestrator (Fabric
+            CI/CD docs, item-definition overview, Fabric REST API) in `doc_links` when they fit;
+            otherwise use the fabric-cicd docs root. Only cite links that were provided.
           - No "### AI Assessment" header and no footer — comment-draft adds those.
 
           --- Condensed reference (full reference injected by the orchestrator when available) ---
