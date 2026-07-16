@@ -1,0 +1,8 @@
+kind: docs
+body: Rename Git Flow page to Deployment Overview and add Deployment Philosophy section
+time: 2026-07-16T14:51:01.9305998+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1018"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1018

@@ -633,6 +633,148 @@ class TestParameterUtilities:
             assert item_name is None
             assert file_path == []
 
+    def test_extract_parameter_filters_memoizes_path_resolution(self):
+        """Resolved file_path filters are cached so the repository is not re-globbed per file."""
+        import threading
+
+        # Lightweight workspace stub carrying the real dict-backed cache from FabricWorkspace.
+        workspace = MagicMock()
+        workspace.repository_directory = Path("/mock/repository")
+        workspace._parameter_filter_path_cache = {}
+        workspace._parameter_filter_path_cache_lock = threading.Lock()
+
+        wildcard_param = {"file_path": "**/definition.pbir"}
+
+        with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
+            mock_process.return_value = [Path("/mock/repository/report/definition.pbir")]
+
+            # Simulate the per-file loop invoking the same parameter entry many times.
+            results = [extract_parameter_filters(workspace, wildcard_param)[2] for _ in range(50)]
+
+            # Resolution happens once despite 50 calls, and every call returns the same result.
+            mock_process.assert_called_once_with(workspace.repository_directory, "**/definition.pbir")
+            assert all(result == [Path("/mock/repository/report/definition.pbir")] for result in results)
+
+    def test_extract_parameter_filters_caches_per_unique_filter(self):
+        """Each distinct file_path filter is resolved exactly once."""
+        import threading
+
+        workspace = MagicMock()
+        workspace.repository_directory = Path("/mock/repository")
+        workspace._parameter_filter_path_cache = {}
+        workspace._parameter_filter_path_cache_lock = threading.Lock()
+
+        filters = [
+            {"file_path": "**/a.json"},
+            {"file_path": "**/b.json"},
+            {"file_path": ["**/a.json", "**/b.json"]},
+            {},  # None filter
+        ]
+
+        with mock.patch("fabric_cicd._parameter._utils.process_input_path") as mock_process:
+
+            def fake_process(_repository_directory, input_path):
+                # Mirror production: a missing/empty filter resolves to None, otherwise concrete paths.
+                if input_path is None:
+                    return None
+                if isinstance(input_path, list):
+                    return [Path(f"/mock/repository/{entry}") for entry in input_path]
+                return [Path(f"/mock/repository/{input_path}")]
+
+            mock_process.side_effect = fake_process
+
+            # Resolve each unique filter three times.
+            for _ in range(3):
+                for param in filters:
+                    extract_parameter_filters(workspace, param)
+
+            # 4 unique filters (two strings, one list, one None) -> 4 resolutions total.
+            assert mock_process.call_count == len(filters)
+
+    def test_extract_parameter_filters_preserves_resolved_file_path(self, temp_repository):
+        """The memoized file_path value equals the pre-change direct resolution.
+
+        Before memoization, extract_parameter_filters resolved file_path with a direct
+        process_input_path(repository_directory, file_path) call on every invocation. This
+        characterization test pins that the memoized value is equivalent for every filter
+        shape, including the None (no filter) versus empty-list (filter matched nothing)
+        distinction that check_replacement relies on. process_input_path is NOT stubbed, so
+        real filesystem resolution is exercised against the temp_repository fixture, and a
+        spy confirms the second call for a given filter is served from the cache rather than
+        re-resolved.
+        """
+        import threading
+
+        # Resolve the fixture path so regular-path resolution is exercised on every platform.
+        # (macOS mkdtemp returns a /var symlink that otherwise defeats the relative_to() check
+        # for non-wildcard paths, which would silently reduce coverage to wildcards only.)
+        repo = temp_repository.resolve()
+
+        workspace = MagicMock()
+        workspace.repository_directory = repo
+        workspace._parameter_filter_path_cache = {}
+        workspace._parameter_filter_path_cache_lock = threading.Lock()
+
+        # Filters spanning every process_input_path branch, resolved against the real fixture.
+        file_path_filters = [
+            None,  # missing filter -> None (apply to all files)
+            "",  # empty string is falsy -> None
+            [],  # empty list is falsy -> None
+            "file1.txt",  # regular relative path
+            "folder1/file3.py",  # nested regular path
+            "**/*.txt",  # recursive wildcard, multiple matches
+            "**/file4.md",  # recursive wildcard, single match
+            ["file1.txt", "folder1/file3.py"],  # list of regular paths
+            ["**/*.txt", "file2.json"],  # mixed wildcard + regular list
+            "**/does_not_exist.xyz",  # wildcard with no matches -> []
+            "missing/file.txt",  # regular path that does not exist -> []
+        ]
+
+        saw_non_empty = False
+
+        for file_path_filter in file_path_filters:
+            # Reproduce the exact pre-change resolution with a fresh, un-memoized call.
+            expected = process_input_path(repo, file_path_filter)
+
+            param_dict = {} if file_path_filter is None else {"file_path": file_path_filter}
+
+            # Spy (wrapping the real function) on the internal resolver used by the cache.
+            with mock.patch("fabric_cicd._parameter._utils.process_input_path", wraps=process_input_path) as spy:
+                first = extract_parameter_filters(workspace, param_dict)[2]
+                second = extract_parameter_filters(workspace, param_dict)[2]
+
+            # Two calls for the same filter must trigger exactly one underlying resolution,
+            # proving the second value came from the cache rather than a re-glob.
+            assert spy.call_count == 1, f"{file_path_filter!r}: expected one resolution, got {spy.call_count}"
+
+            if expected is None:
+                # None must stay None so check_replacement still treats it as "no filter".
+                assert first is None, f"{file_path_filter!r}: expected None, got {first!r}"
+                assert second is None, f"{file_path_filter!r}: expected None on cached call, got {second!r}"
+            else:
+                assert isinstance(first, list), f"{file_path_filter!r}: first result is not a list"
+                assert isinstance(second, list), f"{file_path_filter!r}: cached result is not a list"
+                # process_input_path returns list(set(...)); compare order-independently but
+                # keep it duplicate- and length-sensitive so a dedup regression still fails.
+                assert len(first) == len(expected), (
+                    f"{file_path_filter!r}: cached length differs from direct resolution"
+                )
+                assert set(first) == set(expected), f"{file_path_filter!r}: cached value differs from direct resolution"
+                assert second == first, f"{file_path_filter!r}: repeat (cached) call changed the value"
+                assert all(path.is_file() for path in first), f"{file_path_filter!r}: resolved a non-file path"
+                if expected:
+                    saw_non_empty = True
+
+        # Guard against a vacuous pass: at least one filter must resolve to real files.
+        assert saw_non_empty, "No filter produced a non-empty resolution; test did not exercise real matches"
+
+        # Golden pins for the semantically critical branches (stable across platforms now that
+        # repo is resolved), guarding against silent degradation of the whole filter set.
+        assert process_input_path(repo, None) is None
+        assert process_input_path(repo, "**/does_not_exist.xyz") == []
+        assert process_input_path(repo, "missing/file.txt") == []
+        assert set(process_input_path(repo, "**/*.txt")) == {repo / "file1.txt", repo / "folder2" / "file5.txt"}
+
     def test_check_parameter_structure(self):
         """Tests _check_parameter_structure function."""
         # Test with valid list

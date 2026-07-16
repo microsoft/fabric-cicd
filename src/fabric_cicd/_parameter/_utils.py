@@ -402,13 +402,54 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
             raise error
 
 
-def extract_parameter_filters(workspace_obj: FabricWorkspace, param_dict: dict) -> tuple[str, str, Path]:
+def extract_parameter_filters(
+    workspace_obj: FabricWorkspace, param_dict: dict
+) -> tuple[Optional[str], Optional[str], Optional[list[Path]]]:
     """Extracts the item type, name, and path filters from the parameter dictionary, if present."""
     item_type = param_dict.get("item_type")
     item_name = param_dict.get("item_name")
-    file_path = process_input_path(workspace_obj.repository_directory, param_dict.get("file_path"))
+    file_path = _resolve_filter_path(workspace_obj, param_dict.get("file_path"))
 
     return item_type, item_name, file_path
+
+
+def _resolve_filter_path(
+    workspace_obj: FabricWorkspace, file_path_filter: Union[str, list[str], None]
+) -> Union[list[Path], None]:
+    """
+    Resolves a parameter ``file_path`` filter to concrete repository paths, memoizing the result.
+
+    The resolved path set depends only on ``(repository_directory, file_path filter)``, both of which
+    are invariant across every file processed in a single publish. Without memoization, a wildcard
+    filter re-globs the entire repository once per file per parameter entry, producing super-linear
+    (effectively quadratic) filesystem traversal on large repositories. Caching the result keyed on the
+    filter makes the repository glob run once per unique filter instead.
+    """
+    cache = getattr(workspace_obj, "_parameter_filter_path_cache", None)
+    cache_lock = getattr(workspace_obj, "_parameter_filter_path_cache_lock", None)
+
+    # Fall back to direct resolution when a cache is unavailable (e.g. lightweight callers).
+    if not isinstance(cache, dict):
+        return process_input_path(workspace_obj.repository_directory, file_path_filter)
+
+    # Build a hashable cache key from the filter (None, str, or list of str).
+    cache_key = tuple(file_path_filter) if isinstance(file_path_filter, list) else file_path_filter
+
+    if cache_lock is not None:
+        with cache_lock:
+            if cache_key in cache:
+                return cache[cache_key]
+
+    # Resolve outside the lock so concurrent threads resolving different filters don't serialize.
+    resolved = process_input_path(workspace_obj.repository_directory, file_path_filter)
+
+    if cache_lock is not None:
+        with cache_lock:
+            cache.setdefault(cache_key, resolved)
+            return cache[cache_key]
+
+    cache[cache_key] = resolved
+    return resolved
 
 
 def process_environment_key(environment: str, replace_value_dict: dict) -> dict:

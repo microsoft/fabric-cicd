@@ -155,6 +155,13 @@ class FabricWorkspace:
         self._item_attribute_cache = {}
         self._item_attribute_cache_lock = threading.Lock()
 
+        # Initialize cache for resolved parameter file_path filters. The resolved
+        # set depends only on (repository_directory, file_path filter), which is
+        # invariant across all files in a single publish, so it is memoized to
+        # avoid re-globbing the entire repository once per file per parameter entry.
+        self._parameter_filter_path_cache = {}
+        self._parameter_filter_path_cache_lock = threading.Lock()
+
         # Get parameter_file_path from kwargs
         self.parameter_file_path = kwargs.get("parameter_file_path")
 
@@ -445,7 +452,12 @@ class FabricWorkspace:
             # Only collect attribute values when parameterization with dynamic variables is in use
             if self.contains_param_vars:
                 # Get additional properties
-                if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
+                if item_type in [
+                    ItemType.LAKEHOUSE.value,
+                    ItemType.MIRRORED_DATABASE.value,
+                    ItemType.WAREHOUSE.value,
+                    ItemType.SQL_DATABASE.value,
+                ]:
                     sql_endpoint = self._get_item_attribute(
                         self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
                     )
@@ -975,22 +987,30 @@ class FabricWorkspace:
         root_path = Path(self.repository_directory)
         folder_hierarchy = {}
 
-        # Collect all folders that directly contain a .platform file
+        # Collect all folders that directly contain a .platform file (single traversal)
         platform_folders = set(p.parent for p in root_path.rglob(".platform"))
 
-        # Now, for every folder, check if any of its subfolders is in platform_folders
-        for folder in root_path.rglob("*"):
-            if not folder.is_dir() or folder == root_path or folder.name == ".children":
-                continue
+        # A folder is included if it is a strict ancestor (under the repository root) of at least
+        # one platform folder, excluding platform folders themselves and ".children" containers.
+        # Walking up each platform folder's ancestors is O(tree) overall, avoiding the previous
+        # O(tree^2) behavior of re-globbing every folder's subtree.
+        for platform_folder in platform_folders:
+            for ancestor in platform_folder.parents:
+                # Reached the repository root itself; exclude it and stop walking up.
+                if ancestor == root_path:
+                    break
 
-            # Skip folders that directly contain a .platform file
-            if folder in platform_folders:
-                continue
+                try:
+                    relative = ancestor.relative_to(root_path)
+                except ValueError:
+                    # Ancestor is above the repository root; stop walking up.
+                    break
 
-            # Check if any subfolder (at any depth) is in platform_folders
-            if any(sub in platform_folders for sub in folder.rglob("*") if sub.is_dir()):
-                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
-                folder_hierarchy[relative_path] = ""
+                # Skip item folders (directly contain .platform) and ".children" containers.
+                if ancestor in platform_folders or ancestor.name == ".children":
+                    continue
+
+                folder_hierarchy[f"/{relative.as_posix()}"] = ""
 
         self.repository_folders = folder_hierarchy
 
