@@ -25,6 +25,7 @@ import { checkVersion } from "./check_version.mjs";
 import { searchIssues } from "./search_issues.mjs";
 import { changelogRelevanceFromFile, recentChangesFromFile } from "./changelog_relevance.mjs";
 import { searchCode } from "./search_code.mjs";
+import { selectKnowledge } from "./knowledge.mjs";
 
 // Canonical live documentation the assessment can cite so its pointers are verifiable.
 const DOC_LINKS = {
@@ -141,14 +142,18 @@ function signalsFor(resolution, category, severity) {
     // because they run no analysis skill, so `scope` was never "community".
     const add_help_wanted = r === "community" || (category === "feature" && r === "backlog");
     const needs_human_review =
-        r === "potential-bug" || r === "escalate" || severity === "critical" || (category === "bug" && r !== "duplicate");
-    const can_auto_close = ["answered", "misconfiguration", "redirect-docs", "duplicate"].includes(r);
+        r === "potential-bug" ||
+        r === "escalate" ||
+        severity === "critical" ||
+        (category === "bug" && !["duplicate", "works-as-designed"].includes(r));
+    const can_auto_close = ["answered", "misconfiguration", "redirect-docs", "duplicate", "works-as-designed"].includes(r);
     return { needs_author_feedback, add_help_wanted, needs_human_review, can_auto_close };
 }
 
 function labelsFor(category, resolution, addHelpWanted) {
     const labels = new Set();
-    if (category === "bug") labels.add("bug");
+    // A by-design conclusion is not a defect — don't slap a "bug" label on it.
+    if (category === "bug" && resolution !== "works-as-designed") labels.add("bug");
     else if (category === "feature") labels.add("enhancement");
     else if (category === "question") labels.add("question");
     else if (category === "duplicate" || resolution === "duplicate") labels.add("duplicate");
@@ -198,7 +203,13 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
     const changelog = changelogRelevanceFromFile(version.reported_version, signals, { latestVersion: version.latest_version });
     const recent = recentChangesFromFile({ versions: 1 });
 
-    const toolFindings = { error_log: errorLog, version, symbols, duplicates: dupes, changelog, code_pointers: codePointers };
+    // Authoritative, curated domain facts relevant to THIS issue (known by-design behaviors,
+    // what an item definition does/doesn't contain). Grounds the analysis + comment so the triage
+    // reasons from verified facts instead of guessing (e.g. rename => new item is by design; item
+    // tags are governance metadata, not part of a definition).
+    const knowledge = selectKnowledge(composite);
+
+    const toolFindings = { error_log: errorLog, version, symbols, duplicates: dupes, changelog, code_pointers: codePointers, knowledge };
 
     const toolSummary = JSON.stringify({
         error_log: { primary_exception: errorLog.primary_exception, http_status: errorLog.http_status },
@@ -210,12 +221,20 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
     });
 
     // 3) Branch analysis
+    const knowledgeBlock = knowledge.length
+        ? knowledge
+              .map((k) => `- ${k.title}\n  ${k.fact}\n  Links: ${k.links.map((l) => `[${l.label}](${l.url})`).join(" · ")}`)
+              .join("\n")
+        : "(none matched)";
     const analysisInput = [
         `## Issue`,
         composite,
         ``,
         `## Tool findings (grounded — cite these, do not invent)`,
         toolSummary,
+        ``,
+        `## Known fabric-cicd / Fabric behavior (AUTHORITATIVE — treat as ground truth, cite the links)`,
+        knowledgeBlock,
         ``,
         `## Recent releases (what changed lately, for "is this already addressed?" reasoning)`,
         JSON.stringify(recent),
@@ -288,6 +307,10 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
                     return { name: s.canonical || s.name, kind: s.kind, url: hit ? hit.blob_url : null };
                 }),
             unknown_symbols: symbols.filter((s) => !s.exists).map((s) => ({ name: s.name, suggestions: s.suggestions })),
+            // Curated, authoritative domain facts relevant to this issue (by-design behaviors,
+            // item-definition scope). Each carries real code/doc links so the assessment can cite them
+            // even when no analysis skill ran (e.g. the feature path).
+            knowledge: knowledge.map((k) => ({ title: k.title, fact: k.fact, by_design: k.by_design, links: k.links })),
             doc_links: DOC_LINKS,
         },
     };
@@ -342,6 +365,12 @@ export async function orchestrate(issue, { confidenceThreshold = 0.85 } = {}) {
 
 function deriveResolution(category, classification, analysis, tools) {
     if (tools.duplicates?.likely_duplicate_of) return "duplicate";
+    // A matched by-design knowledge fact (or the analysis reaching the same conclusion) means the
+    // reported behavior is expected/documented — answer it with the workaround instead of escalating
+    // it as a defect. Only overrides bug/needs-info; features stay a real enhancement request.
+    const byDesign =
+        (tools.knowledge || []).some((k) => k.by_design) || analysis?.root_cause === "by-design" || analysis?.works_as_designed === true;
+    if ((category === "bug" || category === "needs-info") && byDesign) return "works-as-designed";
     if (category === "question") {
         if (analysis?.resolution) return analysis.resolution; // answered | redirect-docs | needs-info
         return analysis ? "answered" : "needs-info";
@@ -426,7 +455,9 @@ function statusLine({ sig, can_auto_close, resolution, author }) {
         const why =
             resolution === "answered"
                 ? "answered above"
-                : resolution === "redirect-docs"
+                : resolution === "works-as-designed"
+                  ? "expected, by-design behavior (explained above)"
+                  : resolution === "redirect-docs"
                   ? "covered by the documentation linked above"
                   : resolution === "misconfiguration"
                     ? "a configuration fix (see above)"

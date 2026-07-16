@@ -15,19 +15,27 @@ messages:
             (HTTP 4xx/5xx, capacity, permissions) rather than the library itself.
           - "misconfiguration": incorrect usage — wrong auth, parameter.yml errors, missing
             feature flag, wrong repository structure, item type not in scope.
+          - "by-design": the reported behavior is the expected, documented behavior of fabric-cicd
+            or the Fabric service — NOT a defect. Use this when an appended "Known fabric-cicd /
+            Fabric behavior" fact confirms the behavior is intentional (e.g. renaming an item
+            creates a new item because the library matches items by name+type; the old one is an
+            orphan removable via unpublish_all_orphan_items). Explain the behavior and the correct
+            workaround in `reasoning`/`suggested_fix`; do not treat it as something to fix.
 
           Output a single JSON object and nothing else:
           {
-            "root_cause": "library-bug|fabric-api|misconfiguration",
+            "root_cause": "library-bug|fabric-api|misconfiguration|by-design",
             "confidence": 0.0,
             "reasoning": "2-4 sentence explanation grounded in the reference and any tool findings",
             "missing_info": ["only critical missing items, e.g. 'library version', 'error log'"],
-            "suggested_fix": "for misconfiguration: the correct approach in one or two sentences; otherwise null"
+            "suggested_fix": "for misconfiguration or by-design: the correct approach/workaround in one or two sentences; otherwise null"
           }
 
           Rules:
           - Never assert something is definitively a library bug. Use "library-bug" to mean
             "warrants team confirmation".
+          - If an appended "Known fabric-cicd / Fabric behavior" fact matches the report, trust it:
+            prefer "by-design" (or "misconfiguration") over "library-bug", and cite its link.
           - Ground every claim in the Codebase Reference. Do not invent API functions,
             parameters, item types, or feature flags.
           - If an error/stack trace was parsed by a tool, anchor your reasoning to the real

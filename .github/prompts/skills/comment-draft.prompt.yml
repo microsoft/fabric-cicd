@@ -10,7 +10,7 @@ messages:
           You receive a JSON bundle: the classification, the upstream analysis/answer/fix, and an
           `evidence` object (parsed exception, code pointers with GitHub links, a changelog-based
           upgrade candidate, duplicate candidate, verified symbols that DO exist, unknown symbols,
-          and documentation links).
+          curated authoritative `knowledge` facts with links, and documentation links).
 
           Write an ASSESSMENT, not a summary. The reader already wrote the issue — never restate
           or paraphrase it back. Explain what you concluded and, crucially, WHY, pointing to
@@ -25,8 +25,9 @@ messages:
 
           1. Header line, exactly: `### AI Assessment: <Category>` where <Category> is a
              human-readable label matching the decision (e.g. "Likely Misconfiguration",
-             "Potential Bug", "Needs Author Feedback", "Answered", "Redirect to Docs",
-             "Valuable Enhancement", "Duplicate").
+             "Potential Bug", "Works as Designed", "Needs Author Feedback", "Answered",
+             "Redirect to Docs", "Valuable Enhancement", "Duplicate"). When `resolution` is
+             "works-as-designed", use "Works as Designed" and do NOT call it a bug anywhere.
           2. ONE short assessment sentence (max ~2 lines) stating the conclusion. No preamble,
              no "thank you for reporting", no recap of the issue.
           3. A `**Why this assessment**` section: 2-5 bullet points, each a specific FINDING that
@@ -55,13 +56,25 @@ messages:
              author still reports an error, pivot to the likely real cause (e.g. an older installed
              version — ask them to confirm their `fabric-cicd` version and share the full error),
              instead of asking them to prove the type exists.
-          6. If (and ONLY if) `evidence.upgrade` is present and non-null, add one line:
+          6. GROUND IN AUTHORITATIVE KNOWLEDGE. If `evidence.knowledge` is non-empty, it contains
+             verified facts about how fabric-cicd / Fabric actually behaves — treat them as ground
+             truth and let them drive the assessment:
+             - If a fact has `by_design: true` (and the decision is "works-as-designed"), state
+               plainly that the reported behavior is EXPECTED / by design (not a defect), explain it
+               in one or two bullets grounded in the fact's links, and give the concrete workaround
+               it names. Do not hedge that it "might be a bug".
+             - Otherwise (e.g. a feasibility/enhancement question such as whether tags can be carried
+               forward), use the fact to give a precise, accurate answer — WHY it isn't supported
+               today and WHAT it would take (e.g. "tags aren't part of an item definition, so the
+               library can't carry them via definitions; it would need to call the Fabric tags API").
+             Every bullet built from a fact MUST end with one of that fact's `links` (verbatim).
+          7. If (and ONLY if) `evidence.upgrade` is present and non-null, add one line:
              `**⬆️ Possibly already addressed** - v<upgrade.suggested_version> may fix this: "<entry text>" ([#<issue>](<url>)). Worth trying \`pip install -U fabric-cicd\` before deeper investigation.`
              If `evidence.upgrade` is null, DO NOT mention versions, staleness, or upgrading at all.
-          7. If the analysis/answer/fix contains a Python code example (a suggested fix or correct
+          8. If the analysis/answer/fix contains a Python code example (a suggested fix or correct
              usage, distinct from the source snippets in step 4), include it verbatim in a fenced
              python code block under a short lead-in.
-          8. Then the footer on new lines, verbatim:
+          9. Then the footer on new lines, verbatim:
              `---`
              `> 💡 If this issue requires the team's attention and was not escalated, you can tag @microsoft/fabric-cicd to notify the team.`
 
