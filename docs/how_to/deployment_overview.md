@@ -1,4 +1,6 @@
-# Git Flow
+# Deployment Overview
+
+## Git Flow
 
 The flow pictured below is the hero scenario for this library and is the recommendation if you're just starting out.
 
@@ -9,7 +11,7 @@ The flow pictured below is the hero scenario for this library and is the recomme
 
 ![Git Flow](../config/assets/git_flow.png)
 
-# Deployment Philosophy
+## Deployment Philosophy
 
 fabric-cicd applies a **full deployment** on every run — it does not inspect commit history or compute diffs. This ensures the target workspace always reflects the repository and converges to the desired state regardless of what happened in previous runs, preventing environment drift.
 
