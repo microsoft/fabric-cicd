@@ -11,7 +11,7 @@ nav:
     - How To:
           - How To: how_to/index.md
           - Getting Started: how_to/getting_started.md
-          - Git Flow: how_to/git_flow.md
+          - Deployment Overview: how_to/deployment_overview.md
           - Configuration Deployment: how_to/config_deployment.md
           - Parameterization: how_to/parameterization.md
           - Optional Features: how_to/optional_feature.md

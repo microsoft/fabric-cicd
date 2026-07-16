@@ -59,7 +59,7 @@ This library deploys from a directory containing files and directories committed
 
 ## Next steps
 
-- Review the recommended [Git flow](git_flow.md) for fabric-cicd deployments.
+- Review the recommended [Git flow](deployment_overview.md#git-flow) and [deployment philosophy](deployment_overview.md#deployment-philosophy) for fabric-cicd deployments.
 - Configure deployment behavior with [Configuration Deployment](config_deployment.md).
 - Learn how to manage environment-specific values with [Parameterization](parameterization.md).
 - See [Authentication Examples](../example/authentication.md) for local and pipeline authentication patterns.
