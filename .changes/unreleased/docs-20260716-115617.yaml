@@ -1,0 +1,8 @@
+kind: docs
+body: "Extract Git flow guidance into a dedicated page and add a Next Steps section to Getting Started"
+time: 2026-07-16T11:56:17.7134417+03:00
+custom:
+    Author: nkwork9999
+    AuthorLink: https://github.com/nkwork9999
+    Issue: "1019"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1019
