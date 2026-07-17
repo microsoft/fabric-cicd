@@ -22,6 +22,9 @@ class NotebookPublisher(ItemPublisher):
         def _sort_key(f: Item) -> tuple[int, str]:
             # .ipynb included for completeness; in practice, .json settings only exist with .py notebooks (git integrated format)
             priority = {".platform": 0, ".py": 1, ".ipynb": 1, ".json": 3}
+            # Process built-in resource files after notebook source and settings files.
+            if "Resources/builtin" in str(f.file_path.as_posix()):
+                return (4, f.file_path.name)
             # Account for other file types that may be added later to the notebook item and assign to priority 2
             return (priority.get(f.file_path.name, priority.get(f.file_path.suffix, 2)), f.file_path.name)
 
