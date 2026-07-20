@@ -19,6 +19,16 @@ on:
                 description: "Issue number to triage"
                 required: true
                 type: number
+            enable_handoff:
+                description: "Arm Tier-2 handoff: assign the Copilot coding agent when the issue is eligible"
+                required: false
+                default: false
+                type: boolean
+            force_handoff:
+                description: "Bypass the eligibility gate and force the handoff (manual testing only; needs enable_handoff)"
+                required: false
+                default: false
+                type: boolean
 
 # One triage run per issue at a time; a newer event supersedes an in-flight run.
 concurrency:
@@ -47,7 +57,9 @@ jobs:
             SUPPRESS_LABELS: "false"
             SUPPRESS_COMMENTS: "false"
             # Tier-2 handoff to the Copilot coding agent (off by default — opt-in only).
-            ENABLE_CODING_AGENT_HANDOFF: "false"
+            # A workflow_dispatch run can arm it per-run via the `enable_handoff` input,
+            # without changing the branch defaults (e.g. the suppressed fork-dry-run branch).
+            ENABLE_CODING_AGENT_HANDOFF: ${{ inputs.enable_handoff || false }}
             # Silence Node's harmless DEP0040 punycode deprecation warning (emitted by Node core's
             # URL/fetch stack, not our code) so it doesn't clutter the triage logs.
             NODE_OPTIONS: "--no-deprecation"
@@ -209,10 +221,12 @@ jobs:
                       }
 
             - name: Hand off to coding agent (Tier-2, opt-in)
-              if: steps.orchestrate.outputs.have_decision == 'true' && env.ENABLE_CODING_AGENT_HANDOFF == 'true' && env.SUPPRESS_LABELS != 'true'
+              if: steps.orchestrate.outputs.have_decision == 'true' && env.ENABLE_CODING_AGENT_HANDOFF == 'true'
               uses: actions/github-script@v7
               env:
                   ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+                  FORCE_HANDOFF: ${{ inputs.force_handoff || false }}
+                  SUPPRESS_LABELS: ${{ env.SUPPRESS_LABELS }}
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |
@@ -221,6 +235,8 @@ jobs:
                       const issueNumber = parseInt(process.env.ISSUE_NUMBER);
                       const owner = context.repo.owner;
                       const repo = context.repo.repo;
+                      const force = process.env.FORCE_HANDOFF === 'true';
+                      const suppressLabels = process.env.SUPPRESS_LABELS === 'true';
 
                       // Only hand off clear, non-critical, high-confidence bugs with a reproduction and
                       // a concrete failure signal — never features, questions, or duplicates.
@@ -233,9 +249,12 @@ jobs:
                         && decision.resolution !== 'misconfiguration'
                         && hasRepro;
 
-                      if (!eligible) {
+                      if (!eligible && !force) {
                         core.info('Not eligible for coding-agent handoff — skipping.');
                         return;
+                      }
+                      if (!eligible && force) {
+                        core.info('Eligibility gate bypassed via force_handoff (manual test) — proceeding.');
                       }
 
                       // Best-effort assignment of the Copilot coding agent via GraphQL. Falls back to a
@@ -264,6 +283,10 @@ jobs:
                         throw new Error('Copilot coding agent not available as an assignable actor.');
                       } catch (e) {
                         core.info(`Coding-agent assignment unavailable (${e.message}); labelling for manual pickup.`);
+                        if (suppressLabels) {
+                          core.info('Labels suppressed — skipping the "ready for coding agent" fallback label.');
+                          return;
+                        }
                         try {
                           await github.rest.issues.addLabels({ owner, repo, issue_number: issueNumber, labels: ['ready for coding agent'] });
                         } catch (e2) { core.info(`Could not add handoff label: ${e2.message}`); }
