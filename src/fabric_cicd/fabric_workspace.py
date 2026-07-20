@@ -287,7 +287,9 @@ class FabricWorkspace:
 
             return self._workspace_pools_cache
 
-    def validate_parameter_replace(self, environment: Optional[str] = None, as_dict: bool = True) -> list[dict] | str:
+    def validate_parameter_replace(
+        self, environment: Optional[str] = None, as_dict: bool = True
+    ) -> tuple[list[dict]] | tuple[bool, str]:
         """
         Validate all key_value_replace rules against repository item files. Files are not modified.
 
@@ -296,26 +298,23 @@ class FabricWorkspace:
             as_dict: If True, return detailed result dictionaries; otherwise return a summary string.
 
         Returns:
-            If `as_dict` is True, results is a list of dictionaries: one per (rule, match) pair, plus one for each rule that produced zero matches.
-            Or if `as_dict` is False, results is a summary string with match counts and missing replacement-value count.
+            A tuple of (`all_matched`, `results`). `all_matched` is True when every rule produced at least one match.
+            If `as_dict` is False, `results` is a summary string with match counts and missing replacement-value count.
+            If `as_dict` is True, `results` is a list of dictionaries: one per (rule, match) pair, plus one for each rule that produced zero matches.
         """
         from fabric_cicd._parameter._parameter import Parameter
 
-        parameter_obj = (
-            self.environment_parameter
-            if hasattr(self, "environment_parameter")
-            else Parameter(
-                repository_directory=self.repository_directory,
-                item_type_in_scope=self.item_type_in_scope,
-                environment=self.environment,
-                parameter_file_name=constants.PARAMETER_FILE_NAME,
-                parameter_file_path=self.parameter_file_path,
-            )
+        parameter_obj = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+            parameter_file_name=constants.PARAMETER_FILE_NAME,
+            parameter_file_path=self.parameter_file_path,
         )
 
         validated_results = parameter_obj._validate_key_value_replacements(environment=environment, as_dict=as_dict)
         if as_dict == False:
-            print(validated_results)
+            return validated_results
 
         return validated_results
 
