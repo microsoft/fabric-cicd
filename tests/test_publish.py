@@ -657,6 +657,117 @@ def test_mirrored_database_published_before_lakehouse(mock_endpoint, temp_worksp
 
 
 # =============================================================================
+# Mirrored Azure Databricks Catalog Tests
+# =============================================================================
+
+
+def _create_mirrored_adb_catalog_item(
+    base_path: Path, name: str, logical_id: str, creation_payload: Optional[dict]
+) -> Path:
+    """Create a MirroredAzureDatabricksCatalog test item with an optional creationPayload."""
+    item_dir = base_path / f"{name}.MirroredAzureDatabricksCatalog"
+    item_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata = {
+        "type": "MirroredAzureDatabricksCatalog",
+        "displayName": name,
+        "description": "Test MirroredAzureDatabricksCatalog",
+    }
+    if creation_payload is not None:
+        metadata["creationPayload"] = creation_payload
+
+    platform = {
+        "metadata": metadata,
+        "config": {"version": "2.0", "logicalId": logical_id},
+    }
+    with (item_dir / ".platform").open("w", encoding="utf-8") as f:
+        json.dump(platform, f)
+
+    return item_dir
+
+
+def _get_create_item_body(mock_endpoint) -> dict:
+    """Return the body of the POST /items create call captured by the mock endpoint."""
+    for call in mock_endpoint.invoke.call_args_list:
+        kwargs = call.kwargs
+        if kwargs.get("method") == "POST" and kwargs.get("url", "").endswith("/items"):
+            return kwargs.get("body", {})
+    msg = "No POST /items create call was captured"
+    raise AssertionError(msg)
+
+
+def test_mirrored_adb_catalog_publishes_with_creation_payload(mock_endpoint, temp_workspace_dir):
+    """Test that a Mirrored Azure Databricks Catalog is created via its creationPayload."""
+    creation_payload = {
+        "catalogName": "catalog_1",
+        "databricksWorkspaceConnectionId": "11111111-1111-1111-1111-111111111111",
+        "mirroringMode": "Full",
+        "storageConnectionId": "22222222-2222-2222-2222-222222222222",
+    }
+    _create_mirrored_adb_catalog_item(temp_workspace_dir, "TestCatalog", "test-adb-catalog-id", creation_payload)
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["MirroredAzureDatabricksCatalog"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+    body = _get_create_item_body(mock_endpoint)
+    assert body["type"] == "MirroredAzureDatabricksCatalog"
+    assert body["creationPayload"] == creation_payload
+    # Shell-only publish: no definition parts are sent
+    assert "definition" not in body
+
+
+def test_mirrored_adb_catalog_publishes_without_creation_payload(mock_endpoint, temp_workspace_dir):
+    """Test that a Mirrored Azure Databricks Catalog without a creationPayload creates a shell item."""
+    _create_mirrored_adb_catalog_item(temp_workspace_dir, "ShellCatalog", "shell-adb-catalog-id", None)
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["MirroredAzureDatabricksCatalog"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+    body = _get_create_item_body(mock_endpoint)
+    assert body["type"] == "MirroredAzureDatabricksCatalog"
+    assert "creationPayload" not in body
+    assert "definition" not in body
+
+
+def test_mirrored_adb_catalog_is_shell_only_and_ordered():
+    """Test that the item type is registered as shell-only and placed among the source item types."""
+    assert ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value in constants.SHELL_ONLY_PUBLISH
+
+    order = constants.SERIAL_ITEM_PUBLISH_ORDER
+    positions = {item_type: position for position, item_type in order.items()}
+    # Deploys after MirroredDatabase and before downstream consumers such as Lakehouse/Notebook
+    assert positions[ItemType.MIRRORED_DATABASE] < positions[ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG]
+    assert positions[ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG] < positions[ItemType.LAKEHOUSE]
+    assert positions[ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG] < positions[ItemType.NOTEBOOK]
+
+
+# =============================================================================
 # Folder Exclusion Tests
 # =============================================================================
 
