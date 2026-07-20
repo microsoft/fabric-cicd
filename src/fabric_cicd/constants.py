@@ -60,6 +60,7 @@ class ItemType(str, Enum):
     KQL_QUERYSET = "KQLQueryset"
     LAKEHOUSE = "Lakehouse"
     MAP = "Map"
+    MIRRORED_AZURE_DATABRICKS_CATALOG = "MirroredAzureDatabricksCatalog"
     MIRRORED_DATABASE = "MirroredDatabase"
     ML_EXPERIMENT = "MLExperiment"
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
@@ -82,32 +83,33 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     1: ItemType.VARIABLE_LIBRARY,
     2: ItemType.WAREHOUSE,
     3: ItemType.MIRRORED_DATABASE,
-    4: ItemType.LAKEHOUSE,
-    5: ItemType.SQL_DATABASE,
-    6: ItemType.ENVIRONMENT,
-    7: ItemType.USER_DATA_FUNCTION,
-    8: ItemType.EVENTHOUSE,
-    9: ItemType.SPARK_JOB_DEFINITION,
-    10: ItemType.NOTEBOOK,
-    11: ItemType.SEMANTIC_MODEL,
-    12: ItemType.REPORT,
-    13: ItemType.PAGINATED_REPORT,
-    14: ItemType.COPY_JOB,
-    15: ItemType.DATA_BUILD_TOOL_JOB,
-    16: ItemType.KQL_DATABASE,
-    17: ItemType.KQL_QUERYSET,
-    18: ItemType.DATAFLOW,
-    19: ItemType.DATA_PIPELINE,
-    20: ItemType.REFLEX,
-    21: ItemType.EVENTSTREAM,
-    22: ItemType.KQL_DASHBOARD,
-    23: ItemType.GRAPHQL_API,
-    24: ItemType.APACHE_AIRFLOW_JOB,
-    25: ItemType.MOUNTED_DATA_FACTORY,
-    26: ItemType.DATA_AGENT,
-    27: ItemType.ML_EXPERIMENT,
-    28: ItemType.ONTOLOGY,
-    29: ItemType.MAP,
+    4: ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG,
+    5: ItemType.LAKEHOUSE,
+    6: ItemType.SQL_DATABASE,
+    7: ItemType.ENVIRONMENT,
+    8: ItemType.USER_DATA_FUNCTION,
+    9: ItemType.EVENTHOUSE,
+    10: ItemType.SPARK_JOB_DEFINITION,
+    11: ItemType.NOTEBOOK,
+    12: ItemType.SEMANTIC_MODEL,
+    13: ItemType.REPORT,
+    14: ItemType.PAGINATED_REPORT,
+    15: ItemType.COPY_JOB,
+    16: ItemType.DATA_BUILD_TOOL_JOB,
+    17: ItemType.KQL_DATABASE,
+    18: ItemType.KQL_QUERYSET,
+    19: ItemType.DATAFLOW,
+    20: ItemType.DATA_PIPELINE,
+    21: ItemType.REFLEX,
+    22: ItemType.EVENTSTREAM,
+    23: ItemType.KQL_DASHBOARD,
+    24: ItemType.GRAPHQL_API,
+    25: ItemType.APACHE_AIRFLOW_JOB,
+    26: ItemType.MOUNTED_DATA_FACTORY,
+    27: ItemType.DATA_AGENT,
+    28: ItemType.ML_EXPERIMENT,
+    29: ItemType.ONTOLOGY,
+    30: ItemType.MAP,
 }
 
 
@@ -212,6 +214,7 @@ SHELL_ONLY_PUBLISH = [
     ItemType.WAREHOUSE.value,
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,
+    ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value,
 ]
 
 # Item count limit for bulk publish API (as per current API documentation)
