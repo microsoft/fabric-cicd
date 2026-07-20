@@ -289,11 +289,15 @@ class FabricWorkspace:
 
     def validate_parameter_replace(self, environment: Optional[str] = None, as_dict: bool = True) -> list[dict] | str:
         """
-        Validate key-value replacements in the repository based on the parameter file.
+        Validate all key_value_replace rules against repository item files. Files are not modified.
 
         Args:
-            environment: Optional filter - consider items of this environment (and not the default of the workspace).
-            as_dict: If True, return results as a list of dictionaries; if False, return as a JSON string.
+            environment: Environment used to resolve replace_value entries. Defaults to `self.environment`.
+            as_dict: If True, return detailed result dictionaries; otherwise return a summary string.
+
+        Returns:
+            If `as_dict` is True, results is a list of dictionaries: one per (rule, match) pair, plus one for each rule that produced zero matches.
+            Or if `as_dict` is False, results is a summary string with match counts and missing replacement-value count.
         """
         from fabric_cicd._parameter._parameter import Parameter
 

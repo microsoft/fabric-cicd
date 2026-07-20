@@ -1,0 +1,8 @@
+kind: ✨ New Functionality
+body: Add functionality to validate key-value replacements in parameter files.
+time: 2026-07-20T13:42:52.011124+02:00
+custom:
+  Author: ChielChiel
+  AuthorLink: https://github.com/ChielChiel
+  Issue: "1008"
+  IssueLink: https://github.com/microsoft/fabric-cicd/issues/1008
