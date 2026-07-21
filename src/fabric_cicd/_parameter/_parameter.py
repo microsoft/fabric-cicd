@@ -91,7 +91,7 @@ class Parameter:
 
     def _validate_key_value_replacements(
         self, environment: Optional[str] = None, as_dict: bool = True
-    ) -> tuple[bool, list[dict] | str]:
+    ) -> tuple[bool, object]:
         """
         Dry-run all key_value_replace rules against repository item files.
 
@@ -105,11 +105,9 @@ class Parameter:
             as_dict: If True, return detailed result dictionaries; otherwise return a summary string.
 
         Returns:
-            A tuple of (all_matched, results). all_matched is True when every
-            rule produced at least one match. If as_dict is False, results is a
-            summary string with match counts and missing replacement-value count.
-            If as_dict is True, results is a list of dictionaries: one per
-            (rule, match) pair, plus one for each rule that produced zero matches.
+            A tuple of (all_matched, results). all_matched is True when every rule produced at least one match.
+            If as_dict is False, results is a summary string with match counts and missing replacement-value count.
+            If as_dict is True, results is a list of dictionaries: one per (rule, match) pair, plus one for each rule that produced zero matches.
 
             Match result keys:
 
@@ -118,7 +116,7 @@ class Parameter:
                 find_key      str      - the JSONPath expression
                 item_type     str      - item type of the matched file's parent item
                 item_name     str      - display name of the matched file's parent item
-                file_path     str      - relative path of the file inside the item dir
+                file_path     str      - path to the file relative to repository_directory
                 match_path    str      - resolved JSONPath of the matched node
                 current_value any      - value currently in the file
                 new_value     any      - replacement value for the environment (None if absent)
@@ -272,7 +270,7 @@ class Parameter:
     ) -> bool:
         """Return True if the item/file satisfies the rule's optional filters."""
 
-        def _matches_filter(filter_val: any, actual: Optional[str]) -> bool:
+        def _matches_filter(filter_val: object, actual: Optional[str]) -> bool:
             if filter_val is None:
                 return True
             if isinstance(filter_val, list):
@@ -288,8 +286,14 @@ class Parameter:
         if rule_fp is not None:
             import fnmatch
 
-            if not fnmatch.fnmatch(file_path.replace("\\", "/"), rule_fp.replace("\\", "/")):
+            file_path_norm = (file_path or "").replace("\\", "/").lstrip("/")
+            patterns = rule_fp if isinstance(rule_fp, list) else [rule_fp]
+            patterns = [p.replace("\\", "/").lstrip("/") for p in patterns]
+            if not any(fnmatch.fnmatch(file_path_norm, pattern) for pattern in patterns):
                 return False
+
+            # if not fnmatch.fnmatch(file_path.replace("\\", "/"), rule_fp.replace("\\", "/")):
+            #     return False
 
         return True
 

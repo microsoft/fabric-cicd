@@ -437,7 +437,7 @@ Validation of the `parameter.yml` file is a built-in feature of fabric-cicd, man
 
 **Debuggability:** Users can debug and validate their parameter file to ensure it meets the acceptable structure and input value criteria before running a deployment. Simply run the `debug_parameterization.py` script located in the `devtools` directory.
 
-Users can validate the application of the key-value replacements in the parameter file. Simply run `FabricWorkspace.validate_parameter_replace()`. 
+Users can validate the application of the key-value replacements in the parameter file. Simply run `FabricWorkspace.validate_parameter_replace()`.
 
 **Deployment:** At the start of a deployment, an automated validation checks the validity of the `parameter.yml` file, if it is present. This step ensures that valid parameters are loaded, allowing deployment to run smoothly with correctly applied parameterized configurations. If the parameter file is invalid, the deployment will NOT proceed.
 

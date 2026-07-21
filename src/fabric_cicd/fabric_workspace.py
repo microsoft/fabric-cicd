@@ -299,6 +299,7 @@ class FabricWorkspace:
     def validate_parameter_replace(
         self, environment: Optional[str] = None, as_dict: bool = True
     ) -> tuple[bool, object]:
+        """
         Validate all key_value_replace rules against repository item files. Files are not modified.
 
         Args:

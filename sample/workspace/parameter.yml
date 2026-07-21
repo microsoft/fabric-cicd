@@ -102,7 +102,7 @@ key_value_replace:
       replace_value:
         PPE: "PPE_ENV"
         PROD: "PROD_ENV"
-      file_path: Vars.VariableLibrary/PROD.json
+      file_path: Vars.VariableLibrary/valueSets/PROD.json
       item_type: "VariableLibrary"
       item_name: "Vars"
     - find_key: $.schedules[?(@.jobType=="Execute")].enabled

@@ -468,15 +468,15 @@ SAMPLE_VARIABLE_LIBRARY_PROD = """
 SAMPLE_VARIABLE_LIBRARY_PPE = """
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
-  "name": "PROD",
+  "name": "PPE",
   "variableOverrides": [
     {
       "name": "Environment",
-      "value": "Prod"
+      "value": "PPE"
     },
     {
       "name": "SQL_Server",
-      "value": "contoso-prod.database.windows.net"
+      "value": "contoso-ppe.database.windows.net"
     }
   ]
 }
