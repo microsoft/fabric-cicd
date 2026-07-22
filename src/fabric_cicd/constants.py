@@ -104,9 +104,9 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     23: ItemType.GRAPHQL_API,
     24: ItemType.APACHE_AIRFLOW_JOB,
     25: ItemType.MOUNTED_DATA_FACTORY,
-    26: ItemType.DATA_AGENT,
-    27: ItemType.ML_EXPERIMENT,
-    28: ItemType.ONTOLOGY,
+    26: ItemType.ONTOLOGY,
+    27: ItemType.DATA_AGENT,
+    28: ItemType.ML_EXPERIMENT,
     29: ItemType.MAP,
 }
 
