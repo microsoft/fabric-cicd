@@ -94,7 +94,7 @@ def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
             instance_pool_id = key["instance_pool_id"]
             replace_value = process_environment_key(fabric_workspace_obj.environment, key["replace_value"])
             input_name = key.get("item_name")
-            if instance_pool_id == pool_id and _find_match(input_name, item_name):
+            if instance_pool_id == pool_id and _find_match(input_name or None, item_name):
                 pool_config = replace_value[fabric_workspace_obj.environment]
                 resolved_id = _resolve_pool_id(
                     pools,
