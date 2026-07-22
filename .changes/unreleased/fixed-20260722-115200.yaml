@@ -1,0 +1,8 @@
+kind: fixed
+body: Publish `Ontology` before `DataAgent` so DataAgents that reference an Ontology deploy successfully
+time: 2026-07-22T11:52:00.0000000+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1076"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1076
