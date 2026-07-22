@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix `item_name` list filter in `spark_pool` parameter
+time: 2026-07-22T10:30:03.5378199+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1071"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1071
