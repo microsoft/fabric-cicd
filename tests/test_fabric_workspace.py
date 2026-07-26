@@ -2,7 +2,6 @@
 # Licensed under the MIT License.
 
 import json
-import os
 import re
 import tempfile
 from pathlib import Path
@@ -2108,23 +2107,13 @@ def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(
 
 
 def test_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monkeypatch):
-    """Test that max_duration is read from environment variable by FabricEndpoint."""
+    """Test that FabricWorkspace propagates LRO_MAX_DURATION_SECONDS to FabricEndpoint.max_duration."""
     from fabric_cicd._common._fabric_endpoint import FabricEndpoint
 
-    monkeypatch.setenv("FABRIC_CICD_MAX_DURATION_SECONDS", "600")
-
-    created_endpoints = []
-
-    def capture_endpoint(**_kwargs):
-        ep = FabricEndpoint.__new__(FabricEndpoint)
-        ep.max_duration = int(os.environ.get("FABRIC_CICD_MAX_DURATION_SECONDS", 300))
-        ep._token = None
-        ep._token_expiry = None
-        created_endpoints.append(ep)
-        return ep
+    monkeypatch.setattr(constants, "LRO_MAX_DURATION_SECONDS", 600)
 
     with (
-        patch("fabric_cicd.fabric_workspace.FabricEndpoint", side_effect=capture_endpoint),
+        patch.object(FabricEndpoint, "_get_token", return_value="mock-token"),
         patch.object(FabricWorkspace, "_refresh_deployed_items", lambda self: setattr(self, "deployed_items", {})),
         patch.object(FabricWorkspace, "_refresh_deployed_folders", lambda self: setattr(self, "deployed_folders", {})),
         patch.object(FabricWorkspace, "_refresh_repository_items"),
@@ -2135,6 +2124,4 @@ def test_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monke
             token_credential=DummyTokenCredential(),
         )
 
-    assert len(created_endpoints) == 1
-    assert created_endpoints[0].max_duration == 600
     assert workspace.endpoint.max_duration == 600

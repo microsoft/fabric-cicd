@@ -325,7 +325,7 @@ def test_max_duration_env_var(setup_mocks, monkeypatch):
     )
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
-    monkeypatch.setenv("FABRIC_CICD_MAX_DURATION_SECONDS", "900")
+    monkeypatch.setattr(constants, "LRO_MAX_DURATION_SECONDS", 900)
 
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
     assert endpoint.max_duration == 900
@@ -338,7 +338,7 @@ def test_invoke_uses_instance_max_duration(setup_mocks, monkeypatch):
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
     monkeypatch.setattr("time.sleep", lambda _: None)
-    monkeypatch.setenv("FABRIC_CICD_MAX_DURATION_SECONDS", "0")
+    monkeypatch.setattr(constants, "LRO_MAX_DURATION_SECONDS", 0)
 
     # max_duration=0 means any delay exceeds the limit → should raise immediately
     endpoint = FabricEndpoint(token_credential=mock_token_credential)

@@ -49,8 +49,8 @@ class FabricEndpoint:
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime.datetime] = None
 
-        # Set max_duration from env var or default (300 seconds)
-        self.max_duration = int(os.environ.get(constants.EnvVar.MAX_DURATION_SECONDS.value, 300))
+        # Set max_duration from validated module-level constant (defaults to 300 if unset or invalid)
+        self.max_duration = constants.LRO_MAX_DURATION_SECONDS
 
         # Eagerly validate credentials at init and cache the token
         self._get_token()
@@ -75,7 +75,7 @@ class FabricEndpoint:
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
             max_duration: Maximum execution duration in seconds. Defaults to the instance-level
-                ``max_duration`` (set via the ``FABRIC_CICD_MAX_DURATION_SECONDS``
+                ``max_duration`` (set via the ``FABRIC_CICD_LRO_MAX_DURATION_SECONDS``
                 environment variable, otherwise 300).
             **kwargs: Additional keyword arguments to pass to the method.
         """
