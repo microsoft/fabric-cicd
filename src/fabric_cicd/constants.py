@@ -4,6 +4,7 @@
 """Constants for the fabric-cicd package."""
 
 import os
+import re
 from enum import Enum
 
 from fabric_cicd._common._validate_env_vars import VALID_GUID_REGEX as VALID_GUID_REGEX
@@ -15,6 +16,16 @@ DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
 USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 VALID_ENABLE_FLAGS = ["1", "true", "yes"]
+
+# Constants that must never be overridden via the public `constants:` config section.
+# These control security-sensitive or identity-related behavior and are only settable
+# through the internal Python API.
+PROTECTED_CONSTANTS = frozenset({"USER_AGENT"})
+
+# Allowlist regex for a caller-supplied user-agent. Only a user-agent produced by the
+# Fabric CLI `deploy` command is trusted and used verbatim; anything else falls back to
+# the default USER_AGENT so arbitrary callers cannot spoof an identity.
+USER_AGENT_ALLOWLIST_REGEX = re.compile(r"^ms-fabric-cicd/[^,\s]+,ms-fabric-cli/\S+\s+\(deploy;.*\)$")
 
 
 class EnvVar(str, Enum):
@@ -465,6 +476,7 @@ CONFIG_VALIDATION_MSGS = {
         "empty_section_env": "'{}.{}' cannot be empty if specified",
         "invalid_constant_key": "Constant key in '{}' must be a non-empty string, got: {}",
         "unknown_constant": "Unknown constant '{}' in '{}' - this constant does not exist in fabric_cicd.constants",
+        "protected_constant": "Constant '{}' in '{}' is protected and cannot be overridden via configuration",
         "folders_list_prefix": "'{}[{}]' entry must start with '/' (got '{}')",
         "mutually_exclusive": "Cannot specify both '{}' and '{}'. Choose one filtering strategy.",
         "mutually_exclusive_env": "Cannot specify both '{}' and '{}' for the same environment(s): {}. Choose one filtering strategy per environment.",

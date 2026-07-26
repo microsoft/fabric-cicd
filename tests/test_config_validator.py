@@ -564,6 +564,18 @@ class TestConfigValidator:
         assert len(self.validator.errors) == 1
         assert "Unknown constant 'UNKNOWN_CONSTANT'" in self.validator.errors[0]
 
+    def test_validate_constants_dict_protected_constant(self):
+        """Test _validate_constants_section rejects protected constants like USER_AGENT."""
+        constants_dict = {"USER_AGENT": "spoofed-agent/1.0"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["protected_constant"].format("USER_AGENT", "constants")
+            in self.validator.errors[0]
+        )
+
     def test_validate_constants_dict_valid_various_types(self):
         """Test _validate_constants_section with valid constants of various types."""
         constants_dict = {

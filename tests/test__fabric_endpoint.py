@@ -10,7 +10,13 @@ from azure.core.exceptions import ClientAuthenticationError
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
-from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _format_invoke_log, _handle_response, handle_retry
+from fabric_cicd._common._fabric_endpoint import (
+    FabricEndpoint,
+    _build_user_agent,
+    _format_invoke_log,
+    _handle_response,
+    handle_retry,
+)
 
 
 class DummyLogger:
@@ -332,6 +338,83 @@ def test_get_token(setup_mocks):
     assert endpoint._get_token() == "test_token"  # Second call uses cache
     # Only called once at init — subsequent calls return cached
     mock_token_credential.get_token.assert_called_once_with("https://api.fabric.microsoft.com/.default")
+
+
+# A user-agent that matches the CLI deploy allowlist regex.
+_VALID_CLI_USER_AGENT = "ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/6.6.87-WSL2; Python/3.12.11)"
+# The composed User-Agent header when the CLI value is trusted (default UA + host-app suffix).
+_VALID_CLI_USER_AGENT_COMPOSED = f"{constants.USER_AGENT},(host-app/{_VALID_CLI_USER_AGENT})"
+
+
+@pytest.mark.parametrize(
+    ("user_agent", "expected"),
+    [
+        (None, constants.USER_AGENT),
+        ("", constants.USER_AGENT),
+        ("   ", constants.USER_AGENT),
+        (_VALID_CLI_USER_AGENT, _VALID_CLI_USER_AGENT_COMPOSED),
+        (f"  {_VALID_CLI_USER_AGENT}  ", _VALID_CLI_USER_AGENT_COMPOSED),
+        # Wrong command (not deploy) is rejected.
+        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (publish; Linux/6.6; Python/3.12)", constants.USER_AGENT),
+        # Missing ms-fabric-cli host app is rejected.
+        ("ms-fabric-cicd/1.2.0 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
+        # Arbitrary spoofed identity is rejected.
+        ("malicious-app/9.9.9 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
+        ("not-a-user-agent", constants.USER_AGENT),
+    ],
+    ids=[
+        "none",
+        "empty",
+        "whitespace",
+        "valid_cli_deploy",
+        "valid_surrounding_whitespace",
+        "wrong_command_rejected",
+        "missing_cli_rejected",
+        "spoofed_identity_rejected",
+        "junk_rejected",
+    ],
+)
+def test_build_user_agent(user_agent, expected):
+    """Test a trusted CLI deploy user-agent is appended as a host-app, else the default is used."""
+    assert _build_user_agent(user_agent) == expected
+
+
+@pytest.mark.parametrize(
+    ("user_agent", "expected_user_agent"),
+    [
+        (None, constants.USER_AGENT),
+        ("", constants.USER_AGENT),
+        ("   ", constants.USER_AGENT),
+        (_VALID_CLI_USER_AGENT, _VALID_CLI_USER_AGENT_COMPOSED),
+        ("bogus-app/1.0.0 (deploy)", constants.USER_AGENT),
+    ],
+    ids=["none", "empty", "whitespace", "valid_cli_deploy", "untrusted_ignored"],
+)
+def test_invoke_sets_user_agent_header(setup_mocks, user_agent, expected_user_agent):
+    """Test invoke sends the trusted CLI user-agent verbatim, else the default."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, user_agent=user_agent)
+    endpoint.invoke("GET", "http://example.com")
+
+    sent_headers = mock_requests.call_args.kwargs["headers"]
+    assert sent_headers["User-Agent"] == expected_user_agent
+
+
+def test_build_user_agent_logs_supplied_host(setup_mocks):
+    """Test the supplied user-agent is written to the log for both accepted and rejected values."""
+    dl, _ = setup_mocks
+
+    _build_user_agent(_VALID_CLI_USER_AGENT)
+    assert any(_VALID_CLI_USER_AGENT in message for message in dl.messages)
+
+    dl.messages.clear()
+    _build_user_agent("spoofed-app/1.0.0 (deploy)")
+    assert any("spoofed-app/1.0.0 (deploy)" in message for message in dl.messages)
 
 
 @pytest.mark.parametrize(

@@ -230,7 +230,6 @@ def publish_all_items(
                     "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
                 )
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
-       
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
 
@@ -434,6 +433,7 @@ def deploy_with_config(
     token_credential: TokenCredential,
     environment: str = "N/A",
     config_override: Optional[dict] = None,
+    user_agent: Optional[str] = None,
 ) -> DeploymentResult:
     """
     Deploy items using YAML configuration file with environment-specific settings.
@@ -447,6 +447,13 @@ def deploy_with_config(
         token_credential: Azure token credential for authentication (e.g., AzureCliCredential, ClientSecretCredential) - required.
         environment: Environment name to use for deployment (e.g., 'dev', 'test', 'prod'), if missing defaults to 'N/A'.
         config_override: Optional dictionary to override specific configuration values.
+        user_agent: Optional user-agent supplied by a trusted host application (the Fabric CLI
+            ``deploy`` command), e.g.
+            ``ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/...; Python/3.12.11)``. When
+            it matches ``constants.USER_AGENT_ALLOWLIST_REGEX`` it is appended to the default
+            user-agent as a ``(host-app/...)`` suffix; otherwise only the default
+            ``ms-fabric-cicd/<version>`` is used. This is a Python API argument only and cannot be
+            set through the config file or ``config_override``.
 
     Returns:
         DeploymentResult: A result object containing the deployment status, message, and
@@ -568,6 +575,7 @@ def deploy_with_config(
                 token_credential=token_credential,
                 parameter_file_path=workspace_settings.get("parameter_file_path"),
                 skip_parameterization=skip_parameterization,
+                user_agent=user_agent,
             )
             # Execute deployment operations based on skip settings
             if not publish_settings.get("skip", False):

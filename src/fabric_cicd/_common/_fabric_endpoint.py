@@ -26,6 +26,33 @@ _RESOURCE_URL = "https://api.fabric.microsoft.com/.default"
 _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
 
+def _build_user_agent(user_agent: Optional[str]) -> str:
+    """Return the default user-agent, appending a trusted caller-supplied host-app.
+
+    The Fabric CLI ``deploy`` command supplies a value such as
+    ``ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/...; Python/3.12.11)``.
+    When it matches ``constants.USER_AGENT_ALLOWLIST_REGEX`` (host app ``ms-fabric-cli``
+    running the ``deploy`` command) it is appended to the default user-agent as a
+    ``(host-app/...)`` suffix, e.g.
+    ``ms-fabric-cicd/<version>,(host-app/ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ...))``.
+    Otherwise only the default ``ms-fabric-cicd/<version>`` is used so arbitrary callers
+    cannot spoof an identity.
+
+    Args:
+        user_agent: The user-agent supplied by the caller (e.g., the Fabric CLI).
+    """
+    if not isinstance(user_agent, str) or not user_agent.strip():
+        return constants.USER_AGENT
+
+    candidate = user_agent.strip()
+    if constants.USER_AGENT_ALLOWLIST_REGEX.match(candidate):
+        logger.debug(f"Using caller-supplied user-agent: {candidate}")
+        return f"{constants.USER_AGENT},(host-app/{candidate})"
+
+    logger.debug(f"Ignoring untrusted caller-supplied user-agent: {candidate}")
+    return constants.USER_AGENT
+
+
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
 
@@ -34,6 +61,7 @@ class FabricEndpoint:
         token_credential: TokenCredential,
         requests_module: requests = requests,
         http_tracer: Optional[HTTPTracer] = None,
+        user_agent: Optional[str] = None,
     ) -> None:
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
@@ -42,10 +70,17 @@ class FabricEndpoint:
             token_credential: The token credential.
             requests_module: The requests module.
             http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
+            user_agent: Optional user-agent supplied by a trusted host application (the Fabric
+                CLI ``deploy`` command), e.g.
+                ``ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/...; Python/3.12.11)``.
+                When it matches ``constants.USER_AGENT_ALLOWLIST_REGEX`` it is appended to the
+                default user-agent as a ``(host-app/...)`` suffix; otherwise only the default
+                ``ms-fabric-cicd/<version>`` is used.
         """
         self.token_credential = token_credential
         self.requests = requests_module
         self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
+        self.user_agent = _build_user_agent(user_agent)
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime.datetime] = None
 
@@ -84,7 +119,7 @@ class FabricEndpoint:
             try:
                 headers = {
                     "Authorization": f"Bearer {self._get_token()}",
-                    "User-Agent": f"{constants.USER_AGENT}",
+                    "User-Agent": self.user_agent,
                 }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
