@@ -271,7 +271,7 @@ class FabricWorkspace:
 
         if not attribute_value:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
-            # required=False allows skipping items whose attributes aren't yet available (eventual consistency).
+            # required=False allows skipping items whose attributes aren't yet available (asynchronous provisioning)
             if not required:
                 logger.warning(f"{msg}; skipping (item may be newly provisioned).")
                 return ""
