@@ -273,7 +273,7 @@ class FabricWorkspace:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
             # required=False allows skipping items whose attributes aren't yet available (asynchronous provisioning)
             if not required:
-                logger.warning(f"{msg}; skipping (item may be newly provisioned)")
+                logger.warning(f"{msg} (attribute='{attribute_name}'); skipping (item may be newly provisioned)")
                 return ""
             raise InputError(msg, logger)
 
