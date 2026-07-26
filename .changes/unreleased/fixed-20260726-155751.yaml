@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix deployment failure when item attributes are not yet available due to asynchronous provisioning
+time: 2026-07-26T15:57:51.4571413+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "887"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/887
