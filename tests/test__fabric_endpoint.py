@@ -304,7 +304,7 @@ def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
         endpoint.invoke("GET", "http://example.com", max_duration=0)
 
 
-def test_max_duration_default(setup_mocks):
+def test_max_duration_default(setup_mocks, monkeypatch):
     """Test that FabricEndpoint uses 300s as the default max_duration."""
     _, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
@@ -312,6 +312,10 @@ def test_max_duration_default(setup_mocks):
     )
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    # Pin the module-level constant so the test is not environment-dependent.
+    # LRO_MAX_DURATION_SECONDS is evaluated at import time; an env var set in the
+    # runner's shell would already have changed it before this test executes.
+    monkeypatch.setattr(constants, "LRO_MAX_DURATION_SECONDS", 300)
 
     endpoint = FabricEndpoint(token_credential=mock_token_credential)
     assert endpoint.max_duration == 300
