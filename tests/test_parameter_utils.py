@@ -478,6 +478,41 @@ class TestParameterUtilities:
         ):
             _extract_item_attribute(mock_workspace, "$items.Dataflow.Source Dataflow.guid", True)
 
+    def test_extract_item_attribute_referenced_but_empty_raises(self, mock_workspace):
+        """A referenced item that exists but whose attribute is unpopulated must raise, not silently
+        resolve to an empty string.
+
+        This guards the boundary: the deployed-items refresh now skips
+        (rather than raising for) an item whose attribute is unavailable, leaving an empty value in
+        workspace_items. If a dynamic variable actually references that item, resolution must still
+        fail loudly instead of substituting ''.
+        """
+        # Item exists (passes the type/name existence checks) but its sqlendpoint was left empty,
+        # mimicking a lakehouse the refresh could not fully enrich.
+        mock_workspace.workspace_items = {
+            "Lakehouse": {
+                "PendingLakehouse": {
+                    "id": "pending-lakehouse-id",
+                    "sqlendpoint": "",
+                    "sqlendpointid": "",
+                    "queryserviceuri": "",
+                }
+            }
+        }
+        mock_workspace._refresh_deployed_items = MagicMock()
+
+        with pytest.raises(
+            ParsingError,
+            match=re.escape(
+                "Value does not exist for attribute 'sqlendpoint' in the Lakehouse item 'PendingLakehouse'"
+            ),
+        ):
+            _extract_item_attribute(mock_workspace, "$items.Lakehouse.PendingLakehouse.$sqlendpoint", False)
+
+        # A genuinely non-existent item still errors with the distinct "not found" message.
+        with pytest.raises(ParsingError, match="not found as a deployed Lakehouse"):
+            _extract_item_attribute(mock_workspace, "$items.Lakehouse.MissingLakehouse.$sqlendpoint", False)
+
     def test_extract_workspace_id_with_item_lookup(self, mock_workspace):
         """Tests _extract_workspace_id with item lookup in another workspace."""
         from fabric_cicd._parameter._utils import _extract_workspace_id
