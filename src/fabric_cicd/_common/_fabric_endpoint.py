@@ -27,16 +27,7 @@ _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
 
 def _build_user_agent(user_agent: Optional[str]) -> str:
-    """Return the default user-agent, appending a trusted caller-supplied host-app.
-
-    The Fabric CLI ``deploy`` command supplies a value such as
-    ``ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/...; Python/3.12.11)``.
-    When it matches ``constants.USER_AGENT_ALLOWLIST_REGEX`` (host app ``ms-fabric-cli``
-    running the ``deploy`` command) it is appended to the default user-agent as a
-    ``(host-app/...)`` suffix, e.g.
-    ``ms-fabric-cicd/<version>,(host-app/ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ...))``.
-    Otherwise only the default ``ms-fabric-cicd/<version>`` is used so arbitrary callers
-    cannot spoof an identity.
+    """Return the default user-agent, appending a trusted caller-supplied host-app if exists and supported.
 
     Args:
         user_agent: The user-agent supplied by the caller (e.g., the Fabric CLI).
@@ -45,11 +36,19 @@ def _build_user_agent(user_agent: Optional[str]) -> str:
         return constants.USER_AGENT
 
     candidate = user_agent.strip()
+    # Sanitize CR/LF for any log output so a crafted value cannot forge log lines.
+    sanitized = candidate.replace("\r", "\\r").replace("\n", "\\n")
+
+    # Never allow CR/LF in a value used as an HTTP header, regardless of the allowlist regex.
+    if "\r" in candidate or "\n" in candidate:
+        logger.debug(f"Ignoring caller-supplied user-agent containing CR/LF: {sanitized}")
+        return constants.USER_AGENT
+
     if constants.USER_AGENT_ALLOWLIST_REGEX.match(candidate):
-        logger.debug(f"Using caller-supplied user-agent: {candidate}")
+        logger.debug(f"Using caller-supplied user-agent: {sanitized}")
         return f"{constants.USER_AGENT},(host-app/{candidate})"
 
-    logger.debug(f"Ignoring untrusted caller-supplied user-agent: {candidate}")
+    logger.debug(f"Ignoring untrusted caller-supplied user-agent: {sanitized}")
     return constants.USER_AGENT
 
 

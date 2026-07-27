@@ -20,12 +20,12 @@ VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 # Constants that must never be overridden via the public `constants:` config section.
 # These control security-sensitive or identity-related behavior and are only settable
 # through the internal Python API.
-PROTECTED_CONSTANTS = frozenset({"USER_AGENT"})
+PROTECTED_CONSTANTS = frozenset({"USER_AGENT", "USER_AGENT_ALLOWLIST_REGEX"})
 
-# Allowlist regex for a caller-supplied user-agent. Only a user-agent produced by the
-# Fabric CLI `deploy` command is trusted and used verbatim; anything else falls back to
-# the default USER_AGENT so arbitrary callers cannot spoof an identity.
-USER_AGENT_ALLOWLIST_REGEX = re.compile(r"^ms-fabric-cicd/[^,\s]+,ms-fabric-cli/\S+\s+\(deploy;.*\)$")
+# Allowlist regex for a caller-supplied user-agent. The pattern uses
+# absolute anchors (\A/\Z) and explicitly excludes CR/LF so a crafted value cannot inject
+# additional HTTP headers or forge log lines via `\r`/`\n`.
+USER_AGENT_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cicd/[^,\s]+,ms-fabric-cli/\S+[ \t]+\(deploy;[^\r\n]*\)\Z")
 
 
 class EnvVar(str, Enum):

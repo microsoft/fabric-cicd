@@ -576,6 +576,20 @@ class TestConfigValidator:
             in self.validator.errors[0]
         )
 
+    def test_validate_constants_dict_protected_user_agent_allowlist_regex(self):
+        """Test _validate_constants_section rejects overriding the user-agent allowlist regex."""
+        constants_dict = {"USER_AGENT_ALLOWLIST_REGEX": ".*"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert (
+            constants.CONFIG_VALIDATION_MSGS["operation"]["protected_constant"].format(
+                "USER_AGENT_ALLOWLIST_REGEX", "constants"
+            )
+            in self.validator.errors[0]
+        )
+
     def test_validate_constants_dict_valid_various_types(self):
         """Test _validate_constants_section with valid constants of various types."""
         constants_dict = {

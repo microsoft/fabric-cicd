@@ -361,6 +361,10 @@ _VALID_CLI_USER_AGENT_COMPOSED = f"{constants.USER_AGENT},(host-app/{_VALID_CLI_
         # Arbitrary spoofed identity is rejected.
         ("malicious-app/9.9.9 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
         ("not-a-user-agent", constants.USER_AGENT),
+        # CR/LF injection attempts are rejected (header/log injection guard).
+        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; x\rInjected: 1)", constants.USER_AGENT),
+        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; x\nInjected: 1)", constants.USER_AGENT),
+        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ok)\r\nX-Injected: 1", constants.USER_AGENT),
     ],
     ids=[
         "none",
@@ -372,6 +376,9 @@ _VALID_CLI_USER_AGENT_COMPOSED = f"{constants.USER_AGENT},(host-app/{_VALID_CLI_
         "missing_cli_rejected",
         "spoofed_identity_rejected",
         "junk_rejected",
+        "cr_injection_rejected",
+        "lf_injection_rejected",
+        "trailing_crlf_injection_rejected",
     ],
 )
 def test_build_user_agent(user_agent, expected):
@@ -415,6 +422,18 @@ def test_build_user_agent_logs_supplied_host(setup_mocks):
     dl.messages.clear()
     _build_user_agent("spoofed-app/1.0.0 (deploy)")
     assert any("spoofed-app/1.0.0 (deploy)" in message for message in dl.messages)
+
+
+def test_build_user_agent_sanitizes_crlf_in_log(setup_mocks):
+    """Test a CR/LF-bearing user-agent is rejected and its logged form is sanitized (no raw CR/LF)."""
+    dl, _ = setup_mocks
+
+    result = _build_user_agent("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ok)\r\nX-Injected: 1")
+
+    assert result == constants.USER_AGENT
+    # The raw CR/LF must never reach the log; the escaped form should appear instead.
+    assert all("\r" not in message and "\n" not in message for message in dl.messages)
+    assert any("\\r\\nX-Injected: 1" in message for message in dl.messages)
 
 
 @pytest.mark.parametrize(
