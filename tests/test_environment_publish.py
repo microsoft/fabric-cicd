@@ -289,6 +289,93 @@ def test_resolve_pool_id_not_found():
         env_module._resolve_pool_id(pools, pool_name="MissingPool", pool_type="Workspace")
 
 
+def test_process_environment_file_preserves_live_pool_schedule_times(tmp_path):
+    """Regression for #1072: unquoted live_pool HH:MM:SS times survive processing.
+
+    A full yaml.safe_load / yaml.dump round-trip corrupts unquoted times under
+    PyYAML's YAML 1.1 sexagesimal parsing (18:00:00 -> 64800). The targeted line
+    replacement must leave these values untouched.
+    """
+    env_dir = tmp_path / "EnvSchedule"
+    setting_dir = env_dir / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    sc = setting_dir / "Sparkcompute.yml"
+    original = (
+        "instance_pool_id: pool-123\n"
+        "live_pool:\n"
+        "  state: Enabled\n"
+        "  schedule_state: Enabled\n"
+        "  schedule:\n"
+        "    recurrence_type: Daily\n"
+        "    start_time: 08:00:00\n"
+        "    end_time: 18:00:00\n"
+        "    time_zone: Pacific Standard Time\n"
+    )
+    sc.write_text(original, encoding="utf-8")
+
+    class FakeWS:
+        environment = "DEV"
+        environment_parameter: ClassVar[dict] = {
+            "spark_pool": [
+                {
+                    "instance_pool_id": "pool-123",
+                    "replace_value": {"DEV": {"type": "Capacity", "name": "MyPool"}},
+                }
+            ]
+        }
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+
+        def _get_workspace_pools(self):
+            return [{"id": "resolved-guid-abc", "name": "MyPool", "type": "Capacity"}]
+
+    dummy = DummyFile(sc)
+    result = env_module._process_environment_file(FakeWS(), DummyItem("EnvSchedule", [sc]), dummy)
+
+    # instance_pool_id was replaced
+    assert "instance_pool_id: resolved-guid-abc" in result
+    # time values remain intact as unquoted strings, not sexagesimal integers
+    assert "start_time: 08:00:00" in result
+    assert "end_time: 18:00:00" in result
+    assert "28800" not in result
+    assert "64800" not in result
+    # everything except the instance_pool_id line is byte-for-byte identical
+    expected = original.replace("instance_pool_id: pool-123", "instance_pool_id: resolved-guid-abc")
+    assert result == expected
+
+
+def test_process_environment_file_no_replacement_returns_original_unchanged(tmp_path):
+    """When no pool replacement occurs, the file is returned byte-for-byte unchanged.
+
+    Previously the round-trip ran unconditionally whenever instance_pool_id was
+    present, corrupting live_pool times even when no spark_pool mapping applied.
+    """
+    env_dir = tmp_path / "EnvNoReplace"
+    setting_dir = env_dir / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    sc = setting_dir / "Sparkcompute.yml"
+    original = "instance_pool_id: pool-123\nlive_pool:\n  schedule:\n    start_time: 08:00:00\n    end_time: 18:00:00\n"
+    sc.write_text(original, encoding="utf-8")
+
+    class FakeWS:
+        environment = "DEV"
+        environment_parameter: ClassVar[dict] = {}
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+
+        def _get_workspace_pools(self):
+            return []
+
+    dummy = DummyFile(sc)
+    result = env_module._process_environment_file(FakeWS(), DummyItem("EnvNoReplace", [sc]), dummy)
+    assert result == original
+
+
+def test_replace_instance_pool_id_line_replaces_only_the_value():
+    """_replace_instance_pool_id_line rewrites only the instance_pool_id value."""
+    contents = "instance_pool_id: old-guid\ndriver_cores: 8\nlive_pool:\n  schedule:\n    end_time: 18:00:00\n"
+    result = env_module._replace_instance_pool_id_line(contents, "new-guid")
+    assert result == ("instance_pool_id: new-guid\ndriver_cores: 8\nlive_pool:\n  schedule:\n    end_time: 18:00:00\n")
+
+
 def test_environment_publisher_exposes_func_process_file_for_bulk():
     """EnvironmentPublisher class attribute ensures bulk path discovers the file processor."""
     assert hasattr(env_module.EnvironmentPublisher, "func_process_file")

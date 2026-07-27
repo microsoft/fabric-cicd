@@ -5,6 +5,7 @@
 
 import logging
 import re
+from typing import Optional
 
 import dpath
 import yaml
@@ -33,6 +34,14 @@ def _process_environment_file(
     using the ``spark_pool`` parameter configuration so that the correct pool
     reference is embedded directly in the YAML sent to the Fabric Items API.
 
+    The YAML is parsed only to look up and match the pool mapping; the resolved
+    pool GUID is then written back with a targeted replacement of the
+    ``instance_pool_id`` line, leaving the rest of the file byte-for-byte
+    unchanged. This avoids a ``yaml.safe_load`` / ``yaml.dump`` round-trip, which
+    (under PyYAML's YAML 1.1 rules) would corrupt other values such as unquoted
+    ``live_pool`` schedule ``HH:MM:SS`` times, which are parsed as sexagesimal
+    integers (see issue #1072).
+
     All other files are returned unchanged.
 
     Args:
@@ -52,18 +61,19 @@ def _process_environment_file(
         return contents
 
     yaml_body = yaml.safe_load(contents)
-    if not isinstance(yaml_body, dict):
+    if not isinstance(yaml_body, dict) or "instance_pool_id" not in yaml_body:
         return contents
 
-    if "instance_pool_id" in yaml_body:
-        yaml_body = _replace_instance_pool_id(fabric_workspace_obj, yaml_body, item.name)
+    resolved_id = _resolve_instance_pool_id(fabric_workspace_obj, yaml_body, item.name)
+    if resolved_id is None or resolved_id == yaml_body["instance_pool_id"]:
+        return contents
 
-    return yaml.dump(yaml_body, default_flow_style=False, sort_keys=False)
+    return _replace_instance_pool_id_line(contents, resolved_id)
 
 
-def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: dict, item_name: str) -> dict:
+def _resolve_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: dict, item_name: str) -> Optional[str]:
     """
-    Replace ``instance_pool_id`` in parsed Sparkcompute YAML with a resolved pool GUID.
+    Resolve the target ``instance_pool_id`` GUID for Sparkcompute YAML.
 
     This function reads ``spark_pool`` parameter mappings from
     ``fabric_workspace_obj.environment_parameter`` and finds the entry whose
@@ -72,8 +82,7 @@ def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
     otherwise, the mapping applies globally.
 
     The mapped target pool ``name`` and ``type`` are then resolved against the
-    workspace custom pool list returned by the Fabric API, and the resolved pool
-    ``id`` is written back to ``yaml_body["instance_pool_id"]``.
+    workspace custom pool list returned by the Fabric API.
 
     Args:
         fabric_workspace_obj: Workspace context containing environment, parameters,
@@ -82,7 +91,7 @@ def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
         item_name: Environment item name used for optional per-item mapping filters.
 
     Returns:
-        The YAML dictionary, updated if a matching mapping is found; otherwise unchanged.
+        The resolved pool GUID if a matching mapping is found; otherwise ``None``.
     """
     from fabric_cicd._parameter._utils import _find_match, process_environment_key
 
@@ -96,15 +105,37 @@ def _replace_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
             input_name = key.get("item_name")
             if instance_pool_id == pool_id and _find_match(input_name or None, item_name):
                 pool_config = replace_value[fabric_workspace_obj.environment]
-                resolved_id = _resolve_pool_id(
+                return _resolve_pool_id(
                     pools,
                     pool_name=pool_config["name"],
                     pool_type=pool_config["type"],
                 )
-                yaml_body["instance_pool_id"] = resolved_id
-                break
 
-    return yaml_body
+    return None
+
+
+def _replace_instance_pool_id_line(contents: str, resolved_id: str) -> str:
+    """
+    Replace the value of the top-level ``instance_pool_id`` key in raw YAML text.
+
+    Only the ``instance_pool_id`` line is modified; all other lines (including
+    unquoted ``live_pool`` schedule times) are preserved exactly, avoiding the
+    sexagesimal corruption caused by a full YAML round-trip.
+
+    Args:
+        contents: The original ``Sparkcompute.yml`` contents.
+        resolved_id: The pool GUID to write as the new ``instance_pool_id`` value.
+
+    Returns:
+        The contents with the ``instance_pool_id`` value replaced.
+    """
+    return re.sub(
+        r"^(?P<prefix>instance_pool_id[ \t]*:[ \t]*).*$",
+        lambda m: f"{m.group('prefix')}{resolved_id}",
+        contents,
+        count=1,
+        flags=re.MULTILINE,
+    )
 
 
 def _resolve_pool_id(pools: list[dict], pool_name: str, pool_type: str) -> str:
