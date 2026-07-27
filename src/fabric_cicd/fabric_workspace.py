@@ -141,7 +141,8 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
-        self.contains_param_vars = False
+        self.contains_items_vars = False
+        self.items_dependency_graph: dict[str, set[str]] = {}
         self.bulk_publish_enabled = False
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
@@ -325,7 +326,8 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
-            self.contains_param_vars = bool(parameter_obj._search_dynamic_replacement_variables_in_parameter_file())
+            self.contains_items_vars = parameter_obj._search_dynamic_replacement_variables_in_parameter_file()
+            self.items_dependency_graph = parameter_obj._get_items_dependency_graph()
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -461,7 +463,7 @@ class FabricWorkspace:
                 self.workspace_items[item_type] = {}
 
             # Only collect attribute values when parameterization with dynamic variables is in use
-            if self.contains_param_vars:
+            if self.contains_items_vars:
                 # Get additional properties - eagerly fetch attribute values for specific item types
                 if item_type in [
                     ItemType.LAKEHOUSE.value,

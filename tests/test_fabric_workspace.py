@@ -1583,16 +1583,16 @@ def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace
         assert mock_endpoint.invoke.call_count == 0  # No API call made
 
 
-def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, valid_workspace_id):
-    """When find_value contains dynamic variables, _refresh_deployed_items collects extra attributes."""
-    # Create a parameter file with dynamic variable in find_value
+def test_dynamic_items_replace_value_triggers_attribute_collection(temp_workspace_dir, valid_workspace_id):
+    """When replace_value contains $items variables, _refresh_deployed_items collects extra attributes."""
+    # Create a parameter file with $items variable in replace_value
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
         """
 find_replace:
-  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
+  - find_value: "old-id"
     replace_value:
-      PPE: "replacement-id"
+      PPE: "$items.Lakehouse.MyLakehouse.$sqlendpointid"
 """,
         encoding="utf-8",
     )
@@ -1652,9 +1652,9 @@ find_replace:
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is True
+        assert workspace.contains_items_vars is True
 
-        # Now call _refresh_deployed_items to exercise the contains_param_vars guard
+        # Now call _refresh_deployed_items to exercise the contains_items_vars guard
         workspace._refresh_deployed_items()
 
         # Verify _get_item_attribute was called (lakehouse detail API)
@@ -1809,7 +1809,7 @@ find_replace:
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is False
+        assert workspace.contains_items_vars is False
 
         # Now call _refresh_deployed_items
         workspace._refresh_deployed_items()

@@ -156,3 +156,89 @@ def sort_items(
 
     logger.debug(f"Sorted items in {lookup_type}: {sorted_items}")
     return sorted_items
+
+
+def sort_item_types_into_bulk_layers(
+    types_in_batch: set[str],
+    dependency_graph: dict[str, set[str]],
+) -> list[set[str]]:
+    """
+    Groups item types into ordered bulk-publish layers using topological sort.
+
+    Types in the same layer have no intra-batch dependency on each other and can
+    be published in a single bulk API call. Layers must be published in order,
+    with workspace items refreshed between layers so that $items variable
+    references resolve correctly for each subsequent layer.
+
+    Only edges where both the consumer and the dependency are present in
+    types_in_batch are considered. Dependencies that are already deployed
+    (not in the batch) are ignored because workspace_items is already populated
+    for them before publishing begins.
+
+    Args:
+        types_in_batch: Item type strings being published in the current run.
+        dependency_graph: {consumer_type: set(dependency_types)} derived from
+                         $items variables in the parameter file.
+
+    Returns:
+        Ordered list of sets, where each set is a group of item types to
+        publish together in one bulk API call.
+
+    Raises:
+        ParsingError: If a circular dependency is detected between item types.
+    """
+    # Filter to only intra-batch edges
+    effective_deps: dict[str, set[str]] = {t: dependency_graph.get(t, set()) & types_in_batch for t in types_in_batch}
+
+    in_degree: dict[str, int] = {t: len(effective_deps[t]) for t in types_in_batch}
+
+    # Reverse graph: dependency_type -> set of consumers that depend on it
+    reverse_graph: dict[str, set[str]] = defaultdict(set)
+    for consumer, deps in effective_deps.items():
+        for dep in deps:
+            reverse_graph[dep].add(consumer)
+
+    logger.debug(f"Item type dependency graph (intra-batch): {dict(effective_deps)}")
+
+    layers: list[set[str]] = []
+    remaining = set(types_in_batch)
+
+    while remaining:
+        # Collect all types with no unresolved intra-batch dependencies
+        layer = {t for t in remaining if in_degree[t] == 0}
+        if not layer:
+            msg = "Circular dependency detected in $items variable references across item types."
+            raise ParsingError(msg, logger)
+
+        layers.append(layer)
+        remaining -= layer
+
+        # Reduce in-degree for consumers of the just-resolved types
+        for resolved_type in layer:
+            for consumer in reverse_graph[resolved_type]:
+                if consumer in remaining:
+                    in_degree[consumer] -= 1
+
+    # Align serial order: if type B comes after type A in SERIAL_ITEM_PUBLISH_ORDER,
+    # B's layer must be >= A's layer. The Fabric bulk API can resolve intra-batch
+    # logical-ID references (e.g. DataPipeline referencing a Notebook logical ID
+    # when both are in the same batch), so B and A can share a layer — B just
+    # cannot be in an EARLIER layer than A, which would mean A hasn't deployed yet.
+    serial_order_map = {item_type.value: order for order, item_type in constants.SERIAL_ITEM_PUBLISH_ORDER.items()}
+    type_to_layer: dict[str, int] = {t: idx for idx, layer in enumerate(layers) for t in layer}
+
+    batch_by_serial = sorted(types_in_batch, key=lambda x: serial_order_map.get(x, 0))
+    for t in batch_by_serial:
+        for t2 in batch_by_serial:
+            if serial_order_map.get(t2, 0) < serial_order_map.get(t, 0):
+                type_to_layer[t] = max(type_to_layer[t], type_to_layer[t2])
+
+    # Rebuild layers from the adjusted mapping
+    max_layer_idx = max(type_to_layer.values(), default=-1)
+    adjusted: list[set[str]] = [set() for _ in range(max_layer_idx + 1)]
+    for t, layer_idx in type_to_layer.items():
+        adjusted[layer_idx].add(t)
+    layers = [layer for layer in adjusted if layer]
+
+    logger.debug(f"Bulk publish layers: {[sorted(layer) for layer in layers]}")
+    return layers

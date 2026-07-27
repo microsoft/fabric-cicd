@@ -348,19 +348,11 @@ class ItemPublisher(Publisher):
             items_with_context.extend(publishable_items)
             publishers.append(publisher)
 
-        # Phase 2: Single bulk API call (publisher context used inside for per-item transforms)
+        # Phase 2: Bulk API call(s)
         if items_with_context:
             if skipped_items:
                 logger.info(f"Skipping {len(skipped_items)} item(s) due to publish filters")
-
-            item_count = len(items_with_context)
-            if item_count > constants.BULK_ITEM_COUNT_LIMIT:
-                msg = (
-                    f"Bulk publish item count ({item_count}) exceeds the API limit "
-                    f"of {constants.BULK_ITEM_COUNT_LIMIT} items."
-                )
-                raise InputError(msg, logger)
-            fabric_workspace_obj._publish_items(items_with_context, skipped_items=skipped_items)
+            ItemPublisher._execute_bulk_publish(fabric_workspace_obj, items_with_context, skipped_items)
 
         # Phase 3: Post-hooks per type
         for publisher in publishers:
@@ -511,6 +503,83 @@ class ItemPublisher(Publisher):
     # endregion
 
     # region Publishing
+
+    @staticmethod
+    def _check_bulk_item_count(count: int, context: str = "") -> None:
+        """Raises InputError if count exceeds the bulk API item limit."""
+        if count > constants.BULK_ITEM_COUNT_LIMIT:
+            suffix = f" in {context}" if context else ""
+            msg = f"Bulk publish item count ({count}){suffix} exceeds the API limit of {constants.BULK_ITEM_COUNT_LIMIT} items."
+            raise InputError(msg, logger)
+
+    @staticmethod
+    def _execute_bulk_publish(
+        fabric_workspace_obj: "FabricWorkspace",
+        items_with_context: list[tuple[str, "Item", "ItemPublisher"]],
+        skipped_items: list[str],
+    ) -> None:
+        """
+        Executes the bulk publish API call(s) for the collected items.
+
+        When $items variable references create intra-batch ordering requirements,
+        items are split into topologically-sorted layers and published sequentially
+        with a workspace refresh between layers so each layer's parameterization can
+        resolve the IDs of items deployed in previous layers.
+
+        If all dependency types are already present in workspace_items (i.e. this is
+        a redeployment / update run), no split is needed: the Fabric API can resolve
+        all structural logical-ID references because the items already exist, and
+        $items variable substitution can read IDs from the pre-populated workspace_items.
+
+        Otherwise, a single bulk API call is issued for all items.
+
+        Args:
+            fabric_workspace_obj: The FabricWorkspace object.
+            items_with_context: Collected (name, item, publisher) tuples from Phase 1.
+            skipped_items: Items excluded by publish filters, for logging.
+        """
+        from fabric_cicd._items._manage_dependencies import sort_item_types_into_bulk_layers
+
+        types_in_batch = {publisher.item_type for _, _, publisher in items_with_context}
+        dep_graph = fabric_workspace_obj.items_dependency_graph
+        has_intra_batch_deps = any(dep_graph.get(t, set()) & types_in_batch for t in types_in_batch)
+
+        if not has_intra_batch_deps:
+            ItemPublisher._check_bulk_item_count(len(items_with_context))
+            fabric_workspace_obj._publish_items(items_with_context, skipped_items=skipped_items)
+            return
+
+        # Optimisation: on redeployment all dependency types are already in workspace_items,
+        # so the Fabric API can resolve structural references and $items substitution can
+        # read IDs without splitting into layers.
+        dep_types_needed = {dep for deps in dep_graph.values() for dep in deps if dep in types_in_batch}
+        all_deps_already_deployed = all(
+            dep_type in fabric_workspace_obj.workspace_items for dep_type in dep_types_needed
+        )
+
+        if all_deps_already_deployed:
+            logger.debug("All dependency types already deployed — publishing all items in a single bulk call")
+            ItemPublisher._check_bulk_item_count(len(items_with_context))
+            fabric_workspace_obj._publish_items(items_with_context, skipped_items=skipped_items)
+            return
+
+        layers = sort_item_types_into_bulk_layers(types_in_batch, dep_graph)
+        logger.debug(f"Publishing in {len(layers)} dependency-ordered bulk layer(s)")
+
+        for layer_index, layer_types in enumerate(layers):
+            layer_items = [(n, i, p) for n, i, p in items_with_context if p.item_type in layer_types]
+            if not layer_items:
+                continue
+
+            ItemPublisher._check_bulk_item_count(len(layer_items), context=f"layer {layer_index + 1}")
+
+            # Pass skipped_items only on the first layer to avoid duplicate logging
+            fabric_workspace_obj._publish_items(layer_items, skipped_items=skipped_items if layer_index == 0 else None)
+
+            # Refresh workspace_items so the next layer's parameterization can resolve
+            # $items variable references to items deployed in this layer
+            if layer_index < len(layers) - 1:
+                fabric_workspace_obj._refresh_deployed_items()
 
     def _publish_items_parallel(self, items: dict[str, "Item"]) -> list[tuple[str, Exception]]:
         """

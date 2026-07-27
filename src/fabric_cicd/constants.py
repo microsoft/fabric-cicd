@@ -241,7 +241,8 @@ DATAFLOW_SOURCE_REGEX = (
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
-DYNAMIC_VARIABLES_REGEX = r"^\$(workspace|items)\."
+
+ITEMS_VARIABLE_REGEX = r"^\$items\."
 
 # Well known file names
 DATA_PIPELINE_CONTENT_FILE_JSON = "pipeline-content.json"

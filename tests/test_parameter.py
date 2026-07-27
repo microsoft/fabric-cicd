@@ -3282,8 +3282,8 @@ class TestSearchDynamicReplacementVariables:
             environment="PPE",
         )
 
-    def test_detects_workspace_variable_in_replace_value(self, tmp_path):
-        """Dynamic variable $workspace.* in replace_value is detected."""
+    def test_workspace_variable_in_replace_value_not_tracked(self, tmp_path):
+        """$workspace.* in replace_value is not tracked — only $items.* is."""
         param = self._make_parameter(
             tmp_path,
             """
@@ -3293,10 +3293,10 @@ find_replace:
       PPE: "$workspace.my_ws.$items.my_item.id"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
 
     def test_detects_items_variable_in_replace_value(self, tmp_path):
-        """Dynamic variable $items.* in replace_value is detected."""
+        """$items.* in replace_value is detected."""
         param = self._make_parameter(
             tmp_path,
             """
@@ -3308,8 +3308,8 @@ find_replace:
         )
         assert param._search_dynamic_replacement_variables_in_parameter_file() is True
 
-    def test_detects_workspace_variable_in_find_value(self, tmp_path):
-        """Dynamic variable $workspace.* in find_value is detected."""
+    def test_workspace_variable_in_find_value_not_tracked(self, tmp_path):
+        """$workspace.* in find_value is not tracked — find_value is not checked."""
         param = self._make_parameter(
             tmp_path,
             """
@@ -3319,7 +3319,7 @@ find_replace:
       PPE: "replacement-id"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
 
     def test_no_detection_for_static_values(self, tmp_path):
         """Static find/replace values are not flagged as dynamic."""
@@ -3349,18 +3349,31 @@ spark_pool:
         )
         assert param._search_dynamic_replacement_variables_in_parameter_file() is False
 
-    def test_detects_dynamic_variable_in_key_value_replace(self, tmp_path):
-        """Dynamic variable in key_value_replace replace_value is detected."""
+    def test_detects_items_variable_in_key_value_replace(self, tmp_path):
+        """$items.* in key_value_replace replace_value is detected."""
         param = self._make_parameter(
             tmp_path,
             """
 key_value_replace:
   - find_key: "$.connectionId"
     replace_value:
-      PPE: "$workspace.my_ws.$items.my_item.id"
+      PPE: "$items.my_lakehouse.id"
 """,
         )
         assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+
+    def test_items_variable_in_find_value_not_counted(self, tmp_path):
+        """$items.* in find_value is not counted — find_value is not checked."""
+        param = self._make_parameter(
+            tmp_path,
+            """
+find_replace:
+  - find_value: "$items.my_lakehouse.id"
+    replace_value:
+      PPE: "replacement-id"
+""",
+        )
+        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
 
     def test_empty_parameter_file_returns_false(self, tmp_path):
         """No parameters means no dynamic variables detected."""

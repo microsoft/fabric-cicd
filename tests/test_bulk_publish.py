@@ -239,18 +239,13 @@ class TestBulkPublishFallback:
             publish.publish_all_items(workspace)
             assert workspace.bulk_publish_enabled is False
 
-    @pytest.mark.parametrize(
-        "param_yaml",
-        [
-            'find_replace:\n  - find_value: "some-id"\n    replace_value:\n      PPE: "$workspace.other_ws.$items.some_item.id"\n',
-            'find_replace:\n  - find_value: "$workspace.source_ws.$items.Notebook.some_lakehouse.id"\n    replace_value:\n      PPE: "replacement-id"\n',
-        ],
-        ids=["dynamic_replace_value", "dynamic_find_value"],
-    )
-    def test_fallback_on_dynamic_variables(self, mock_endpoint, temp_workspace_dir, param_yaml):
-        """Bulk publish falls back when parameter file contains dynamic $workspace/$items variables."""
+    def test_fallback_on_items_variables(self, mock_endpoint, temp_workspace_dir):
+        """Bulk publish falls back when parameter file contains $items variables."""
         create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
-        create_parameter_file(temp_workspace_dir, param_yaml)
+        create_parameter_file(
+            temp_workspace_dir,
+            'find_replace:\n  - find_value: "some-id"\n    replace_value:\n      PPE: "$items.my_lakehouse.id"\n',
+        )
 
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir, environment="PPE") as workspace,
@@ -258,7 +253,23 @@ class TestBulkPublishFallback:
         ):
             publish.publish_all_items(workspace)
             assert workspace.bulk_publish_enabled is False
-            assert workspace.contains_param_vars is True
+            assert workspace.contains_items_vars is True
+
+    def test_no_fallback_on_workspace_variables_only(self, mock_endpoint, temp_workspace_dir):
+        """Bulk publish is not disabled when parameter file contains only $workspace variables."""
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        create_parameter_file(
+            temp_workspace_dir,
+            'find_replace:\n  - find_value: "$workspace.source_ws.$items.Notebook.some_lakehouse.id"\n    replace_value:\n      PPE: "replacement-id"\n',
+        )
+
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir, environment="PPE") as workspace,
+            patch.object(ItemPublisher, "publish_all_bulk", return_value=[]),
+        ):
+            publish.publish_all_items(workspace)
+            assert workspace.bulk_publish_enabled is True
+            assert workspace.contains_items_vars is False
 
     def test_no_fallback_without_dynamic_variables(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish remains enabled when parameter file has no dynamic variables."""
@@ -279,7 +290,7 @@ find_replace:
         ):
             publish.publish_all_items(workspace)
             assert workspace.bulk_publish_enabled is True
-            assert workspace.contains_param_vars is False
+            assert workspace.contains_items_vars is False
 
     def test_item_name_exclude_regex_supported_in_bulk(self, mock_endpoint, temp_workspace_dir, caplog):
         """item_name_exclude_regex does not cause fallback -- filtering is applied in bulk Phase 1."""
