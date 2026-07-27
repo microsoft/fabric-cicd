@@ -223,7 +223,13 @@ class FabricWorkspace:
         raise InputError(msg, logger)
 
     def _get_item_attribute(
-        self, workspace_id: str, item_type: str, item_guid: str, item_name: str, attribute_name: str
+        self,
+        workspace_id: str,
+        item_type: str,
+        item_guid: str,
+        item_name: str,
+        attribute_name: str,
+        required: bool = True,
     ) -> str:
         """Returns the attribute value of an item in the specified workspace based on item type and id"""
         # No need to make API calls if we don't have an item guid
@@ -262,8 +268,13 @@ class FabricWorkspace:
         )
         # Extract the attribute value using the path
         attribute_value = dpath.get(response, property_path, default="")
+
         if not attribute_value:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
+            # required=False allows skipping items whose attributes aren't yet available (asynchronous provisioning)
+            if not required:
+                logger.warning(f"{msg} (attribute='{attribute_name}'); skipping (item may be newly provisioned)")
+                return ""
             raise InputError(msg, logger)
 
         # Cache the result before returning
@@ -451,7 +462,7 @@ class FabricWorkspace:
 
             # Only collect attribute values when parameterization with dynamic variables is in use
             if self.contains_param_vars:
-                # Get additional properties
+                # Get additional properties - eagerly fetch attribute values for specific item types
                 if item_type in [
                     ItemType.LAKEHOUSE.value,
                     ItemType.MIRRORED_DATABASE.value,
@@ -459,14 +470,14 @@ class FabricWorkspace:
                     ItemType.SQL_DATABASE.value,
                 ]:
                     sql_endpoint = self._get_item_attribute(
-                        self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpoint", required=False
                     )
                     sql_endpoint_id = self._get_item_attribute(
-                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid", required=False
                     )
                 if item_type in [ItemType.EVENTHOUSE.value]:
                     query_service_uri = self._get_item_attribute(
-                        self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
+                        self.workspace_id, item_type, item_guid, item_name, "queryserviceuri", required=False
                     )
 
             # Add item details to the deployed_items dictionary

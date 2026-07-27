@@ -1666,6 +1666,86 @@ find_replace:
         assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == "sqlep-id"
 
 
+def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir, valid_workspace_id, caplog):
+    """A newly provisioned lakehouse (e.g. Dataflow Gen2 staging lakehouse)
+    with an unpopulated SQL endpoint must not fail the deployed-items refresh."""
+
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text(
+        """
+find_replace:
+  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
+    replace_value:
+      PPE: "replacement-id"
+""",
+        encoding="utf-8",
+    )
+
+    item_dir = temp_workspace_dir / "MyNotebook.Notebook"
+    item_dir.mkdir()
+    platform = item_dir / ".platform"
+    platform.write_text(
+        json.dumps({
+            "metadata": {"type": "Notebook", "displayName": "MyNotebook", "description": ""},
+            "config": {"logicalId": "nb-001"},
+        }),
+        encoding="utf-8",
+    )
+
+    mock_ep = MagicMock()
+
+    items_response = {
+        "body": {
+            "value": [
+                {
+                    "type": "Lakehouse",
+                    "displayName": "StagingLakehouseForDataflows_20260318145744",
+                    "description": "",
+                    "id": "staging-lh-guid",
+                    "folderId": "",
+                }
+            ],
+            "capacityId": "test-cap",
+        }
+    }
+    # SQL endpoint never becomes available (simulates eventual consistency window)
+    lakehouse_detail = {"body": {"properties": {"sqlEndpointProperties": {"connectionString": "", "id": ""}}}}
+
+    def mock_invoke(method, url, **_kwargs):
+        if method == "GET" and url.endswith("/items"):
+            return items_response
+        if method == "GET" and "lakehouses/" in url:
+            return lakehouse_detail
+        return {"body": {"value": [], "capacityId": "test-cap"}}
+
+    mock_ep.invoke.side_effect = mock_invoke
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_ep),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            token_credential=DummyTokenCredential(),
+        )
+
+        assert workspace.contains_param_vars is True
+
+        # Should not raise even though the staging lakehouse SQL endpoint is unresolved
+        with caplog.at_level("WARNING"):
+            workspace._refresh_deployed_items()
+
+        staging = workspace.workspace_items["Lakehouse"]["StagingLakehouseForDataflows_20260318145744"]
+        assert staging["sqlendpoint"] == ""
+        assert staging["sqlendpointid"] == ""
+        assert "Attribute value not found" in caplog.text
+
+
 def test_static_params_skip_attribute_collection(temp_workspace_dir, valid_workspace_id):
     """When only static parameters are present, _refresh_deployed_items skips extra attribute calls."""
     # Create a parameter file with only static values
@@ -1783,8 +1863,32 @@ def test_get_item_attribute_unsupported_and_empty(patched_fabric_workspace, vali
         # Verify the error case was not cached
         with pytest.raises(InputError):
             workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "sqlendpoint")
-        # Should still be only 1 API call (cached error)
+        # Should still be only 1 API call per lookup (cached error not stored)
         assert mock_endpoint.invoke.call_count == 2
+
+
+def test_get_item_attribute_not_required_returns_empty(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir, caplog
+):
+    """When required=False, an unresolved attribute returns '' with a warning instead of raising."""
+    mock_endpoint = MagicMock()
+    mock_endpoint.invoke.return_value = {"body": {"properties": {"sqlEndpointProperties": {"connectionString": ""}}}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        with caplog.at_level("WARNING"):
+            result = workspace._get_item_attribute(
+                "ws1", "Lakehouse", "StagingLakehouseForDataflows_1", "name1", "sqlendpoint", required=False
+            )
+
+        assert result == ""
+        assert mock_endpoint.invoke.call_count == 1
+        assert "Attribute value not found" in caplog.text
 
 
 def test_multiple_items_with_default_guid_logical_id(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
