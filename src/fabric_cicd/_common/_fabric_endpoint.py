@@ -36,19 +36,14 @@ def _build_user_agent(user_agent: Optional[str]) -> str:
         return constants.USER_AGENT
 
     candidate = user_agent.strip()
-    # Sanitize CR/LF for any log output so a crafted value cannot forge log lines.
-    sanitized = candidate.replace("\r", "\\r").replace("\n", "\\n")
 
     # Never allow CR/LF in a value used as an HTTP header, regardless of the allowlist regex.
     if "\r" in candidate or "\n" in candidate:
-        logger.debug(f"Ignoring caller-supplied user-agent containing CR/LF: {sanitized}")
         return constants.USER_AGENT
 
     if constants.USER_AGENT_ALLOWLIST_REGEX.match(candidate):
-        logger.debug(f"Using caller-supplied user-agent: {sanitized}")
         return f"{constants.USER_AGENT},(host-app/{candidate})"
 
-    logger.debug(f"Ignoring untrusted caller-supplied user-agent: {sanitized}")
     return constants.USER_AGENT
 
 
@@ -69,12 +64,7 @@ class FabricEndpoint:
             token_credential: The token credential.
             requests_module: The requests module.
             http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
-            user_agent: Optional user-agent supplied by a trusted host application (the Fabric
-                CLI ``deploy`` command), e.g.
-                ``ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/...; Python/3.12.11)``.
-                When it matches ``constants.USER_AGENT_ALLOWLIST_REGEX`` it is appended to the
-                default user-agent as a ``(host-app/...)`` suffix; otherwise only the default
-                ``ms-fabric-cicd/<version>`` is used.
+            user_agent: Optional user-agent supplied by a trusted host application.
         """
         self.token_credential = token_credential
         self.requests = requests_module

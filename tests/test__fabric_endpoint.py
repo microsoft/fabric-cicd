@@ -412,28 +412,25 @@ def test_invoke_sets_user_agent_header(setup_mocks, user_agent, expected_user_ag
     assert sent_headers["User-Agent"] == expected_user_agent
 
 
-def test_build_user_agent_logs_supplied_host(setup_mocks):
-    """Test the supplied user-agent is written to the log for both accepted and rejected values."""
+def test_build_user_agent_ignores_untrusted_value(setup_mocks):
+    """Test an untrusted (non-allowlisted) user-agent is ignored and never written to the log."""
     dl, _ = setup_mocks
 
-    _build_user_agent(_VALID_CLI_USER_AGENT)
-    assert any(_VALID_CLI_USER_AGENT in message for message in dl.messages)
+    result = _build_user_agent("spoofed-app/1.0.0 (deploy)")
 
-    dl.messages.clear()
-    _build_user_agent("spoofed-app/1.0.0 (deploy)")
-    assert any("spoofed-app/1.0.0 (deploy)" in message for message in dl.messages)
+    assert result == constants.USER_AGENT
+    assert all("spoofed-app/1.0.0 (deploy)" not in message for message in dl.messages)
 
 
-def test_build_user_agent_sanitizes_crlf_in_log(setup_mocks):
-    """Test a CR/LF-bearing user-agent is rejected and its logged form is sanitized (no raw CR/LF)."""
+def test_build_user_agent_rejects_crlf(setup_mocks):
+    """Test a CR/LF-bearing user-agent is rejected and never written to the log."""
     dl, _ = setup_mocks
 
     result = _build_user_agent("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ok)\r\nX-Injected: 1")
 
     assert result == constants.USER_AGENT
-    # The raw CR/LF must never reach the log; the escaped form should appear instead.
+    # The raw CR/LF must never reach the log.
     assert all("\r" not in message and "\n" not in message for message in dl.messages)
-    assert any("\\r\\nX-Injected: 1" in message for message in dl.messages)
 
 
 @pytest.mark.parametrize(
