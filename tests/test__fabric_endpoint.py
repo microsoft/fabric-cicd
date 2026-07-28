@@ -340,40 +340,40 @@ def test_get_token(setup_mocks):
     mock_token_credential.get_token.assert_called_once_with("https://api.fabric.microsoft.com/.default")
 
 
-# A user-agent that matches the CLI deploy allowlist regex.
-_VALID_CLI_USER_AGENT = "ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; Linux/6.6.87-WSL2; Python/3.12.11)"
-# The composed User-Agent header when the CLI value is trusted (default UA + host-app suffix).
-_VALID_CLI_USER_AGENT_COMPOSED = f"{constants.USER_AGENT},(host-app/{_VALID_CLI_USER_AGENT})"
+# A host-app value that matches the allowlist regex (bare ms-fabric-cli product token).
+_VALID_HOST_APP = "ms-fabric-cli/1.6.1"
+# The composed User-Agent header when the host-app value is trusted (host-app token + default UA).
+_VALID_HOST_APP_COMPOSED = f"{_VALID_HOST_APP} (deploy; {constants.USER_AGENT})"
 
 
 @pytest.mark.parametrize(
-    ("user_agent", "expected"),
+    ("host_app", "expected"),
     [
         (None, constants.USER_AGENT),
         ("", constants.USER_AGENT),
         ("   ", constants.USER_AGENT),
-        (_VALID_CLI_USER_AGENT, _VALID_CLI_USER_AGENT_COMPOSED),
-        (f"  {_VALID_CLI_USER_AGENT}  ", _VALID_CLI_USER_AGENT_COMPOSED),
-        # Wrong command (not deploy) is rejected.
-        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (publish; Linux/6.6; Python/3.12)", constants.USER_AGENT),
-        # Missing ms-fabric-cli host app is rejected.
-        ("ms-fabric-cicd/1.2.0 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
+        (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
+        (f"  {_VALID_HOST_APP}  ", _VALID_HOST_APP_COMPOSED),
+        # Missing version is rejected.
+        ("ms-fabric-cli", constants.USER_AGENT),
+        # A full user-agent string (with spaces) is rejected; only the bare product token is allowed.
+        ("ms-fabric-cli/1.6.1 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
         # Arbitrary spoofed identity is rejected.
-        ("malicious-app/9.9.9 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
-        ("not-a-user-agent", constants.USER_AGENT),
+        ("malicious-app/9.9.9", constants.USER_AGENT),
+        ("not-a-host-app", constants.USER_AGENT),
         # CR/LF injection attempts are rejected (header/log injection guard).
-        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; x\rInjected: 1)", constants.USER_AGENT),
-        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; x\nInjected: 1)", constants.USER_AGENT),
-        ("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ok)\r\nX-Injected: 1", constants.USER_AGENT),
+        ("ms-fabric-cli/1.6.1\rInjected: 1", constants.USER_AGENT),
+        ("ms-fabric-cli/1.6.1\nInjected: 1", constants.USER_AGENT),
+        ("ms-fabric-cli/1.6.1\r\nX-Injected: 1", constants.USER_AGENT),
     ],
     ids=[
         "none",
         "empty",
         "whitespace",
-        "valid_cli_deploy",
+        "valid_host_app",
         "valid_surrounding_whitespace",
-        "wrong_command_rejected",
-        "missing_cli_rejected",
+        "missing_version_rejected",
+        "full_user_agent_rejected",
         "spoofed_identity_rejected",
         "junk_rejected",
         "cr_injection_rejected",
@@ -381,31 +381,31 @@ _VALID_CLI_USER_AGENT_COMPOSED = f"{constants.USER_AGENT},(host-app/{_VALID_CLI_
         "trailing_crlf_injection_rejected",
     ],
 )
-def test_build_user_agent(user_agent, expected):
-    """Test a trusted CLI deploy user-agent is appended as a host-app, else the default is used."""
-    assert _build_user_agent(user_agent) == expected
+def test_build_user_agent(host_app, expected):
+    """Test a trusted host-app is appended as a host-app suffix, else the default is used."""
+    assert _build_user_agent(host_app) == expected
 
 
 @pytest.mark.parametrize(
-    ("user_agent", "expected_user_agent"),
+    ("host_app", "expected_user_agent"),
     [
         (None, constants.USER_AGENT),
         ("", constants.USER_AGENT),
         ("   ", constants.USER_AGENT),
-        (_VALID_CLI_USER_AGENT, _VALID_CLI_USER_AGENT_COMPOSED),
-        ("bogus-app/1.0.0 (deploy)", constants.USER_AGENT),
+        (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
+        ("bogus-app/1.0.0", constants.USER_AGENT),
     ],
-    ids=["none", "empty", "whitespace", "valid_cli_deploy", "untrusted_ignored"],
+    ids=["none", "empty", "whitespace", "valid_host_app", "untrusted_ignored"],
 )
-def test_invoke_sets_user_agent_header(setup_mocks, user_agent, expected_user_agent):
-    """Test invoke sends the trusted CLI user-agent verbatim, else the default."""
+def test_invoke_sets_user_agent_header(setup_mocks, host_app, expected_user_agent):
+    """Test invoke sends the composed host-app user-agent when trusted, else the default."""
     _, mock_requests = setup_mocks
     mock_requests.return_value = Mock(
         status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
     )
     mock_token_credential = Mock()
     mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
-    endpoint = FabricEndpoint(token_credential=mock_token_credential, user_agent=user_agent)
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, host_app=host_app)
     endpoint.invoke("GET", "http://example.com")
 
     sent_headers = mock_requests.call_args.kwargs["headers"]
@@ -413,20 +413,20 @@ def test_invoke_sets_user_agent_header(setup_mocks, user_agent, expected_user_ag
 
 
 def test_build_user_agent_ignores_untrusted_value(setup_mocks):
-    """Test an untrusted (non-allowlisted) user-agent is ignored and never written to the log."""
+    """Test an untrusted (non-allowlisted) host-app is ignored and never written to the log."""
     dl, _ = setup_mocks
 
-    result = _build_user_agent("spoofed-app/1.0.0 (deploy)")
+    result = _build_user_agent("spoofed-app/1.0.0")
 
     assert result == constants.USER_AGENT
-    assert all("spoofed-app/1.0.0 (deploy)" not in message for message in dl.messages)
+    assert all("spoofed-app/1.0.0" not in message for message in dl.messages)
 
 
 def test_build_user_agent_rejects_crlf(setup_mocks):
-    """Test a CR/LF-bearing user-agent is rejected and never written to the log."""
+    """Test a CR/LF-bearing host-app is rejected and never written to the log."""
     dl, _ = setup_mocks
 
-    result = _build_user_agent("ms-fabric-cicd/1.2.0,ms-fabric-cli/1.6.1 (deploy; ok)\r\nX-Injected: 1")
+    result = _build_user_agent("ms-fabric-cli/1.6.1\r\nX-Injected: 1")
 
     assert result == constants.USER_AGENT
     # The raw CR/LF must never reach the log.

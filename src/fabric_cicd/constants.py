@@ -18,14 +18,10 @@ USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 
 # Constants that must never be overridden via the public `constants:` config section.
-# These control security-sensitive or identity-related behavior and are only settable
-# through the internal Python API.
-PROTECTED_CONSTANTS = frozenset({"USER_AGENT", "USER_AGENT_ALLOWLIST_REGEX"})
+PROTECTED_CONSTANTS = frozenset({"USER_AGENT", "HOST_APP_ALLOWLIST_REGEX"})
 
-# Allowlist regex for a caller-supplied user-agent. The pattern uses
-# absolute anchors (\A/\Z) and explicitly excludes CR/LF so a crafted value cannot inject
-# additional HTTP headers or forge log lines via `\r`/`\n`.
-USER_AGENT_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cicd/[^,\s]+,ms-fabric-cli/\S+[ \t]+\(deploy;[^\r\n]*\)\Z")
+# Allowlist for the host-app value; matches only a bare `ms-fabric-cli/<version>` token (no whitespace/CRLF).
+HOST_APP_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cli/\S+\Z")
 
 
 class EnvVar(str, Enum):

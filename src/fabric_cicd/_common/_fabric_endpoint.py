@@ -26,23 +26,24 @@ _RESOURCE_URL = "https://api.fabric.microsoft.com/.default"
 _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
 
-def _build_user_agent(user_agent: Optional[str]) -> str:
-    """Return the default user-agent, appending a trusted caller-supplied host-app if exists and supported.
+def _build_user_agent(host_app: Optional[str]) -> str:
+    """Return the default user-agent, appending a trusted host-app suffix when supported.
 
     Args:
-        user_agent: The user-agent supplied by the caller (e.g., the Fabric CLI).
+        host_app: The host-app identifier supplied by a trusted caller (e.g. the Fabric CLI).
+            Only a value matching ``HOST_APP_ALLOWLIST_REGEX`` is appended; anything else is ignored.
     """
-    if not isinstance(user_agent, str) or not user_agent.strip():
+    if not isinstance(host_app, str) or not host_app.strip():
         return constants.USER_AGENT
 
-    candidate = user_agent.strip()
+    candidate = host_app.strip()
 
-    # Never allow CR/LF in a value used as an HTTP header, regardless of the allowlist regex.
+    # Reject CR/LF to prevent HTTP header / log injection.
     if "\r" in candidate or "\n" in candidate:
         return constants.USER_AGENT
 
-    if constants.USER_AGENT_ALLOWLIST_REGEX.match(candidate):
-        return f"{constants.USER_AGENT},(host-app/{candidate})"
+    if constants.HOST_APP_ALLOWLIST_REGEX.match(candidate):
+        return f"{candidate} (deploy; {constants.USER_AGENT})"
 
     return constants.USER_AGENT
 
@@ -55,7 +56,7 @@ class FabricEndpoint:
         token_credential: TokenCredential,
         requests_module: requests = requests,
         http_tracer: Optional[HTTPTracer] = None,
-        user_agent: Optional[str] = None,
+        host_app: Optional[str] = None,
     ) -> None:
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
@@ -64,12 +65,12 @@ class FabricEndpoint:
             token_credential: The token credential.
             requests_module: The requests module.
             http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
-            user_agent: Optional user-agent supplied by a trusted host application.
+            host_app: Optional host-app identifier supplied by a trusted caller.
         """
         self.token_credential = token_credential
         self.requests = requests_module
         self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
-        self.user_agent = _build_user_agent(user_agent)
+        self.user_agent = _build_user_agent(host_app)
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime.datetime] = None
 
