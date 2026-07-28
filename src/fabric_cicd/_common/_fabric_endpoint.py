@@ -49,9 +49,6 @@ class FabricEndpoint:
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime.datetime] = None
 
-        # Set max_duration from validated module-level constant (defaults to 300 if unset or invalid)
-        self.max_duration = constants.LRO_MAX_DURATION_SECONDS
-
         # Eagerly validate credentials at init and cache the token
         self._get_token()
 
@@ -62,7 +59,7 @@ class FabricEndpoint:
         body: str = "{}",
         files: Optional[dict] = None,
         poll_long_running: bool = True,
-        max_duration: Optional[int] = None,
+        max_duration: Optional[int] = constants.RETRY_API_MAX_DURATION_SECONDS,
         **kwargs,
     ) -> dict:
         """
@@ -74,15 +71,10 @@ class FabricEndpoint:
             body: The JSON body to include in the request. Defaults to an empty JSON object.
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
-            max_duration: Maximum execution duration in seconds. Defaults to the instance-level
-                ``max_duration`` (set via the ``FABRIC_CICD_LRO_MAX_DURATION_SECONDS``
-                environment variable, otherwise 300).
+            max_duration: Maximum execution duration in seconds. Defaults to
+                ``FABRIC_CICD_RETRY_API_MAX_DURATION_SECONDS`` environment variable, otherwise 300.
             **kwargs: Additional keyword arguments to pass to the method.
         """
-        # Resolve max_duration: use provided value or fall back to instance-level default
-        if max_duration is None:
-            max_duration = self.max_duration
-
         exit_loop = False
         iteration_count = 0
         long_running = False

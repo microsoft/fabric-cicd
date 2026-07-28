@@ -2208,24 +2208,3 @@ def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(
     # workspace_a should still use fqdn_a, not fqdn_b
     assert workspace_a._api_root_url == expected_fqdn_a
     assert workspace_a.base_api_url.startswith(expected_fqdn_a)
-
-
-def test_max_duration_from_env_var(temp_workspace_dir, valid_workspace_id, monkeypatch):
-    """Test that FabricWorkspace propagates LRO_MAX_DURATION_SECONDS to FabricEndpoint.max_duration."""
-    from fabric_cicd._common._fabric_endpoint import FabricEndpoint
-
-    monkeypatch.setattr(constants, "LRO_MAX_DURATION_SECONDS", 600)
-
-    with (
-        patch.object(FabricEndpoint, "_get_token", return_value="mock-token"),
-        patch.object(FabricWorkspace, "_refresh_deployed_items", lambda self: setattr(self, "deployed_items", {})),
-        patch.object(FabricWorkspace, "_refresh_deployed_folders", lambda self: setattr(self, "deployed_folders", {})),
-        patch.object(FabricWorkspace, "_refresh_repository_items"),
-    ):
-        workspace = FabricWorkspace(
-            workspace_id=valid_workspace_id,
-            repository_directory=str(temp_workspace_dir),
-            token_credential=DummyTokenCredential(),
-        )
-
-    assert workspace.endpoint.max_duration == 600
