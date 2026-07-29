@@ -27,7 +27,7 @@ _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
 
 def _build_user_agent(host_app: Optional[str]) -> str:
-    """Return the default user-agent, appending a trusted host-app suffix when supported.
+    """Return the default user-agent
 
     Args:
         host_app: The host-app identifier supplied by a trusted caller (e.g. the Fabric CLI).
