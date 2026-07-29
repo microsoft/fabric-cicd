@@ -7,6 +7,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import time
 from typing import Optional
 
@@ -25,14 +26,18 @@ logger = logging.getLogger(__name__)
 _RESOURCE_URL = "https://api.fabric.microsoft.com/.default"
 _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
+_USER_AGENT = f"ms-fabric-cicd/{constants.VERSION}"
+
+_HOST_APP_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cli/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\Z")
+
 
 def _build_user_agent(host_app: Optional[str]) -> str:
-    """Return the user-agent"""
+    """Return the default user-agent, appending a trusted host-app token when supported."""
     candidate = host_app.strip() if isinstance(host_app, str) else ""
-    if candidate and constants.HOST_APP_ALLOWLIST_REGEX.match(candidate):
-        return f"{candidate} (deploy; {constants.USER_AGENT})"
+    if candidate and _HOST_APP_ALLOWLIST_REGEX.match(candidate):
+        return f"{candidate} (deploy; {_USER_AGENT})"
 
-    return constants.USER_AGENT
+    return _USER_AGENT
 
 
 class FabricEndpoint:

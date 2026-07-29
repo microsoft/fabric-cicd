@@ -11,6 +11,7 @@ from azure.core.exceptions import ClientAuthenticationError
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
 from fabric_cicd._common._fabric_endpoint import (
+    _USER_AGENT,
     FabricEndpoint,
     _build_user_agent,
     _format_invoke_log,
@@ -340,36 +341,28 @@ def test_get_token(setup_mocks):
     mock_token_credential.get_token.assert_called_once_with("https://api.fabric.microsoft.com/.default")
 
 
-# A host-app value that matches the allowlist regex (bare ms-fabric-cli product token).
 _VALID_HOST_APP = "ms-fabric-cli/1.6.1"
-# The composed User-Agent header when the host-app value is trusted (host-app token + default UA).
-_VALID_HOST_APP_COMPOSED = f"{_VALID_HOST_APP} (deploy; {constants.USER_AGENT})"
+_VALID_HOST_APP_COMPOSED = f"{_VALID_HOST_APP} (deploy; {_USER_AGENT})"
 
 
 @pytest.mark.parametrize(
     ("host_app", "expected"),
     [
-        (None, constants.USER_AGENT),
-        ("", constants.USER_AGENT),
-        ("   ", constants.USER_AGENT),
+        (None, _USER_AGENT),
+        ("", _USER_AGENT),
+        ("   ", _USER_AGENT),
         (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
         (f"  {_VALID_HOST_APP}  ", _VALID_HOST_APP_COMPOSED),
-        # Pre-release and build-metadata semver tokens are accepted.
-        ("ms-fabric-cli/1.0.0-beta", f"ms-fabric-cli/1.0.0-beta (deploy; {constants.USER_AGENT})"),
-        ("ms-fabric-cli/1.0.0+build.123", f"ms-fabric-cli/1.0.0+build.123 (deploy; {constants.USER_AGENT})"),
-        # Missing version is rejected.
-        ("ms-fabric-cli", constants.USER_AGENT),
-        # Incomplete semver (missing patch) is rejected.
-        ("ms-fabric-cli/1.6", constants.USER_AGENT),
-        # A full user-agent string (with spaces) is rejected; only the bare product token is allowed.
-        ("ms-fabric-cli/1.6.1 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
-        # Arbitrary spoofed identity is rejected.
-        ("malicious-app/9.9.9", constants.USER_AGENT),
-        ("not-a-host-app", constants.USER_AGENT),
-        # CR/LF injection attempts are rejected (header/log injection guard).
-        ("ms-fabric-cli/1.6.1\rInjected: 1", constants.USER_AGENT),
-        ("ms-fabric-cli/1.6.1\nInjected: 1", constants.USER_AGENT),
-        ("ms-fabric-cli/1.6.1\r\nX-Injected: 1", constants.USER_AGENT),
+        ("ms-fabric-cli/1.0.0-beta", f"ms-fabric-cli/1.0.0-beta (deploy; {_USER_AGENT})"),
+        ("ms-fabric-cli/1.0.0+build.123", f"ms-fabric-cli/1.0.0+build.123 (deploy; {_USER_AGENT})"),
+        ("ms-fabric-cli", _USER_AGENT),
+        ("ms-fabric-cli/1.6", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1 (deploy; Linux/6.6; Python/3.12)", _USER_AGENT),
+        ("malicious-app/9.9.9", _USER_AGENT),
+        ("not-a-host-app", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1\rInjected: 1", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1\nInjected: 1", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1\r\nX-Injected: 1", _USER_AGENT),
     ],
     ids=[
         "none",
@@ -397,11 +390,11 @@ def test_build_user_agent(host_app, expected):
 @pytest.mark.parametrize(
     ("host_app", "expected_user_agent"),
     [
-        (None, constants.USER_AGENT),
-        ("", constants.USER_AGENT),
-        ("   ", constants.USER_AGENT),
+        (None, _USER_AGENT),
+        ("", _USER_AGENT),
+        ("   ", _USER_AGENT),
         (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
-        ("bogus-app/1.0.0", constants.USER_AGENT),
+        ("bogus-app/1.0.0", _USER_AGENT),
     ],
     ids=["none", "empty", "whitespace", "valid_host_app", "untrusted_ignored"],
 )
@@ -426,7 +419,7 @@ def test_build_user_agent_ignores_untrusted_value(setup_mocks):
 
     result = _build_user_agent("spoofed-app/1.0.0")
 
-    assert result == constants.USER_AGENT
+    assert result == _USER_AGENT
     assert all("spoofed-app/1.0.0" not in message for message in dl.messages)
 
 
@@ -436,8 +429,7 @@ def test_build_user_agent_rejects_crlf(setup_mocks):
 
     result = _build_user_agent("ms-fabric-cli/1.6.1\r\nX-Injected: 1")
 
-    assert result == constants.USER_AGENT
-    # The raw CR/LF must never reach the log.
+    assert result == _USER_AGENT
     assert all("\r" not in message and "\n" not in message for message in dl.messages)
 
 

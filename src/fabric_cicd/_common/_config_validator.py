@@ -1022,12 +1022,6 @@ class ConfigValidator:
                     constants.CONFIG_VALIDATION_MSGS["operation"]["unknown_constant"].format(key, "constants")
                 )
 
-            # Reject protected constants that must not be settable via configuration
-            elif key in constants.PROTECTED_CONSTANTS:
-                self.errors.append(
-                    constants.CONFIG_VALIDATION_MSGS["operation"]["protected_constant"].format(key, "constants")
-                )
-
             if isinstance(value, dict):
                 # Per-key environment mapping: { KEY: { dev: val, prod: val } }
                 for env, env_value in value.items():
