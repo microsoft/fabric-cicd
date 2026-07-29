@@ -27,7 +27,7 @@ _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
 
 def _build_user_agent(host_app: Optional[str]) -> str:
-    """Return the default user-agent, appending a trusted host-app suffix when supported."""
+    """Return the default user-agent"""
     candidate = host_app.strip() if isinstance(host_app, str) else ""
     if candidate and constants.HOST_APP_ALLOWLIST_REGEX.match(candidate):
         return f"{candidate} (deploy; {constants.USER_AGENT})"
