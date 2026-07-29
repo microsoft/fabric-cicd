@@ -529,7 +529,6 @@ def deploy_with_config(  # noqa: D417
         ...     print(e.deployment_result.message)   # Original error message
         ...     print(e.deployment_result.responses) # Partial API responses or None
     """
-    # Trusted first-party callers (e.g. the Fabric CLI) may pass ``host_app`` via kwargs to
     # Trusted first-party callers may pass ``host_app`` via kwargs to
     host_app = kwargs.get("host_app")
 
