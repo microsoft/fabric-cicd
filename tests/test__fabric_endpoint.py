@@ -354,8 +354,13 @@ _VALID_HOST_APP_COMPOSED = f"{_VALID_HOST_APP} (deploy; {constants.USER_AGENT})"
         ("   ", constants.USER_AGENT),
         (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
         (f"  {_VALID_HOST_APP}  ", _VALID_HOST_APP_COMPOSED),
+        # Pre-release and build-metadata semver tokens are accepted.
+        ("ms-fabric-cli/1.0.0-beta", f"ms-fabric-cli/1.0.0-beta (deploy; {constants.USER_AGENT})"),
+        ("ms-fabric-cli/1.0.0+build.123", f"ms-fabric-cli/1.0.0+build.123 (deploy; {constants.USER_AGENT})"),
         # Missing version is rejected.
         ("ms-fabric-cli", constants.USER_AGENT),
+        # Incomplete semver (missing patch) is rejected.
+        ("ms-fabric-cli/1.6", constants.USER_AGENT),
         # A full user-agent string (with spaces) is rejected; only the bare product token is allowed.
         ("ms-fabric-cli/1.6.1 (deploy; Linux/6.6; Python/3.12)", constants.USER_AGENT),
         # Arbitrary spoofed identity is rejected.
@@ -372,7 +377,10 @@ _VALID_HOST_APP_COMPOSED = f"{_VALID_HOST_APP} (deploy; {constants.USER_AGENT})"
         "whitespace",
         "valid_host_app",
         "valid_surrounding_whitespace",
+        "valid_prerelease",
+        "valid_build_metadata",
         "missing_version_rejected",
+        "incomplete_semver_rejected",
         "full_user_agent_rejected",
         "spoofed_identity_rejected",
         "junk_rejected",

@@ -27,22 +27,9 @@ _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
 
 def _build_user_agent(host_app: Optional[str]) -> str:
-    """Return the default user-agent, appending a trusted host-app suffix when supported.
-
-    Args:
-        host_app: The host-app identifier supplied by a trusted caller (e.g. the Fabric CLI).
-            Only a value matching ``HOST_APP_ALLOWLIST_REGEX`` is appended; anything else is ignored.
-    """
-    if not isinstance(host_app, str) or not host_app.strip():
-        return constants.USER_AGENT
-
-    candidate = host_app.strip()
-
-    # Reject CR/LF to prevent HTTP header / log injection.
-    if "\r" in candidate or "\n" in candidate:
-        return constants.USER_AGENT
-
-    if constants.HOST_APP_ALLOWLIST_REGEX.match(candidate):
+    """Return the default user-agent, appending a trusted host-app suffix when supported."""
+    candidate = host_app.strip() if isinstance(host_app, str) else ""
+    if candidate and constants.HOST_APP_ALLOWLIST_REGEX.match(candidate):
         return f"{candidate} (deploy; {constants.USER_AGENT})"
 
     return constants.USER_AGENT

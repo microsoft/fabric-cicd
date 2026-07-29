@@ -20,8 +20,8 @@ VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 # Constants that must never be overridden via the public `constants:` config section.
 PROTECTED_CONSTANTS = frozenset({"USER_AGENT", "HOST_APP_ALLOWLIST_REGEX"})
 
-# Allowlist for the host-app value; matches only a bare `ms-fabric-cli/<version>` token (no whitespace/CRLF).
-HOST_APP_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cli/\S+\Z")
+# Allowlist for the host-app value;
+HOST_APP_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cli/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\Z")
 
 
 class EnvVar(str, Enum):
