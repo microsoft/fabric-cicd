@@ -32,7 +32,7 @@ _HOST_APP_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cli/\d+\.\d+\.\d+(?:-[0-9A-
 
 
 def _build_user_agent(host_app: Optional[str]) -> str:
-    """Return the default user-agent, appending a trusted host-app token when supported."""
+    """Return the user-agent."""
     candidate = host_app.strip() if isinstance(host_app, str) else ""
     if candidate and _HOST_APP_ALLOWLIST_REGEX.match(candidate):
         return f"{candidate} (deploy; {_USER_AGENT})"
