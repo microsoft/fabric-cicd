@@ -310,6 +310,20 @@ def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
         endpoint.invoke("GET", "http://example.com", max_duration=0)
 
 
+def test_invoke_respects_max_duration(setup_mocks, monkeypatch):
+    """Test that invoke raises InvokeError when max_duration is exceeded."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = requests.exceptions.Timeout("Request timed out")
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    with pytest.raises(InvokeError):
+        endpoint.invoke("GET", "http://example.com", max_duration=0)
+
+
 def test_invoke_calls_http_tracer(setup_mocks):
     """Test that invoke calls http_tracer capture methods and save."""
     _, mock_requests = setup_mocks
