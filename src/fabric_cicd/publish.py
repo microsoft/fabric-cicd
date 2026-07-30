@@ -230,6 +230,7 @@ def publish_all_items(
                     "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
                 )
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
+
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
 

@@ -76,7 +76,7 @@ class FabricEndpoint:
         body: str = "{}",
         files: Optional[dict] = None,
         poll_long_running: bool = True,
-        max_duration: int = 300,
+        max_duration: Optional[int] = constants.RETRY_API_MAX_DURATION_SECONDS,
         **kwargs,
     ) -> dict:
         """
@@ -88,7 +88,8 @@ class FabricEndpoint:
             body: The JSON body to include in the request. Defaults to an empty JSON object.
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
-            max_duration: Maximum execution duration in seconds. Defaults to 300 (5 minutes).
+            max_duration: Maximum execution duration in seconds. Defaults to
+                ``FABRIC_CICD_RETRY_API_MAX_DURATION_SECONDS`` environment variable, otherwise 300.
             **kwargs: Additional keyword arguments to pass to the method.
         """
         exit_loop = False
