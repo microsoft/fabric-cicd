@@ -34,13 +34,7 @@ def _process_environment_file(
     using the ``spark_pool`` parameter configuration so that the correct pool
     reference is embedded directly in the YAML sent to the Fabric Items API.
 
-    The YAML is parsed only to look up and match the pool mapping; the resolved
-    pool GUID is then written back with a targeted replacement of the
-    ``instance_pool_id`` line, leaving the rest of the file byte-for-byte
-    unchanged. This avoids a ``yaml.safe_load`` / ``yaml.dump`` round-trip, which
-    (under PyYAML's YAML 1.1 rules) would corrupt other values such as unquoted
-    ``live_pool`` schedule ``HH:MM:SS`` times, which are parsed as sexagesimal
-    integers (see issue #1072).
+    Only the ``instance_pool_id`` line is replaced; all other content is preserved unchanged.
 
     All other files are returned unchanged.
 
@@ -118,9 +112,7 @@ def _replace_instance_pool_id_line(contents: str, resolved_id: str) -> str:
     """
     Replace the value of the top-level ``instance_pool_id`` key in raw YAML text.
 
-    Only the ``instance_pool_id`` line is modified; all other lines (including
-    unquoted ``live_pool`` schedule times) are preserved exactly, avoiding the
-    sexagesimal corruption caused by a full YAML round-trip.
+    Only the ``instance_pool_id`` line is modified; all other content is preserved unchanged.
 
     Args:
         contents: The original ``Sparkcompute.yml`` contents.

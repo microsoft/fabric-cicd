@@ -290,7 +290,7 @@ def test_resolve_pool_id_not_found():
 
 
 def test_process_environment_file_preserves_live_pool_schedule_times(tmp_path):
-    """Regression for #1072: unquoted live_pool HH:MM:SS times survive processing.
+    """Tests unquoted live_pool HH:MM:SS times survive processing.
 
     A full yaml.safe_load / yaml.dump round-trip corrupts unquoted times under
     PyYAML's YAML 1.1 sexagesimal parsing (18:00:00 -> 64800). The targeted line
