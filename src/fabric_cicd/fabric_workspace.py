@@ -111,7 +111,7 @@ class FabricWorkspace:
         token_credential = validate_token_credential(token_credential)
 
         # Initialize endpoint
-        self.endpoint = FabricEndpoint(token_credential=token_credential)
+        self.endpoint = FabricEndpoint(token_credential=token_credential, host_app=kwargs.get("host_app"))
 
         # Snapshot at construction so subsequent configure_fabric_fqdn calls for a
         # different workspace don't retarget this instance.

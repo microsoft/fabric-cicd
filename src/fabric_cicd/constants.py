@@ -13,7 +13,6 @@ from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
 VERSION = "1.2.0"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
-USER_AGENT = f"ms-fabric-cicd/{VERSION}"
 VALID_ENABLE_FLAGS = ["1", "true", "yes"]
 
 
@@ -40,6 +39,8 @@ class EnvVar(str, Enum):
     """Override max parallel workers for concurrent item publishing. Defaults to 8."""
     FILE_LOGGING_ENABLED = "FABRIC_CICD_FILE_LOGGING_ENABLED"
     """Set to '1', 'true', or 'yes' to enable file logging for fabric-cicd. Defaults to disabled."""
+    RETRY_API_MAX_DURATION_SECONDS = "FABRIC_CICD_RETRY_API_MAX_DURATION_SECONDS"
+    """Override the maximum duration in seconds for API request execution, including long-running operation polling and connection retries. Defaults to 300 seconds."""
 
 
 class ItemType(str, Enum):
@@ -186,6 +187,12 @@ FABRIC_API_ROOT_URL = validate_env_var_api_url(EnvVar.FABRIC_API_ROOT_URL.value,
 RETRY_AFTER_SECONDS = float(os.environ.get(EnvVar.RETRY_AFTER_SECONDS.value, 300))
 RETRY_BASE_DELAY_SECONDS = float(os.environ.get(EnvVar.RETRY_BASE_DELAY_SECONDS.value, 30))
 RETRY_MAX_DURATION_SECONDS = int(os.environ.get(EnvVar.RETRY_MAX_DURATION_SECONDS.value, 300))
+_retry_api_max_duration_raw = os.environ.get(EnvVar.RETRY_API_MAX_DURATION_SECONDS.value)
+RETRY_API_MAX_DURATION_SECONDS: int = (
+    int(_retry_api_max_duration_raw)
+    if _retry_api_max_duration_raw and _retry_api_max_duration_raw.isdigit() and int(_retry_api_max_duration_raw) > 0
+    else 300
+)
 
 # Parallel Settings
 _parallel_max_workers_raw = os.environ.get(EnvVar.PARALLEL_MAX_WORKERS.value)

@@ -192,7 +192,7 @@ def publish_all_items(
         ...     publish_all_items(workspace, items_to_include=changed)
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
-    
+
     # Initialize response collection if feature flag is enabled
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
@@ -217,20 +217,20 @@ def publish_all_items(
         if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
             msg = "The 'enable_bulk_publish' feature flag requires 'enable_experimental_features' to be enabled."
             raise InputError(msg, logger)
-        
+
         reasons = []
         unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
         # Fall back to standard deployment if unsupported item types or dynamic parameter variables are detected, otherwise enable bulk publish
         if unsupported or fabric_workspace_obj.contains_param_vars:
             if unsupported:
                 reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
-                
+
             if fabric_workspace_obj.contains_param_vars:
                 reasons.append(
                     "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
                 )
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
-       
+
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
 
@@ -428,12 +428,13 @@ def unpublish_all_orphan_items(
     )
 
 
-def deploy_with_config(
+def deploy_with_config(  # noqa: D417
     config_file_path: str,
     *,
     token_credential: TokenCredential,
     environment: str = "N/A",
     config_override: Optional[dict] = None,
+    **kwargs,
 ) -> DeploymentResult:
     """
     Deploy items using YAML configuration file with environment-specific settings.
@@ -529,6 +530,8 @@ def deploy_with_config(
         ...     print(e.deployment_result.message)   # Original error message
         ...     print(e.deployment_result.responses) # Partial API responses or None
     """
+    host_app = kwargs.get("host_app")
+
     log_header(logger, "Config-Based Deployment")
     logger.info(f"Loading configuration from {config_file_path} for environment '{environment}'")
 
@@ -568,6 +571,7 @@ def deploy_with_config(
                 token_credential=token_credential,
                 parameter_file_path=workspace_settings.get("parameter_file_path"),
                 skip_parameterization=skip_parameterization,
+                host_app=host_app,
             )
             # Execute deployment operations based on skip settings
             if not publish_settings.get("skip", False):
