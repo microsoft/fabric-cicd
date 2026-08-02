@@ -7,6 +7,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import time
 from typing import Optional
 
@@ -25,6 +26,19 @@ logger = logging.getLogger(__name__)
 _RESOURCE_URL = "https://api.fabric.microsoft.com/.default"
 _TOKEN_EXPIRY_BUFFER = datetime.timedelta(seconds=10)
 
+_USER_AGENT = f"ms-fabric-cicd/{constants.VERSION}"
+
+_HOST_APP_ALLOWLIST_REGEX = re.compile(r"\Ams-fabric-cli/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\Z")
+
+
+def _build_user_agent(host_app: Optional[str]) -> str:
+    """Return the user-agent."""
+    candidate = host_app.strip() if isinstance(host_app, str) else ""
+    if candidate and _HOST_APP_ALLOWLIST_REGEX.match(candidate):
+        return f"{candidate} (deploy; {_USER_AGENT})"
+
+    return _USER_AGENT
+
 
 class FabricEndpoint:
     """Handles interactions with the Fabric API, including authentication and request management."""
@@ -34,6 +48,7 @@ class FabricEndpoint:
         token_credential: TokenCredential,
         requests_module: requests = requests,
         http_tracer: Optional[HTTPTracer] = None,
+        host_app: Optional[str] = None,
     ) -> None:
         """
         Initializes the FabricEndpoint instance, sets up the authentication token.
@@ -42,10 +57,12 @@ class FabricEndpoint:
             token_credential: The token credential.
             requests_module: The requests module.
             http_tracer: Optional HTTP tracer for debugging. If None, create using factory.
+            host_app: Optional host-app identifier supplied by a trusted caller.
         """
         self.token_credential = token_credential
         self.requests = requests_module
         self.http_tracer = http_tracer if http_tracer is not None else HTTPTracerFactory.create()
+        self.user_agent = _build_user_agent(host_app)
         self._token: Optional[str] = None
         self._token_expiry: Optional[datetime.datetime] = None
 
@@ -59,7 +76,7 @@ class FabricEndpoint:
         body: str = "{}",
         files: Optional[dict] = None,
         poll_long_running: bool = True,
-        max_duration: int = 300,
+        max_duration: Optional[int] = constants.RETRY_API_MAX_DURATION_SECONDS,
         **kwargs,
     ) -> dict:
         """
@@ -71,7 +88,8 @@ class FabricEndpoint:
             body: The JSON body to include in the request. Defaults to an empty JSON object.
             files: The file path to be included in the request. Defaults to None.
             poll_long_running: A flag to poll for long-running operations. Defaults to True.
-            max_duration: Maximum execution duration in seconds. Defaults to 300 (5 minutes).
+            max_duration: Maximum execution duration in seconds. Defaults to
+                ``FABRIC_CICD_RETRY_API_MAX_DURATION_SECONDS`` environment variable, otherwise 300.
             **kwargs: Additional keyword arguments to pass to the method.
         """
         exit_loop = False
@@ -84,7 +102,7 @@ class FabricEndpoint:
             try:
                 headers = {
                     "Authorization": f"Bearer {self._get_token()}",
-                    "User-Agent": f"{constants.USER_AGENT}",
+                    "User-Agent": self.user_agent,
                 }
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
