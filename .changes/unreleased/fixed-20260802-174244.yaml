@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix `instance_pool_id` replacement in `Sparkcompute.yml` corrupting live pool schedule times
+time: 2026-08-02T17:42:44.2669842+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1072"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1072
