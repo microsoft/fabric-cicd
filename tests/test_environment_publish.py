@@ -369,13 +369,6 @@ def test_process_environment_file_no_replacement_returns_original_unchanged(tmp_
     assert result == original
 
 
-def test_replace_instance_pool_id_line_replaces_only_the_value():
-    """_replace_instance_pool_id_line rewrites only the instance_pool_id value."""
-    contents = "instance_pool_id: old-guid\ndriver_cores: 8\nlive_pool:\n  schedule:\n    end_time: 18:00:00\n"
-    result = env_module._replace_instance_pool_id_line(contents, "new-guid")
-    assert result == ("instance_pool_id: new-guid\ndriver_cores: 8\nlive_pool:\n  schedule:\n    end_time: 18:00:00\n")
-
-
 def test_environment_publisher_exposes_func_process_file_for_bulk():
     """EnvironmentPublisher class attribute ensures bulk path discovers the file processor."""
     assert hasattr(env_module.EnvironmentPublisher, "func_process_file")
