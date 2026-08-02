@@ -62,7 +62,13 @@ def _process_environment_file(
     if resolved_id is None or resolved_id == yaml_body["instance_pool_id"]:
         return contents
 
-    return _replace_instance_pool_id_line(contents, resolved_id)
+    return re.sub(
+        r"^(?P<prefix>instance_pool_id[ \t]*:[ \t]*).*$",
+        lambda match: f"{match.group('prefix')}{resolved_id}",
+        contents,
+        count=1,
+        flags=re.MULTILINE,
+    )
 
 
 def _resolve_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: dict, item_name: str) -> Optional[str]:
@@ -106,28 +112,6 @@ def _resolve_instance_pool_id(fabric_workspace_obj: FabricWorkspace, yaml_body: 
                 )
 
     return None
-
-
-def _replace_instance_pool_id_line(contents: str, resolved_id: str) -> str:
-    """
-    Replace the value of the top-level ``instance_pool_id`` key in raw YAML text.
-
-    Only the ``instance_pool_id`` line is modified; all other content is preserved unchanged.
-
-    Args:
-        contents: The original ``Sparkcompute.yml`` contents.
-        resolved_id: The pool GUID to write as the new ``instance_pool_id`` value.
-
-    Returns:
-        The contents with the ``instance_pool_id`` value replaced.
-    """
-    return re.sub(
-        r"^(?P<prefix>instance_pool_id[ \t]*:[ \t]*).*$",
-        lambda m: f"{m.group('prefix')}{resolved_id}",
-        contents,
-        count=1,
-        flags=re.MULTILINE,
-    )
 
 
 def _resolve_pool_id(pools: list[dict], pool_name: str, pool_type: str) -> str:
