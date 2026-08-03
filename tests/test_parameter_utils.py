@@ -1474,6 +1474,78 @@ runtime_version: "1.2"
         result_data = yaml.safe_load(result)
         assert result_data["config"]["threshold"] == 0.8
 
+    def test_replace_key_value_yaml_preserves_schedule_times(self, mock_workspace):
+        """Regression for #1072: unquoted HH:MM:SS times survive key_value_replace on YAML.
+
+        A yaml.safe_load / yaml.dump round-trip under PyYAML's YAML 1.1 rules parses
+        unquoted times as sexagesimal integers (18:00:00 -> 64800), corrupting
+        live_pool schedules even when the replacement targets an unrelated key.
+        """
+        test_yaml = """instance_pool_id: pool-123
+live_pool:
+  state: Enabled
+  schedule_state: Enabled
+  schedule:
+    recurrence_type: Daily
+    start_time: 08:00:00
+    end_time: 18:00:00
+    time_zone: Pacific Standard Time
+"""
+        # Replacement targets only instance_pool_id; times must be untouched.
+        param_dict = {
+            "find_key": "$.instance_pool_id",
+            "replace_value": {"dev": "new-guid", "prod": "prod-guid"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+
+        assert "instance_pool_id: new-guid" in result
+        # Times remain intact, not corrupted to sexagesimal integers.
+        assert "start_time: 08:00:00" in result
+        assert "end_time: 18:00:00" in result
+        assert "28800" not in result
+        assert "64800" not in result
+
+        result_data = yaml.safe_load(result.replace("08:00:00", "'08:00:00'").replace("18:00:00", "'18:00:00'"))
+        assert result_data["live_pool"]["schedule"]["start_time"] == "08:00:00"
+        assert result_data["live_pool"]["schedule"]["end_time"] == "18:00:00"
+
+    def test_replace_key_value_yaml_preserves_key_order(self, mock_workspace):
+        """key_value_replace on YAML must not reorder keys alphabetically (sort_keys=False)."""
+        test_yaml = """zeta: 1
+alpha: 2
+schedule:
+  start_time: 08:00:00
+  end_time: 18:00:00
+"""
+        param_dict = {"find_key": "$.alpha", "replace_value": {"dev": 9}}
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+
+        # Original order preserved: zeta before alpha, start_time before end_time.
+        assert result.index("zeta:") < result.index("alpha:")
+        assert result.index("start_time:") < result.index("end_time:")
+        assert "alpha: 9" in result
+
+    def test_replace_key_value_yaml_time_safe_loader_keeps_numeric_types(self, mock_workspace):
+        """The sexagesimal-safe loader still resolves normal ints, floats, and bools."""
+        test_yaml = """count: 8
+ratio: 1.3
+enabled: true
+end_time: 18:00:00
+"""
+        param_dict = {"find_key": "$.count", "replace_value": {"dev": 10}}
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        result_data = yaml.safe_load(result.replace("18:00:00", "'18:00:00'"))
+
+        assert result_data["count"] == 10
+        assert isinstance(result_data["count"], int)
+        assert result_data["ratio"] == 1.3
+        assert isinstance(result_data["ratio"], float)
+        assert result_data["enabled"] is True
+        assert result_data["end_time"] == "18:00:00"
+
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
         # Set up test environment variables
