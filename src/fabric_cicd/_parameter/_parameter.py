@@ -168,6 +168,7 @@ class Parameter:
 
                 # Use custom loader that detects duplicate keys
                 parameter_dict = yaml.load(yaml_content, Loader=_DuplicateKeyLoader) or {}
+                _warn_on_sexagesimal_values(yaml_content)
                 logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
 
                 if parameter_dict.get("extend"):
@@ -273,7 +274,9 @@ class Parameter:
                     return {}
 
             # Use custom loader that detects duplicate keys
-            return yaml.load(param_content, Loader=_DuplicateKeyLoader) or {}
+            template_dict = yaml.load(param_content, Loader=_DuplicateKeyLoader) or {}
+            _warn_on_sexagesimal_values(param_content)
+            return template_dict
 
         except (UnicodeDecodeError, yaml.YAMLError) as e:
             logger.error(constants.PARAMETER_MSGS["template_file_error"].format(file_path, e))
@@ -1071,6 +1074,58 @@ class _DuplicateKeyLoader(yaml.SafeLoader):
     """Custom YAML loader that raises an error on duplicate keys."""
 
     pass
+
+
+_SEXAGESIMAL_NUMERIC_TAGS = frozenset({"tag:yaml.org,2002:int", "tag:yaml.org,2002:float"})
+
+
+def _find_sexagesimal_scalars(yaml_content: str) -> list[str]:
+    """Find unquoted YAML 1.1 sexagesimal (base-60) time values in raw parameter content.
+
+    PyYAML implements YAML 1.1, whose implicit resolvers parse unquoted ``HH:MM:SS``
+    values as base-60 integers (for example ``18:00:00`` -> ``64800``). When such a
+    value is used as a replacement in the parameter file, the corrupted integer is
+    injected into the deployed item and rejected by the Fabric API (see issue #1072).
+
+    This inspects the composed node tree and returns the original text of each scalar
+    the resolver would treat as an int or float whose raw form is sexagesimal
+    (colon-separated). Quoted values resolve to strings and are not flagged.
+
+    Args:
+        yaml_content: The raw parameter file contents.
+
+    Returns:
+        A sorted list of unique ``"value (line N)"`` descriptors, empty if none found.
+    """
+    try:
+        root = yaml.compose(yaml_content, Loader=yaml.SafeLoader)
+    except yaml.YAMLError:
+        return []
+    if root is None:
+        return []
+
+    findings: set[str] = set()
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, yaml.ScalarNode):
+            if node.tag in _SEXAGESIMAL_NUMERIC_TAGS and ":" in node.value:
+                findings.add(f"'{node.value}' (line {node.start_mark.line + 1})")
+        elif isinstance(node, yaml.MappingNode):
+            for key_node, value_node in node.value:
+                stack.append(key_node)
+                stack.append(value_node)
+        elif isinstance(node, yaml.SequenceNode):
+            stack.extend(node.value)
+
+    return sorted(findings)
+
+
+def _warn_on_sexagesimal_values(yaml_content: str) -> None:
+    """Log a warning if the parameter content contains unquoted sexagesimal time values."""
+    findings = _find_sexagesimal_scalars(yaml_content)
+    if findings:
+        logger.warning(constants.PARAMETER_MSGS["sexagesimal time"].format(", ".join(findings)))
 
 
 def _collect_duplicate_key_errors(root_node: yaml.MappingNode, loader: _DuplicateKeyLoader) -> list[str]:

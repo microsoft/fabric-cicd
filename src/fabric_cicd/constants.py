@@ -300,6 +300,11 @@ PARAMETER_MSGS = {
     "not set": "Parameter file path is not set",
     "empty yaml": "YAML content is empty",
     "duplicate key": "duplicate key(s) found: {}",
+    "sexagesimal time": (
+        "Unquoted time value(s) {} were parsed as base-60 integers by YAML "
+        "(e.g. 18:00:00 becomes 64800), which will corrupt the deployed value. "
+        "Quote these value(s) in your parameter file (e.g. '18:00:00') to preserve them as strings."
+    ),
     "valid load": f"Successfully loaded {PARAMETER_FILE_NAME}",
     "invalid load": f"Error loading {PARAMETER_FILE_NAME} " + "'{}'",
     "invalid structure": "Invalid parameter file structure",
