@@ -425,8 +425,15 @@ class Parameter:
 
             formatted_parameter_value = {}
             for environment, value in parameter_value.items():
+                if not isinstance(environment, str) or not environment.strip():
+                    return False, f"parameter_value environment keys in {param_name} must be non-empty strings"
+
                 if isinstance(value, str):
-                    formatted_parameter_value[environment] = value if value.startswith("#") else f'"{value}"'
+                    if value.startswith("#"):
+                        formatted_parameter_value[environment] = value
+                    else:
+                        escaped = value.replace('"', '""')
+                        formatted_parameter_value[environment] = f'"{escaped}"'
                 elif isinstance(value, bool):
                     formatted_parameter_value[environment] = str(value).lower()
                 elif isinstance(value, (int, float)):
