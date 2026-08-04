@@ -655,6 +655,16 @@ semantic_model_parameter:
     parameter_value:
       TEST: mytestserver
       PROD: prodserver
+  - semantic_model_name: MyModel
+    parameter_name: MaxRows
+    parameter_value:
+      TEST: 100
+      PROD: 1000
+  - semantic_model_name: MyModel
+    parameter_name: StartDate
+    parameter_value:
+      TEST: "#date(2026, 8, 4)"
+      PROD: "#date(2026, 9, 1)"
 """
     model_dir = temp_workspace_dir / "MyModel.SemanticModel"
     expressions_dir = model_dir / "definition" / "expressions"
@@ -662,6 +672,8 @@ semantic_model_parameter:
     expressions_file = expressions_dir / "expressions.tmdl"
     expressions_file.write_text(
         'expression my.Parameter = "devserver" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]\n'
+        'expression MaxRows = "10" meta [IsParameterQuery=true, Type="Number", IsParameterQueryRequired=true]\n'
+        'expression StartDate = "2025-01-01" meta [IsParameterQuery=true, Type="Date", IsParameterQueryRequired=true]\n'
         'expression other = "unchanged" meta [IsParameterQuery=false, Type="Text"]'
     )
     (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
@@ -684,6 +696,10 @@ semantic_model_parameter:
         'expression my.Parameter = "mytestserver" meta [IsParameterQuery=true, '
         'Type="Text", IsParameterQueryRequired=true]'
     ) in result
+    assert 'expression MaxRows = 100 meta [IsParameterQuery=true, Type="Number"' in result
+    assert 'expression MaxRows = "100"' not in result
+    assert 'expression StartDate = #date(2026, 8, 4) meta [IsParameterQuery=true, Type="Date"' in result
+    assert 'expression StartDate = "#date(2026, 8, 4)"' not in result
     assert 'expression other = "unchanged"' in result
 
 

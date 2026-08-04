@@ -423,12 +423,26 @@ class Parameter:
             if not parameter_value:
                 return False, constants.PARAMETER_MSGS["missing required value"].format("parameter_value", param_name)
 
+            formatted_parameter_value = {}
+            for environment, value in parameter_value.items():
+                if isinstance(value, str):
+                    formatted_parameter_value[environment] = value if value.startswith("#") else f'"{value}"'
+                elif isinstance(value, bool):
+                    formatted_parameter_value[environment] = str(value).lower()
+                elif isinstance(value, (int, float)):
+                    formatted_parameter_value[environment] = str(value)
+                else:
+                    return False, (
+                        f"parameter_value for environment '{environment}' in {param_name} "
+                        "must be a string, number, or boolean"
+                    )
+
             converted_parameters.append({
                 "find_value": (
-                    rf'expression {re.escape(parameter_name)}\s*=\s*"([^"]*)"'
+                    rf"expression {re.escape(parameter_name)}\s*=\s*(.+?)"
                     r"\s+meta\s+\[IsParameterQuery\s*=\s*true\s*,"
                 ),
-                "replace_value": parameter_value,
+                "replace_value": formatted_parameter_value,
                 "is_regex": "true",
                 "item_name": semantic_model_name,
                 "file_path": "**/expressions.tmdl",

@@ -168,9 +168,19 @@ semantic_model_parameter:
       parameter_value:
           TEST: "mytestserver"
           PROD: "prodserver"
+    - semantic_model_name: "MyModel"
+      parameter_name: "MaxRows"
+      parameter_value:
+          TEST: 100
+          PROD: 1000
+    - semantic_model_name: "MyModel"
+      parameter_name: "StartDate"
+      parameter_value:
+          TEST: "#date(2026, 8, 4)"
+          PROD: "#date(2026, 9, 1)"
 ```
 
-The matching TMDL expression must use a quoted value and be marked as a parameter query, for example `expression DatabaseName = "MyLakehouse" meta [IsParameterQuery=true,`. The quoted value (`MyLakehouse`) is replaced while the expression and metadata remain unchanged. Parameter names containing regex characters are treated literally.
+The matching TMDL expression must be marked as a parameter query, for example `expression DatabaseName = "MyLakehouse" meta [IsParameterQuery=true,`. Strings are written with quotes, while numeric and boolean values are written without quotes. String values beginning with `#` are treated as raw TMDL/M literals and are also written without quotes, such as `#date(2026, 8, 4)`. The expression and metadata remain unchanged, and parameter names containing regex characters are treated literally.
 
 ### `semantic_model_binding`
 
