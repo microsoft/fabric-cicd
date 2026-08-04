@@ -645,6 +645,48 @@ find_replace:
     assert result.count("my-ppe-server") == 2
 
 
+def test_semantic_model_parameter_replaces_expression_value(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
+    parameter_content = """
+semantic_model_parameter:
+  - semantic_model_name: MyModel
+    parameter_name: my.Parameter
+    parameter_value:
+      TEST: mytestserver
+      PROD: prodserver
+"""
+    model_dir = temp_workspace_dir / "MyModel.SemanticModel"
+    expressions_dir = model_dir / "definition" / "expressions"
+    expressions_dir.mkdir(parents=True)
+    expressions_file = expressions_dir / "expressions.tmdl"
+    expressions_file.write_text(
+        'expression my.Parameter = "devserver" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]\n'
+        'expression other = "unchanged" meta [IsParameterQuery=false, Type="Text"]'
+    )
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["SemanticModel"],
+            environment="TEST",
+        )
+
+    model = Item(type="SemanticModel", name="MyModel", description="", guid="test-guid", path=model_dir)
+    result = workspace._replace_parameters(File(item_path=model_dir, file_path=expressions_file), model)
+
+    assert (
+        'expression my.Parameter = "mytestserver" meta [IsParameterQuery=true, '
+        'Type="Text", IsParameterQueryRequired=true]'
+    ) in result
+    assert 'expression other = "unchanged"' in result
+
+
 def test_environment_parameter_replacement_ignore_case_regex(
     patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
 ):

@@ -54,6 +54,13 @@ spark_pool:
               type: "Capacity"
               name: "PROD-Pool-name"
 
+semantic_model_parameter:
+    - semantic_model_name: "MyModel"
+      parameter_name: "myParameter"
+      parameter_value:
+          PPE: "my-ppe-server"
+          PROD: "my-prod-server"
+
 semantic_model_binding:
     default:
         connection_id:
@@ -149,6 +156,21 @@ spark_pool:
       # Optional field: value must be a string or array of strings
       item_name: <item-name-filter-value>
 ```
+
+### `semantic_model_parameter`
+
+Replaces the value of a Power Query parameter in a semantic model for the target environment. Specify the semantic model, the parameter name, and its value for each environment. Internally, this is translated to a regex-based `find_replace` entry scoped to the model's `expressions.tmdl` file.
+
+```yaml
+semantic_model_parameter:
+    - semantic_model_name: "MyModel"
+      parameter_name: "myParameter"
+      parameter_value:
+          TEST: "mytestserver"
+          PROD: "prodserver"
+```
+
+The matching TMDL expression must use a quoted value and be marked as a parameter query, for example `expression DatabaseName = "MyLakehouse" meta [IsParameterQuery=true,`. The quoted value (`MyLakehouse`) is replaced while the expression and metadata remain unchanged. Parameter names containing regex characters are treated literally.
 
 ### `semantic_model_binding`
 
