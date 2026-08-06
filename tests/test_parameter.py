@@ -837,7 +837,7 @@ find_replace:
 
 
 def test_parameter_loader_preserves_unquoted_time():
-    """The parameter file loader keeps unquoted YAML 1.1 time values as strings (#1072)."""
+    """The parameter file loader keeps unquoted YAML 1.1 time values as strings."""
     import tempfile
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:

@@ -6,8 +6,7 @@
 PyYAML implements YAML 1.1, whose implicit resolvers parse unquoted ``HH:MM:SS``
 values as base-60 (sexagesimal) integers (for example ``18:00:00`` -> ``64800``).
 When file content is round-tripped through ``load`` / ``dump``, this silently
-corrupts time values such as Environment ``live_pool`` schedules, which the Fabric
-API then rejects as invalid TimeSpans (see issue #1072).
+corrupts time values.
 
 This module is the single place YAML is loaded and dumped across the package.
 :func:`load_yaml` and :func:`dump_yaml` strip only the base-60 branch from the

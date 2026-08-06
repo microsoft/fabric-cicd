@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Tests for the centralized sexagesimal-safe YAML helpers (#1072)."""
+"""Tests for the centralized sexagesimal-safe YAML helpers."""
 
 import io
 from pathlib import Path
@@ -132,7 +132,7 @@ def test_no_raw_yaml_round_trip_in_src():
     """Guardrail: no source module bypasses the shared helpers with raw load/dump.
 
     Raw ``yaml.safe_load`` / ``yaml.dump`` (and bare ``yaml.load(x)``) re-introduce
-    the YAML 1.1 sexagesimal corruption fixed in #1072. All loading and dumping must
+    the YAML 1.1 sexagesimal corruption. All loading and dumping must
     go through ``_yaml_safe`` (or ``yaml.load`` with an explicit sexagesimal-safe
     ``Loader=``), so this test fails if a raw round-trip call reappears.
     """

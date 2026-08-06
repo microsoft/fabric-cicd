@@ -1475,7 +1475,7 @@ runtime_version: "1.2"
         assert result_data["config"]["threshold"] == 0.8
 
     def test_replace_key_value_yaml_preserves_schedule_times(self, mock_workspace):
-        """Regression for #1072: unquoted HH:MM:SS times survive key_value_replace on YAML.
+        """Test unquoted HH:MM:SS times survive key_value_replace on YAML.
 
         A yaml.safe_load / yaml.dump round-trip under PyYAML's YAML 1.1 rules parses
         unquoted times as sexagesimal integers (18:00:00 -> 64800), corrupting
