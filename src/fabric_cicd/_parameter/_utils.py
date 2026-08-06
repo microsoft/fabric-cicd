@@ -22,6 +22,7 @@ from jsonpath_ng.ext import parse
 import fabric_cicd.constants as constants
 from fabric_cicd import FabricWorkspace
 from fabric_cicd._common._exceptions import InputError, ParsingError
+from fabric_cicd._common._yaml_safe import dump_yaml, load_yaml
 from fabric_cicd.constants import ItemType
 
 logger = logging.getLogger(__name__)
@@ -467,69 +468,6 @@ def process_environment_key(environment: str, replace_value_dict: dict) -> dict:
 """Functions to replace key values in JSON or YAML"""
 
 
-class _TimeSafeLoader(yaml.SafeLoader):
-    """A ``SafeLoader`` that does not apply YAML 1.1 sexagesimal (base-60) parsing.
-
-    PyYAML implements YAML 1.1, whose implicit resolvers treat unquoted
-    ``HH:MM:SS`` values as base-60 integers (for example ``18:00:00`` -> ``64800``).
-    When a document is round-tripped through ``safe_load`` / ``dump`` during
-    ``key_value_replace`` parameterization, this silently corrupts time values
-    such as Environment ``live_pool`` schedules (see issue #1072). This loader
-    strips the sexagesimal branch from the int/float implicit resolvers so those
-    values are preserved as strings, while normal integers, floats, octal, hex,
-    and binary literals continue to resolve as before.
-    """
-
-
-class _TimeSafeDumper(yaml.SafeDumper):
-    """A ``SafeDumper`` counterpart to :class:`_TimeSafeLoader`.
-
-    With the sexagesimal implicit resolvers removed, string time values are
-    emitted unquoted (for example ``18:00:00``) instead of being force-quoted,
-    matching the representation the Fabric portal writes.
-    """
-
-
-# YAML 1.1 int/float implicit resolvers as used by PyYAML, with the sexagesimal
-# (``(:[0-5]?[0-9])+``) branch removed so ``HH:MM:SS`` values stay strings.
-_INT_RESOLVER = re.compile(
-    r"""^(?:[-+]?0b[0-1_]+
-    |[-+]?0[0-7_]+
-    |[-+]?(?:0|[1-9][0-9_]*)
-    |[-+]?0x[0-9a-fA-F_]+)$""",
-    re.VERBOSE,
-)
-_FLOAT_RESOLVER = re.compile(
-    r"""^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
-    |\.[0-9_]+(?:[eE][-+]?[0-9]+)?
-    |[-+]?[0-9][0-9_]*(?:[eE][-+]?[0-9]+)
-    |[-+]?\.(?:inf|Inf|INF)
-    |\.(?:nan|NaN|NAN))$""",
-    re.VERBOSE,
-)
-
-
-def _install_sexagesimal_safe_resolvers(cls: type) -> None:
-    """Replace the int/float implicit resolvers on ``cls`` with sexagesimal-free versions.
-
-    Copies PyYAML's default implicit resolver table onto ``cls`` and swaps the
-    ``int`` and ``float`` regexes for ones that omit the base-60 branch, leaving
-    every other resolver (bool, null, timestamp, etc.) untouched.
-    """
-    replacements = {
-        "tag:yaml.org,2002:int": _INT_RESOLVER,
-        "tag:yaml.org,2002:float": _FLOAT_RESOLVER,
-    }
-    resolvers = {}
-    for first_char, mappings in yaml.SafeLoader.yaml_implicit_resolvers.items():
-        resolvers[first_char] = [(tag, replacements.get(tag, regexp)) for tag, regexp in mappings]
-    cls.yaml_implicit_resolvers = resolvers
-
-
-_install_sexagesimal_safe_resolvers(_TimeSafeLoader)
-_install_sexagesimal_safe_resolvers(_TimeSafeDumper)
-
-
 def replace_key_value(
     workspace_obj: FabricWorkspace, param_dict: dict, content: str, env: str, is_yaml: bool = False
 ) -> str:
@@ -545,7 +483,7 @@ def replace_key_value(
     # Parse content to a dictionary based on format (YAML or JSON)
     if is_yaml:
         try:
-            data = yaml.load(content, Loader=_TimeSafeLoader)
+            data = load_yaml(content)
         except yaml.YAMLError as ye:
             raise ValueError(ye) from ye
 
@@ -576,11 +514,7 @@ def replace_key_value(
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 
-    return (
-        yaml.dump(data, Dumper=_TimeSafeDumper, default_flow_style=False, allow_unicode=True, sort_keys=False)
-        if is_yaml
-        else json.dumps(data)
-    )
+    return dump_yaml(data) if is_yaml else json.dumps(data)
 
 
 def replace_variables_in_parameter_file(raw_file: str) -> str:

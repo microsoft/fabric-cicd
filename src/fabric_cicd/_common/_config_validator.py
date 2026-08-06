@@ -13,6 +13,7 @@ import yaml
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url
+from fabric_cicd._common._yaml_safe import load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class ConfigValidator:
 
         try:
             with config_path.open(encoding="utf-8") as f:
-                config = yaml.safe_load(f)
+                config = load_yaml(f)
         except yaml.YAMLError as e:
             self.errors.append(constants.CONFIG_VALIDATION_MSGS["file"]["yaml_syntax"].format(e))
             return None

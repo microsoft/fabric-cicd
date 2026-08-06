@@ -836,42 +836,8 @@ find_replace:
         Path(temp_file_path).unlink()
 
 
-def test_find_sexagesimal_scalars_detects_unquoted_time():
-    """_find_sexagesimal_scalars flags only unquoted YAML 1.1 base-60 time values."""
-    from fabric_cicd._parameter._parameter import _find_sexagesimal_scalars
-
-    content = """key_value_replace:
-  - find_key: $.end_time
-    replace_value:
-      DEV: 18:00:00
-      PROD: '18:00:00'
-      QA: 64800
-      RATIO: 1.3
-      LABEL: not_a_time
-"""
-    findings = _find_sexagesimal_scalars(content)
-    # Only the unquoted 18:00:00 is flagged; quoted string, plain int, float, and
-    # non-numeric string are all ignored.
-    assert findings == ["'18:00:00' (line 4)"]
-
-
-def test_find_sexagesimal_scalars_none_when_all_safe():
-    """_find_sexagesimal_scalars returns nothing when times are quoted or absent."""
-    from fabric_cicd._parameter._parameter import _find_sexagesimal_scalars
-
-    content = """key_value_replace:
-  - find_key: $.end_time
-    replace_value:
-      DEV: '18:00:00'
-      PROD: plain-string
-      COUNT: 42
-"""
-    assert _find_sexagesimal_scalars(content) == []
-
-
-def test_load_parameter_file_warns_on_unquoted_time(caplog):
-    """Loading a parameter file with an unquoted time logs a sexagesimal warning (#1072)."""
-    import logging
+def test_parameter_loader_preserves_unquoted_time():
+    """The parameter file loader keeps unquoted YAML 1.1 time values as strings (#1072)."""
     import tempfile
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
@@ -883,43 +849,15 @@ def test_load_parameter_file_warns_on_unquoted_time(caplog):
         temp_file_path = temp_file.name
 
     try:
-        with caplog.at_level(logging.WARNING):
-            Parameter(
-                repository_directory=Path(temp_file_path).parent,
-                item_type_in_scope=["Notebook"],
-                environment="TEST",
-                parameter_file_name=Path(temp_file_path).name,
-            )
-        warning_prefix = constants.PARAMETER_MSGS["sexagesimal time"].split("{}")[0]
-        assert any(warning_prefix in record.message for record in caplog.records)
-        assert any("18:00:00" in record.message for record in caplog.records)
-    finally:
-        Path(temp_file_path).unlink()
-
-
-def test_load_parameter_file_no_warning_when_time_quoted(caplog):
-    """A quoted time value in the parameter file does not trigger the sexagesimal warning."""
-    import logging
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as temp_file:
-        temp_file.write("""key_value_replace:
-  - find_key: $.live_pool.schedule.end_time
-    replace_value:
-      TEST: '18:00:00'
-""")
-        temp_file_path = temp_file.name
-
-    try:
-        with caplog.at_level(logging.WARNING):
-            Parameter(
-                repository_directory=Path(temp_file_path).parent,
-                item_type_in_scope=["Notebook"],
-                environment="TEST",
-                parameter_file_name=Path(temp_file_path).name,
-            )
-        warning_prefix = constants.PARAMETER_MSGS["sexagesimal time"].split("{}")[0]
-        assert not any(warning_prefix in record.message for record in caplog.records)
+        param = Parameter(
+            repository_directory=Path(temp_file_path).parent,
+            item_type_in_scope=["Notebook"],
+            environment="TEST",
+            parameter_file_name=Path(temp_file_path).name,
+        )
+        replace_value = param.environment_parameter["key_value_replace"][0]["replace_value"]
+        # Without sexagesimal-safe loading this would be the integer 64800.
+        assert replace_value["TEST"] == "18:00:00"
     finally:
         Path(temp_file_path).unlink()
 

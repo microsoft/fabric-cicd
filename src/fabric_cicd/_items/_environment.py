@@ -8,7 +8,6 @@ import re
 from typing import Optional
 
 import dpath
-import yaml
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import InputError
@@ -16,6 +15,7 @@ from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
+from fabric_cicd._common._yaml_safe import load_yaml
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import ItemType
 
@@ -54,7 +54,7 @@ def _process_environment_file(
     if "instance_pool_id" not in contents:
         return contents
 
-    yaml_body = yaml.safe_load(contents)
+    yaml_body = load_yaml(contents)
     if not isinstance(yaml_body, dict) or "instance_pool_id" not in yaml_body:
         return contents
 

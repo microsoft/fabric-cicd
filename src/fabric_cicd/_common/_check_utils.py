@@ -12,6 +12,7 @@ import filetype
 import yaml
 
 from fabric_cicd._common._exceptions import FileTypeError
+from fabric_cicd._common._yaml_safe import load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ def check_valid_yaml_content(content: str) -> bool:
         bool: True if the content parses as a YAML mapping or sequence, False otherwise.
     """
     try:
-        result = yaml.safe_load(content)
+        result = load_yaml(content)
         return isinstance(result, (dict, list))
     except yaml.YAMLError:
         return False
