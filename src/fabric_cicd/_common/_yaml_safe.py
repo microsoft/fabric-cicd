@@ -31,8 +31,8 @@ _SEXAGESIMAL_SUBPATTERN = ":[0-5]?[0-9]"
 _NUMERIC_TAGS = ("tag:yaml.org,2002:int", "tag:yaml.org,2002:float")
 
 
-def _strip_sexagesimal_branch(pattern: str) -> str:
-    """Remove only the base-60 alternation branch from a PyYAML numeric resolver pattern.
+def _strip_sexagesimal_branch(rx: re.Pattern) -> re.Pattern:
+    """Return a copy of a PyYAML numeric resolver with only its base-60 branch removed.
 
     PyYAML's int/float implicit resolvers are a top-level ``^(?: A | B | ... )$``
     alternation in which exactly the branches matching sexagesimal (``HH:MM:SS``)
@@ -40,36 +40,56 @@ def _strip_sexagesimal_branch(pattern: str) -> str:
     that is byte-for-byte identical to PyYAML's for every other input, so normal
     ints, floats, exponents, hex, octal, and binary literals resolve exactly as
     before while colon-separated time values fall through to being strings.
+
+    Raises:
+        RuntimeError: If the pattern is not the expected ``^(?:...)$`` wrapper. This
+            makes an unexpected future PyYAML change fail loudly at import instead of
+            silently producing a resolver that could re-corrupt time values.
     """
-    inner = pattern[len("^(?:") : -len(")$")]
+    prefix, suffix = "^(?:", ")$"
+    pattern = rx.pattern
+    if not (pattern.startswith(prefix) and pattern.endswith(suffix)):
+        msg = f"Unexpected PyYAML numeric resolver format; cannot strip sexagesimal branch safely: {pattern!r}"
+        raise RuntimeError(msg)
+
+    inner = pattern[len(prefix) : -len(suffix)]
+    # PyYAML's numeric resolvers are a flat top-level alternation. A couple of the
+    # non-sexagesimal branches contain an inner ``|`` inside a group (for example
+    # ``[-+]?(?:0|[1-9][0-9_]*)``). Splitting naively on ``|`` cuts those into
+    # fragments, but none of those fragments contain _SEXAGESIMAL_SUBPATTERN, so they
+    # are all kept and rejoined with ``|``, exactly reconstructing the original. Only
+    # the whole sexagesimal branches (which have no inner ``|``) are dropped. The
+    # re.compile below reuses the source pattern's own flags and would raise if a
+    # future pattern ever broke this invariant.
     kept = [branch for branch in inner.split("|") if _SEXAGESIMAL_SUBPATTERN not in branch]
-    return "^(?:" + "|".join(kept) + ")$"
+    return re.compile(prefix + "|".join(kept) + suffix, rx.flags)
 
 
-def _sexagesimal_safe_resolvers() -> dict:
-    """Build a copy of PyYAML's implicit resolver table with the base-60 branches removed."""
-    compiled = {}
-    for tag_suffix in _NUMERIC_TAGS:
-        for _, mappings in yaml.SafeLoader.yaml_implicit_resolvers.items():
-            match = next((rx for tag, rx in mappings if tag == tag_suffix), None)
-            if match is not None:
-                compiled[tag_suffix] = re.compile(_strip_sexagesimal_branch(match.pattern), re.VERBOSE)
-                break
+def _sexagesimal_safe_resolvers(source_cls: type) -> dict:
+    """Copy ``source_cls``'s implicit resolver table with the numeric base-60 branches removed.
 
+    The table is derived from the given class's own resolvers (rather than a
+    hard-coded ``SafeLoader``) so a loader is built from ``SafeLoader``'s table and a
+    dumper from ``SafeDumper``'s, keeping each self-consistent even if PyYAML ever
+    diverges the two.
+    """
     resolvers = {}
-    for first_char, mappings in yaml.SafeLoader.yaml_implicit_resolvers.items():
-        resolvers[first_char] = [(tag, compiled.get(tag, regexp)) for tag, regexp in mappings]
+    for first_char, mappings in source_cls.yaml_implicit_resolvers.items():
+        resolvers[first_char] = [
+            (tag, _strip_sexagesimal_branch(regexp) if tag in _NUMERIC_TAGS else regexp) for tag, regexp in mappings
+        ]
     return resolvers
 
 
 def _install_sexagesimal_safe_resolvers(cls: type) -> None:
-    """Install the sexagesimal-free implicit resolver table on ``cls``.
+    """Install a sexagesimal-free implicit resolver table on ``cls``.
 
-    Derives the table from PyYAML's own default resolvers (see
-    :func:`_strip_sexagesimal_branch`), leaving every non-numeric resolver
-    (bool, null, timestamp, etc.) untouched.
+    Derives the table from ``cls``'s own (inherited) PyYAML resolvers via
+    :func:`_strip_sexagesimal_branch`, leaving every non-numeric resolver
+    (bool, null, timestamp, etc.) untouched. Assigning the result shadows the
+    inherited attribute without mutating the PyYAML base class.
     """
-    cls.yaml_implicit_resolvers = _sexagesimal_safe_resolvers()
+    cls.yaml_implicit_resolvers = _sexagesimal_safe_resolvers(cls)
 
 
 class SafeYamlLoader(yaml.SafeLoader):

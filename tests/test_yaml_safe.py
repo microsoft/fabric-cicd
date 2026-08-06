@@ -108,6 +108,27 @@ def test_dump_yaml_matches_pyyaml_for_normal_data():
     expected = yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
     assert dump_yaml(data) == expected
 
+
+def test_strip_sexagesimal_branch_rejects_unexpected_format():
+    """The resolver strip guards against a PyYAML wrapper-format change instead of corrupting silently."""
+    import re
+
+    import pytest
+
+    from fabric_cicd._common._yaml_safe import _strip_sexagesimal_branch
+
+    with pytest.raises(RuntimeError):
+        _strip_sexagesimal_branch(re.compile(r"^[0-9]+$"))
+
+
+def test_dumper_resolvers_derived_from_safedumper():
+    """SafeYamlDumper's resolvers derive from SafeDumper's own table, not SafeLoader's."""
+    from fabric_cicd._common._yaml_safe import SafeYamlDumper
+
+    assert set(SafeYamlDumper.yaml_implicit_resolvers) == set(yaml.SafeDumper.yaml_implicit_resolvers)
+
+
+def test_no_raw_yaml_round_trip_in_src():
     """Guardrail: no source module bypasses the shared helpers with raw load/dump.
 
     Raw ``yaml.safe_load`` / ``yaml.dump`` (and bare ``yaml.load(x)``) re-introduce
