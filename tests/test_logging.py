@@ -19,6 +19,7 @@ from fabric_cicd import (
     constants,
     disable_file_logging,
     get_supported_feature_flags,
+    remove_feature_flag,
 )
 from fabric_cicd._common._logging import (
     CustomFormatter,
@@ -657,6 +658,15 @@ class TestWrapperFunctions:
         assert "feature_1" in constants.FEATURE_FLAG
         assert "feature_2" in constants.FEATURE_FLAG
         assert len([f for f in constants.FEATURE_FLAG if f == "feature_1"]) == 1
+
+    def test_remove_feature_flag(self):
+        """Test remove_feature_flag removes only the requested flag."""
+        constants.FEATURE_FLAG.update({"feature_1", "feature_2"})
+
+        remove_feature_flag("feature_1")
+        remove_feature_flag("missing_feature")
+
+        assert {"feature_2"} == constants.FEATURE_FLAG
 
     def test_get_supported_feature_flags_returns_all_enum_values(self):
         """Test get_supported_feature_flags returns every FeatureFlag value."""

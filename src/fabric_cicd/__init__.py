@@ -34,6 +34,21 @@ def append_feature_flag(feature: str) -> None:
     constants.FEATURE_FLAG.add(feature)
 
 
+def remove_feature_flag(feature: str) -> None:
+    """
+    Remove a feature flag from the global feature_flag set.
+
+    Args:
+        feature: The feature flag to be removed.
+
+    Examples:
+        Basic usage
+        >>> from fabric_cicd import remove_feature_flag
+        >>> remove_feature_flag("enable_lakehouse_unpublish")
+    """
+    constants.FEATURE_FLAG.discard(feature)
+
+
 def get_supported_feature_flags() -> list[str]:
     """
     Return all feature flags supported by fabric-cicd.
@@ -234,5 +249,6 @@ __all__ = [
     "get_changed_items",
     "get_supported_feature_flags",
     "publish_all_items",
+    "remove_feature_flag",
     "unpublish_all_orphan_items",
 ]
