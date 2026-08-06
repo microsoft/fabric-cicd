@@ -23,40 +23,53 @@ from typing import Union
 
 import yaml
 
-# YAML 1.1 int/float implicit resolvers as used by PyYAML, with the sexagesimal
-# (``(:[0-5]?[0-9])+``) branch removed so ``HH:MM:SS`` values stay strings.
-_INT_RESOLVER = re.compile(
-    r"""^(?:[-+]?0b[0-1_]+
-    |[-+]?0[0-7_]+
-    |[-+]?(?:0|[1-9][0-9_]*)
-    |[-+]?0x[0-9a-fA-F_]+)$""",
-    re.VERBOSE,
-)
-_FLOAT_RESOLVER = re.compile(
-    r"""^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
-    |\.[0-9_]+(?:[eE][-+]?[0-9]+)?
-    |[-+]?[0-9][0-9_]*(?:[eE][-+]?[0-9]+)
-    |[-+]?\.(?:inf|Inf|INF)
-    |\.(?:nan|NaN|NAN))$""",
-    re.VERBOSE,
-)
+# The base-60 sub-pattern PyYAML uses inside its int/float implicit resolvers.
+# Any alternation branch containing it is the sexagesimal branch we want to drop.
+_SEXAGESIMAL_SUBPATTERN = ":[0-5]?[0-9]"
+
+# Tags whose implicit resolvers carry the sexagesimal branch.
+_NUMERIC_TAGS = ("tag:yaml.org,2002:int", "tag:yaml.org,2002:float")
+
+
+def _strip_sexagesimal_branch(pattern: str) -> str:
+    """Remove only the base-60 alternation branch from a PyYAML numeric resolver pattern.
+
+    PyYAML's int/float implicit resolvers are a top-level ``^(?: A | B | ... )$``
+    alternation in which exactly the branches matching sexagesimal (``HH:MM:SS``)
+    notation contain ``:[0-5]?[0-9]``. Dropping just those branches yields a resolver
+    that is byte-for-byte identical to PyYAML's for every other input, so normal
+    ints, floats, exponents, hex, octal, and binary literals resolve exactly as
+    before while colon-separated time values fall through to being strings.
+    """
+    inner = pattern[len("^(?:") : -len(")$")]
+    kept = [branch for branch in inner.split("|") if _SEXAGESIMAL_SUBPATTERN not in branch]
+    return "^(?:" + "|".join(kept) + ")$"
+
+
+def _sexagesimal_safe_resolvers() -> dict:
+    """Build a copy of PyYAML's implicit resolver table with the base-60 branches removed."""
+    compiled = {}
+    for tag_suffix in _NUMERIC_TAGS:
+        for _, mappings in yaml.SafeLoader.yaml_implicit_resolvers.items():
+            match = next((rx for tag, rx in mappings if tag == tag_suffix), None)
+            if match is not None:
+                compiled[tag_suffix] = re.compile(_strip_sexagesimal_branch(match.pattern), re.VERBOSE)
+                break
+
+    resolvers = {}
+    for first_char, mappings in yaml.SafeLoader.yaml_implicit_resolvers.items():
+        resolvers[first_char] = [(tag, compiled.get(tag, regexp)) for tag, regexp in mappings]
+    return resolvers
 
 
 def _install_sexagesimal_safe_resolvers(cls: type) -> None:
-    """Replace the int/float implicit resolvers on ``cls`` with sexagesimal-free versions.
+    """Install the sexagesimal-free implicit resolver table on ``cls``.
 
-    Copies PyYAML's default implicit resolver table onto ``cls`` and swaps the
-    ``int`` and ``float`` regexes for ones that omit the base-60 branch, leaving
-    every other resolver (bool, null, timestamp, etc.) untouched.
+    Derives the table from PyYAML's own default resolvers (see
+    :func:`_strip_sexagesimal_branch`), leaving every non-numeric resolver
+    (bool, null, timestamp, etc.) untouched.
     """
-    replacements = {
-        "tag:yaml.org,2002:int": _INT_RESOLVER,
-        "tag:yaml.org,2002:float": _FLOAT_RESOLVER,
-    }
-    resolvers = {}
-    for first_char, mappings in yaml.SafeLoader.yaml_implicit_resolvers.items():
-        resolvers[first_char] = [(tag, replacements.get(tag, regexp)) for tag, regexp in mappings]
-    cls.yaml_implicit_resolvers = resolvers
+    cls.yaml_implicit_resolvers = _sexagesimal_safe_resolvers()
 
 
 class SafeYamlLoader(yaml.SafeLoader):
