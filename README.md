@@ -34,7 +34,7 @@ pip install fabric-cicd
 
 ## Contribution
 
-See the [contribution guide](CONTRIBUTING.md).
+See the [contribution guide](https://github.com/microsoft/fabric-cicd/blob/main/CONTRIBUTING.md).
 
 ## Trademarks
 
