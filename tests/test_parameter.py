@@ -2688,21 +2688,21 @@ def test_validate_required_values_integration_calls_find_key_validator(empty_par
     assert "must be an absolute JSONPath" in msg
 
 
-def test_validate_dynamic_variables_rejects_items_in_find_value(empty_parameter):
+def test_validate_dynamic_replacement_variables_rejects_items_in_find_value(empty_parameter):
     """Document validation rejects $items.* in find_value."""
     find_value = "$items.Lakehouse.Example.$id"
     empty_parameter.environment_parameter = {
         "find_replace": [{"find_value": find_value, "replace_value": {"DEV": "some-id"}}]
     }
 
-    ok, msg = empty_parameter._validate_dynamic_variables()
+    ok, msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is False
     assert "find_replace[1].find_value" in msg
     assert constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value) in msg
 
 
-def test_validate_dynamic_variables_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
+def test_validate_dynamic_replacement_variables_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
     """Validation warns on cross-workspace $items references in find_value."""
     import logging
 
@@ -2712,14 +2712,16 @@ def test_validate_dynamic_variables_warns_cross_workspace_items_in_find_value(em
     }
 
     with caplog.at_level(logging.WARNING):
-        ok, _msg = empty_parameter._validate_dynamic_variables()
+        ok, _msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is True
     expected_warning = constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, "dev")
     assert expected_warning in caplog.text
 
 
-def test_validate_dynamic_variables_does_not_warn_for_invalid_cross_workspace_find_value(empty_parameter, caplog):
+def test_validate_dynamic_replacement_variables_does_not_warn_for_invalid_cross_workspace_find_value(
+    empty_parameter, caplog
+):
     """Validation does not emit a runtime warning for an invalid cross-workspace reference."""
     import logging
 
@@ -2729,7 +2731,7 @@ def test_validate_dynamic_variables_does_not_warn_for_invalid_cross_workspace_fi
     }
 
     with caplog.at_level(logging.WARNING):
-        ok, _msg = empty_parameter._validate_dynamic_variables()
+        ok, _msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is False
     assert constants.PARAMETER_MSGS["find_value_variable_warning"].split("{")[0] not in caplog.text
@@ -2821,7 +2823,7 @@ find_replace:
     assert "Invalid dynamic variables" not in caplog.text
 
 
-def test_validate_dynamic_variables_reports_all_invalid_locations(empty_parameter):
+def test_validate_dynamic_replacement_variables_reports_all_invalid_locations(empty_parameter):
     empty_parameter.environment_parameter = {
         "find_replace": [
             {
@@ -2840,7 +2842,7 @@ def test_validate_dynamic_variables_reports_all_invalid_locations(empty_paramete
         ],
     }
 
-    ok, msg = empty_parameter._validate_dynamic_variables()
+    ok, msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is False
     assert "find_replace[1].find_value" in msg
