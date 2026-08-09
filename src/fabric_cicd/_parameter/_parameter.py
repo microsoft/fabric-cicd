@@ -17,7 +17,7 @@ from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._parameter._utils import (
     is_valid_structure,
     parse_cross_workspace_item_variable,
-    parse_item_variable,
+    parse_dynamic_variable,
     process_input_path,
     replace_variables_in_parameter_file,
 )
@@ -1132,57 +1132,8 @@ class Parameter:
             return True, "No dynamic replacement variable present"
 
         try:
-            # Parse and validate $items dynamic replacement variable (attribute is validated within parsing function)
-            if value.startswith("$items."):
-                item_type, _item_name, _attr = parse_item_variable(value)
-
-                # Validate item type is in scope
-                if item_type not in constants.ACCEPTED_ITEM_TYPES:
-                    msg = constants.DYNAMIC_VARIABLE_MSGS["item_type"].format(item_type)
-                    raise ParsingError(msg, logger)
-                return True, "Valid dynamic items variable"
-
-            # Parse and validate $workspace dynamic replacement variable
-            if value.startswith("$workspace."):
-                # Validate exact fixed workspace variables
-                if value in constants.WORKSPACE_VARIABLES_FIXED:
-                    return True, "Valid dynamic workspace variable"
-
-                var_string = value.removeprefix("$workspace.")
-
-                # Validate a cross-workspace item variable with no workspace name
-                if var_string.startswith("$items."):
-                    msg = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_name_missing"].format(value)
-                    raise ParsingError(msg, logger)
-
-                # Validate unsupported current-workspace variable syntax (e.g., $workspace.$name.$id, $workspace.$guid)
-                if var_string.startswith("$"):
-                    msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_current_syntax"].format(
-                        value, constants.WORKSPACE_VARIABLES_FIXED
-                    )
-                    raise ParsingError(msg, logger)
-
-                # Validate cross-workspace item variables
-                if "$items." in var_string:
-                    parse_cross_workspace_item_variable(value)
-                    return True, "Valid dynamic cross-workspace variable"
-
-                # Validate named-workspace variables
-                # Check for unsupported attribute (e.g., $workspace.<name>.$name, $workspace.<name>.$guid)
-                if ".$" in var_string and not var_string.endswith(".$id"):
-                    attribute = var_string.rsplit(".$", 1)[1]
-                    msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_attribute"].format(attribute)
-                    raise ParsingError(msg, logger)
-
-                # Check for missing name or attribute (e.g., $workspace.)
-                workspace_name = var_string.removesuffix(".$id").strip()
-                if not workspace_name:
-                    msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_missing_name"].format(value)
-                    raise ParsingError(msg, logger)
-                return True, "Valid dynamic workspace name variable"
-
-            msg = constants.DYNAMIC_VARIABLE_MSGS["invalid_format"].format(value)
-            raise ParsingError(msg, logger)
+            parsed_variable = parse_dynamic_variable(value)
+            return True, f"Valid dynamic {parsed_variable.kind} variable"
         except ParsingError as error:
             return False, str(error)
 
