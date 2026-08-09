@@ -218,7 +218,7 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
         item_type = items_info[:last_period_pos].strip()
         item_name = items_info[last_period_pos + 1 :].strip()
 
-    _validate_item_variable_parts(variable, item_type, item_name)
+    _check_item_variable_parts(variable, item_type, item_name)
 
     if item_type not in constants.ACCEPTED_ITEM_TYPES:
         msg = constants.DYNAMIC_VARIABLE_MSGS["item_type"].format(item_type)
@@ -227,8 +227,8 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
     return workspace_name, item_type, item_name, attribute
 
 
-def _validate_item_variable_parts(variable: str, item_type: str, item_name: str) -> None:
-    """Validate that an item dynamic replacement variable contains both its type and name."""
+def _check_item_variable_parts(variable: str, item_type: str, item_name: str) -> None:
+    """Check that an item dynamic replacement variable contains both its type and name."""
     if not item_type and not item_name:
         msg_key = "item_type_and_name_missing"
     elif not item_type:
@@ -336,7 +336,7 @@ def parse_item_variable(variable: str) -> tuple[str, str, str]:
         item_name = parts[1][:last_period_pos].strip()
         attribute = parts[1][last_period_pos + 1 :].strip()
 
-    _validate_item_variable_parts(variable, item_type, item_name)
+    _check_item_variable_parts(variable, item_type, item_name)
 
     # Validate the attribute
     attr_name = attribute.lower()
