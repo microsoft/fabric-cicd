@@ -181,6 +181,55 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
     raise InputError(msg, logger)
 
 
+def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, str]:
+    """Parse a cross-workspace item variable without resolving workspace or item metadata."""
+    expected_format = "$workspace.name.$items.type.name.$attribute"
+    var_string = variable.removeprefix("$workspace.")
+
+    if ".$items." not in var_string:
+        msg = f"Invalid $workspace variable syntax: {variable}. Expected format: {expected_format}"
+        raise ParsingError(msg, logger)
+
+    # Extract the workspace name and item parts on the $items separator
+    workspace_name, items_part = var_string.split(".$items.", 1)
+    workspace_name = workspace_name.strip()
+    if not workspace_name:
+        msg = f"Invalid $workspace variable syntax: {variable}. Expected format: {expected_format}"
+        raise ParsingError(msg, logger)
+
+    # Validate the attribute part
+    attribute = next(
+        (attr for attr in constants.ITEM_ATTR_LOOKUP if items_part.endswith(f".${attr}")),
+        None,
+    )
+    if attribute is None:
+        msg = (
+            f"Invalid syntax or missing attribute in cross-workspace variable '{variable}'. "
+            f"Expected format: {expected_format} where attribute is one of: "
+            f"{', '.join(constants.ITEM_ATTR_LOOKUP)}"
+        )
+        raise ParsingError(msg, logger)
+
+    # Extract the item type and name from the items part and validate
+    items_info = items_part.removesuffix(f".${attribute}")
+    last_period_pos = items_info.rfind(".")
+    if last_period_pos == -1:
+        msg = f"Invalid $workspace variable syntax: {variable}. Expected format: {expected_format}"
+        raise ParsingError(msg, logger)
+
+    item_type = items_info[:last_period_pos].strip()
+    item_name = items_info[last_period_pos + 1 :].strip()
+    if not item_type or not item_name:
+        msg = f"Invalid $workspace variable syntax: {variable}. Expected format: {expected_format}"
+        raise ParsingError(msg, logger)
+
+    if item_type not in constants.ACCEPTED_ITEM_TYPES:
+        msg = f"Item type '{item_type}' is invalid or not supported"
+        raise ParsingError(msg, logger)
+
+    return workspace_name, item_type, item_name, attribute
+
+
 def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) -> str:
     """
     Extracts workspace ID or display name from the $workspace variable to set as the replace_value.
@@ -212,46 +261,14 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
 
         # Case 4: Check if this is a cross-workspace item reference
         if "$items." in var_string:
-            # Check if the variable ends with a valid attribute
-            valid_attribute = False
-            attribute = None
-
-            for attr in constants.ITEM_ATTR_LOOKUP:
-                if var_string.endswith(f".${attr}"):
-                    valid_attribute = True
-                    attribute = attr
-                    break
-
-            if not valid_attribute:
-                msg = f"Invalid syntax or missing attribute in cross-workspace variable '{replace_value}'. Expected format: $workspace.name.$items.type.name.$attribute where attribute is one of: {', '.join(constants.ITEM_ATTR_LOOKUP)}"
-                raise ParsingError(msg, logger)
-
-            # Split on the $items prefix to get workspace name
-            workspace_part, items_part = var_string.split(".$items.", 1)
-            workspace_name = workspace_part.strip()
+            # Parse the cross-workspace item variable to extract workspace name, item type, item name, and attribute
+            workspace_name, item_type, item_name, attribute = parse_cross_workspace_item_variable(replace_value)
             logger.debug(f"Extracted workspace name: {workspace_name}")
 
             # Get workspace ID
             workspace_id = workspace_obj._resolve_workspace_id(workspace_name)
 
-            # Remove the trailing .$attribute to get the item info
-            items_info = items_part.removesuffix(f".${attribute}")
-
-            # Find the last period to separate item type from item name
-            last_period_pos = items_info.rfind(".")
-            if last_period_pos == -1:
-                msg = f"Invalid $workspace variable syntax: {replace_value}. Expected format: $workspace.name.$items.type.name.$attribute"
-                raise ParsingError(msg, logger)
-
-            # Extract item_type and item_name
-            item_type = items_info[:last_period_pos].strip()
-            item_name = items_info[last_period_pos + 1 :].strip()
-
             logger.debug(f"Extracted item type: {item_type}, item name: {item_name}, attribute: {attribute}")
-
-            if item_type not in constants.ACCEPTED_ITEM_TYPES:
-                msg = f"Item type '{item_type}' is invalid or not supported"
-                raise ParsingError(msg, logger)
 
             # Look up the attribute value of the item in the specified workspace
             attribute_value = workspace_obj._lookup_item_attribute(workspace_id, item_type, item_name, attribute)
@@ -275,6 +292,48 @@ def _extract_workspace_id(workspace_obj: FabricWorkspace, replace_value: str) ->
         raise ParsingError(msg, logger) from e
 
 
+def parse_item_variable(variable: str) -> tuple[str, str, str]:
+    """Parse an item dynamic variable without resolving it against a workspace."""
+    var_string = variable.removeprefix("$items.")
+
+    # Check for new pattern with $attribute
+    if ".$" in var_string:
+        # Split on the $attribute marker
+        name_part, attribute = var_string.rsplit(".$", 1)
+
+        # Find the last period to separate item_type from item_name
+        last_period_pos = name_part.rfind(".")
+        if last_period_pos == -1:
+            msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.$attribute"
+            raise ParsingError(msg, logger)
+
+        # Extract item_type and item_name
+        item_type = name_part[:last_period_pos].strip()
+        item_name = name_part[last_period_pos + 1 :].strip()
+
+    # Backward compatibility for legacy pattern
+    else:
+        msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.attribute"
+        # Split the string to get the parts and validate the format
+        parts = var_string.split(".", 1)
+        if len(parts) < 2 or "." not in parts[1]:
+            raise ParsingError(msg, logger)
+
+        # Extract item_type, item_name, and attribute from the parts
+        last_period_pos = parts[1].rfind(".")
+        item_type = parts[0].strip()
+        item_name = parts[1][:last_period_pos].strip()
+        attribute = parts[1][last_period_pos + 1 :].strip()
+
+    # Validate the attribute
+    attr_name = attribute.lower()
+    if attr_name not in constants.ITEM_ATTR_LOOKUP:
+        msg = f"Attribute '{attribute}' is invalid. Supported attributes: {list(constants.ITEM_ATTR_LOOKUP)}"
+        raise ParsingError(msg, logger)
+
+    return item_type, item_name, attr_name
+
+
 def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_dataflow_name: bool) -> str:
     """
     Extracts the item attribute value from the $items variable to set as the replace_value.
@@ -290,62 +349,11 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
     """
     error = None
     try:
-        var_string = variable.removeprefix("$items.")
-
-        # Check for new pattern with $attribute
-        if ".$" in var_string:
-            # Split on the $attribute marker
-            name_part, attr_part = var_string.rsplit(".$", 1)
-
-            # Extract attribute name
-            attribute = attr_part.strip()
-
-            # Find the last period to separate item_type from item_name
-            last_period_pos = name_part.rfind(".")
-            if last_period_pos == -1:
-                msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.$attribute"
-                error = ParsingError(msg, logger)
-                return None
-
-            # Extract item_type and item_name
-            item_type = name_part[:last_period_pos].strip()
-            item_name = name_part[last_period_pos + 1 :].strip()
-
-        # Backward compatibility for legacy pattern
-        else:
-            msg = f"Invalid $items variable syntax: {variable}. Expected format: $items.type.name.attribute"
-            # Split the string to get item_type (first part)
-            parts = var_string.split(".", 1)
-            if len(parts) < 2:
-                error = ParsingError(msg, logger)
-                return None
-
-            item_type = parts[0].strip()
-
-            # Get the attribute (last part)
-            if "." not in parts[1]:
-                error = ParsingError(msg, logger)
-                return None
-
-            # Find the position of the last period which separates item_name from attribute
-            last_period_pos = parts[1].rfind(".")
-            if last_period_pos == -1:
-                error = ParsingError(msg, logger)
-                return None
-
-            # Extract item_name and attribute
-            item_name = parts[1][:last_period_pos].strip()
-            attribute = parts[1][last_period_pos + 1 :].strip()
-
-        # Validate attribute before further processing
-        attr_name = attribute.lower()
-        if attr_name not in constants.ITEM_ATTR_LOOKUP:
-            msg = f"Attribute '{attribute}' is invalid. Supported attributes: {list(constants.ITEM_ATTR_LOOKUP)}"
-            error = ParsingError(msg, logger)
-            return None
+        # Parse the variable to extract item_type, item_name, and attr_name
+        item_type, item_name, attr_name = parse_item_variable(variable)
 
         logger.debug(
-            f"Processing $items variable with item_type={item_type}, item_name={item_name}, attribute={attribute}"
+            f"Processing $items variable with item_type={item_type}, item_name={item_name}, attribute={attr_name}"
         )
 
         # Refresh the workspace items to get the latest deployed items
@@ -369,7 +377,7 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
                 item_type in workspace_obj.repository_items
                 and item_type == ItemType.DATAFLOW.value
                 and item_name in workspace_obj.repository_items[item_type]
-                and attribute == "id"
+                and attr_name == "id"
             ):
                 logger.debug("Source Dataflow reference will be replaced separately")
                 return item_name
@@ -382,7 +390,7 @@ def _extract_item_attribute(workspace_obj: FabricWorkspace, variable: str, get_d
         # Get the attribute value and check if it exists
         attr_value = item_attr_values.get(attr_name)
         if not attr_value:
-            msg = f"Value does not exist for attribute '{attribute}' in the {item_type} item '{item_name}'"
+            msg = f"Value does not exist for attribute '{attr_name}' in the {item_type} item '{item_name}'"
             error = ParsingError(msg, logger)
             return None
 

@@ -2688,28 +2688,51 @@ def test_validate_required_values_integration_calls_find_key_validator(empty_par
     assert "must be an absolute JSONPath" in msg
 
 
-def test_validate_required_values_rejects_items_in_find_value(empty_parameter):
-    """Validation rejects $items.* in find_value (resolves to target env, can't exist in source)."""
+def test_validate_dynamic_variables_rejects_items_in_find_value(empty_parameter):
+    """Document validation rejects $items.* in find_value."""
     find_value = "$items.Lakehouse.Example.$id"
-    param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
-    ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
+    empty_parameter.environment_parameter = {
+        "find_replace": [{"find_value": find_value, "replace_value": {"DEV": "some-id"}}]
+    }
+
+    ok, msg = empty_parameter._validate_dynamic_variables()
+
     assert ok is False
-    assert msg == constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
+    assert "find_replace[1].find_value" in msg
+    assert constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value) in msg
 
 
-def test_validate_required_values_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
+def test_validate_dynamic_variables_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
     """Validation warns on cross-workspace $items references in find_value."""
     import logging
 
     find_value = "$workspace.dev.$items.Lakehouse.Example.$id"
-    param_dict = {"find_value": find_value, "replace_value": {"DEV": "some-id"}}
+    empty_parameter.environment_parameter = {
+        "find_replace": [{"find_value": find_value, "replace_value": {"DEV": "some-id"}}]
+    }
 
     with caplog.at_level(logging.WARNING):
-        ok, _msg = empty_parameter._validate_required_values("find_replace", param_dict)
+        ok, _msg = empty_parameter._validate_dynamic_variables()
 
     assert ok is True
     expected_warning = constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, "dev")
     assert expected_warning in caplog.text
+
+
+def test_validate_dynamic_variables_does_not_warn_for_invalid_cross_workspace_find_value(empty_parameter, caplog):
+    """Validation does not emit a runtime warning for an invalid cross-workspace reference."""
+    import logging
+
+    find_value = "$workspace.dev.$items.Lakehouse.Example.$unsupported"
+    empty_parameter.environment_parameter = {
+        "find_replace": [{"find_value": find_value, "replace_value": {"DEV": "some-id"}}]
+    }
+
+    with caplog.at_level(logging.WARNING):
+        ok, _msg = empty_parameter._validate_dynamic_variables()
+
+    assert ok is False
+    assert constants.PARAMETER_MSGS["find_value_variable_warning"].split("{")[0] not in caplog.text
 
 
 def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_parameter):
@@ -2719,6 +2742,112 @@ def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_para
     ok, msg = empty_parameter._validate_required_values("find_replace", param_dict)
     assert ok is False
     assert msg == constants.PARAMETER_MSGS["incompatible_find_value_regex_variable"].format(find_value)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_message"),
+    [
+        ("$items.Lakehouse.Example.$guid", "Attribute 'guid' is invalid"),
+        ("$items.InvalidType.Example.$id", "Item type 'InvalidType' is invalid or not supported"),
+        ("$workspace.dev.$items.Lakehouse.Example.$guid", "Invalid syntax or missing attribute"),
+        ("$workspace.$items.Lakehouse.Example.$id", "Invalid $workspace variable syntax"),
+        ("$workspace.dev.$guid", "Attribute 'guid' is invalid for a workspace variable"),
+        ("$unknown.value", "Invalid dynamic variable format"),
+    ],
+)
+def test_validate_dynamic_variable_rejects_invalid_syntax(empty_parameter, value, expected_message):
+    ok, msg = empty_parameter._validate_dynamic_variable(value)
+
+    assert ok is False
+    assert expected_message in msg
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "$items.Lakehouse.Example.id",
+        "$items.Lakehouse.Example.$id",
+        "$workspace.id",
+        "$workspace.$id",
+        "$workspace.$name",
+        "$workspace.$name_encoded",
+        "$workspace.dev.$id",
+        "$workspace.dev.$items.Lakehouse.Example.$sqlendpoint",
+    ],
+)
+def test_validate_dynamic_variable_accepts_supported_syntax(empty_parameter, value):
+    ok, _ = empty_parameter._validate_dynamic_variable(value)
+
+    assert ok is True
+
+
+def test_validate_parameter_file_rejects_invalid_dynamic_attribute(tmp_path):
+    parameter_file = tmp_path / "parameter.yml"
+    parameter_file.write_text(
+        """
+find_replace:
+  - find_value: old-id
+    replace_value:
+      DEV: $items.Lakehouse.Example.$guid
+""",
+        encoding="utf-8",
+    )
+    parameter = Parameter(
+        repository_directory=tmp_path,
+        item_type_in_scope=["Lakehouse"],
+        environment="DEV",
+    )
+
+    assert parameter._validate_parameter_file() is False
+
+
+def test_validate_parameter_file_reports_parameter_structure_before_dynamic_syntax(tmp_path, caplog):
+    parameter_file = tmp_path / "parameter.yml"
+    parameter_file.write_text(
+        """
+find_replace:
+  - find_value: $workspace.dev.$guid
+""",
+        encoding="utf-8",
+    )
+    parameter = Parameter(
+        repository_directory=tmp_path,
+        item_type_in_scope=["Lakehouse"],
+        environment="DEV",
+    )
+
+    assert parameter._validate_parameter_file() is False
+    assert constants.PARAMETER_MSGS["missing key"].format("find_replace") in caplog.text
+    assert "Invalid dynamic variables" not in caplog.text
+
+
+def test_validate_dynamic_variables_reports_all_invalid_locations(empty_parameter):
+    empty_parameter.environment_parameter = {
+        "find_replace": [
+            {
+                "find_value": "$workspace.dev.$guid",
+                "replace_value": {
+                    "DEV": "$items.Lakehouse.Example.$guid",
+                    "PROD": "$workspace.prod.$items.InvalidType.Example.$id",
+                },
+            }
+        ],
+        "key_value_replace": [
+            {
+                "find_key": "$.value",
+                "replace_value": {"DEV": "$unknown.value"},
+            }
+        ],
+    }
+
+    ok, msg = empty_parameter._validate_dynamic_variables()
+
+    assert ok is False
+    assert "find_replace[1].find_value" in msg
+    assert "find_replace[1].replace_value.DEV" in msg
+    assert "find_replace[1].replace_value.PROD" in msg
+    assert "key_value_replace[1].replace_value.DEV" in msg
+    assert msg.count("\n- ") == 4
 
 
 def test_validate_required_values_allows_regex_with_dollar_anchor(empty_parameter):

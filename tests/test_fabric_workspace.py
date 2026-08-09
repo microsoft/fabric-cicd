@@ -1588,12 +1588,14 @@ def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, va
     # Create a parameter file with dynamic variable in find_value
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
-        """
-find_replace:
-  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
-    replace_value:
-      PPE: "replacement-id"
-""",
+        yaml.safe_dump({
+            "find_replace": [
+                {
+                    "find_value": "$workspace.source_ws.$items.Lakehouse.MyLakehouse.$id",
+                    "replace_value": {"PPE": "replacement-id"},
+                }
+            ]
+        }),
         encoding="utf-8",
     )
 
@@ -1672,12 +1674,14 @@ def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir
 
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
-        """
-find_replace:
-  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
-    replace_value:
-      PPE: "replacement-id"
-""",
+        yaml.safe_dump({
+            "find_replace": [
+                {
+                    "find_value": "$workspace.source_ws.$items.Lakehouse.MyLakehouse.$id",
+                    "replace_value": {"PPE": "replacement-id"},
+                }
+            ]
+        }),
         encoding="utf-8",
     )
 

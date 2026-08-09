@@ -239,6 +239,7 @@ The `find_replace` and `key_value_replace` parameters support fabric-cicd define
 
 Additional notes:
 
+- **Workspace and item dynamic variable syntax is validated before deployment.** Validation checks that workspace variables use a supported form and that item variables use a supported format, item type, and attribute. It does not resolve the referenced workspace or item, so a syntactically valid variable can still fail during deployment if the resource does not exist or is inaccessible.
 - **`$items` variables resolve for items that exist in the `repository_directory`.** Cross-workspace variables (`$workspace.<name>.$items...`) reference items outside the repository — these items must exist in the specified workspace at deployment time.
 - Within a single parameter entry, `replace_value` can mix static strings and variables across environments, e.g. `PPE` set to a literal GUID and `PROD` set to a `$workspace.$id` variable.
 
