@@ -21,7 +21,7 @@ Section Overview:
 -   [Home](https://microsoft.github.io/fabric-cicd/latest/)
 -   [How To](https://microsoft.github.io/fabric-cicd/latest/how_to/)
 -   [Examples](https://microsoft.github.io/fabric-cicd/latest/example/)
--   [Contribution](https://microsoft.github.io/fabric-cicd/latest/contribution/)
+-   [Contribution](CONTRIBUTING.md)
 -   [Changelog](https://microsoft.github.io/fabric-cicd/latest/changelog/)
 -   [About](https://microsoft.github.io/fabric-cicd/latest/help/) - Inclusive of Support & Security Policies
 
