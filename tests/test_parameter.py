@@ -2754,7 +2754,7 @@ def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_para
         ("$items..Example.$id", "Item type is missing"),
         ("$items.Lakehouse..$id", "Item name is missing"),
         ("$items..$id", "Item type and item name are missing"),
-        ("$items.Lakehouse.Example", "Use the preferred format: '$items.type.name.$attribute'"),
+        ("$items.Lakehouse.Example", "Expected format: '$items.type.name.$attribute'"),
         ("$workspace.dev.$items.Lakehouse.Example.$guid", "Invalid or missing attribute"),
         ("$workspace.dev.$items..Example.$id", "Item type is missing"),
         ("$workspace.dev.$items.Lakehouse.$id", "Item name is missing"),
