@@ -460,7 +460,7 @@ class FabricWorkspace:
             if item_type not in self.workspace_items:
                 self.workspace_items[item_type] = {}
 
-            # Only collect attribute values when parameterization with dynamic variables is in use
+            # Only collect attribute values when parameterization with dynamic replacement variables is in use
             if self.contains_param_vars:
                 # Get additional properties - eagerly fetch attribute values for specific item types
                 if item_type in [

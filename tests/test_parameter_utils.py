@@ -231,7 +231,7 @@ class TestParameterUtilities:
             extract_find_value(param_dict, "some content", True, workspace_obj=mock_workspace)
 
     def test_extract_find_value_dynamic_variable_resolves_empty(self, mock_workspace):
-        """Tests extract_find_value returns no-op when dynamic variable resolves to empty string."""
+        """Tests extract_find_value returns no-op when dynamic replacement variable resolves to empty string."""
         mock_workspace._resolve_workspace_id.return_value = ""
         param_dict = {"find_value": "$workspace.nonexistent"}
         expected = {"pattern": "", "is_regex": False, "has_matches": False, "ignore_case": False}
@@ -297,7 +297,7 @@ class TestParameterUtilities:
         with pytest.raises(
             InputError,
             match=re.escape(
-                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.$attribute"
+                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: '$items.type.name.$attribute'"
             ),
         ):
             result = extract_replace_value(mock_workspace, "$workspace.id", True)
@@ -484,7 +484,7 @@ class TestParameterUtilities:
 
         This guards the boundary: the deployed-items refresh now skips
         (rather than raising for) an item whose attribute is unavailable, leaving an empty value in
-        workspace_items. If a dynamic variable actually references that item, resolution must still
+        workspace_items. If a dynamic replacement variable actually references that item, resolution must still
         fail loudly instead of substituting ''.
         """
         # Item exists (passes the type/name existence checks) but its sqlendpoint was left empty,

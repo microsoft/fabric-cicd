@@ -261,7 +261,7 @@ class TestBulkPublishFallback:
             assert workspace.contains_param_vars is True
 
     def test_no_fallback_without_dynamic_variables(self, mock_endpoint, temp_workspace_dir):
-        """Bulk publish remains enabled when parameter file has no dynamic variables."""
+        """Bulk publish remains enabled when parameter file has no dynamic replacement variables."""
         create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
         create_parameter_file(
             temp_workspace_dir,

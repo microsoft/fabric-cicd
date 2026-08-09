@@ -356,7 +356,7 @@ class Parameter:
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
-            ("dynamic variables", self._validate_dynamic_replacement_variables),
+            ("dynamic replacement variables", self._validate_dynamic_replacement_variables),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -757,7 +757,7 @@ class Parameter:
                 if not is_valid:
                     return False, msg
 
-            # Reject combining dynamic variables with is_regex — these are separate features
+            # Reject combining dynamic replacement variables with is_regex — these are separate features
             # Only check for $workspace. prefix (not bare $) to avoid flagging legitimate regex anchors
             is_regex_val = param_dict.get("is_regex", "")
             is_regex = isinstance(is_regex_val, str) and is_regex_val.lower() == "true"
@@ -1050,7 +1050,7 @@ class Parameter:
 
     def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
         """Search for dynamic replacement variables in the parameter file."""
-        dynamic_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
+        dynamic_replacement_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
         dynamic_param_names = {"find_replace", "key_value_replace"}
 
         for param_name, param_values in self.environment_parameter.items():
@@ -1058,16 +1058,16 @@ class Parameter:
                 continue
             if isinstance(param_values, list):
                 for param_dict in param_values:
-                    # Check find_value for dynamic variables
+                    # Check find_value for dynamic replacement variables
                     find_value = param_dict.get("find_value", "")
-                    if isinstance(find_value, str) and dynamic_var_pattern.search(find_value):
+                    if isinstance(find_value, str) and dynamic_replacement_var_pattern.search(find_value):
                         return True
 
-                    # Check replace_value for dynamic variables
+                    # Check replace_value for dynamic replacement variables
                     replace_value = param_dict.get("replace_value")
                     if isinstance(replace_value, dict):
                         for env_value in replace_value.values():
-                            if isinstance(env_value, str) and dynamic_var_pattern.search(env_value):
+                            if isinstance(env_value, str) and dynamic_replacement_var_pattern.search(env_value):
                                 return True
 
         return False
@@ -1076,7 +1076,7 @@ class Parameter:
         """Validate every dynamic replacement variable and report all syntax errors with their locations."""
         errors = []
 
-        # Validate dynamic variables in find_replace and key_value_replace parameters
+        # Validate dynamic replacement variables in find_replace and key_value_replace parameters
         for param_name in ("find_replace", "key_value_replace"):
             param_values = self.environment_parameter.get(param_name, [])
             if not isinstance(param_values, list):
@@ -1086,7 +1086,7 @@ class Parameter:
                 if not isinstance(param_dict, dict):
                     continue
 
-                # Validate dynamic variables in the find_value of find_replace
+                # Validate dynamic replacement variables in the find_value of find_replace
                 if param_name == "find_replace":
                     find_value = param_dict.get("find_value")
                     # Dynamic items variables ($items.type.name.$attribute) are not supported in find_value
@@ -1112,7 +1112,7 @@ class Parameter:
                 if not isinstance(replace_value, dict):
                     continue
 
-                # Validate dynamic variables in the replace_value
+                # Validate dynamic replacement variables in the replace_value
                 for environment, value in replace_value.items():
                     if not isinstance(value, str) or not value.startswith("$"):
                         continue
@@ -1121,63 +1121,67 @@ class Parameter:
                         errors.append(f"{param_name}[{index}].replace_value.{environment}: {msg}")
 
         if errors:
-            return False, "Invalid dynamic variables:\n- " + "\n- ".join(errors)
+            return False, "Invalid dynamic replacement variables:\n- " + "\n- ".join(errors)
 
-        return True, "Valid dynamic variables"
+        return True, "Valid dynamic replacement variables"
 
     @staticmethod
     def _validate_dynamic_variable(value: object) -> tuple[bool, str]:
-        """Validate a replacement dynamic variable without resolving its target."""
+        """Validate a replacement dynamic replacement variable without resolving its target."""
         if not isinstance(value, str) or not value.startswith("$"):
-            return True, "No dynamic variable present"
+            return True, "No dynamic replacement variable present"
 
         try:
-            # Parse and validate $items dynamic variable (attribute is validated within parsing function)
+            # Parse and validate $items dynamic replacement variable (attribute is validated within parsing function)
             if value.startswith("$items."):
                 item_type, item_name, _ = parse_item_variable(value)
 
-                if not item_type or not item_name:
-                    msg = f"Invalid $items variable syntax: {value}. Expected format: $items.type.name.$attribute"
-                    raise ParsingError(msg, logger)
-
                 # Validate item type is in scope
                 if item_type not in constants.ACCEPTED_ITEM_TYPES:
-                    msg = f"Item type '{item_type}' is invalid or not supported"
+                    msg = constants.DYNAMIC_VARIABLE_MSGS["item_type"].format(item_type)
                     raise ParsingError(msg, logger)
                 return True, "Valid dynamic items variable"
 
-            # Parse and validate $workspace dynamic variable
+            # Parse and validate $workspace dynamic replacement variable
             if value.startswith("$workspace."):
-                # Validate fixed workspace variable is in the supported list
+                # Validate exact fixed workspace variables
                 if value in constants.WORKSPACE_VARIABLES_FIXED:
                     return True, "Valid dynamic workspace variable"
 
-                # Validate cross-workspace item variable syntax
                 var_string = value.removeprefix("$workspace.")
+
+                # Validate a cross-workspace item variable with no workspace name
+                if var_string.startswith("$items."):
+                    msg = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_name_missing"].format(value)
+                    raise ParsingError(msg, logger)
+
+                # Validate unsupported current-workspace variable syntax (e.g., $workspace.$name.$id, $workspace.$guid)
+                if var_string.startswith("$"):
+                    msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_current_syntax"].format(
+                        value, constants.WORKSPACE_VARIABLES_FIXED
+                    )
+                    raise ParsingError(msg, logger)
+
+                # Validate cross-workspace item variables
                 if "$items." in var_string:
                     parse_cross_workspace_item_variable(value)
                     return True, "Valid dynamic cross-workspace variable"
 
-                # Validate workspace name variable with unsupported attribute (e.g., $workspace.Dev.$name)
+                # Validate named-workspace variables
+                # Check for unsupported attribute (e.g., $workspace.<name>.$name, $workspace.<name>.$guid)
                 if ".$" in var_string and not var_string.endswith(".$id"):
                     attribute = var_string.rsplit(".$", 1)[1]
-                    msg = f"Attribute '{attribute}' is invalid for a workspace variable. Supported attributes: ['id']"
+                    msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_attribute"].format(attribute)
                     raise ParsingError(msg, logger)
 
-                # Validate workspace variable with missing parts (e.g., $workspace.)
+                # Check for missing name or attribute (e.g., $workspace.)
                 workspace_name = var_string.removesuffix(".$id").strip()
                 if not workspace_name:
-                    msg = (
-                        f"Invalid $workspace variable syntax: {value}. Expected a workspace name or supported attribute"
-                    )
+                    msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_missing_name"].format(value)
                     raise ParsingError(msg, logger)
                 return True, "Valid dynamic workspace name variable"
 
-            msg = (
-                f"Invalid dynamic variable format: '{value}'. Expected $items.type.name.$attribute, "
-                "$workspace.$id, $workspace.$name, $workspace.$name_encoded, $workspace.<name>.$id, "
-                "or $workspace.<name>.$items.<type>.<name>.$attribute"
-            )
+            msg = constants.DYNAMIC_VARIABLE_MSGS["invalid_format"].format(value)
             raise ParsingError(msg, logger)
         except ParsingError as error:
             return False, str(error)
