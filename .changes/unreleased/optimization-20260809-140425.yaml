@@ -1,5 +1,5 @@
 kind: optimization
-body: Add validation for dynamic replacement variables before deployment
+body: Move validation for dynamic replacement variables before deployment
 time: 2026-08-09T14:04:25.2759172+03:00
 custom:
     Author: shirasassoon
