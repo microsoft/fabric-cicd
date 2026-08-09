@@ -1134,7 +1134,7 @@ class Parameter:
         try:
             # Parse and validate $items dynamic replacement variable (attribute is validated within parsing function)
             if value.startswith("$items."):
-                item_type, item_name, _ = parse_item_variable(value)
+                item_type, _item_name, _attr = parse_item_variable(value)
 
                 # Validate item type is in scope
                 if item_type not in constants.ACCEPTED_ITEM_TYPES:
