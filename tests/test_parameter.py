@@ -2860,6 +2860,36 @@ def test_validate_dynamic_replacement_variables_reports_all_invalid_locations(em
     assert msg.count("\n- ") == 4
 
 
+def test_validate_dynamic_replacement_variables_reports_all_key_value_replace_errors(empty_parameter):
+    empty_parameter.environment_parameter = {
+        "key_value_replace": [
+            {
+                "find_key": "$.first",
+                "replace_value": {
+                    "DEV": "$items.Lakehouse.Example.$guid",
+                    "PROD": "$unknown.value",
+                },
+            },
+            {
+                "find_key": "$.second",
+                "replace_value": {
+                    "DEV": "static-value",
+                    "PROD": "$workspace.prod.$guid",
+                },
+            },
+        ]
+    }
+
+    ok, msg = empty_parameter._validate_dynamic_replacement_variables()
+
+    assert ok is False
+    assert "key_value_replace[1].replace_value.DEV" in msg
+    assert "key_value_replace[1].replace_value.PROD" in msg
+    assert "key_value_replace[2].replace_value.PROD" in msg
+    assert "key_value_replace[2].replace_value.DEV" not in msg
+    assert msg.count("\n- ") == 3
+
+
 def test_validate_required_values_allows_regex_with_dollar_anchor(empty_parameter):
     """Validation allows legitimate regex patterns starting with $ (regex anchor) when is_regex is set."""
     # A regex pattern like "value$" or "$" at the start is a regex anchor, not a dynamic replacement variable
