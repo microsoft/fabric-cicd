@@ -1,0 +1,8 @@
+kind: docs
+body: Fix broken link to contribution docs in README.md
+time: 2026-08-09T18:43:41.743187+10:00
+custom:
+    Author: isaakchoi
+    AuthorLink: https://github.com/isaakchoi
+    Issue: "1099"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1099
