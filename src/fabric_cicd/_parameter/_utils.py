@@ -218,22 +218,14 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
                 "$workspace.$name": "name",
                 "$workspace.$name_encoded": "name_encoded",
             }[variable]
-            return ParsedDynamicVariable(kind="workspace", attribute=attribute)
+            return ParsedDynamicVariable(
+                kind="workspace",
+                attribute=attribute,
+            )
 
         var_string = variable.removeprefix("$workspace.")
 
-        # $workspace.$items... is missing the required workspace name
-        if var_string.startswith("$items."):
-            parse_cross_workspace_item_variable(variable)
-
-        # Other $workspace.$... forms resemble fixed attributes but are unsupported
-        if var_string.startswith("$"):
-            msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_current_syntax"].format(
-                variable, constants.WORKSPACE_VARIABLES_FIXED
-            )
-            raise ParsingError(msg, logger)
-
-        # $workspace.<workspace>.$items.<type>.<name>.$<attribute>
+        # Parse cross-workspace item variables and validate workspace name exists before the .$items. segment.
         if "$items." in var_string:
             workspace_name, item_type, item_name, attribute = parse_cross_workspace_item_variable(variable)
             return ParsedDynamicVariable(
@@ -244,7 +236,14 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
                 attribute=attribute,
             )
 
-        # Named workspaces support only an optional .$id attribute
+        # Check for unsupported current-workspace syntax (e.g., $workspace.$unknown, $workspace.$items)
+        if var_string.startswith("$"):
+            msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_current_syntax"].format(
+                variable, constants.WORKSPACE_VARIABLES_FIXED
+            )
+            raise ParsingError(msg, logger)
+
+        # Check for unsupported attribute on a named workspace (e.g., $workspace.<name>.$unknown)
         if ".$" in var_string and not var_string.endswith(".$id"):
             attribute = var_string.rsplit(".$", 1)[1]
             msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_attribute"].format(attribute)
@@ -252,11 +251,16 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
 
         # $workspace.<workspace> or $workspace.<workspace>.$id
         workspace_name = var_string.removesuffix(".$id").strip()
+        # Check for missing workspace name
         if not workspace_name:
             msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_missing_name"].format(variable)
             raise ParsingError(msg, logger)
 
-        return ParsedDynamicVariable(kind="workspace", workspace_name=workspace_name, attribute="id")
+        return ParsedDynamicVariable(
+            kind="workspace",
+            workspace_name=workspace_name,
+            attribute="id",
+        )
 
     # Any other $-prefixed form is not a supported dynamic replacement variable
     msg = constants.DYNAMIC_VARIABLE_MSGS["invalid_format"].format(variable)
@@ -266,22 +270,21 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
 def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, str]:
     """Parse a cross-workspace item variable without resolving workspace or item metadata."""
     expected_format = "$workspace.name.$items.type.name.$attribute"
+    separator = ".$items."
+
     var_string = variable.removeprefix("$workspace.")
 
-    # Workspace name segment is omitted: $workspace.$items...
+    # Validate the workspace name and items part syntax
     if var_string.startswith("$items."):
-        msg = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_name_missing"].format(variable)
-        raise ParsingError(msg, logger)
-
-    # Cross-workspace item syntax requires the .$items. separator
-    if ".$items." not in var_string:
+        workspace_name = ""
+    elif separator in var_string:
+        workspace_name, items_part = var_string.split(separator, 1)
+    else:
         msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_syntax"].format(variable, expected_format)
         raise ParsingError(msg, logger)
 
-    # Separate the workspace name from the item reference
-    workspace_name, items_part = var_string.split(".$items.", 1)
+    # Check for missing workspace name (absent or empty string)
     workspace_name = workspace_name.strip()
-    # Workspace segment contains only whitespace: $workspace.   .$items...
     if not workspace_name:
         msg = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_name_missing"].format(variable)
         raise ParsingError(msg, logger)
@@ -296,8 +299,16 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
     items_info, attribute = items_part.rsplit(".$", 1)
     attribute = _validate_item_variable_attribute(variable, attribute, expected_format)
 
-    # Extract the item type and name from the items part and validate
+    # Extract and validate the item type and name from the items part
+    item_type, item_name = _extract_item_variable_components(variable, items_info)
+
+    return workspace_name, item_type, item_name, attribute
+
+
+def _extract_item_variable_components(variable: str, items_info: str) -> tuple[str, str]:
+    """Extract and validate the item type and name."""
     last_period_pos = items_info.rfind(".")
+
     if last_period_pos == -1:
         item_type = items_info.strip()
         item_name = ""
@@ -307,7 +318,7 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
 
     _validate_item_variable_components(variable, item_type, item_name)
 
-    return workspace_name, item_type, item_name, attribute
+    return item_type, item_name
 
 
 def _validate_item_variable_components(variable: str, item_type: str, item_name: str) -> None:
@@ -350,7 +361,7 @@ def _extract_workspace_id(
     parsed_variable: ParsedDynamicVariable,
 ) -> str:
     """
-    Extracts workspace ID or display name from the $workspace variable to set as the replace_value.
+    Extracts workspace ID/name or cross-workspace item attribute from the $workspace variable to set as the replace_value.
 
     Supports the following formats:
     - $workspace.id or $workspace.$id - Returns the target workspace ID
@@ -359,8 +370,14 @@ def _extract_workspace_id(
     - $workspace.<name>.$items.<type>.<name>.$<attribute> - Resolves an item attribute from the specified workspace,
       where $attribute is any supported attribute in constants.ITEM_ATTR_LOOKUP
     - $workspace.<name> or $workspace.<name>.$id - Resolves the workspace ID from the name
+
+    Args:
+        workspace_obj: The FabricWorkspace object containing the workspace items dictionary used to access item metadata.
+        replace_value: The original $workspace variable string.
+        parsed_variable: The parsed workspace variable.
     """
     try:
+        # Resolve fixed current-workspace attributes
         if parsed_variable.kind == "workspace" and parsed_variable.workspace_name is None:
             if parsed_variable.attribute == "id":
                 return workspace_obj.workspace_id
@@ -370,6 +387,7 @@ def _extract_workspace_id(
                 name = workspace_obj._resolve_workspace_name()
                 return urllib.parse.quote(name, safe="")
 
+        # Resolve cross-workspace item attributes
         if parsed_variable.kind == "item" and parsed_variable.workspace_name is not None:
             logger.debug(f"Extracted workspace name: {parsed_variable.workspace_name}")
 
@@ -391,6 +409,7 @@ def _extract_workspace_id(
             logger.debug(f"Found item {parsed_variable.attribute}: {attribute_value}")
             return attribute_value
 
+        # Resolve cross-workspace ID from workspace name
         if parsed_variable.kind == "workspace" and parsed_variable.workspace_name is not None:
             logger.debug(f"Extracted workspace name: {parsed_variable.workspace_name}")
             return workspace_obj._resolve_workspace_id(parsed_variable.workspace_name)
@@ -414,40 +433,25 @@ def parse_item_variable(variable: str) -> tuple[str, str, str]:
     """Parse an item dynamic replacement variable without resolving it against a workspace."""
     var_string = variable.removeprefix("$items.")
 
-    # Check for new pattern with $attribute
+    # Modern syntax: $items.<type>.<name>.$<attribute>
     if ".$" in var_string:
-        # Split on the $attribute marker
-        name_part, attribute = var_string.rsplit(".$", 1)
+        items_info, attribute = var_string.rsplit(".$", 1)
 
-        # Find the last period to separate item_type from item_name
-        last_period_pos = name_part.rfind(".")
-        if last_period_pos == -1:
-            item_type = name_part.strip()
-            item_name = ""
-        else:
-            # Extract item_type and item_name
-            item_type = name_part[:last_period_pos].strip()
-            item_name = name_part[last_period_pos + 1 :].strip()
-
-    # Backward compatibility for legacy pattern
+    # Legacy syntax: $items.<type>.<name>.<attribute>
     else:
         msg = constants.DYNAMIC_VARIABLE_MSGS["item_syntax"].format(variable)
-        # Split the string to get the parts and validate the format
         parts = var_string.split(".", 1)
         if len(parts) < 2 or "." not in parts[1]:
             raise ParsingError(msg, logger)
 
-        # Extract item_type, item_name, and attribute from the parts
         last_period_pos = parts[1].rfind(".")
-        item_type = parts[0].strip()
-        item_name = parts[1][:last_period_pos].strip()
+        items_info = f"{parts[0]}.{parts[1][:last_period_pos]}"
         attribute = parts[1][last_period_pos + 1 :].strip()
 
-    _validate_item_variable_components(variable, item_type, item_name)
+    item_type, item_name = _extract_item_variable_components(variable, items_info)
+    attribute = _validate_item_variable_attribute(variable, attribute)
 
-    attr_name = _validate_item_variable_attribute(variable, attribute)
-
-    return item_type, item_name, attr_name
+    return item_type, item_name, attribute
 
 
 def _extract_item_attribute(
