@@ -307,17 +307,15 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
 
 def _extract_item_variable_components(variable: str, items_info: str) -> tuple[str, str]:
     """Extract and validate the item type and name."""
-    last_period_pos = items_info.rfind(".")
+    item_type, separator, item_name = items_info.partition(".")
 
-    if last_period_pos == -1:
-        item_type = items_info.strip()
+    if not separator:
         item_name = ""
-    else:
-        item_type = items_info[:last_period_pos].strip()
-        item_name = items_info[last_period_pos + 1 :].strip()
+
+    item_type = item_type.strip()
+    item_name = item_name.strip()
 
     _validate_item_variable_components(variable, item_type, item_name)
-
     return item_type, item_name
 
 
