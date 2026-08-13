@@ -517,10 +517,7 @@ def _extract_item_attribute(
         return attr_value
 
     except Exception as e:
-        # If it's not a ParsingError, create a new one
-        if not isinstance(e, ParsingError):
-            error = ParsingError(f"Error parsing $items variable: {e!s}", logger)
-        error = e
+        error = e if isinstance(e, ParsingError) else ParsingError(f"Error parsing $items variable: {e!s}", logger)
         return None
 
     finally:

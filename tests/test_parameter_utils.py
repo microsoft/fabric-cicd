@@ -259,6 +259,8 @@ class TestParameterUtilities:
         [
             ("$items.Lakehouse.Example.$id", ("Lakehouse", "Example", "id")),
             ("$items.Lakehouse.Example.id", ("Lakehouse", "Example", "id")),
+            ("$items.Notebook.Sales.Daily.$id", ("Notebook", "Sales.Daily", "id")),
+            ("$items.Notebook.Sales.Daily.id", ("Notebook", "Sales.Daily", "id")),
             (
                 "$items.Lakehouse.Example.$SQLENDPOINT",
                 ("Lakehouse", "Example", "sqlendpoint"),
@@ -267,6 +269,40 @@ class TestParameterUtilities:
     )
     def test_parse_item_variable(self, variable, expected):
         assert parse_item_variable(variable) == expected
+
+    def test_parse_cross_workspace_item_variable_preserves_periods_in_item_name(self):
+        variable = "$workspace.dev.$items.Notebook.Sales.Daily.$id"
+
+        assert parse_cross_workspace_item_variable(variable) == (
+            "dev",
+            "Notebook",
+            "Sales.Daily",
+            "id",
+        )
+
+    @pytest.mark.parametrize(
+        ("variable", "message_key"),
+        [
+            ("$items..$id", "item_type_and_name_missing"),
+            ("$items..Example.$id", "item_type_missing"),
+        ],
+    )
+    def test_parse_item_variable_reports_missing_components(self, variable, message_key):
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS[message_key].format(variable)
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            parse_item_variable(variable)
+
+    def test_parse_cross_workspace_item_variable_reports_invalid_attribute(self):
+        variable = "$workspace.dev.$items.Notebook.Example.$guid"
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_attribute"].format(
+            variable,
+            "$workspace.name.$items.type.name.$attribute",
+            ", ".join(constants.ITEM_ATTR_LOOKUP),
+        )
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            parse_cross_workspace_item_variable(variable)
 
     @pytest.mark.parametrize(
         ("variable", "expected"),
@@ -505,6 +541,25 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.Dataflow.source dataflow.id", get_dataflow_name=True)
         assert result is None
 
+    def test_extract_item_attribute_rejects_missing_deployed_item_type(self, mock_workspace):
+        mock_workspace.workspace_items = {}
+
+        with pytest.raises(ParsingError, match="Item type 'Notebook' is invalid or not found in deployed items"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Example.$id")
+
+    @pytest.mark.parametrize(
+        ("error", "expected_message"),
+        [
+            (RuntimeError("Refresh failed"), "Error parsing $items variable: Refresh failed"),
+            (ParsingError("Refresh parsing failed", logger), "Refresh parsing failed"),
+        ],
+    )
+    def test_extract_item_attribute_handles_refresh_errors(self, mock_workspace, error, expected_message):
+        mock_workspace._refresh_deployed_items.side_effect = error
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Example.$id")
+
     def test_extract_workspace_id_direct(self, mock_workspace):
         """Tests _extract_workspace_id with direct workspace ID variable."""
         # Test with $workspace.id - should return workspace_id directly
@@ -562,6 +617,21 @@ class TestParameterUtilities:
         # Should wrap general exceptions in ParsingError
         with pytest.raises(ParsingError, match=r"Error parsing \$workspace variable"):
             _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
+
+    def test_extract_workspace_id_rejects_unsupported_parsed_variable(self, mock_workspace):
+        variable = "$workspace.invalid"
+        parsed_variable = ParsedDynamicVariable(
+            kind="item",
+            item_type="Notebook",
+            item_name="Example",
+            attribute="id",
+        )
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS["workspace_syntax"].format(
+            variable, "$workspace.name.$items.type.name.$attribute"
+        )
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            _resolve_workspace_id(mock_workspace, variable, parsed_variable)
 
     def test_extract_item_attribute_null_return(self, mock_workspace):
         """Tests _extract_item_attribute cases that return None."""
