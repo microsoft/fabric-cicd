@@ -1,8 +1,0 @@
-kind: added
-body: Add support for removing globally enabled feature flags via `remove_feature_flag` function
-time: 2026-08-06T15:17:53.0016095+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "1097"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1097
