@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Tests for KQL Queryset item processing."""
+"""Tests for KQL Queryset cluster URI replacement."""
 
 import json
 from types import SimpleNamespace
