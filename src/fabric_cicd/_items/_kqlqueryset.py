@@ -57,19 +57,24 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
     for data_source in data_sources:
         if data_source.get("clusterUri") == "":
             # Get the logical ID of the source KQL database
-            database_id = data_source.get("databaseItemId")
-            logger.debug(f"Found empty cluster URI for database with ID '{database_id}'")
+            database_logical_id = data_source.get("databaseItemId")
+            logger.debug(f"Found empty cluster URI for database with ID '{database_logical_id}'")
 
             database_item = next(
-                (item for item in database_items.values() if item.logical_id == database_id),
+                (item for item in database_items.values() if item.logical_id == database_logical_id),
                 None,
             )
-
-            if not database_item or not database_item.guid:
-                msg = f"Cannot find a deployed KQL Database with logical ID '{database_id}'."
+            if not database_item:
+                msg = f"Cannot find a KQL Database source with logical ID '{database_logical_id}' in the repository."
                 raise ParsingError(msg, logger)
 
+            database_item_name = database_item.name
             database_item_guid = database_item.guid
+
+            if not database_item_guid:
+                msg = f"Cannot find the KQL Database source with name '{database_item_name}' as it is not yet deployed."
+                raise ParsingError(msg, logger)
+
             # Get the cluster URI of the KQL database
             kqldatabase_data = fabric_workspace_obj.endpoint.invoke(
                 method="GET",
@@ -81,12 +86,12 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
                 kqldatabase_cluster_uri = None
 
             if not kqldatabase_cluster_uri:
-                msg = f"Cannot find the cluster URI for KQL Database '{database_item.name}'."
+                msg = f"Cannot find the cluster URI for KQL Database '{database_item_name}'."
                 raise ParsingError(msg, logger)
             # Replace the cluster URI value
             data_source["clusterUri"] = kqldatabase_cluster_uri
             logger.debug(
-                f"Updated the cluster URI for data source '{database_item.name}' with '{kqldatabase_cluster_uri}'"
+                f"Updated the cluster URI for data source '{database_item_name}' with '{kqldatabase_cluster_uri}'"
             )
 
     logger.debug("Successfully updated all empty cluster URIs.")
