@@ -31,13 +31,13 @@ jobs:
             HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         steps:
             - name: ⤵️ Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
               with:
                   fetch-depth: 0 # Required to access full commit history
 
             - name: ✔️ Check for changelog changes
               id: changelog_check
-              uses: actions/github-script@v6
+              uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6.4.1
               with:
                   script: |
                       const { execSync } = require('child_process');
@@ -51,7 +51,7 @@ jobs:
 
             - name: 🚧 Setup Node
               if: steps.changelog_check.outputs.exists == 'true'
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
               with:
                   node-version: "20"
 
