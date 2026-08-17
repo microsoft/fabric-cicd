@@ -89,6 +89,214 @@ class Parameter:
         self._set_parameter_file_path()
         self._refresh_parameter_file()
 
+    def _validate_key_value_replacements(
+        self, environment: Optional[str] = None, as_dict: bool = True
+    ) -> tuple[bool, object]:
+        """
+        Dry-run all key_value_replace rules against repository item files.
+
+        Compiles each rule's JSONPath expression, locates Fabric item root
+        directories by their .platform file, and scans JSON/YAML files within
+        those item directories.  Rule-level item_type, item_name, and file_path
+        filters are honored.  Files are not modified.
+
+        Args:
+            environment: Environment used to resolve replace_value entries. Defaults to self.environment.
+            as_dict: If True, return detailed result dictionaries; otherwise return a summary string.
+
+        Returns:
+            A tuple of (all_matched, results). all_matched is True when every rule produced at least one match.
+            If as_dict is False, results is a summary string with match counts and missing replacement-value count.
+            If as_dict is True, results is a list of dictionaries: one per (rule, match) pair, plus one for each rule that produced zero matches.
+
+            Match result keys:
+
+            For a match:
+                rule_index    int      - 0-based index in key_value_replace list
+                find_key      str      - the JSONPath expression
+                item_type     str      - item type of the matched file's parent item
+                item_name     str      - display name of the matched file's parent item
+                file_path     str      - path to the file relative to repository_directory
+                match_path    str      - resolved JSONPath of the matched node
+                current_value any      - value currently in the file
+                new_value     any      - replacement value for the environment (None if absent)
+                found         bool     - True
+
+            No-match result keys:
+                rule_index    int
+                find_key      str
+                item_type_filter  str | list | None
+                item_name_filter  str | list | None
+                new_value     any      - replacement value for the environment (None if absent)
+                found         bool     - False
+                error         str      - "No matches found"
+        """
+        from jsonpath_ng.ext import parse
+
+        from fabric_cicd._common._check_utils import check_valid_json_content, check_valid_yaml_content
+
+        rules = self.environment_parameter.get("key_value_replace", [])
+
+        if environment is None:
+            environment = self.environment
+
+        # Pre-compile each rule's JSONPath expression once
+        compiled_rules = []
+        for idx, rule in enumerate(rules):
+            find_key = rule.get("find_key", "")
+            try:
+                compiled = parse(find_key)
+            except Exception as exc:
+                logger.warning(f"Rule {idx}: could not compile JSONPath '{find_key}': {exc}")
+                compiled = None
+            compiled_rules.append({
+                "rule_index": idx,
+                "find_key": find_key,
+                "compiled": compiled,
+                # rule-level optional filters (may be str or list)
+                "rule_item_type": rule.get("item_type"),
+                "rule_item_name": rule.get("item_name"),
+                "rule_file_path": rule.get("file_path"),
+                "new_value": (rule.get("replace_value") or {}).get(environment),
+                "matches_found": 0,
+            })
+
+        results: list[dict] = []
+
+        # Walk through all files in the repository_directory, looking for JSON/YAML files to apply the rules to
+        # First pass: find all item root directories (those containing the .platform file)
+        item_roots = []
+        for root, _dirs, files in os.walk(self.repository_directory):
+            if ".platform" in files:
+                item_roots.append(Path(root))
+
+        # Second pass: for each item root, walk all its subdirectories for files
+        for item_root in item_roots:
+            # Read item metadata
+            try:
+                meta = json.loads((item_root / ".platform").read_text(encoding="utf-8"))
+                this_item_type = meta["metadata"]["type"]
+                this_item_name = meta["metadata"]["displayName"]
+            except Exception:
+                continue
+
+            # Examine every file in the item directory and subdirectories
+            # Walk the entire item directory tree for JSON/YAML files
+            for root, _dirs, files in os.walk(item_root):
+                for file_name in files:
+                    if file_name == ".platform":
+                        continue
+
+                    file_path_abs = Path(root) / file_name
+                    rel_path = str(file_path_abs.relative_to(self.repository_directory))
+
+                    try:
+                        raw = file_path_abs.read_text(encoding="utf-8")
+                    except Exception:
+                        continue
+
+                    # Determine data format
+                    if check_valid_json_content(raw):
+                        try:
+                            data = json.loads(raw)
+                        except Exception:
+                            continue
+                    elif check_valid_yaml_content(raw):
+                        try:
+                            data = yaml.safe_load(raw)
+                        except Exception:
+                            continue
+                    else:
+                        continue  # not JSON or YAML - skip
+
+                    for cr in compiled_rules:
+                        if cr["compiled"] is None:
+                            continue
+
+                        # Apply rule-level item_type / item_name / file_path filters
+                        if not self._rule_filter_matches(cr, this_item_type, this_item_name, rel_path):
+                            continue
+
+                        matches = cr["compiled"].find(data)
+                        for match in matches:
+                            cr["matches_found"] += 1
+                            results.append({
+                                "rule_index": cr["rule_index"],
+                                "find_key": cr["find_key"],
+                                "item_type": this_item_type,
+                                "item_name": this_item_name,
+                                "file_path": rel_path,
+                                "match_path": str(match.full_path),
+                                "current_value": match.value,
+                                "new_value": cr["new_value"],
+                                "found": True,
+                            })
+
+        # Append a "not found" record for each rule that matched nothing
+        for cr in compiled_rules:
+            if cr["matches_found"] == 0:
+                results.append({
+                    "rule_index": cr["rule_index"],
+                    "find_key": cr["find_key"],
+                    "item_type_filter": cr["rule_item_type"],
+                    "item_name_filter": cr["rule_item_name"],
+                    "new_value": cr["new_value"],
+                    "found": False,
+                    "error": "No matches found",
+                })
+
+        # Determine summary statistics
+        total_rules = len(compiled_rules)
+        rules_without_new_value = sum(1 for cr in compiled_rules if cr["new_value"] is None)
+        rules_without_matches = sum(1 for cr in compiled_rules if cr["matches_found"] == 0)
+        rules_with_matches = total_rules - rules_without_matches
+        all_matched = total_rules == rules_with_matches
+
+        if not as_dict:
+            # Return results as human-readable string e.g., "3/5 rules matched, 2 rules had no matches. For 1 rules, the new value was not defined for environment PPE."
+            return (
+                all_matched,
+                f"{rules_with_matches}/{total_rules} rules matched, {rules_without_matches} rules had no matches. For {rules_without_new_value} rules, the new value was not defined for environment {environment}.",
+            )
+
+        return all_matched, results
+
+    def _rule_filter_matches(
+        self,
+        compiled_rule: dict,
+        item_type: Optional[str],
+        item_name: Optional[str],
+        file_path: Optional[str],
+    ) -> bool:
+        """Return True if the item/file satisfies the rule's optional filters."""
+
+        def _matches_filter(filter_val: object, actual: Optional[str]) -> bool:
+            if filter_val is None:
+                return True
+            if isinstance(filter_val, list):
+                return actual in filter_val
+            return actual == filter_val
+
+        if not _matches_filter(compiled_rule["rule_item_type"], item_type):
+            return False
+        if not _matches_filter(compiled_rule["rule_item_name"], item_name):
+            return False
+
+        rule_fp = compiled_rule["rule_file_path"]
+        if rule_fp is not None:
+            import fnmatch
+
+            file_path_norm = (file_path or "").replace("\\", "/").lstrip("/")
+            patterns = rule_fp if isinstance(rule_fp, list) else [rule_fp]
+            patterns = [p.replace("\\", "/").lstrip("/") for p in patterns]
+            if not any(fnmatch.fnmatch(file_path_norm, pattern) for pattern in patterns):
+                return False
+
+            # if not fnmatch.fnmatch(file_path.replace("\\", "/"), rule_fp.replace("\\", "/")):
+            #     return False
+
+        return True
+
     def _set_parameter_file_path(self) -> None:
         """Set the parameter file path based on the provided path or default name."""
         is_param_path = False

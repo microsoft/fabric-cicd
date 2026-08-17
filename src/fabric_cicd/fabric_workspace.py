@@ -307,6 +307,37 @@ class FabricWorkspace:
 
             return self._workspace_pools_cache
 
+    def validate_parameter_replace(
+        self, environment: Optional[str] = None, as_dict: bool = True
+    ) -> tuple[bool, object]:
+        """
+        Validate all key_value_replace rules against repository item files. Files are not modified.
+
+        Args:
+            environment: Environment used to resolve replace_value entries. Defaults to `self.environment`.
+            as_dict: If True, return detailed result dictionaries; otherwise return a summary string.
+
+        Returns:
+            A tuple of (`all_matched`, `results`). `all_matched` is True when every rule produced at least one match.
+            If `as_dict` is False, `results` is a summary string with match counts and missing replacement-value count.
+            If `as_dict` is True, `results` is a list of dictionaries: one per (rule, match) pair, plus one for each rule that produced zero matches.
+        """
+        from fabric_cicd._parameter._parameter import Parameter
+
+        parameter_obj = Parameter(
+            repository_directory=self.repository_directory,
+            item_type_in_scope=self.item_type_in_scope,
+            environment=self.environment,
+            parameter_file_name=constants.PARAMETER_FILE_NAME,
+            parameter_file_path=self.parameter_file_path,
+        )
+
+        validated_results = parameter_obj._validate_key_value_replacements(environment=environment, as_dict=as_dict)
+        if as_dict == False:
+            return validated_results
+
+        return validated_results
+
     def _refresh_parameter_file(self) -> None:
         """Load parameters if file is present."""
         from fabric_cicd._parameter._parameter import Parameter

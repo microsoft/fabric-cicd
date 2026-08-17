@@ -75,7 +75,7 @@ find_replace:
       file_path: "/ABC Paginated.PaginatedReport/ABC Paginated.rdl"
 
 key_value_replace:
-    - find_key: $.variables[?(@.name=="SQL_Server")].value
+    - find_key: $.variables[?(@.name=="SQL_Server")].value # No Filepath
       replace_value:
         PPE: "contoso-ppe.database.windows.net"
         PROD: "contoso-prod.database.windows.net"
@@ -83,7 +83,7 @@ key_value_replace:
       # Optional fields:
       item_type: "VariableLibrary"
       item_name: "Vars"
-    - find_key: $.variables[?(@.name=="Environment")].value
+    - find_key: $.variables[?(@.name=="Environment")].value # No Filepath
       replace_value:
         PPE: "PPE"
         PROD: "PROD"
@@ -91,14 +91,16 @@ key_value_replace:
       # Optional fields:
       item_type: "VariableLibrary"
       item_name: "Vars"
-    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value
+    - find_key: $.variableOverrides[?(@.name=="SQL_Server")].value # No match found
       replace_value:
+        PPE: "contoso-ppe-override.database.windows.net"
         PROD: "contoso-production-override.database.windows.net"
       file_path: Vars.VariableLibrary/valueSets/PROD.json
       item_type: "VariableLibrary"
       item_name: "Vars"
-    - find_key: $.variableOverrides[?(@.name=="Environment")].value
+    - find_key: $.variableOverrides[?(@.name=="Environment")].value # No Match found
       replace_value:
+        PPE: "PPE_ENV"
         PROD: "PROD_ENV"
       file_path: Vars.VariableLibrary/valueSets/PROD.json
       item_type: "VariableLibrary"
@@ -108,6 +110,10 @@ key_value_replace:
         PPE: false
         PROD: true
       file_path: "**/.schedules"
+    - find_key: $.properties.activities[?(@.type=="TridentNotebook")].name
+      replace_value:
+        PPE: "Run Hello World PPE"
+        PROD: "Run Hello World PROD"
 
 spark_pool:
     # CapacityPool_Large
