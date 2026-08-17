@@ -56,6 +56,10 @@ class Parameter:
             "minimum": set(),
             "maximum": {"connection_id", "semantic_model_name", "default", "models"},
         },
+        "semantic_model_parameter": {
+            "minimum": {"semantic_model_name", "parameter_name", "parameter_value"},
+            "maximum": {"semantic_model_name", "parameter_name", "parameter_value"},
+        },
         "extend": {"minimum": set(), "maximum": set()},
     }
 
@@ -331,6 +335,12 @@ class Parameter:
 
     def _validate_parameter_file(self) -> bool:
         """Validate the parameter file."""
+        # Convert user-friendly semantic model parameters into find_replace entries.
+        is_valid, msg = self._handle_semantic_model_parameter()
+        if not is_valid:
+            logger.error(constants.PARAMETER_MSGS["failed"].format(msg))
+            return False
+
         # Handle gateway_binding deprecation
         if "gateway_binding" in self.environment_parameter or "semantic_model_binding" in self.environment_parameter:
             self._handle_gateway_binding_parameter()
@@ -372,6 +382,85 @@ class Parameter:
         # Return True if all validation steps pass
         logger.info(constants.PARAMETER_MSGS["validation_complete"])
         return True
+
+    def _handle_semantic_model_parameter(self) -> tuple[bool, str]:
+        """Convert semantic_model_parameter entries into find_replace entries."""
+        param_name = "semantic_model_parameter"
+        if param_name not in self.environment_parameter:
+            return True, "parameter not found"
+
+        parameters = self.environment_parameter[param_name]
+        if not isinstance(parameters, list):
+            return False, f"{param_name} must be a list"
+
+        converted_parameters = []
+
+        for parameter in parameters:
+            if not isinstance(parameter, dict):
+                return False, f"Each {param_name} entry must be a dictionary"
+
+            is_valid, keys_msg = self._validate_parameter_keys(param_name, list(parameter))
+            if not is_valid:
+                return False, keys_msg
+
+            semantic_model_name = parameter["semantic_model_name"]
+            parameter_name = parameter["parameter_name"]
+            parameter_value = parameter["parameter_value"]
+
+            for key, value in (
+                ("semantic_model_name", semantic_model_name),
+                ("parameter_name", parameter_name),
+            ):
+                is_valid, type_msg = self._validate_data_type(value, "string", key, param_name)
+                if not is_valid:
+                    return False, type_msg
+                if not value:
+                    return False, constants.PARAMETER_MSGS["missing required value"].format(key, param_name)
+
+            is_valid, type_msg = self._validate_data_type(parameter_value, "dictionary", "parameter_value", param_name)
+            if not is_valid:
+                return False, type_msg
+            if not parameter_value:
+                return False, constants.PARAMETER_MSGS["missing required value"].format("parameter_value", param_name)
+
+            formatted_parameter_value = {}
+            for environment, value in parameter_value.items():
+                if not isinstance(environment, str) or not environment.strip():
+                    return False, f"parameter_value environment keys in {param_name} must be non-empty strings"
+
+                if isinstance(value, str):
+                    if value.startswith("#"):
+                        formatted_parameter_value[environment] = value
+                    else:
+                        escaped = value.replace('"', '""')
+                        formatted_parameter_value[environment] = f'"{escaped}"'
+                elif isinstance(value, bool):
+                    formatted_parameter_value[environment] = str(value).lower()
+                elif isinstance(value, (int, float)):
+                    formatted_parameter_value[environment] = str(value)
+                else:
+                    return False, (
+                        f"parameter_value for environment '{environment}' in {param_name} "
+                        "must be a string, number, or boolean"
+                    )
+
+            converted_parameters.append({
+                "find_value": (
+                    rf"expression {re.escape(parameter_name)}\s*=\s*(.+?)"
+                    r"\s+meta\s+\[IsParameterQuery\s*=\s*true\s*,"
+                ),
+                "replace_value": formatted_parameter_value,
+                "is_regex": "true",
+                "item_name": semantic_model_name,
+                "file_path": "**/expressions.tmdl",
+            })
+
+        find_replace_parameters = self.environment_parameter.setdefault("find_replace", [])
+        if not isinstance(find_replace_parameters, list):
+            return False, "find_replace must be a list"
+        find_replace_parameters.extend(converted_parameters)
+        del self.environment_parameter[param_name]
+        return True, constants.PARAMETER_MSGS["valid parameter"].format(param_name)
 
     def _handle_gateway_binding_parameter(self) -> None:
         """This code will be removed in future releases, after deprecating 'gateway_binding' support."""
