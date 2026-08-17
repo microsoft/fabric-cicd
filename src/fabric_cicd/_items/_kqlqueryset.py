@@ -50,21 +50,31 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
         logger.debug("No data sources found in KQL Queryset.")
         return file_obj.contents
 
-    # Get the KQL Database items from the deployed items
-    database_items = fabric_workspace_obj.deployed_items.get(ItemType.KQL_DATABASE.value, {})
+    # Get the KQL Database items from the repository items
+    database_items = fabric_workspace_obj.repository_items.get(ItemType.KQL_DATABASE.value, {})
 
     # If the cluster URI is empty, replace it with the cluster URI of the KQL database
     for data_source in data_sources:
         if data_source.get("clusterUri") == "":
-            database_item_name = data_source.get("databaseItemName")
-            logger.debug(f"Found empty cluster URI for database '{database_item_name}'")
+            # Get the logical ID of the source KQL database
+            database_logical_id = data_source.get("databaseItemId")
+            logger.debug(f"Found empty cluster URI for KQL database with logical ID '{database_logical_id}'")
 
-            database_item = database_items.get(database_item_name)
+            database_item = next(
+                (item for item in database_items.values() if item.logical_id == database_logical_id),
+                None,
+            )
             if not database_item:
+                msg = f"Cannot find a KQL Database source with logical ID '{database_logical_id}' in the repository."
+                raise ParsingError(msg, logger)
+
+            database_item_name = database_item.name
+            database_item_guid = database_item.guid
+
+            if not database_item_guid:
                 msg = f"Cannot find the KQL Database source with name '{database_item_name}' as it is not yet deployed."
                 raise ParsingError(msg, logger)
 
-            database_item_guid = database_item.guid
             # Get the cluster URI of the KQL database
             kqldatabase_data = fabric_workspace_obj.endpoint.invoke(
                 method="GET",
