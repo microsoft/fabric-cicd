@@ -58,7 +58,7 @@ def replace_cluster_uri(fabric_workspace_obj: FabricWorkspace, file_obj: File) -
         if data_source.get("clusterUri") == "":
             # Get the logical ID of the source KQL database
             database_logical_id = data_source.get("databaseItemId")
-            logger.debug(f"Found empty cluster URI for database with ID '{database_logical_id}'")
+            logger.debug(f"Found empty cluster URI for KQL database with logical ID '{database_logical_id}'")
 
             database_item = next(
                 (item for item in database_items.values() if item.logical_id == database_logical_id),
