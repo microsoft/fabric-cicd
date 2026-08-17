@@ -283,7 +283,16 @@ PARAMETER_FILE_NAME = "parameter.yml"
 PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
 
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
-WORKSPACE_VARIABLES_FIXED = ["$workspace.id", "$workspace.$id", "$workspace.$name", "$workspace.$name_encoded"]
+ITEM_VARIABLE_PREFIX = "$items."
+WORKSPACE_VARIABLE_PREFIX = "$workspace."
+CROSS_WORKSPACE_ITEM_SEPARATOR = ".$items."
+WORKSPACE_VARIABLE_ATTRIBUTES = {
+    "$workspace.id": "id",
+    "$workspace.$id": "id",
+    "$workspace.$name": "name",
+    "$workspace.$name_encoded": "name_encoded",
+}
+WORKSPACE_VARIABLES_FIXED = list(WORKSPACE_VARIABLE_ATTRIBUTES)
 
 # Parameter file validation messages
 INVALID_REPLACE_VALUE_SPARK_POOL = {

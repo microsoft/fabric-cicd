@@ -199,7 +199,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
 def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
     """Parse and validate a dynamic replacement variable without resolving its target."""
     # $items.<type>.<name>.$<attribute>
-    if variable.startswith("$items."):
+    if variable.startswith(constants.ITEM_VARIABLE_PREFIX):
         item_type, item_name, attribute = parse_item_variable(variable)
         return ParsedDynamicVariable(
             kind="item",
@@ -209,24 +209,21 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
         )
 
     # All $workspace-prefixed forms
-    if variable.startswith("$workspace."):
+    if variable.startswith(constants.WORKSPACE_VARIABLE_PREFIX):
         # Fixed current workspace attributes, such as $workspace.$id
-        if variable in constants.WORKSPACE_VARIABLES_FIXED:
-            attribute = {
-                "$workspace.id": "id",
-                "$workspace.$id": "id",
-                "$workspace.$name": "name",
-                "$workspace.$name_encoded": "name_encoded",
-            }[variable]
+        if variable in constants.WORKSPACE_VARIABLE_ATTRIBUTES:
             return ParsedDynamicVariable(
                 kind="workspace",
-                attribute=attribute,
+                attribute=constants.WORKSPACE_VARIABLE_ATTRIBUTES[variable],
             )
 
-        var_string = variable.removeprefix("$workspace.")
+        var_string = variable.removeprefix(constants.WORKSPACE_VARIABLE_PREFIX)
 
         # Parse cross-workspace item variables and validate workspace name exists before the .$items. segment.
-        if "$items." in var_string:
+        if (
+            var_string.startswith(constants.ITEM_VARIABLE_PREFIX)
+            or constants.CROSS_WORKSPACE_ITEM_SEPARATOR in var_string
+        ):
             workspace_name, item_type, item_name, attribute = parse_cross_workspace_item_variable(variable)
             return ParsedDynamicVariable(
                 kind="item",
@@ -270,15 +267,14 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
 def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, str]:
     """Parse a cross-workspace item variable without resolving workspace or item metadata."""
     expected_format = "$workspace.name.$items.type.name.$attribute"
-    separator = ".$items."
 
-    var_string = variable.removeprefix("$workspace.")
+    var_string = variable.removeprefix(constants.WORKSPACE_VARIABLE_PREFIX)
 
     # Validate the workspace name and items part syntax
-    if var_string.startswith("$items."):
+    if var_string.startswith(constants.ITEM_VARIABLE_PREFIX):
         workspace_name = ""
-    elif separator in var_string:
-        workspace_name, items_part = var_string.split(separator, 1)
+    elif constants.CROSS_WORKSPACE_ITEM_SEPARATOR in var_string:
+        workspace_name, items_part = var_string.split(constants.CROSS_WORKSPACE_ITEM_SEPARATOR, 1)
     else:
         msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_syntax"].format(variable, expected_format)
         raise ParsingError(msg, logger)
@@ -297,7 +293,7 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
         raise ParsingError(msg, logger)
 
     items_info, attribute = items_part.rsplit(".$", 1)
-    attribute = _validate_item_variable_attribute(variable, attribute, expected_format)
+    attribute = _validate_and_normalize_item_variable_attribute(variable, attribute, expected_format)
 
     # Extract and validate the item type and name from the items part
     item_type, item_name = _extract_item_variable_components(variable, items_info)
@@ -338,7 +334,7 @@ def _validate_item_variable_components(variable: str, item_type: str, item_name:
         raise ParsingError(msg, logger)
 
 
-def _validate_item_variable_attribute(variable: str, attribute: str, expected_format: str = "") -> str:
+def _validate_and_normalize_item_variable_attribute(variable: str, attribute: str, expected_format: str = "") -> str:
     """Validate and normalize an item variable attribute."""
     attribute_name = attribute.lower()
     if attribute_name in constants.ITEM_ATTR_LOOKUP:
@@ -429,7 +425,7 @@ def _extract_workspace_id(
 
 def parse_item_variable(variable: str) -> tuple[str, str, str]:
     """Parse an item dynamic replacement variable without resolving it against a workspace."""
-    var_string = variable.removeprefix("$items.")
+    var_string = variable.removeprefix(constants.ITEM_VARIABLE_PREFIX)
 
     # Modern syntax: $items.<type>.<name>.$<attribute>
     if ".$" in var_string:
@@ -447,7 +443,7 @@ def parse_item_variable(variable: str) -> tuple[str, str, str]:
         attribute = parts[1][last_period_pos + 1 :].strip()
 
     item_type, item_name = _extract_item_variable_components(variable, items_info)
-    attribute = _validate_item_variable_attribute(variable, attribute)
+    attribute = _validate_and_normalize_item_variable_attribute(variable, attribute)
 
     return item_type, item_name, attribute
 

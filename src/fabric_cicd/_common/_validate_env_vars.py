@@ -19,6 +19,7 @@ def is_env_flag_enabled(env_var: str) -> bool:
 
     return os.environ.get(env_var, "").lower() in VALID_ENABLE_FLAGS
 
+
 # Define a regular expression for valid hostnames
 # Matches: any subdomain of [<word>]api.fabric.microsoft.com or [<word>]api.powerbi.com
 _VALID_HOSTNAME_REGEX = re.compile(r"^([\w-]+\.)*[\w-]*api\.(fabric\.microsoft\.com|powerbi\.com)\Z", re.IGNORECASE)
