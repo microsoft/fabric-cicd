@@ -1,6 +1,0 @@
-kind: fixed
-body: Fix `KeyError` when deploying an Environment without a specified environment (defaults to `N/A`) while a `spark_pool` parameter mapping's `replace_value` does not contain an `N/A` key
-time: 2026-08-18T06:18:00.000000000Z
-custom:
-    Author: copilot
-    Issue: 1096
