@@ -265,7 +265,15 @@ def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
 
 
 def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, str]:
-    """Parse a cross-workspace item variable without resolving workspace or item metadata."""
+    """
+    Parse a cross-workspace item variable without resolving workspace or item metadata.
+
+    Args:
+        variable: The cross-workspace item variable string.
+
+    Returns:
+        A tuple containing the workspace name, item type, item name, and attribute.
+    """
     expected_format = "$workspace.name.$items.type.name.$attribute"
 
     var_string = variable.removeprefix(constants.WORKSPACE_VARIABLE_PREFIX)
@@ -302,7 +310,16 @@ def parse_cross_workspace_item_variable(variable: str) -> tuple[str, str, str, s
 
 
 def _extract_item_variable_components(variable: str, items_info: str) -> tuple[str, str]:
-    """Extract and validate the item type and name."""
+    """
+    Extract and validate the item type and name.
+
+    Args:
+        variable: The item dynamic replacement variable string.
+        items_info: The items part of the variable string.
+
+    Returns:
+        A tuple containing the item type and item name.
+    """
     item_type, separator, item_name = items_info.partition(".")
 
     if not separator:
@@ -424,7 +441,15 @@ def _extract_workspace_id(
 
 
 def parse_item_variable(variable: str) -> tuple[str, str, str]:
-    """Parse an item dynamic replacement variable without resolving it against a workspace."""
+    """
+    Parse an item dynamic replacement variable without resolving it against a workspace.
+
+    Args:
+        variable: The item dynamic replacement variable string.
+
+    Returns:
+        A tuple containing the item type, item name, and attribute.
+    """
     var_string = variable.removeprefix(constants.ITEM_VARIABLE_PREFIX)
 
     # Modern syntax: $items.<type>.<name>.$<attribute>
