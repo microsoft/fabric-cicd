@@ -13,8 +13,11 @@ from typing import ClassVar, Optional
 import yaml
 
 import fabric_cicd.constants as constants
+from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._parameter._utils import (
     is_valid_structure,
+    parse_cross_workspace_item_variable,
+    parse_dynamic_variable,
     process_input_path,
     replace_variables_in_parameter_file,
 )
@@ -89,6 +92,8 @@ class Parameter:
         self._set_parameter_file_path()
         self._refresh_parameter_file()
 
+    # region Parameter File Setup
+
     def _set_parameter_file_path(self) -> None:
         """Set the parameter file path based on the provided path or default name."""
         is_param_path = False
@@ -143,41 +148,9 @@ class Parameter:
             if is_valid:
                 self.environment_parameter = environment_parameter
 
-    def _validate_parameter_file_exists(self) -> bool:
-        """Validate the parameter file exists."""
-        if self.parameter_file_path is None:
-            return False
+    # endregion
 
-        return self.parameter_file_path.is_file()
-
-    def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
-        """Validate loading the parameter file to a dictionary, including any templates."""
-        parameter_dict = {}
-        try:
-            # Load the base parameter file
-            with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
-                yaml_content = yaml_file.read()
-                yaml_content = replace_variables_in_parameter_file(yaml_content)
-
-                # Check for empty YAML content
-                if not yaml_content.strip():
-                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(
-                        constants.PARAMETER_MSGS["empty yaml"]
-                    )
-                    return False, parameter_dict
-
-                # Use custom loader that detects duplicate keys
-                parameter_dict = yaml.load(yaml_content, Loader=_DuplicateKeyLoader) or {}
-                logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
-
-                if parameter_dict.get("extend"):
-                    parameter_dict = self._process_template_parameters(parameter_dict)
-
-                return True, parameter_dict
-
-        except (UnicodeDecodeError, yaml.YAMLError) as e:
-            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
-            return False, parameter_dict
+    # region Template Parameters
 
     def _process_template_parameters(self, base_parameter_dict: dict) -> dict:
         """
@@ -314,6 +287,46 @@ class Parameter:
 
         return result
 
+    # endregion
+
+    # region Parameter File Checks
+
+    def _validate_parameter_file_exists(self) -> bool:
+        """Validate the parameter file exists."""
+        if self.parameter_file_path is None:
+            return False
+
+        return self.parameter_file_path.is_file()
+
+    def _validate_load_parameters_to_dict(self) -> tuple[bool, dict]:
+        """Validate loading the parameter file to a dictionary, including any templates."""
+        parameter_dict = {}
+        try:
+            # Load the base parameter file
+            with Path.open(self.parameter_file_path, encoding="utf-8") as yaml_file:
+                yaml_content = yaml_file.read()
+                yaml_content = replace_variables_in_parameter_file(yaml_content)
+
+                # Check for empty YAML content
+                if not yaml_content.strip():
+                    self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(
+                        constants.PARAMETER_MSGS["empty yaml"]
+                    )
+                    return False, parameter_dict
+
+                # Use custom loader that detects duplicate keys
+                parameter_dict = yaml.load(yaml_content, Loader=_DuplicateKeyLoader) or {}
+                logger.debug(constants.PARAMETER_MSGS["passed"].format("YAML content is valid"))
+
+                if parameter_dict.get("extend"):
+                    parameter_dict = self._process_template_parameters(parameter_dict)
+
+                return True, parameter_dict
+
+        except (UnicodeDecodeError, yaml.YAMLError) as e:
+            self.LOAD_ERROR_MSG = constants.PARAMETER_MSGS["invalid load"].format(e)
+            return False, parameter_dict
+
     def _validate_parameter_load(self) -> tuple[bool, str]:
         """Validate the parameter file load."""
         if self.parameter_file_path is None:
@@ -343,6 +356,7 @@ class Parameter:
             ("spark_pool parameter", lambda: self._validate_parameter("spark_pool")),
             ("key_value_replace parameter", lambda: self._validate_parameter("key_value_replace")),
             ("semantic_model_binding parameter", lambda: self._validate_parameter("semantic_model_binding")),
+            ("dynamic replacement variables", self._validate_dynamic_replacement_variables),
         ]
         for step, validation_func in validation_steps:
             logger.debug(constants.PARAMETER_MSGS["validating"].format(step))
@@ -401,30 +415,6 @@ class Parameter:
             # Remove original gateway_binding after processing
             del self.environment_parameter["gateway_binding"]
             logger.warning(constants.PARAMETER_MSGS["gateway_deprecated"])
-
-    def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
-        """Search for dynamic replacement variables in the parameter file."""
-        dynamic_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
-        dynamic_param_names = {"find_replace", "key_value_replace"}
-
-        for param_name, param_values in self.environment_parameter.items():
-            if param_name not in dynamic_param_names:
-                continue
-            if isinstance(param_values, list):
-                for param_dict in param_values:
-                    # Check find_value for dynamic variables
-                    find_value = param_dict.get("find_value", "")
-                    if isinstance(find_value, str) and dynamic_var_pattern.search(find_value):
-                        return True
-
-                    # Check replace_value for dynamic variables
-                    replace_value = param_dict.get("replace_value")
-                    if isinstance(replace_value, dict):
-                        for env_value in replace_value.values():
-                            if isinstance(env_value, str) and dynamic_var_pattern.search(env_value):
-                                return True
-
-        return False
 
     def _validate_parameter_structure(self) -> tuple[bool, str]:
         """Validate the parameter file structure."""
@@ -759,19 +749,7 @@ class Parameter:
                 return False, msg
 
         if param_name == "find_replace":
-            # Reject $items.* in find_value — resolves to target env values that can't exist in source files
             find_value = param_dict.get("find_value", "")
-            if find_value.startswith("$items."):
-                return False, constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value)
-
-            # Warn on cross-workspace item references — allowed but depend on runtime state
-            if find_value.startswith("$workspace."):
-                var_string = find_value.removeprefix("$workspace.")
-                if ".$items." in var_string:
-                    workspace_name = var_string.split(".$items.", 1)[0].strip()
-                    logger.warning(
-                        constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, workspace_name)
-                    )
 
             # Validate is_regex type if present
             if param_dict.get("is_regex") is not None:
@@ -779,7 +757,7 @@ class Parameter:
                 if not is_valid:
                     return False, msg
 
-            # Reject combining dynamic variables with is_regex — these are separate features
+            # Reject combining dynamic replacement variables with is_regex — these are separate features
             # Only check for $workspace. prefix (not bare $) to avoid flagging legitimate regex anchors
             is_regex_val = param_dict.get("is_regex", "")
             is_regex = isinstance(is_regex_val, str) and is_regex_val.lower() == "true"
@@ -1066,6 +1044,104 @@ class Parameter:
 
         return True, "Valid file path"
 
+    # endregion
+
+    # region Dynamic Var Checks
+
+    def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
+        """Search for dynamic replacement variables in the parameter file."""
+        dynamic_replacement_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
+        dynamic_param_names = {"find_replace", "key_value_replace"}
+
+        for param_name, param_values in self.environment_parameter.items():
+            if param_name not in dynamic_param_names:
+                continue
+            if isinstance(param_values, list):
+                for param_dict in param_values:
+                    # Check find_value for dynamic replacement variables
+                    find_value = param_dict.get("find_value", "")
+                    if isinstance(find_value, str) and dynamic_replacement_var_pattern.search(find_value):
+                        return True
+
+                    # Check replace_value for dynamic replacement variables
+                    replace_value = param_dict.get("replace_value")
+                    if isinstance(replace_value, dict):
+                        for env_value in replace_value.values():
+                            if isinstance(env_value, str) and dynamic_replacement_var_pattern.search(env_value):
+                                return True
+
+        return False
+
+    def _validate_dynamic_replacement_variables(self) -> tuple[bool, str]:
+        """Validate every dynamic replacement variable and report all syntax errors with their locations."""
+        errors = []
+
+        # Validate dynamic replacement variables in find_replace and key_value_replace parameters
+        for param_name in ("find_replace", "key_value_replace"):
+            param_values = self.environment_parameter.get(param_name, [])
+            if not isinstance(param_values, list):
+                continue
+
+            for index, param_dict in enumerate(param_values, start=1):
+                if not isinstance(param_dict, dict):
+                    continue
+
+                # Validate dynamic replacement variables in the find_value of find_replace
+                if param_name == "find_replace":
+                    find_value = param_dict.get("find_value")
+                    # Dynamic items variables ($items.type.name.$attribute) are not supported in find_value
+                    if isinstance(find_value, str) and find_value.startswith("$items."):
+                        errors.append(
+                            f"{param_name}[{index}].find_value: "
+                            f"{constants.PARAMETER_MSGS['unsupported_find_value_variable'].format(find_value)}"
+                        )
+                    # Dynamic cross-workspace variables are supported, but throw a warning to ensure items exist prior to deployment
+                    elif isinstance(find_value, str) and find_value.startswith("$workspace."):
+                        is_valid, msg = self._validate_dynamic_variable(find_value)
+                        if not is_valid:
+                            errors.append(f"{param_name}[{index}].find_value: {msg}")
+                        elif ".$items." in find_value:
+                            workspace_name, _, _, _ = parse_cross_workspace_item_variable(find_value)
+                            logger.warning(
+                                constants.PARAMETER_MSGS["find_value_variable_warning"].format(
+                                    find_value, workspace_name
+                                )
+                            )
+
+                replace_value = param_dict.get("replace_value")
+                if not isinstance(replace_value, dict):
+                    continue
+
+                # Validate dynamic replacement variables in the replace_value
+                for environment, value in replace_value.items():
+                    if not isinstance(value, str) or not value.startswith("$"):
+                        continue
+                    is_valid, msg = self._validate_dynamic_variable(value)
+                    if not is_valid:
+                        errors.append(f"{param_name}[{index}].replace_value.{environment}: {msg}")
+
+        if errors:
+            return False, "Invalid dynamic replacement variables:\n- " + "\n- ".join(errors)
+
+        return True, "Valid dynamic replacement variables"
+
+    @staticmethod
+    def _validate_dynamic_variable(value: object) -> tuple[bool, str]:
+        """Validate a replacement dynamic replacement variable without resolving its target."""
+        if not isinstance(value, str) or not value.startswith("$"):
+            return True, "No dynamic replacement variable present"
+
+        try:
+            parsed_variable = parse_dynamic_variable(value)
+            return True, f"Valid dynamic {parsed_variable.kind} variable"
+        except ParsingError as error:
+            return False, str(error)
+
+    # endregion
+
+
+# region Duplicate Key Check
+
 
 class _DuplicateKeyLoader(yaml.SafeLoader):
     """Custom YAML loader that raises an error on duplicate keys."""
@@ -1127,3 +1203,5 @@ def _check_duplicate_keys_constructor(loader: _DuplicateKeyLoader, node: yaml.Ma
 
 
 _DuplicateKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _check_duplicate_keys_constructor)
+
+# endregion

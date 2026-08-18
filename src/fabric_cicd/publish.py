@@ -227,7 +227,7 @@ def publish_all_items(
 
             if fabric_workspace_obj.contains_param_vars:
                 reasons.append(
-                    "parameter file contains dynamic variables ($workspace/$items) requiring runtime resolution"
+                    "parameter file contains dynamic replacement variables ($workspace/$items) requiring runtime resolution"
                 )
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
 
