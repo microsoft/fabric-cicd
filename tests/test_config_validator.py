@@ -1030,6 +1030,44 @@ class TestConfigValidator:
 
         assert self.validator.errors == []
 
+    def test_environment_exists_no_environment_with_parameter_string(self):
+        """Test _validate_environment_exists errors when N/A environment but 'parameter' field (string) is present."""
+        self.validator.config = {
+            "core": {
+                "workspace_id": "single-id",
+                "repository_directory": "/path/to/repo",
+                "parameter": "parameter.yml",
+            }
+        }
+        self.validator.environment = "N/A"
+
+        self.validator._validate_environment_exists()
+
+        assert len(self.validator.errors) == 1
+        assert (
+            "Configuration contains a 'core.parameter' file but no environment was provided" in self.validator.errors[0]
+        )
+
+    def test_environment_exists_no_environment_with_parameter_mapping(self):
+        """Test _validate_environment_exists errors when N/A environment but 'parameter' is an environment mapping."""
+        self.validator.config = {
+            "core": {
+                "workspace_id": "single-id",
+                "repository_directory": "/path/to/repo",
+                "parameter": {"dev": "dev_parameter.yml", "prod": "prod_parameter.yml"},
+            }
+        }
+        self.validator.environment = "N/A"
+
+        self.validator._validate_environment_exists()
+
+        # Both the environment-mapping check and the parameter-specific check apply
+        assert len(self.validator.errors) == 2
+        assert any(
+            "Configuration contains a 'core.parameter' file but no environment was provided" in error
+            for error in self.validator.errors
+        )
+
     # Config Override Tests
     @pytest.mark.parametrize(
         ("section", "value", "expected_result", "expected_error_msg"),

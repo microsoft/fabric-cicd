@@ -430,6 +430,7 @@ CONFIG_VALIDATION_MSGS = {
     # Environment validation
     "environment": {
         "no_env_with_mappings": "Configuration contains environment mappings but no environment was provided. Please specify an environment or remove environment mappings.",
+        "parameter_requires_env": "Configuration contains a 'core.parameter' file but no environment was provided. Parameterization requires a target environment; please specify an environment or remove the 'parameter' field.",
         "env_not_found": "Environment '{}' not found in '{}' mappings. Available: {}",
         "empty_mapping": "'{}' environment mapping cannot be empty",
         "invalid_env_key": "Environment key in '{}' must be a non-empty string, got: {}",

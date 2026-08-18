@@ -347,6 +347,13 @@ class ConfigValidator:
                 if field_name != "constants"
             ):
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["no_env_with_mappings"])
+
+            # Parameterization (e.g. spark_pool, find_replace) inherently depends on a target
+            # environment, so requiring a "parameter" file without an environment is unsafe,
+            # even when the field itself is not an environment mapping.
+            core = self.config.get("core", {})
+            if core.get("parameter"):
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["parameter_requires_env"])
             return
 
         # Check each field for target environment presence
