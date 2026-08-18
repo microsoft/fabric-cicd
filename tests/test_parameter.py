@@ -2731,9 +2731,11 @@ def test_validate_dynamic_replacement_variables_does_not_warn_for_invalid_cross_
     }
 
     with caplog.at_level(logging.WARNING):
-        ok, _msg = empty_parameter._validate_dynamic_replacement_variables()
+        ok, msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is False
+    assert "find_replace[1].find_value" in msg
+    assert "Invalid or missing attribute" in msg
     assert constants.PARAMETER_MSGS["find_value_variable_warning"].split("{")[0] not in caplog.text
 
 

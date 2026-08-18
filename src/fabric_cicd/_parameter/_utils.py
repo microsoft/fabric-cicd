@@ -197,7 +197,15 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
 
 
 def parse_dynamic_variable(variable: str) -> ParsedDynamicVariable:
-    """Parse and validate a dynamic replacement variable without resolving its target."""
+    """
+    Parse and validate a dynamic replacement variable without resolving its target.
+
+    Args:
+        variable: The dynamic replacement variable string.
+
+    Returns:
+        A ParsedDynamicVariable object representing the parsed variable.
+    """
     # $items.<type>.<name>.$<attribute>
     if variable.startswith(constants.ITEM_VARIABLE_PREFIX):
         item_type, item_name, attribute = parse_item_variable(variable)
