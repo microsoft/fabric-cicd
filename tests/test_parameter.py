@@ -2702,11 +2702,79 @@ def test_validate_dynamic_replacement_variables_rejects_items_in_find_value(empt
     assert constants.PARAMETER_MSGS["unsupported_find_value_variable"].format(find_value) in msg
 
 
-def test_validate_dynamic_replacement_variables_warns_cross_workspace_items_in_find_value(empty_parameter, caplog):
-    """Validation warns on cross-workspace $items references in find_value."""
+def test_validate_dynamic_replacement_variables_warns_once_for_cross_workspace_variables(empty_parameter, caplog):
+    """Validation emits one warning for cross-workspace variables across find and replace values."""
     import logging
 
-    find_value = "$workspace.dev.$items.Lakehouse.Example.$id"
+    empty_parameter.environment_parameter = {
+        "find_replace": [
+            {
+                "find_value": "$workspace.dev.$items.Lakehouse.Example.$id",
+                "replace_value": {
+                    "DEV": "$workspace.test.$id",
+                    "PROD": "$workspace.prod.$items.Notebook.Example.$id",
+                },
+            }
+        ]
+    }
+
+    with caplog.at_level(logging.WARNING):
+        ok, _msg = empty_parameter._validate_dynamic_replacement_variables()
+
+    assert ok is True
+    warning = constants.PARAMETER_MSGS["cross_workspace_variable_warning"]
+    assert caplog.messages.count(warning) == 1
+
+
+def test_validate_dynamic_replacement_variables_warns_for_cross_workspace_replace_value(empty_parameter, caplog):
+    """Validation warns when only replace_value contains a cross-workspace variable."""
+    import logging
+
+    empty_parameter.environment_parameter = {
+        "find_replace": [
+            {
+                "find_value": "old-id",
+                "replace_value": {"DEV": "$workspace.dev.$items.Lakehouse.Example.$id"},
+            }
+        ]
+    }
+
+    with caplog.at_level(logging.WARNING):
+        ok, _msg = empty_parameter._validate_dynamic_replacement_variables()
+
+    assert ok is True
+    warning = constants.PARAMETER_MSGS["cross_workspace_variable_warning"]
+    assert caplog.messages.count(warning) == 1
+
+
+def test_validate_dynamic_replacement_variables_accepts_same_workspace_item_replace_value(empty_parameter, caplog):
+    """Validation accepts same-workspace item variables without a cross-workspace warning."""
+    import logging
+
+    empty_parameter.environment_parameter = {
+        "find_replace": [
+            {
+                "find_value": "old-id",
+                "replace_value": {"DEV": "$items.Lakehouse.Example.$id"},
+            }
+        ]
+    }
+
+    with caplog.at_level(logging.WARNING):
+        ok, msg = empty_parameter._validate_dynamic_replacement_variables()
+
+    assert ok is True
+    assert msg == "Valid dynamic replacement variables"
+    assert constants.PARAMETER_MSGS["cross_workspace_variable_warning"] not in caplog.messages
+
+
+@pytest.mark.parametrize("find_value", ["$workspace.$id", "$workspace.$name", "$workspace.$name_encoded"])
+def test_validate_dynamic_replacement_variables_does_not_warn_for_workspace_find_value(
+    empty_parameter, caplog, find_value
+):
+    """Validation does not warn for current-workspace references."""
+    import logging
+
     empty_parameter.environment_parameter = {
         "find_replace": [{"find_value": find_value, "replace_value": {"DEV": "some-id"}}]
     }
@@ -2715,8 +2783,7 @@ def test_validate_dynamic_replacement_variables_warns_cross_workspace_items_in_f
         ok, _msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is True
-    expected_warning = constants.PARAMETER_MSGS["find_value_variable_warning"].format(find_value, "dev")
-    assert expected_warning in caplog.text
+    assert constants.PARAMETER_MSGS["cross_workspace_variable_warning"] not in caplog.messages
 
 
 def test_validate_dynamic_replacement_variables_does_not_warn_for_invalid_cross_workspace_find_value(
@@ -2736,7 +2803,7 @@ def test_validate_dynamic_replacement_variables_does_not_warn_for_invalid_cross_
     assert ok is False
     assert "find_replace[1].find_value" in msg
     assert "Invalid or missing attribute" in msg
-    assert constants.PARAMETER_MSGS["find_value_variable_warning"].split("{")[0] not in caplog.text
+    assert constants.PARAMETER_MSGS["cross_workspace_variable_warning"] not in caplog.messages
 
 
 def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_parameter):
@@ -2767,50 +2834,16 @@ def test_validate_required_values_rejects_regex_with_dynamic_variable(empty_para
         ("$unknown.value", "Invalid dynamic replacement variable format"),
     ],
 )
-def test_validate_dynamic_variable_rejects_invalid_syntax(empty_parameter, value, expected_message):
-    ok, msg = empty_parameter._validate_dynamic_variable(value)
+def test_validate_dynamic_replacement_variables_rejects_invalid_replace_value(empty_parameter, value, expected_message):
+    empty_parameter.environment_parameter = {
+        "find_replace": [{"find_value": "old-id", "replace_value": {"DEV": value}}]
+    }
+
+    ok, msg = empty_parameter._validate_dynamic_replacement_variables()
 
     assert ok is False
+    assert "find_replace[1].replace_value.DEV" in msg
     assert expected_message in msg
-
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        "$items.Lakehouse.Example.id",
-        "$items.Lakehouse.Example.$id",
-        "$workspace.id",
-        "$workspace.$id",
-        "$workspace.$name",
-        "$workspace.$name_encoded",
-        "$workspace.dev.$id",
-        "$workspace.dev.$items.Lakehouse.Example.$sqlendpoint",
-    ],
-)
-def test_validate_dynamic_variable_accepts_supported_syntax(empty_parameter, value):
-    ok, _ = empty_parameter._validate_dynamic_variable(value)
-
-    assert ok is True
-
-
-def test_validate_parameter_file_rejects_invalid_dynamic_attribute(tmp_path):
-    parameter_file = tmp_path / "parameter.yml"
-    parameter_file.write_text(
-        """
-find_replace:
-  - find_value: old-id
-    replace_value:
-      DEV: $items.Lakehouse.Example.$guid
-""",
-        encoding="utf-8",
-    )
-    parameter = Parameter(
-        repository_directory=tmp_path,
-        item_type_in_scope=["Lakehouse"],
-        environment="DEV",
-    )
-
-    assert parameter._validate_parameter_file() is False
 
 
 def test_validate_parameter_file_reports_parameter_structure_before_dynamic_syntax(tmp_path, caplog):

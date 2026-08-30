@@ -16,7 +16,6 @@ import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._parameter._utils import (
     is_valid_structure,
-    parse_cross_workspace_item_variable,
     parse_dynamic_variable,
     process_input_path,
     replace_variables_in_parameter_file,
@@ -1075,6 +1074,7 @@ class Parameter:
     def _validate_dynamic_replacement_variables(self) -> tuple[bool, str]:
         """Validate every dynamic replacement variable and report all syntax errors with their locations."""
         errors = []
+        has_cross_workspace_variables = False
 
         # Validate dynamic replacement variables in find_replace and key_value_replace parameters
         for param_name in ("find_replace", "key_value_replace"):
@@ -1090,23 +1090,20 @@ class Parameter:
                 if param_name == "find_replace":
                     find_value = param_dict.get("find_value")
                     # Dynamic items variables ($items.type.name.$attribute) are not supported in find_value
-                    if isinstance(find_value, str) and find_value.startswith("$items."):
+                    if isinstance(find_value, str) and find_value.startswith(constants.ITEM_VARIABLE_PREFIX):
                         errors.append(
                             f"{param_name}[{index}].find_value: "
                             f"{constants.PARAMETER_MSGS['unsupported_find_value_variable'].format(find_value)}"
                         )
                     # Dynamic cross-workspace variables are supported, but throw a warning to ensure items exist prior to deployment
-                    elif isinstance(find_value, str) and find_value.startswith("$workspace."):
-                        is_valid, msg = self._validate_dynamic_variable(find_value)
-                        if not is_valid:
-                            errors.append(f"{param_name}[{index}].find_value: {msg}")
-                        elif ".$items." in find_value:
-                            workspace_name, _, _, _ = parse_cross_workspace_item_variable(find_value)
-                            logger.warning(
-                                constants.PARAMETER_MSGS["find_value_variable_warning"].format(
-                                    find_value, workspace_name
-                                )
-                            )
+                    elif isinstance(find_value, str) and find_value.startswith(constants.WORKSPACE_VARIABLE_PREFIX):
+                        try:
+                            parsed_variable = parse_dynamic_variable(find_value)
+                        except ParsingError as error:
+                            errors.append(f"{param_name}[{index}].find_value: {error}")
+                        else:
+                            if parsed_variable.workspace_name:
+                                has_cross_workspace_variables = True
 
                 replace_value = param_dict.get("replace_value")
                 if not isinstance(replace_value, dict):
@@ -1116,26 +1113,21 @@ class Parameter:
                 for environment, value in replace_value.items():
                     if not isinstance(value, str) or not value.startswith("$"):
                         continue
-                    is_valid, msg = self._validate_dynamic_variable(value)
-                    if not is_valid:
-                        errors.append(f"{param_name}[{index}].replace_value.{environment}: {msg}")
+                    try:
+                        parsed_variable = parse_dynamic_variable(value)
+                    except ParsingError as error:
+                        errors.append(f"{param_name}[{index}].replace_value.{environment}: {error}")
+                    else:
+                        if parsed_variable.workspace_name:
+                            has_cross_workspace_variables = True
+
+        if has_cross_workspace_variables:
+            logger.warning(constants.PARAMETER_MSGS["cross_workspace_variable_warning"])
 
         if errors:
             return False, "Invalid dynamic replacement variables:\n- " + "\n- ".join(errors)
 
         return True, "Valid dynamic replacement variables"
-
-    @staticmethod
-    def _validate_dynamic_variable(value: object) -> tuple[bool, str]:
-        """Validate a replacement dynamic replacement variable without resolving its target."""
-        if not isinstance(value, str) or not value.startswith("$"):
-            return True, "No dynamic replacement variable present"
-
-        try:
-            parsed_variable = parse_dynamic_variable(value)
-            return True, f"Valid dynamic {parsed_variable.kind} variable"
-        except ParsingError as error:
-            return False, str(error)
 
     # endregion
 
