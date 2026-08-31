@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix intermittent failures in Paginated Report deployment by publishing reports serially
+time: 2026-08-31T09:46:36.4025327+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1065"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1065
