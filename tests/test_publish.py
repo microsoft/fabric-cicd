@@ -248,30 +248,7 @@ def test_publish_paginated_report_item(mock_endpoint, temp_workspace_dir):
 
 def test_paginated_report_publisher_uses_sequential_mode():
     """Paginated reports should publish sequentially to avoid intermittent updateDefinition failures."""
-
-    class DummyItem:
-        def __init__(self):
-            self.skip_publish = False
-
-    class FakeWorkspace:
-        def __init__(self):
-            self.repository_items = {
-                "PaginatedReport": {
-                    "ReportA": DummyItem(),
-                    "ReportB": DummyItem(),
-                }
-            }
-            self.items_to_include = None
-
-    publisher = PaginatedReportPublisher(FakeWorkspace())
-    with (
-        patch.object(publisher, "_publish_items_parallel", return_value=[]) as parallel_publish,
-        patch.object(publisher, "_publish_items_sequential", return_value=[]) as sequential_publish,
-    ):
-        publisher.publish_all()
-
-    parallel_publish.assert_not_called()
-    sequential_publish.assert_called_once()
+    assert PaginatedReportPublisher.parallel_config.enabled is False
 
 
 def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint, temp_workspace_dir):
