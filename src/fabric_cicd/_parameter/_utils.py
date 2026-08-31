@@ -406,6 +406,11 @@ def _extract_workspace_id(
                 name = workspace_obj._resolve_workspace_name()
                 return urllib.parse.quote(name, safe="")
 
+        # Resolve cross-workspace ID from workspace name
+        if parsed_variable.kind == "workspace" and parsed_variable.workspace_name is not None:
+            logger.debug(f"Extracted workspace name: {parsed_variable.workspace_name}")
+            return workspace_obj._resolve_workspace_id(parsed_variable.workspace_name)
+
         # Resolve cross-workspace item attributes
         if parsed_variable.kind == "item" and parsed_variable.workspace_name is not None:
             logger.debug(f"Extracted workspace name: {parsed_variable.workspace_name}")
@@ -427,11 +432,6 @@ def _extract_workspace_id(
             )
             logger.debug(f"Found item {parsed_variable.attribute}: {attribute_value}")
             return attribute_value
-
-        # Resolve cross-workspace ID from workspace name
-        if parsed_variable.kind == "workspace" and parsed_variable.workspace_name is not None:
-            logger.debug(f"Extracted workspace name: {parsed_variable.workspace_name}")
-            return workspace_obj._resolve_workspace_id(parsed_variable.workspace_name)
 
         msg = constants.DYNAMIC_VARIABLE_MSGS["workspace_syntax"].format(
             replace_value, "$workspace.name.$items.type.name.$attribute"
