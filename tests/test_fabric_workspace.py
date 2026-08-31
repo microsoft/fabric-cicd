@@ -1584,16 +1584,18 @@ def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace
 
 
 def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, valid_workspace_id):
-    """When find_value contains dynamic variables, _refresh_deployed_items collects extra attributes."""
-    # Create a parameter file with dynamic variable in find_value
+    """When find_value contains dynamic replacement variables, _refresh_deployed_items collects extra attributes."""
+    # Create a parameter file with dynamic replacement variable in find_value
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
-        """
-find_replace:
-  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
-    replace_value:
-      PPE: "replacement-id"
-""",
+        yaml.safe_dump({
+            "find_replace": [
+                {
+                    "find_value": "$workspace.source_ws.$items.Lakehouse.MyLakehouse.$id",
+                    "replace_value": {"PPE": "replacement-id"},
+                }
+            ]
+        }),
         encoding="utf-8",
     )
 
@@ -1672,12 +1674,14 @@ def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir
 
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
-        """
-find_replace:
-  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
-    replace_value:
-      PPE: "replacement-id"
-""",
+        yaml.safe_dump({
+            "find_replace": [
+                {
+                    "find_value": "$workspace.source_ws.$items.Lakehouse.MyLakehouse.$id",
+                    "replace_value": {"PPE": "replacement-id"},
+                }
+            ]
+        }),
         encoding="utf-8",
     )
 
