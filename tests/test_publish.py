@@ -17,6 +17,7 @@ import fabric_cicd.publish as publish
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._items._notebook import NotebookPublisher
+from fabric_cicd._items._paginatedreport import PaginatedReportPublisher
 from fabric_cicd.constants import API_FORMAT_MAPPING, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -243,6 +244,11 @@ def test_publish_paginated_report_item(mock_endpoint, temp_workspace_dir):
         assert "PaginatedReport" in workspace.repository_items
         mock_paginated_report_cls.assert_called_once_with(workspace)
         mock_paginated_report_instance.publish_all.assert_called_once()
+
+
+def test_paginated_report_publisher_uses_sequential_mode():
+    """Paginated reports should publish sequentially to avoid intermittent updateDefinition failures."""
+    assert PaginatedReportPublisher.parallel_config.enabled is False
 
 
 def test_default_none_item_type_in_scope_includes_all_types(mock_endpoint, temp_workspace_dir):
