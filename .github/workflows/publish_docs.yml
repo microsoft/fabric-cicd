@@ -17,13 +17,13 @@ jobs:
         steps:
             - name: Generate GitHub App Token
               id: app-token
-              uses: actions/create-github-app-token@v1
+              uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
               with:
                   app-id: ${{ secrets.APP_ID }}
                   private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   fetch-depth: 0
                   token: ${{ steps.app-token.outputs.token }}
@@ -42,7 +42,7 @@ jobs:
                   echo "version_number=$CONSTANTS_VERSION" >> $GITHUB_OUTPUT
 
             - name: Install Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
               with:
                   python-version: "3.9"
 

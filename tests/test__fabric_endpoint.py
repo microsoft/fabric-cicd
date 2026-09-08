@@ -10,7 +10,14 @@ from azure.core.exceptions import ClientAuthenticationError
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
-from fabric_cicd._common._fabric_endpoint import FabricEndpoint, _format_invoke_log, _handle_response, handle_retry
+from fabric_cicd._common._fabric_endpoint import (
+    _USER_AGENT,
+    FabricEndpoint,
+    _build_user_agent,
+    _format_invoke_log,
+    _handle_response,
+    handle_retry,
+)
 
 
 class DummyLogger:
@@ -304,6 +311,20 @@ def test_invoke_timeout_exceeds_max_duration(setup_mocks, monkeypatch):
         endpoint.invoke("GET", "http://example.com", max_duration=0)
 
 
+def test_invoke_respects_max_duration(setup_mocks, monkeypatch):
+    """Test that invoke raises InvokeError when max_duration is exceeded."""
+    _, mock_requests = setup_mocks
+    mock_requests.side_effect = requests.exceptions.Timeout("Request timed out")
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    endpoint = FabricEndpoint(token_credential=mock_token_credential)
+
+    with pytest.raises(InvokeError):
+        endpoint.invoke("GET", "http://example.com", max_duration=0)
+
+
 def test_invoke_calls_http_tracer(setup_mocks):
     """Test that invoke calls http_tracer capture methods and save."""
     _, mock_requests = setup_mocks
@@ -332,6 +353,98 @@ def test_get_token(setup_mocks):
     assert endpoint._get_token() == "test_token"  # Second call uses cache
     # Only called once at init — subsequent calls return cached
     mock_token_credential.get_token.assert_called_once_with("https://api.fabric.microsoft.com/.default")
+
+
+_VALID_HOST_APP = "ms-fabric-cli/1.6.1"
+_VALID_HOST_APP_COMPOSED = f"{_VALID_HOST_APP} (deploy; {_USER_AGENT})"
+
+
+@pytest.mark.parametrize(
+    ("host_app", "expected"),
+    [
+        (None, _USER_AGENT),
+        ("", _USER_AGENT),
+        ("   ", _USER_AGENT),
+        (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
+        (f"  {_VALID_HOST_APP}  ", _VALID_HOST_APP_COMPOSED),
+        ("ms-fabric-cli/1.0.0-beta", f"ms-fabric-cli/1.0.0-beta (deploy; {_USER_AGENT})"),
+        ("ms-fabric-cli/1.0.0+build.123", f"ms-fabric-cli/1.0.0+build.123 (deploy; {_USER_AGENT})"),
+        ("ms-fabric-cli", _USER_AGENT),
+        ("ms-fabric-cli/1.6", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1 (deploy; Linux/6.6; Python/3.12)", _USER_AGENT),
+        ("malicious-app/9.9.9", _USER_AGENT),
+        ("not-a-host-app", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1\rInjected: 1", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1\nInjected: 1", _USER_AGENT),
+        ("ms-fabric-cli/1.6.1\r\nX-Injected: 1", _USER_AGENT),
+    ],
+    ids=[
+        "none",
+        "empty",
+        "whitespace",
+        "valid_host_app",
+        "valid_surrounding_whitespace",
+        "valid_prerelease",
+        "valid_build_metadata",
+        "missing_version_rejected",
+        "incomplete_semver_rejected",
+        "full_user_agent_rejected",
+        "spoofed_identity_rejected",
+        "junk_rejected",
+        "cr_injection_rejected",
+        "lf_injection_rejected",
+        "trailing_crlf_injection_rejected",
+    ],
+)
+def test_build_user_agent(host_app, expected):
+    """Test a trusted host-app is appended as a host-app suffix, else the default is used."""
+    assert _build_user_agent(host_app) == expected
+
+
+@pytest.mark.parametrize(
+    ("host_app", "expected_user_agent"),
+    [
+        (None, _USER_AGENT),
+        ("", _USER_AGENT),
+        ("   ", _USER_AGENT),
+        (_VALID_HOST_APP, _VALID_HOST_APP_COMPOSED),
+        ("bogus-app/1.0.0", _USER_AGENT),
+    ],
+    ids=["none", "empty", "whitespace", "valid_host_app", "untrusted_ignored"],
+)
+def test_invoke_sets_user_agent_header(setup_mocks, host_app, expected_user_agent):
+    """Test invoke sends the composed host-app user-agent when trusted, else the default."""
+    _, mock_requests = setup_mocks
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    endpoint = FabricEndpoint(token_credential=mock_token_credential, host_app=host_app)
+    endpoint.invoke("GET", "http://example.com")
+
+    sent_headers = mock_requests.call_args.kwargs["headers"]
+    assert sent_headers["User-Agent"] == expected_user_agent
+
+
+def test_build_user_agent_ignores_untrusted_value(setup_mocks):
+    """Test an untrusted (non-allowlisted) host-app is ignored and never written to the log."""
+    dl, _ = setup_mocks
+
+    result = _build_user_agent("spoofed-app/1.0.0")
+
+    assert result == _USER_AGENT
+    assert all("spoofed-app/1.0.0" not in message for message in dl.messages)
+
+
+def test_build_user_agent_rejects_crlf(setup_mocks):
+    """Test a CR/LF-bearing host-app is rejected and never written to the log."""
+    dl, _ = setup_mocks
+
+    result = _build_user_agent("ms-fabric-cli/1.6.1\r\nX-Injected: 1")
+
+    assert result == _USER_AGENT
+    assert all("\r" not in message and "\n" not in message for message in dl.messages)
 
 
 @pytest.mark.parametrize(

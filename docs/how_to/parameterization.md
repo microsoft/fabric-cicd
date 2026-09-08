@@ -230,15 +230,16 @@ The `find_replace` and `key_value_replace` parameters support fabric-cicd define
 - **`find_value`** (`find_replace`): 
     - Supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`)
     - Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched
-    - **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both
+    - **Cannot be combined with `is_regex: "true"`** — use either a dynamic replacement variable OR a regex pattern, not both
 - **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
 
 !!! note "Bulk Publish Limitation"
 
-    Dynamic replacement variables (`$workspace`, `$items`) are not supported when using [bulk publish](optional_feature.md#bulk-publish) mode. When dynamic variables are detected in the parameter file, the deployment automatically falls back to standard publishing. To use bulk publish, replace dynamic variables with static values or use logical IDs directly.
+    Dynamic replacement variables (`$workspace`, `$items`) are not supported when using [bulk publish](optional_feature.md#bulk-publish) mode. When dynamic replacement variables are detected in the parameter file, the deployment automatically falls back to standard publishing. To use bulk publish, replace dynamic replacement variables with static values or use logical IDs directly.
 
 Additional notes:
 
+- **Workspace and item dynamic replacement variable syntax is validated before deployment.** Validation checks the variable format and verifies required components, including workspace names, item types, item names, and attributes. It does not resolve the referenced workspace or item, so a syntactically valid variable can still fail during deployment if the resource does not exist or is inaccessible.
 - **`$items` variables resolve for items that exist in the `repository_directory`.** Cross-workspace variables (`$workspace.<name>.$items...`) reference items outside the repository — these items must exist in the specified workspace at deployment time.
 - Within a single parameter entry, `replace_value` can mix static strings and variables across environments, e.g. `PPE` set to a literal GUID and `PROD` set to a `$workspace.$id` variable.
 
@@ -282,7 +283,7 @@ Additional notes:
         - **Example:** `$items.Notebook.Hello World.$id` → returns the item ID of the "Hello World" Notebook in the target workspace.
         - **Important**: Deployment will fail if the variable contains any error — including a typo in the syntax (e.g., `$item` instead of `$items`), a non-existent item type or name, or an unsupported attribute for the given item type.
         - See the **Notebook/Dataflow Advanced `find_replace` Parameterization Case** for examples.
-        - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace (and `$sqlendpointid` for every Lakehouse and MirroredDatabase) — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning, the deployment fails before any item is published; ensure these items are fully provisioned in the target workspace before deploying.
+        - **SQL endpoint resolution is eager:** whenever any dynamic replacement variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace (and `$sqlendpointid` for every Lakehouse and MirroredDatabase) — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning, the deployment fails before any item is published; ensure these items are fully provisioned in the target workspace before deploying.
 
 ### Environment Variable Replacement
 
@@ -406,7 +407,7 @@ find_replace:
 - Include `is_regex` field when setting the `find_value` to a **valid regex pattern.**
 - When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
 - When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
-- **`is_regex` cannot be combined with dynamic replacement variables** (e.g., `$workspace.*`) in `find_value`. Dynamic variables resolve to plain strings at runtime, making regex matching redundant. Use one feature or the other.
+- **`is_regex` cannot be combined with dynamic replacement variables** (e.g., `$workspace.*`) in `find_value`. Dynamic replacement variables resolve to plain strings at runtime, making regex matching redundant. Use one feature or the other.
 
 ### Supported File Filters
 
@@ -717,7 +718,7 @@ display(df)
 
 **Case:** A Notebook is attached to a Lakehouse which resides in the same workspace. When deploying both the Lakehouse and the Notebook to a target environment (PPE/PROD/etc), the Workspace and Lakehouse GUIDs referenced in the Notebook must be updated to ensure it correctly points to the corresponding Lakehouse in the new environment.
 
-**Solution:** This approach uses `find_value` [**regex**](#find_value-regex)\*\* and [**dynamic variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
+**Solution:** This approach uses `find_value` [**regex**](#find_value-regex)\*\* and [**dynamic replacement variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
 
 This approach is particularly useful for replacing values that are not known until deployment time, such as item IDs.
 
@@ -1180,7 +1181,7 @@ When Reports and Semantic Models are deployed separately (e.g., models first, th
 
 #### `find_replace` Parameterization Case
 
-This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This enables granular control over each component in the connection string and allows the option to apply dynamic variables where needed.
+This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This enables granular control over each component in the connection string and allows the option to apply dynamic replacement variables where needed.
 
 **Note:** The examples below use placeholder values (e.g., `MyReport`, `YourSemanticModelName`). Replace these with your actual report and semantic model names. For a working example, see `sample/workspace/parameter.yml` which references the `ByConnection.Report` and `ABC.SemanticModel` items.
 
@@ -1229,7 +1230,7 @@ find_replace:
 
 #### `key_value_replace` Parameterization Case
 
-This approach replaces the entire connection string with environment-specific values. This simplifies the parameter configuration, however, dynamic variables are not supported in this example as they cannot be embedded within a larger string value.
+This approach replaces the entire connection string with environment-specific values. This simplifies the parameter configuration, however, dynamic replacement variables are not supported in this example as they cannot be embedded within a larger string value.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 

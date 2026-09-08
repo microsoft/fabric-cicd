@@ -132,6 +132,96 @@ def test_process_environment_file_pool_with_item_name_filter(tmp_path):
     assert parsed["instance_pool_id"] == "ws-pool-guid"
 
 
+def test_process_environment_file_pool_with_item_name_list_filter(tmp_path):
+    """instance_pool_id replacement respects an item_name filter provided as a list."""
+    env_dir = tmp_path / "EnvD"
+    setting_dir = env_dir / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    sc = setting_dir / "Sparkcompute.yml"
+    sc.write_text("instance_pool_id: pool-456\n", encoding="utf-8")
+
+    class FakeWS:
+        environment = "PROD"
+        environment_parameter: ClassVar[dict] = {
+            "spark_pool": [
+                {
+                    "instance_pool_id": "pool-456",
+                    "replace_value": {"PROD": {"type": "Workspace", "name": "WsPool"}},
+                    "item_name": ["OtherEnv", "EnvD"],
+                }
+            ]
+        }
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+
+        def _get_workspace_pools(self):
+            return [{"id": "ws-pool-guid", "name": "WsPool", "type": "Workspace"}]
+
+    dummy = DummyFile(sc)
+    result = env_module._process_environment_file(FakeWS(), DummyItem("EnvD", [sc]), dummy)
+    parsed = yaml.safe_load(result)
+    assert parsed["instance_pool_id"] == "ws-pool-guid"
+
+
+def test_process_environment_file_pool_item_name_list_no_match(tmp_path):
+    """A list item_name filter that excludes the item leaves instance_pool_id unchanged."""
+    env_dir = tmp_path / "EnvD"
+    setting_dir = env_dir / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    sc = setting_dir / "Sparkcompute.yml"
+    sc.write_text("instance_pool_id: pool-456\n", encoding="utf-8")
+
+    class FakeWS:
+        environment = "PROD"
+        environment_parameter: ClassVar[dict] = {
+            "spark_pool": [
+                {
+                    "instance_pool_id": "pool-456",
+                    "replace_value": {"PROD": {"type": "Workspace", "name": "WsPool"}},
+                    "item_name": ["OtherEnv"],
+                }
+            ]
+        }
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+
+        def _get_workspace_pools(self):
+            return [{"id": "ws-pool-guid", "name": "WsPool", "type": "Workspace"}]
+
+    dummy = DummyFile(sc)
+    result = env_module._process_environment_file(FakeWS(), DummyItem("EnvD", [sc]), dummy)
+    parsed = yaml.safe_load(result)
+    assert parsed["instance_pool_id"] == "pool-456"
+
+
+def test_process_environment_file_pool_empty_item_name_applies_globally(tmp_path):
+    """A falsy item_name (empty list) is treated as no filter and applies globally."""
+    env_dir = tmp_path / "EnvD"
+    setting_dir = env_dir / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    sc = setting_dir / "Sparkcompute.yml"
+    sc.write_text("instance_pool_id: pool-456\n", encoding="utf-8")
+
+    class FakeWS:
+        environment = "PROD"
+        environment_parameter: ClassVar[dict] = {
+            "spark_pool": [
+                {
+                    "instance_pool_id": "pool-456",
+                    "replace_value": {"PROD": {"type": "Workspace", "name": "WsPool"}},
+                    "item_name": [],
+                }
+            ]
+        }
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+
+        def _get_workspace_pools(self):
+            return [{"id": "ws-pool-guid", "name": "WsPool", "type": "Workspace"}]
+
+    dummy = DummyFile(sc)
+    result = env_module._process_environment_file(FakeWS(), DummyItem("EnvD", [sc]), dummy)
+    parsed = yaml.safe_load(result)
+    assert parsed["instance_pool_id"] == "ws-pool-guid"
+
+
 def test_process_environment_file_pool_no_match(tmp_path):
     """When no spark_pool entry matches, instance_pool_id is left as-is."""
     env_dir = tmp_path / "EnvE"
