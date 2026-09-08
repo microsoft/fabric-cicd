@@ -243,6 +243,11 @@ API_FORMAT_MAPPING = {
 
 # REGEX Constants
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
+REFLEX_WORKSPACE_ID_REFERENCE_REGEX = (
+    r'(\\"name\\":\\"workspaceId\\",\\"type\\":\\"string\\",\\"value\\":\\")'
+    rf"{DEFAULT_GUID}"
+    r'(\\")'
+)
 DATAFLOW_SOURCE_REGEX = (
     r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
 )
