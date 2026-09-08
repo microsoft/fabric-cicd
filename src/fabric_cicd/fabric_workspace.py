@@ -611,8 +611,8 @@ class FabricWorkspace:
 
     def _replace_workspace_ids(self, raw_file: str, item_obj: Item) -> str:
         """
-        Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000)
-        values, with target workspace ID in the raw file content.
+        Replaces default workspace ID references (00000000-0000-0000-0000-000000000000)
+        with the target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
