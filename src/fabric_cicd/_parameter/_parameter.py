@@ -485,16 +485,22 @@ class Parameter:
                 else "find value"
             )
 
-            if self.environment != "N/A" and not is_valid_env:
+            if not is_valid_env:
                 if env_type.lower() == "_all_":
                     return False, constants.PARAMETER_MSGS["other target env"].format(
                         env_type, parameter_dict["replace_value"]
                     )
 
+                if self.environment == "N/A":
+                    return False, constants.PARAMETER_MSGS["target env missing"].format(self.parameter_file_name)
+
                 skip_msg = constants.PARAMETER_MSGS["no target env"].format(self.environment, param_name)
                 log_func(
                     constants.PARAMETER_MSGS["skip"].format(
-                        value_type, find_value, skip_msg, param_name + " " + param_num_str
+                        value_type,
+                        find_value,
+                        skip_msg,
+                        param_name + " " + param_num_str,
                     )
                 )
                 continue
@@ -689,9 +695,13 @@ class Parameter:
 
             # Validate environment exists
             is_valid_env, env_type = self._validate_environment(connection_id)
-            if self.environment != "N/A" and not is_valid_env:
+            if not is_valid_env:
                 if env_type.lower() == "_all_":
                     return False, constants.PARAMETER_MSGS["other target env"].format(env_type, connection_id)
+
+                if self.environment == "N/A":
+                    return False, constants.PARAMETER_MSGS["target env missing"].format(self.parameter_file_name)
+
                 logger.warning(constants.PARAMETER_MSGS["no target env"].format(self.environment, context_name))
 
             return True, f"Valid {context_name}"

@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix `KeyError` when deploying an Environment with a `spark_pool` parameter and no deployment environment specified (defaults to `N/A`)
+time: 2026-08-18T10:08:55.8469602+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1096"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1096

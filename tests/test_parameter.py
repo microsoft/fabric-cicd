@@ -3332,6 +3332,89 @@ def test_validate_connection_id(
     assert expected_msg_contains.lower() in msg.lower()
 
 
+@pytest.mark.parametrize(
+    ("connection_id", "expected_ok"),
+    [
+        pytest.param(
+            {"_ALL_": "76e05dfe-9855-4e3d-a410-1dda048dbe99"},
+            True,
+            id="all_environment",
+        ),
+        pytest.param(
+            {"DEV": "76e05dfe-9855-4e3d-a410-1dda048dbe99"},
+            False,
+            id="named_environment",
+        ),
+    ],
+)
+def test_semantic_model_binding_without_target_environment(empty_parameter, connection_id, expected_ok):
+    """Validate semantic model mappings when no target environment is supplied."""
+    empty_parameter.environment = "N/A"
+    empty_parameter.environment_parameter = {
+        "semantic_model_binding": {
+            "models": [
+                {
+                    "semantic_model_name": "MyModel",
+                    "connection_id": connection_id,
+                }
+            ]
+        }
+    }
+
+    ok, _ = empty_parameter._validate_semantic_model_binding_parameter("semantic_model_binding")
+
+    assert ok is expected_ok
+
+
+@pytest.mark.parametrize(
+    ("param_name", "parameter_entry"),
+    [
+        pytest.param(
+            "find_replace",
+            {"find_value": "source-value", "replace_value": None},
+            id="find_replace",
+        ),
+        pytest.param(
+            "key_value_replace",
+            {"find_key": "$.value", "replace_value": None},
+            id="key_value_replace",
+        ),
+        pytest.param(
+            "spark_pool",
+            {"instance_pool_id": "source-pool", "replace_value": None},
+            id="spark_pool",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("environment_key", "expected_ok"),
+    [
+        pytest.param("_ALL_", True, id="all_environment"),
+        pytest.param("DEV", False, id="named_environment"),
+    ],
+)
+def test_validate_parameter_without_target_environment(
+    empty_parameter,
+    param_name,
+    parameter_entry,
+    environment_key,
+    expected_ok,
+):
+    """Validate environment mappings for non-binding parameters without a target."""
+    values_by_parameter = {
+        "find_replace": "replacement-value",
+        "key_value_replace": "replacement-value",
+        "spark_pool": {"type": "Capacity", "name": "Pool"},
+    }
+    parameter_entry["replace_value"] = {environment_key: values_by_parameter[param_name]}
+    empty_parameter.environment = "N/A"
+    empty_parameter.environment_parameter = {param_name: [parameter_entry]}
+
+    ok, _ = empty_parameter._validate_parameter(param_name)
+
+    assert ok is expected_ok
+
+
 def test_semantic_model_binding_new_format_models_invalid_connection_guid(empty_parameter):
     """Test semantic_model_binding new format with invalid GUID in models connections."""
     empty_parameter.environment_parameter = {
