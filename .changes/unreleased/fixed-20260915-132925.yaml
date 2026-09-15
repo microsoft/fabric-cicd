@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix Semantic Model connection binding for OneLake paths missing a trailing `/`
+time: 2026-09-15T13:29:25.7932433+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1128"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1128

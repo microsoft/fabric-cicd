@@ -407,7 +407,7 @@ def test_bind_list_with_non_string_elements_does_not_raise(caplog):
 
 
 # ---------------------------------------------------------------------------
-# build_request_body — OneLake path trailing slash normalization (issue #1128)
+# build_request_body — OneLake path trailing slash normalization
 # ---------------------------------------------------------------------------
 
 
@@ -422,7 +422,7 @@ def _make_body(conn_type, path):
 
 
 def test_build_request_body_appends_slash_for_adls_path_without_slash():
-    """AzureDataLakeStorage path without a trailing slash must get one appended (issue #1128)."""
+    """AzureDataLakeStorage path without a trailing slash must get one appended."""
     result = build_request_body(_make_body("AzureDataLakeStorage", "https://onelake/ws/item.Lakehouse/Tables"))
     details = result["connectionBinding"]["connectionDetails"]
     assert details["type"] == "AzureDataLakeStorage"
