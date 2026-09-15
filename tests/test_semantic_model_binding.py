@@ -19,6 +19,7 @@ from fabric_cicd._items._semanticmodel import (
     _normalize_connection_ids,
     bind_semanticmodel_to_connection,
     build_binding_mapping,
+    build_request_body,
 )
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -403,3 +404,56 @@ def test_bind_list_with_non_string_elements_does_not_raise(caplog):
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
     assert len(post_calls) == 1  # only the valid "11111111-1111-1111-1111-111111111111" is bound
+
+
+# ---------------------------------------------------------------------------
+# build_request_body — OneLake path trailing slash normalization (issue #1128)
+# ---------------------------------------------------------------------------
+
+
+def _make_body(conn_type, path):
+    return {
+        "connectionBinding": {
+            "id": "conn-id",
+            "connectivityType": "ShareableCloud",
+            "connectionDetails": {"type": conn_type, "path": path},
+        }
+    }
+
+
+def test_build_request_body_appends_slash_for_adls_path_without_slash():
+    """AzureDataLakeStorage path without a trailing slash must get one appended (issue #1128)."""
+    result = build_request_body(_make_body("AzureDataLakeStorage", "https://onelake/ws/item.Lakehouse/Tables"))
+    details = result["connectionBinding"]["connectionDetails"]
+    assert details["type"] == "AzureDataLakeStorage"
+    assert details["path"] == "https://onelake/ws/item.Lakehouse/Tables/"
+    # Field ordering is preserved
+    assert list(result["connectionBinding"].keys()) == ["id", "connectivityType", "connectionDetails"]
+    assert list(details.keys()) == ["type", "path"]
+
+
+def test_build_request_body_leaves_adls_path_with_slash_unchanged():
+    """AzureDataLakeStorage path already ending in '/' must be left unchanged."""
+    result = build_request_body(_make_body("AzureDataLakeStorage", "https://onelake/ws/item.Lakehouse/Tables/"))
+    assert result["connectionBinding"]["connectionDetails"]["path"] == "https://onelake/ws/item.Lakehouse/Tables/"
+
+
+def test_build_request_body_leaves_non_adls_type_untouched():
+    """A non-AzureDataLakeStorage type must not have its path modified."""
+    result = build_request_body(_make_body("SQL", "myserver/mydb"))
+    details = result["connectionBinding"]["connectionDetails"]
+    assert details["type"] == "SQL"
+    assert details["path"] == "myserver/mydb"
+
+
+def test_build_request_body_handles_empty_and_none_path():
+    """Empty or None paths must be handled gracefully without appending a slash."""
+    empty_result = build_request_body(_make_body("AzureDataLakeStorage", ""))
+    assert empty_result["connectionBinding"]["connectionDetails"]["path"] == ""
+
+    none_result = build_request_body(_make_body("AzureDataLakeStorage", None))
+    assert none_result["connectionBinding"]["connectionDetails"]["path"] is None
+
+    missing_result = build_request_body({"connectionBinding": {"id": "x", "connectivityType": "ShareableCloud"}})
+    assert missing_result["connectionBinding"]["connectionDetails"]["path"] is None
+    assert missing_result["connectionBinding"]["connectionDetails"]["type"] is None

@@ -315,13 +315,22 @@ def build_request_body(body: dict) -> dict:
     connection_binding = body.get("connectionBinding", {})
     connection_details = connection_binding.get("connectionDetails", {})
 
+    connection_type = connection_details.get("type") if "type" in connection_details else None
+    path = connection_details.get("path") if "path" in connection_details else None
+
+    # The Fabric Connections API returns AzureDataLakeStorage OneLake paths without a trailing
+    # slash, but bindConnection requires the path to exactly match the model's data source (which
+    # ends in '/'), so append it here to avoid BindConnectionDetailNotFound errors.
+    if connection_type == "AzureDataLakeStorage" and path and not path.endswith("/"):
+        path = f"{path}/"
+
     return {
         "connectionBinding": {
             "id": connection_binding.get("id"),
             "connectivityType": connection_binding.get("connectivityType"),
             "connectionDetails": {
-                "type": connection_details.get("type") if "type" in connection_details else None,
-                "path": connection_details.get("path") if "path" in connection_details else None,
+                "type": connection_type,
+                "path": path,
             },
         }
     }
