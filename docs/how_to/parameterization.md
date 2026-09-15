@@ -287,7 +287,9 @@ Additional notes:
 
 ### Environment Variable Replacement
 
-In the `find_replace` parameter, if the `enable_environment_variable_replacement` feature flag is set, pipeline/environment variables will be used to replace the values in the `parameter.yml` file with the corresponding values from the variables dictionary. **Only Environment Variable beginning with '$ENV:' will be used as replacement values.** See example below:
+In the `find_replace` parameter, if the `enable_environment_variable_replacement` feature flag is set, environment variables will be used to replace the values in the `parameter.yml` file. In the `parameter.yml` file, reference an environment variable using the `$ENV:` token prefix followed by the variable's plain name (for example, `$ENV:ppe_lakehouse`). The `$ENV:` prefix is **only** the in-file token marker — the actual OS/pipeline environment variable is looked up by its plain name (`ppe_lakehouse`), **not** `$ENV:ppe_lakehouse`. If a referenced environment variable is not set, the token is left unchanged. See example below:
+
+For example, set the environment variables `ppe_lakehouse` and `prod_lakehouse` in your shell or pipeline, then reference them in `parameter.yml` with the `$ENV:` prefix:
 
 ```yaml
 find_replace:

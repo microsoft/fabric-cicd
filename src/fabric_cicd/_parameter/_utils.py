@@ -677,14 +677,13 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
     raw_file: The parameter.yml file content as a string.
     """
     if "enable_environment_variable_replacement" in constants.FEATURE_FLAG:
-        # filter os.environ dict to only allow variables that begin with $ENV:
-        env_vars = {k[len("$ENV:") :]: v for k, v in os.environ.items() if k.startswith("$ENV:")}
-        # block of code to support both variants of the parameters.yml file
-
-        # Perform replacements
-        for var_name, var_value in env_vars.items():
-            placeholder = f"$ENV:{var_name}"
-            if placeholder in raw_file:
+        # $ENV: is only the in-file token prefix; the lookup uses the plain OS
+        # environment variable name (e.g. $ENV:ppe_lakehouse -> os.environ["ppe_lakehouse"]).
+        # Tokens whose environment variable is not set are left unchanged.
+        for var_name in set(re.findall(r"\$ENV:(\w+)", raw_file)):
+            if var_name in os.environ:
+                placeholder = f"$ENV:{var_name}"
+                var_value = os.environ[var_name]
                 raw_file = raw_file.replace(placeholder, var_value)
                 logger.debug(f"Replaced {placeholder} with {var_value}")
 
