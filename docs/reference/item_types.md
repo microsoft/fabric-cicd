@@ -113,6 +113,15 @@
     - Referenced items (e.g., Lakehouse, KQL Database, Ontology) that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
 
+## Mirrored Azure Databricks Catalog
+
+- **Parameterization:**
+    - The catalog is created from the `creationPayload` in the `.platform` file's `metadata` (`catalogName`, `mirroringMode`, `databricksWorkspaceConnectionId`, `storageConnectionId`).
+    - **Connections** (`databricksWorkspaceConnectionId` and `storageConnectionId`) are environment-specific and are not source controlled. Parameterize them in the `find_replace` (or `key_value_replace`) section of the `parameter.yml` file, targeting the `.platform` file, when they change between environments.
+- **Only the item shell is deployed** via the `creationPayload`. The item definition is not deployed or updated by `fabric-cicd`.
+- The referenced **connections must exist** in the target environment before deployment, and the executing identity must have access to them.
+- **Known limitation — `autoSync`:** the `autoSync` property is not managed by `fabric-cicd`. The Fabric API only allows it to be set through a separate update request (it is not part of the `creationPayload` or the deployable definition), so it takes the Fabric default on creation and must be configured manually if a non-default value is required.
+
 ## Mirrored Database
 
 - **Parameterization:**
