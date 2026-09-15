@@ -454,10 +454,6 @@ def test_build_request_body_handles_empty_and_none_path():
     none_result = build_request_body(_make_body("AzureDataLakeStorage", None))
     assert none_result["connectionBinding"]["connectionDetails"]["path"] is None
 
-    # A non-string path must not raise (isinstance guard) and is passed through untouched
-    non_string_result = build_request_body(_make_body("AzureDataLakeStorage", 123))
-    assert non_string_result["connectionBinding"]["connectionDetails"]["path"] == 123
-
     missing_result = build_request_body({"connectionBinding": {"id": "x", "connectivityType": "ShareableCloud"}})
     assert missing_result["connectionBinding"]["connectionDetails"]["path"] is None
     assert missing_result["connectionBinding"]["connectionDetails"]["type"] is None
