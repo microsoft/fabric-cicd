@@ -1694,9 +1694,7 @@ runtime_version: "1.2"
         # The set variable is replaced, the missing one is left untouched
         assert "present: set_value" in result
         assert "absent: $ENV:MISSING_VAR" in result
-        mock_logger.debug.assert_any_call(
-            "Environment variable 'MISSING_VAR' is not set; preserving '$ENV:MISSING_VAR'"
-        )
+        mock_logger.debug.assert_any_call("Environment variable 'MISSING_VAR' is not set; keeping '$ENV:MISSING_VAR'")
 
     def test_replace_variables_in_parameter_file_multiple_tokens(self, monkeypatch):
         """Test replacement of multiple tokens, including repeated tokens for the same variable."""

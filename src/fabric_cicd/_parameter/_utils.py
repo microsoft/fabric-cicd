@@ -686,12 +686,12 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
             var_name = match.group(1)
             # Preserve tokens whose OS environment variable is not set
             if var_name not in os.environ:
-                logger.debug(f"Environment variable '{var_name}' is not set; preserving '{match.group(0)}'")
+                logger.debug(f"Environment variable '{var_name}' is not set; keeping '{match.group(0)}'")
                 return match.group(0)
 
             # Look up the plain variable name without the $ENV: prefix
             var_value = os.environ[var_name]
-            logger.debug(f"Replaced {match.group(0)} with {var_value}")
+            logger.debug(f"Replaced {match.group(0)} with {var_value} in the parameter file")
             return var_value
 
         # Match the exact, case-sensitive in-file token prefix
