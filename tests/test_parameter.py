@@ -2768,6 +2768,36 @@ def test_validate_dynamic_replacement_variables_accepts_same_workspace_item_repl
     assert constants.PARAMETER_MSGS["cross_workspace_variable_warning"] not in caplog.messages
 
 
+@pytest.mark.parametrize("feature_enabled", [False, True])
+def test_validate_dynamic_replacement_variables_ignores_environment_tokens(
+    empty_parameter, monkeypatch, caplog, feature_enabled
+):
+    """$ENV: tokens are ignored and warn when their feature flag is disabled."""
+    import logging
+
+    feature_flags = {"enable_environment_variable_replacement"} if feature_enabled else set()
+    monkeypatch.setattr(constants, "FEATURE_FLAG", feature_flags)
+    empty_parameter.environment_parameter = {
+        "find_replace": [
+            {
+                "find_value": "source-lakehouse-id",
+                "replace_value": {
+                    "PPE": "$ENV:ppe_lakehouse",
+                    "PROD": "$ENV:prod_lakehouse",
+                },
+            }
+        ]
+    }
+
+    with caplog.at_level(logging.WARNING):
+        ok, msg = empty_parameter._validate_dynamic_replacement_variables()
+
+    assert ok is True
+    assert msg == "Valid dynamic replacement variables"
+    warning = constants.PARAMETER_MSGS["environment_variable_feature_warning"]
+    assert caplog.messages.count(warning) == (0 if feature_enabled else 1)
+
+
 @pytest.mark.parametrize("find_value", ["$workspace.$id", "$workspace.$name", "$workspace.$name_encoded"])
 def test_validate_dynamic_replacement_variables_does_not_warn_for_workspace_find_value(
     empty_parameter, caplog, find_value

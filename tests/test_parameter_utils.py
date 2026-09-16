@@ -373,6 +373,14 @@ class TestParameterUtilities:
         # Regular string should be returned as is
         assert extract_replace_value(mock_workspace, "literal string") == "literal string"
 
+        # Non-dynamic tokens should be returned without dynamic variable parsing
+        with mock.patch("fabric_cicd._parameter._utils.parse_dynamic_variable") as mock_parse:
+            assert extract_replace_value(mock_workspace, "$ENV:LAKEHOUSE_ID") == "$ENV:LAKEHOUSE_ID"
+            mock_parse.assert_not_called()
+
+        with pytest.raises(ParsingError, match="Invalid dynamic replacement variable format"):
+            extract_replace_value(mock_workspace, "$env:LAKEHOUSE_ID")
+
         # Workspace ID variable should return the workspace ID
         assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
 
@@ -410,6 +418,7 @@ class TestParameterUtilities:
         """Tests extract_replace_value with different inputs, get_dataflow_name=True."""
         # With get_dataflow_name=True for regular string, should return None
         assert extract_replace_value(mock_workspace, "literal string", True) is None
+        assert extract_replace_value(mock_workspace, "$ENV:DATAFLOW_ID", True) is None
 
         # With get_dataflow_name=True for workspace ID, should return an error
         with pytest.raises(
@@ -1666,6 +1675,8 @@ runtime_version: "1.2"
 
     def test_replace_variables_in_parameter_file_missing_env_var(self, monkeypatch):
         """Test that tokens are left unchanged when the OS environment variable is not set."""
+        mock_logger = mock.MagicMock()
+        monkeypatch.setattr("fabric_cicd._parameter._utils.logger", mock_logger)
         # Only SET_VAR is defined; MISSING_VAR is not present in the environment
         test_env_vars = {
             "SET_VAR": "set_value",
@@ -1683,6 +1694,9 @@ runtime_version: "1.2"
         # The set variable is replaced, the missing one is left untouched
         assert "present: set_value" in result
         assert "absent: $ENV:MISSING_VAR" in result
+        mock_logger.debug.assert_any_call(
+            "Environment variable 'MISSING_VAR' is not set; preserving '$ENV:MISSING_VAR'"
+        )
 
     def test_replace_variables_in_parameter_file_multiple_tokens(self, monkeypatch):
         """Test replacement of multiple tokens, including repeated tokens for the same variable."""

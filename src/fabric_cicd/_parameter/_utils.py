@@ -177,6 +177,10 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
             return None
         return replace_value
 
+    # Return early for environment variable replace_value
+    if replace_value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
+        return None if get_dataflow_name else replace_value
+
     # Parse and validate the dynamic variable to determine its kind and components
     parsed_variable = parse_dynamic_variable(replace_value)
 
@@ -674,22 +678,26 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
     A function to replace tokens in the parameter.yml file with environment variables.
 
     Args:
-    raw_file: The parameter.yml file content as a string.
+        raw_file: The parameter.yml file content as a string.
     """
     if "enable_environment_variable_replacement" in constants.FEATURE_FLAG:
-        # $ENV: is only the in-file token prefix; the lookup uses the plain OS
-        # environment variable name (e.g. $ENV:ppe_lakehouse -> os.environ["ppe_lakehouse"]).
-        # Tokens whose environment variable is not set are left unchanged.
+        # Replace each complete $ENV: token independently
         def replace_environment_variable(match: re.Match) -> str:
             var_name = match.group(1)
+            # Preserve tokens whose OS environment variable is not set
             if var_name not in os.environ:
+                logger.debug(f"Environment variable '{var_name}' is not set; preserving '{match.group(0)}'")
                 return match.group(0)
 
+            # Look up the plain variable name without the $ENV: prefix
             var_value = os.environ[var_name]
             logger.debug(f"Replaced {match.group(0)} with {var_value}")
             return var_value
 
-        return re.sub(r"\$ENV:(\w+)", replace_environment_variable, raw_file)
+        # Match the exact, case-sensitive in-file token prefix
+        pattern = rf"{re.escape(constants.ENVIRONMENT_VARIABLE_PREFIX)}(\w+)"
+        return re.sub(pattern, replace_environment_variable, raw_file)
+
     return raw_file
 
 
