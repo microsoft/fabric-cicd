@@ -177,6 +177,15 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
             return None
         return replace_value
 
+    # Check the dynamic replacement variable cache first (only populated during bulk publish)
+    if (
+        not get_dataflow_name
+        and workspace_obj.bulk_publish_enabled
+        and replace_value in workspace_obj._dynamic_var_cache
+    ):
+        logger.debug(f"Cache hit for dynamic replacement variable: {replace_value}")
+        return workspace_obj._dynamic_var_cache[replace_value]
+
     # Parse and validate the dynamic variable to determine its kind and components
     parsed_variable = parse_dynamic_variable(replace_value)
 
@@ -186,11 +195,17 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
             msg = "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: '$items.type.name.$attribute'"
             raise InputError(msg, logger)
 
-        return _extract_workspace_id(workspace_obj, replace_value, parsed_variable)
+        resolved = _extract_workspace_id(workspace_obj, replace_value, parsed_variable)
+        if workspace_obj.bulk_publish_enabled:
+            workspace_obj._dynamic_var_cache[replace_value] = resolved
+        return resolved
 
     # Current-workspace item variables resolve against deployed workspace items
     if parsed_variable.kind == "item":
-        return _extract_item_attribute(workspace_obj, get_dataflow_name, parsed_variable)
+        resolved = _extract_item_attribute(workspace_obj, get_dataflow_name, parsed_variable)
+        if workspace_obj.bulk_publish_enabled and not get_dataflow_name and resolved is not None:
+            workspace_obj._dynamic_var_cache[replace_value] = resolved
+        return resolved
 
     msg = constants.DYNAMIC_VARIABLE_MSGS["invalid_format"].format(replace_value)
     raise ParsingError(msg, logger)
@@ -920,18 +935,18 @@ def _resolve_file_path(
     Returns the resolved absolute path if valid, None otherwise.
     """
     try:
+        resolved_repository_directory = repository_directory.resolve()
+
         # Step 1: Resolve the input path based on its type
         if path_type == "Relative":
-            resolved_path = (repository_directory / input_path).resolve()
+            resolved_path = (resolved_repository_directory / input_path).resolve()
             logger.debug(f"{path_type} path '{input_path}' resolved as '{resolved_path}'")
-        elif path_type == "Absolute":
-            resolved_path = input_path.resolve()
         else:
-            resolved_path = input_path
+            resolved_path = input_path.resolve()
 
         # Step 2: Check if the path is within the repository directory
         try:
-            _ = resolved_path.relative_to(repository_directory)
+            _ = resolved_path.relative_to(resolved_repository_directory)
         except ValueError:
             log_func(f"{path_type} path '{input_path}' is outside the repository directory")
             return None

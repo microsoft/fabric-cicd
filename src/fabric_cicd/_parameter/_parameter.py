@@ -1047,9 +1047,8 @@ class Parameter:
 
     # region Dynamic Var Checks
 
-    def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
-        """Search for dynamic replacement variables in the parameter file."""
-        dynamic_replacement_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
+    def _search_dynamic_replacement_item_variables_in_parameter_file(self) -> bool:
+        """Return whether a replace value contains a current-workspace item variable."""
         dynamic_param_names = {"find_replace", "key_value_replace"}
 
         for param_name, param_values in self.environment_parameter.items():
@@ -1057,16 +1056,12 @@ class Parameter:
                 continue
             if isinstance(param_values, list):
                 for param_dict in param_values:
-                    # Check find_value for dynamic replacement variables
-                    find_value = param_dict.get("find_value", "")
-                    if isinstance(find_value, str) and dynamic_replacement_var_pattern.search(find_value):
-                        return True
-
-                    # Check replace_value for dynamic replacement variables
                     replace_value = param_dict.get("replace_value")
                     if isinstance(replace_value, dict):
                         for env_value in replace_value.values():
-                            if isinstance(env_value, str) and dynamic_replacement_var_pattern.search(env_value):
+                            if isinstance(env_value, str) and env_value.lower().startswith(
+                                constants.ITEM_VARIABLE_PREFIX
+                            ):
                                 return True
 
         return False

@@ -3472,8 +3472,8 @@ def test_check_duplicate_semantic_model_names(empty_parameter, param_value, is_n
 # =============================================================================
 
 
-class TestSearchDynamicReplacementVariables:
-    """Unit tests for _search_dynamic_replacement_variables_in_parameter_file."""
+class TestSearchDynamicReplacementItemVariables:
+    """Unit tests for _search_dynamic_replacement_item_variables_in_parameter_file."""
 
     @staticmethod
     def _make_parameter(tmp_path, yaml_content):
@@ -3486,8 +3486,8 @@ class TestSearchDynamicReplacementVariables:
             environment="PPE",
         )
 
-    def test_detects_workspace_variable_in_replace_value(self, tmp_path):
-        """Dynamic replacement variable $workspace.* in replace_value is detected."""
+    def test_ignores_cross_workspace_item_variable_in_replace_value(self, tmp_path):
+        """Cross-workspace item variables do not create current-workspace dependencies."""
         param = self._make_parameter(
             tmp_path,
             """
@@ -3497,7 +3497,7 @@ find_replace:
       PPE: "$workspace.my_ws.$items.my_item.id"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is False
 
     def test_detects_items_variable_in_replace_value(self, tmp_path):
         """Dynamic replacement variable $items.* in replace_value is detected."""
@@ -3510,10 +3510,10 @@ find_replace:
       PPE: "$items.my_lakehouse.id"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is True
 
-    def test_detects_workspace_variable_in_find_value(self, tmp_path):
-        """Dynamic replacement variable $workspace.* in find_value is detected."""
+    def test_ignores_workspace_variable_in_find_value(self, tmp_path):
+        """Workspace variables in find_value do not create current-workspace dependencies."""
         param = self._make_parameter(
             tmp_path,
             """
@@ -3523,7 +3523,7 @@ find_replace:
       PPE: "replacement-id"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is False
 
     def test_no_detection_for_static_values(self, tmp_path):
         """Static find/replace values are not flagged as dynamic."""
@@ -3536,7 +3536,7 @@ find_replace:
       PPE: "static-new-value"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is False
 
     def test_no_detection_in_non_dynamic_params(self, tmp_path):
         """Dynamic replacement variable patterns in spark_pool are not checked."""
@@ -3551,10 +3551,10 @@ spark_pool:
         name: "$workspace.something"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is False
 
-    def test_detects_dynamic_variable_in_key_value_replace(self, tmp_path):
-        """Dynamic replacement variable in key_value_replace replace_value is detected."""
+    def test_ignores_cross_workspace_item_variable_in_key_value_replace(self, tmp_path):
+        """Cross-workspace item variables do not create current-workspace dependencies."""
         param = self._make_parameter(
             tmp_path,
             """
@@ -3564,7 +3564,7 @@ key_value_replace:
       PPE: "$workspace.my_ws.$items.my_item.id"
 """,
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is True
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is False
 
     def test_empty_parameter_file_returns_false(self, tmp_path):
         """No parameters means no dynamic replacement variables detected."""
@@ -3573,4 +3573,4 @@ key_value_replace:
             item_type_in_scope=["Notebook"],
             environment="PPE",
         )
-        assert param._search_dynamic_replacement_variables_in_parameter_file() is False
+        assert param._search_dynamic_replacement_item_variables_in_parameter_file() is False

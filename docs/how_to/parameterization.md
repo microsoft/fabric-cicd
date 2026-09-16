@@ -233,9 +233,9 @@ The `find_replace` and `key_value_replace` parameters support fabric-cicd define
     - **Cannot be combined with `is_regex: "true"`** — use either a dynamic replacement variable OR a regex pattern, not both
 - **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
 
-!!! note "Bulk Publish Limitation"
+!!! note "Bulk Publish Note"
 
-    Dynamic replacement variables (`$workspace`, `$items`) are not supported when using [bulk publish](optional_feature.md#bulk-publish) mode. When dynamic replacement variables are detected in the parameter file, the deployment automatically falls back to standard publishing. To use bulk publish, replace dynamic replacement variables with static values or use logical IDs directly.
+    Dynamic replacement variables (`$workspace`, `$items`) are supported in [bulk publish](optional_feature.md#bulk-publish) mode. Current-workspace `$items.*` references are published in dependency-ordered batches so referenced items are available before their dependents. However, a current-workspace `$items.*` `replace_value` without an `item_type`, `item_name`, or `file_path` filter causes a fallback to standard publishing because its dependency scope cannot be determined. `$workspace.*` and cross-workspace item variables do not create in-batch dependencies.
 
 Additional notes:
 

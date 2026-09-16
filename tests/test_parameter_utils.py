@@ -1820,6 +1820,17 @@ class TestPathUtilities:
         result = process_input_path(temp_repository, None)
         assert result is None
 
+    def test_process_input_path_resolves_wildcards_from_relative_repository(self, tmp_path, monkeypatch):
+        repository = tmp_path / "repository"
+        repository.mkdir()
+        expected_path = repository / "file.txt"
+        expected_path.write_text("content", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        result = process_input_path(Path("repository"), "*.txt")
+
+        assert result == [expected_path.resolve()]
+
     def test_process_input_path_string(self, temp_repository, monkeypatch):
         """Tests process_input_path with string input."""
 
