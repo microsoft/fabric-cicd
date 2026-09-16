@@ -373,6 +373,14 @@ class TestParameterUtilities:
         # Regular string should be returned as is
         assert extract_replace_value(mock_workspace, "literal string") == "literal string"
 
+        # Non-dynamic tokens should be returned without dynamic variable parsing
+        with mock.patch("fabric_cicd._parameter._utils.parse_dynamic_variable") as mock_parse:
+            assert extract_replace_value(mock_workspace, "$ENV:LAKEHOUSE_ID") == "$ENV:LAKEHOUSE_ID"
+            mock_parse.assert_not_called()
+
+        with pytest.raises(ParsingError, match="Invalid dynamic replacement variable format"):
+            extract_replace_value(mock_workspace, "$env:LAKEHOUSE_ID")
+
         # Workspace ID variable should return the workspace ID
         assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
 
@@ -410,6 +418,7 @@ class TestParameterUtilities:
         """Tests extract_replace_value with different inputs, get_dataflow_name=True."""
         # With get_dataflow_name=True for regular string, should return None
         assert extract_replace_value(mock_workspace, "literal string", True) is None
+        assert extract_replace_value(mock_workspace, "$ENV:DATAFLOW_ID", True) is None
 
         # With get_dataflow_name=True for workspace ID, should return an error
         with pytest.raises(
@@ -1639,11 +1648,11 @@ runtime_version: "1.2"
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
-        # Set up test environment variables
+        # OS environment variables use plain names; $ENV: is only the in-file token prefix
         test_env_vars = {
-            "$ENV:TEST_VAR": "test_value",
-            "$ENV:ANOTHER_VAR": "another_value",
-            "NORMAL_VAR": "normal_value",  # Should be ignored
+            "TEST_VAR": "test_value",
+            "ANOTHER_VAR": "another_value",
+            "NORMAL_VAR": "normal_value",  # Not referenced with $ENV:, so ignored
         }
         # Mock os.environ
         monkeypatch.setattr("os.environ", test_env_vars)
@@ -1664,12 +1673,68 @@ runtime_version: "1.2"
         assert "other: another_value" in result
         assert "normal: NORMAL_VAR" in result  # Normal var unchanged
 
+    def test_replace_variables_in_parameter_file_missing_env_var(self, monkeypatch):
+        """Test that tokens are left unchanged when the OS environment variable is not set."""
+        mock_logger = mock.MagicMock()
+        monkeypatch.setattr("fabric_cicd._parameter._utils.logger", mock_logger)
+        # Only SET_VAR is defined; MISSING_VAR is not present in the environment
+        test_env_vars = {
+            "SET_VAR": "set_value",
+        }
+        monkeypatch.setattr("os.environ", test_env_vars)
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        test_content = """
+        parameter:
+          present: $ENV:SET_VAR
+          absent: $ENV:MISSING_VAR
+        """
+        result = replace_variables_in_parameter_file(test_content)
+
+        # The set variable is replaced, the missing one is left untouched
+        assert "present: set_value" in result
+        assert "absent: $ENV:MISSING_VAR" in result
+        mock_logger.debug.assert_any_call("Environment variable 'MISSING_VAR' is not set; keeping '$ENV:MISSING_VAR'")
+
+    def test_replace_variables_in_parameter_file_multiple_tokens(self, monkeypatch):
+        """Test replacement of multiple tokens, including repeated tokens for the same variable."""
+        test_env_vars = {
+            "ppe_lakehouse": "ppe-guid",
+            "prod_lakehouse": "prod-guid",
+        }
+        monkeypatch.setattr("os.environ", test_env_vars)
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        test_content = """
+        find_replace:
+          - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+            replace_value:
+              PPE: "$ENV:ppe_lakehouse"
+              PROD: "$ENV:prod_lakehouse"
+              PPE_DUP: "$ENV:ppe_lakehouse"
+        """
+        result = replace_variables_in_parameter_file(test_content)
+
+        assert 'PPE: "ppe-guid"' in result
+        assert 'PROD: "prod-guid"' in result
+        assert 'PPE_DUP: "ppe-guid"' in result
+        assert "$ENV:" not in result
+
+    def test_replace_variables_in_parameter_file_shared_prefix(self, monkeypatch):
+        """Test that variable names sharing a prefix are replaced independently."""
+        monkeypatch.setattr("os.environ", {"FOO": "x", "FOO_BAR": "y"})
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        result = replace_variables_in_parameter_file("short: $ENV:FOO\nlong: $ENV:FOO_BAR")
+
+        assert result == "short: x\nlong: y"
+
     def test_replace_variables_in_parameter_file_feature_disabled(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag disabled."""
-        # Set up test environment variables with $ENV: prefix
+        # OS environment variables use plain names
         test_env_vars = {
-            "$ENV:TEST_VAR": "test_value",
-            "$ENV:ANOTHER_VAR": "another_value",
+            "TEST_VAR": "test_value",
+            "ANOTHER_VAR": "another_value",
         }
         # Mock os.environ
         monkeypatch.setattr("os.environ", test_env_vars)
@@ -1698,12 +1763,11 @@ runtime_version: "1.2"
 
     def test_replace_env_variables_in_content(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
-        # Set up test environment variables with $ENV: prefix
-        # This is required because the function filters os.environ for keys starting with $ENV:
+        # OS environment variables use plain names; $ENV: is only the in-file token prefix
         test_env_vars = {
-            "$ENV:TEST_VAR": "test_value",
-            "$ENV:ANOTHER_VAR": "another_value",
-            "NORMAL_VAR": "normal_value",  # Should be ignored (no $ENV: prefix)
+            "TEST_VAR": "test_value",
+            "ANOTHER_VAR": "another_value",
+            "NORMAL_VAR": "normal_value",  # Not referenced with $ENV:, so ignored
         }
         # Mock os.environ
         monkeypatch.setattr("os.environ", test_env_vars)

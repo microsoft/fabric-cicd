@@ -177,6 +177,10 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
             return None
         return replace_value
 
+    # Return early for environment variable replace_value
+    if replace_value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
+        return None if get_dataflow_name else replace_value
+
     # Parse and validate the dynamic variable to determine its kind and components
     parsed_variable = parse_dynamic_variable(replace_value)
 
@@ -674,21 +678,26 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
     A function to replace tokens in the parameter.yml file with environment variables.
 
     Args:
-    raw_file: The parameter.yml file content as a string.
+        raw_file: The parameter.yml file content as a string.
     """
     if "enable_environment_variable_replacement" in constants.FEATURE_FLAG:
-        # filter os.environ dict to only allow variables that begin with $ENV:
-        env_vars = {k[len("$ENV:") :]: v for k, v in os.environ.items() if k.startswith("$ENV:")}
-        # block of code to support both variants of the parameters.yml file
+        # Replace each complete $ENV: token independently
+        def replace_environment_variable(match: re.Match) -> str:
+            var_name = match.group(1)
+            # Preserve tokens whose OS environment variable is not set
+            if var_name not in os.environ:
+                logger.debug(f"Environment variable '{var_name}' is not set; keeping '{match.group(0)}'")
+                return match.group(0)
 
-        # Perform replacements
-        for var_name, var_value in env_vars.items():
-            placeholder = f"$ENV:{var_name}"
-            if placeholder in raw_file:
-                raw_file = raw_file.replace(placeholder, var_value)
-                logger.debug(f"Replaced {placeholder} with {var_value}")
+            # Look up the plain variable name without the $ENV: prefix
+            var_value = os.environ[var_name]
+            logger.debug(f"Replaced {match.group(0)} with {var_value} in the parameter file")
+            return var_value
 
-        return raw_file
+        # Match the exact, case-sensitive in-file token prefix
+        pattern = rf"{re.escape(constants.ENVIRONMENT_VARIABLE_PREFIX)}(\w+)"
+        return re.sub(pattern, replace_environment_variable, raw_file)
+
     return raw_file
 
 

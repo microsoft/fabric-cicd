@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix `$ENV:` token replacement to use plain OS environment variable names
+time: 2026-09-16T13:01:38.3854422+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1129"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1129

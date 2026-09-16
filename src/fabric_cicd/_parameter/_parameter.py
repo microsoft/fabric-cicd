@@ -1075,6 +1075,7 @@ class Parameter:
         """Validate every dynamic replacement variable and report all syntax errors with their locations."""
         errors = []
         has_cross_workspace_variables = False
+        has_environment_variables = False
 
         # Validate dynamic replacement variables in find_replace and key_value_replace parameters
         for param_name in ("find_replace", "key_value_replace"):
@@ -1113,6 +1114,10 @@ class Parameter:
                 for environment, value in replace_value.items():
                     if not isinstance(value, str) or not value.startswith("$"):
                         continue
+                    # Ignore the supported environment variable prefix that also starts with "$"
+                    if value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
+                        has_environment_variables = True
+                        continue
                     try:
                         parsed_variable = parse_dynamic_variable(value)
                     except ParsingError as error:
@@ -1123,6 +1128,10 @@ class Parameter:
 
         if has_cross_workspace_variables:
             logger.warning(constants.PARAMETER_MSGS["cross_workspace_variable_warning"])
+
+        # Warn if environment variables are detected but the feature flag is not enabled
+        if has_environment_variables and "enable_environment_variable_replacement" not in constants.FEATURE_FLAG:
+            logger.warning(constants.PARAMETER_MSGS["environment_variable_feature_warning"])
 
         if errors:
             return False, "Invalid dynamic replacement variables:\n- " + "\n- ".join(errors)
