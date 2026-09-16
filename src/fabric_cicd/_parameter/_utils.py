@@ -680,14 +680,16 @@ def replace_variables_in_parameter_file(raw_file: str) -> str:
         # $ENV: is only the in-file token prefix; the lookup uses the plain OS
         # environment variable name (e.g. $ENV:ppe_lakehouse -> os.environ["ppe_lakehouse"]).
         # Tokens whose environment variable is not set are left unchanged.
-        for var_name in set(re.findall(r"\$ENV:(\w+)", raw_file)):
-            if var_name in os.environ:
-                placeholder = f"$ENV:{var_name}"
-                var_value = os.environ[var_name]
-                raw_file = raw_file.replace(placeholder, var_value)
-                logger.debug(f"Replaced {placeholder} with {var_value}")
+        def replace_environment_variable(match: re.Match) -> str:
+            var_name = match.group(1)
+            if var_name not in os.environ:
+                return match.group(0)
 
-        return raw_file
+            var_value = os.environ[var_name]
+            logger.debug(f"Replaced {match.group(0)} with {var_value}")
+            return var_value
+
+        return re.sub(r"\$ENV:(\w+)", replace_environment_variable, raw_file)
     return raw_file
 
 

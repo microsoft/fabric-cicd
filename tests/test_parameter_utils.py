@@ -1708,6 +1708,15 @@ runtime_version: "1.2"
         assert 'PPE_DUP: "ppe-guid"' in result
         assert "$ENV:" not in result
 
+    def test_replace_variables_in_parameter_file_shared_prefix(self, monkeypatch):
+        """Test that variable names sharing a prefix are replaced independently."""
+        monkeypatch.setattr("os.environ", {"FOO": "x", "FOO_BAR": "y"})
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        result = replace_variables_in_parameter_file("short: $ENV:FOO\nlong: $ENV:FOO_BAR")
+
+        assert result == "short: x\nlong: y"
+
     def test_replace_variables_in_parameter_file_feature_disabled(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag disabled."""
         # OS environment variables use plain names
