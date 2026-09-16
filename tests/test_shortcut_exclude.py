@@ -36,7 +36,7 @@ def mock_fabric_workspace():
     # Mock parameter replacement methods to return content as-is
     workspace._replace_parameters = lambda file_obj, _item_obj: file_obj.contents
     workspace._replace_logical_ids = lambda contents: contents
-    workspace._replace_workspace_ids = lambda contents: contents
+    workspace._replace_workspace_ids = lambda contents, _item_obj: contents
 
     return workspace
 

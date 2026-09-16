@@ -609,16 +609,17 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file: str) -> str:
+    def _replace_workspace_ids(self, raw_file: str, item_obj: Item) -> str:
         """
-        Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
-        (actual workspace ID guid) values, with target workspace ID in the raw file content.
+        Replaces default workspace ID references (00000000-0000-0000-0000-000000000000)
+        with the target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
+            item_obj: The Item object instance that provides the item type.
         """
         # Use re.sub to replace all matches
-        return re.sub(
+        raw_file = re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
                 match.group(0).replace(constants.DEFAULT_GUID, self.workspace_id)
@@ -627,6 +628,15 @@ class FabricWorkspace:
             ),
             raw_file,
         )
+        # For Reflex items, also replace default workspace IDs embedded in escaped action definitions
+        if item_obj.type == ItemType.REFLEX.value:
+            raw_file = re.sub(
+                constants.REFLEX_WORKSPACE_ID_REFERENCE_REGEX,
+                rf"\g<1>{self.workspace_id}\g<2>",
+                raw_file,
+            )
+
+        return raw_file
 
     def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
@@ -717,7 +727,7 @@ class FabricWorkspace:
                             file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file, item)
-                            file.contents = self._replace_workspace_ids(file.contents)
+                            file.contents = self._replace_workspace_ids(file.contents, item)
 
                     item_payload.append(file.base64_payload)
             # Some item definitions require specifying the format as multiple API versions exist (i.e. Spark Job Definitions)

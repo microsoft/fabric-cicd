@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix replacement of escaped default workspace IDs in Activator item definitions
+time: 2026-09-08T17:21:02.5203199+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1118"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1118

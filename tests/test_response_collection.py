@@ -145,7 +145,7 @@ def test_publish_item_without_response_collection(test_workspace_with_notebook):
     with (
         patch.object(workspace, "_replace_logical_ids", side_effect=lambda x: x),
         patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents),
-        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda x: x),
+        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda contents, _item_obj: contents),
     ):
         workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
         assert workspace.responses is None
@@ -164,7 +164,7 @@ def test_publish_item_with_response_collection(test_workspace_with_notebook):
         with (
             patch.object(workspace, "_replace_logical_ids", side_effect=lambda x: x),
             patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents),
-            patch.object(workspace, "_replace_workspace_ids", side_effect=lambda x: x),
+            patch.object(workspace, "_replace_workspace_ids", side_effect=lambda contents, _item_obj: contents),
         ):
             workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
 

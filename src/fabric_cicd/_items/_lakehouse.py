@@ -212,7 +212,9 @@ class ShortcutPublisher(Publisher):
         if shortcut_file_obj:
             shortcut_file_obj.contents = self.fabric_workspace_obj._replace_parameters(shortcut_file_obj, self.item_obj)
             shortcut_file_obj.contents = self.fabric_workspace_obj._replace_logical_ids(shortcut_file_obj.contents)
-            shortcut_file_obj.contents = self.fabric_workspace_obj._replace_workspace_ids(shortcut_file_obj.contents)
+            shortcut_file_obj.contents = self.fabric_workspace_obj._replace_workspace_ids(
+                shortcut_file_obj.contents, self.item_obj
+            )
 
             shortcuts = json.loads(shortcut_file_obj.contents) or []
         else:
