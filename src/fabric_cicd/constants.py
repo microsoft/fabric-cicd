@@ -48,6 +48,7 @@ class ItemType(str, Enum):
 
     APACHE_AIRFLOW_JOB = "ApacheAirflowJob"
     COPY_JOB = "CopyJob"
+    COSMOS_DB_DATABASE = "CosmosDBDatabase"
     DATA_AGENT = "DataAgent"
     DATA_BUILD_TOOL_JOB = "DataBuildToolJob"
     DATA_PIPELINE = "DataPipeline"
@@ -85,30 +86,31 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     3: ItemType.MIRRORED_DATABASE,
     4: ItemType.LAKEHOUSE,
     5: ItemType.SQL_DATABASE,
-    6: ItemType.ENVIRONMENT,
-    7: ItemType.USER_DATA_FUNCTION,
-    8: ItemType.EVENTHOUSE,
-    9: ItemType.SPARK_JOB_DEFINITION,
-    10: ItemType.NOTEBOOK,
-    11: ItemType.SEMANTIC_MODEL,
-    12: ItemType.REPORT,
-    13: ItemType.PAGINATED_REPORT,
-    14: ItemType.COPY_JOB,
-    15: ItemType.DATA_BUILD_TOOL_JOB,
-    16: ItemType.KQL_DATABASE,
-    17: ItemType.KQL_QUERYSET,
-    18: ItemType.DATAFLOW,
-    19: ItemType.DATA_PIPELINE,
-    20: ItemType.REFLEX,
-    21: ItemType.EVENTSTREAM,
-    22: ItemType.KQL_DASHBOARD,
-    23: ItemType.GRAPHQL_API,
-    24: ItemType.APACHE_AIRFLOW_JOB,
-    25: ItemType.MOUNTED_DATA_FACTORY,
-    26: ItemType.ONTOLOGY,
-    27: ItemType.DATA_AGENT,
-    28: ItemType.ML_EXPERIMENT,
-    29: ItemType.MAP,
+    6: ItemType.COSMOS_DB_DATABASE,
+    7: ItemType.ENVIRONMENT,
+    8: ItemType.USER_DATA_FUNCTION,
+    9: ItemType.EVENTHOUSE,
+    10: ItemType.SPARK_JOB_DEFINITION,
+    11: ItemType.NOTEBOOK,
+    12: ItemType.SEMANTIC_MODEL,
+    13: ItemType.REPORT,
+    14: ItemType.PAGINATED_REPORT,
+    15: ItemType.COPY_JOB,
+    16: ItemType.DATA_BUILD_TOOL_JOB,
+    17: ItemType.KQL_DATABASE,
+    18: ItemType.KQL_QUERYSET,
+    19: ItemType.DATAFLOW,
+    20: ItemType.DATA_PIPELINE,
+    21: ItemType.REFLEX,
+    22: ItemType.EVENTSTREAM,
+    23: ItemType.KQL_DASHBOARD,
+    24: ItemType.GRAPHQL_API,
+    25: ItemType.APACHE_AIRFLOW_JOB,
+    26: ItemType.MOUNTED_DATA_FACTORY,
+    27: ItemType.ONTOLOGY,
+    28: ItemType.DATA_AGENT,
+    29: ItemType.ML_EXPERIMENT,
+    30: ItemType.MAP,
 }
 
 
@@ -125,6 +127,8 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of Eventhouses."""
     ENABLE_KQLDATABASE_UNPUBLISH = "enable_kqldatabase_unpublish"
     """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
+    ENABLE_COSMOSDBDATABASE_UNPUBLISH = "enable_cosmosdbdatabase_unpublish"
+    """Set to enable the deletion of Cosmos DB Databases."""
     ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
     """Set to enable deploying shortcuts with the lakehouse."""
     DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
@@ -167,6 +171,7 @@ UNPUBLISH_FLAG_MAPPING = {
     ItemType.WAREHOUSE.value: FeatureFlag.ENABLE_WAREHOUSE_UNPUBLISH.value,
     ItemType.EVENTHOUSE.value: FeatureFlag.ENABLE_EVENTHOUSE_UNPUBLISH.value,
     ItemType.KQL_DATABASE.value: FeatureFlag.ENABLE_KQLDATABASE_UNPUBLISH.value,
+    ItemType.COSMOS_DB_DATABASE.value: FeatureFlag.ENABLE_COSMOSDBDATABASE_UNPUBLISH.value,
 }
 
 # Item Type

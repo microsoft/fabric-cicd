@@ -165,6 +165,33 @@ def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
         mock_ontology_instance.publish_all.assert_called_once()
 
 
+def test_publish_cosmosdbdatabase_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes Cosmos DB Database items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestCosmosDB", "CosmosDBDatabase", "test-cosmosdb-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._cosmosdbdatabase.CosmosDBDatabasePublisher") as mock_cosmos_cls,
+    ):
+        mock_cosmos_instance = mock_cosmos_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "CosmosDBDatabase" in workspace.repository_items
+        mock_cosmos_cls.assert_called_once_with(workspace)
+        mock_cosmos_instance.publish_all.assert_called_once()
+
+
 def test_publish_map_item(mock_endpoint, temp_workspace_dir):
     """Test that publish_all_items publishes Map items when present in repository."""
     create_test_item(temp_workspace_dir, None, "TestMap", "Map", "test-map-id")
@@ -340,6 +367,7 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
         ("legacy", "TestLakehouse", "Lakehouse", "test-lakehouse-id"),
         ("legacy", "TestWarehouse", "Warehouse", "test-warehouse-id"),
         ("legacy", "TestSQLDB", "SQLDatabase", "test-sqldb-id"),
+        ("legacy", "TestCosmosDB", "CosmosDBDatabase", "test-cosmosdb-id"),
         ("legacy", "TestEventhouse", "Eventhouse", "test-eventhouse-id"),
     ]
 
@@ -364,7 +392,7 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
-            item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "Eventhouse"],
+            item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "CosmosDBDatabase", "Eventhouse"],
             token_credential=DummyTokenCredential(),
         )
 
@@ -374,6 +402,7 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
             "Skipping unpublish for Lakehouse items because the 'enable_lakehouse_unpublish' feature flag is not enabled.",
             "Skipping unpublish for Warehouse items because the 'enable_warehouse_unpublish' feature flag is not enabled.",
             "Skipping unpublish for SQLDatabase items because the 'enable_sqldatabase_unpublish' feature flag is not enabled.",
+            "Skipping unpublish for CosmosDBDatabase items because the 'enable_cosmosdbdatabase_unpublish' feature flag is not enabled.",
             "Skipping unpublish for Eventhouse items because the 'enable_eventhouse_unpublish' feature flag is not enabled.",
         ]
 

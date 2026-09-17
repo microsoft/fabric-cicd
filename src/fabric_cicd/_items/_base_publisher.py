@@ -142,6 +142,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._activator import ActivatorPublisher
         from fabric_cicd._items._apacheairflowjob import ApacheAirflowJobPublisher
         from fabric_cicd._items._copyjob import CopyJobPublisher
+        from fabric_cicd._items._cosmosdbdatabase import CosmosDBDatabasePublisher
         from fabric_cicd._items._dataagent import DataAgentPublisher
         from fabric_cicd._items._databuildtooljob import DataBuildToolJobPublisher
         from fabric_cicd._items._dataflowgen2 import DataflowPublisher
@@ -175,6 +176,7 @@ class ItemPublisher(Publisher):
             ItemType.MIRRORED_DATABASE: MirroredDatabasePublisher,
             ItemType.LAKEHOUSE: LakehousePublisher,
             ItemType.SQL_DATABASE: SQLDatabasePublisher,
+            ItemType.COSMOS_DB_DATABASE: CosmosDBDatabasePublisher,
             ItemType.ENVIRONMENT: EnvironmentPublisher,
             ItemType.USER_DATA_FUNCTION: UserDataFunctionPublisher,
             ItemType.EVENTHOUSE: EventhousePublisher,

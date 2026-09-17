@@ -30,6 +30,13 @@
     - Connections will always point to the original data source unless parameterized in the `find_replace` section of the `parameter.yml` file.
 - **Initial deployment** requires manual configuration of the connection after deployment.
 
+## Cosmos DB Database
+
+- **Parameterization:**
+    - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Initial deployment** creates the item definition without the data loaded; data must be added afterward.
+- **Unpublish** is disabled by default, enable with feature flag `enable_cosmosdbdatabase_unpublish`.
+
 ## Dataflow
 
 - **Parameterization:**
