@@ -55,6 +55,7 @@ class ItemType(str, Enum):
     ENVIRONMENT = "Environment"
     EVENTHOUSE = "Eventhouse"
     EVENTSTREAM = "Eventstream"
+    GRAPH_MODEL = "GraphModel"
     GRAPHQL_API = "GraphQLApi"
     KQL_DASHBOARD = "KQLDashboard"
     KQL_DATABASE = "KQLDatabase"
@@ -109,6 +110,7 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     27: ItemType.DATA_AGENT,
     28: ItemType.ML_EXPERIMENT,
     29: ItemType.MAP,
+    30: ItemType.GRAPH_MODEL,
 }
 
 

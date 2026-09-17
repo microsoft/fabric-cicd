@@ -192,6 +192,33 @@ def test_publish_map_item(mock_endpoint, temp_workspace_dir):
         mock_map_instance.publish_all.assert_called_once()
 
 
+def test_publish_graph_model_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes GraphModel items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestGraphModel", "GraphModel", "test-graph-model-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._graphmodel.GraphModelPublisher") as mock_graph_model_cls,
+    ):
+        mock_graph_model_instance = mock_graph_model_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "GraphModel" in workspace.repository_items
+        mock_graph_model_cls.assert_called_once_with(workspace)
+        mock_graph_model_instance.publish_all.assert_called_once()
+
+
 def test_publish_data_build_tool_job_item(mock_endpoint, temp_workspace_dir):
     """Test that publish_all_items publishes DataBuildToolJob items when present in repository."""
     create_test_item(temp_workspace_dir, None, "TestDbtJob", "DataBuildToolJob", "test-dbt-job-id")
