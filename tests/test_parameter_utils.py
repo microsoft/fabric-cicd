@@ -1652,6 +1652,7 @@ runtime_version: "1.2"
         test_env_vars = {
             "TEST_VAR": "test_value",
             "ANOTHER_VAR": "another_value",
+            "MULTI_WORD_VAR": "value with multiple words",
             "NORMAL_VAR": "normal_value",  # Not referenced with $ENV:, so ignored
         }
         # Mock os.environ
@@ -1665,12 +1666,14 @@ runtime_version: "1.2"
         parameter:
           value: $ENV:TEST_VAR
           other: $ENV:ANOTHER_VAR
+          phrase: "$ENV:MULTI_WORD_VAR"
           normal: NORMAL_VAR
         """
         result = replace_variables_in_parameter_file(test_content)
         # Verify replacements
         assert "value: test_value" in result
         assert "other: another_value" in result
+        assert 'phrase: "value with multiple words"' in result
         assert "normal: NORMAL_VAR" in result  # Normal var unchanged
 
     def test_replace_variables_in_parameter_file_missing_env_var(self, monkeypatch):
@@ -1728,6 +1731,17 @@ runtime_version: "1.2"
         result = replace_variables_in_parameter_file("short: $ENV:FOO\nlong: $ENV:FOO_BAR")
 
         assert result == "short: x\nlong: y"
+
+    def test_replace_variables_in_parameter_file_prefix_is_case_sensitive(self, monkeypatch):
+        """Only the exact uppercase $ENV: token prefix triggers replacement."""
+        monkeypatch.setattr("os.environ", {"TEST_VAR": "replaced"})
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        result = replace_variables_in_parameter_file(
+            "uppercase: $ENV:TEST_VAR\nlowercase: $env:TEST_VAR\nmixed_case: $Env:TEST_VAR"
+        )
+
+        assert result == "uppercase: replaced\nlowercase: $env:TEST_VAR\nmixed_case: $Env:TEST_VAR"
 
     def test_replace_variables_in_parameter_file_feature_disabled(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag disabled."""

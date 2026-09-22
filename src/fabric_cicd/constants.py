@@ -361,7 +361,8 @@ PARAMETER_MSGS = {
     "duplicate_semantic_model": "Duplicate semantic model names found: {}. Each semantic model should only appear once in the configuration as only one connection can be bound per semantic model. Please remove duplicate entries to avoid unpredictable binding behavior.",
     "unsupported_find_value_variable": "Dynamic replacement variable '{}' is not supported in find_value. Same-workspace item attributes ($items.*) resolve to the target environment's item ID, which cannot be present in the source file",
     "cross_workspace_variable_warning": "Cross-workspace dynamic replacement variable(s) were found. Ensure the referenced workspace(s) and item(s), if applicable, exist before deployment",
-    "environment_variable_feature_warning": "Environment variable references using the '$ENV:' prefix were found, but the 'enable_environment_variable_replacement' feature flag was not enabled. These references were not resolved",
+    "environment_variable_feature_disabled": "Environment variable reference '{}' requires the 'enable_environment_variable_replacement' feature flag",
+    "environment_variable_unresolved": "Environment variable reference '{}' could not be resolved. Ensure the referenced OS environment variable is set",
     "incompatible_find_value_regex_variable": "Dynamic replacement variable '{}' in find_value cannot be combined with is_regex. Use either a dynamic replacement variable OR a regex pattern, not both",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",
