@@ -36,6 +36,7 @@
     - The `find_replace` section in the `parameter.yml` file is not applied.
 - **Initial deployment** creates the item definition without the data loaded; data must be added afterward.
 - **Unpublish** is disabled by default, enable with feature flag `enable_cosmosdbdatabase_unpublish`.
+- **Note:** Cosmos DB databases are subject to soft delete. Before redeploying a deleted database, remove it from the recycle bin to ensure the deployment works as expected.
 
 ## Dataflow
 
