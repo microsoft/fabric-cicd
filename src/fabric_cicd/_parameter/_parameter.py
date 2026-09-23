@@ -1141,7 +1141,7 @@ class Parameter:
                     f"{location}: {constants.PARAMETER_MSGS['environment_variable_feature_disabled'].format(value)}"
                     for location, value in environment_variable_references
                 )
-            else:
+            elif active_environment_variable_references:
                 environment_errors.extend(
                     f"{location}: {constants.PARAMETER_MSGS['environment_variable_unresolved'].format(value)}"
                     for location, value in active_environment_variable_references
