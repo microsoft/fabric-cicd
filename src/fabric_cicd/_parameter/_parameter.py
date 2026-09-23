@@ -1120,11 +1120,7 @@ class Parameter:
                     if value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
                         reference = (f"{param_name}[{index}].replace_value.{environment}", value)
                         environment_variable_references.append(reference)
-                        if (
-                            self.environment == "N/A"
-                            or environment == self.environment
-                            or environment.lower() == "_all_"
-                        ):
+                        if environment == self.environment or environment.lower() == "_all_":
                             active_environment_variable_references.append(reference)
                         continue
                     try:

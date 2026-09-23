@@ -2846,6 +2846,27 @@ def test_validate_dynamic_replacement_variables_ignores_unresolved_token_for_oth
     assert msg == "Valid dynamic replacement variables"
 
 
+def test_validate_dynamic_replacement_variables_ignores_environment_specific_token_without_target(
+    empty_parameter, monkeypatch
+):
+    """An unresolved environment-specific token is inactive when no target environment is provided."""
+    monkeypatch.setattr(constants, "FEATURE_FLAG", {"enable_environment_variable_replacement"})
+    empty_parameter.environment = "N/A"
+    empty_parameter.environment_parameter = {
+        "find_replace": [
+            {
+                "find_value": "source-lakehouse-id",
+                "replace_value": {"PPE": "$ENV:missing_ppe_value"},
+            }
+        ]
+    }
+
+    ok, msg = empty_parameter._validate_dynamic_replacement_variables()
+
+    assert ok is True
+    assert msg == "Valid dynamic replacement variables"
+
+
 @pytest.mark.parametrize("find_value", ["$workspace.$id", "$workspace.$name", "$workspace.$name_encoded"])
 def test_validate_dynamic_replacement_variables_does_not_warn_for_workspace_find_value(
     empty_parameter, caplog, find_value
