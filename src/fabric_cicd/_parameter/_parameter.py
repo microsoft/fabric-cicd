@@ -1116,13 +1116,16 @@ class Parameter:
                 for environment, value in replace_value.items():
                     if not isinstance(value, str) or not value.startswith("$"):
                         continue
+
                     # Ignore the supported environment variable prefix that also starts with "$"
                     if value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
                         reference = (f"{param_name}[{index}].replace_value.{environment}", value)
                         environment_variable_references.append(reference)
+                        # Get the environment variable reference for the target environment
                         if environment == self.environment or environment.lower() == "_all_":
                             active_environment_variable_references.append(reference)
                         continue
+
                     try:
                         parsed_variable = parse_dynamic_variable(value)
                     except ParsingError as error:
@@ -1134,13 +1137,15 @@ class Parameter:
         if has_cross_workspace_variables:
             logger.warning(constants.PARAMETER_MSGS["cross_workspace_variable_warning"])
 
-        # Any environment variable tokens remaining after parameter loading are unresolved
+        # Remaining environment variable tokens are unresolved
         if environment_variable_references:
+            # Report all references when replacement is disabled
             if "enable_environment_variable_replacement" not in constants.FEATURE_FLAG:
                 environment_errors.extend(
                     f"{location}: {constants.PARAMETER_MSGS['environment_variable_feature_disabled'].format(value)}"
                     for location, value in environment_variable_references
                 )
+            # Otherwise, report only active references
             elif active_environment_variable_references:
                 environment_errors.extend(
                     f"{location}: {constants.PARAMETER_MSGS['environment_variable_unresolved'].format(value)}"
