@@ -85,6 +85,14 @@
     - Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
 - **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
 
+## Graph Model
+
+- **Parameterization:**
+    - The data source (e.g., Lakehouse) will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - It is recommended to use the supported variables in `find_replace` for dynamic replacement of the source workspace and item IDs.
+- **Initial deployment** requires the target Lakehouse to contain the schema and Delta tables expected by the Graph Model. Creating an empty Lakehouse alongside the Graph Model is not sufficient, even if the Lakehouse item is created successfully. Populate the Lakehouse before deploying the dependent Graph Model.
+- **Unpublish** is disabled by default. Enable it with the `enable_graphmodel_unpublish` feature flag. Use cautiously: in-scope Graph Models missing from the repository, including automatically created child items, will be deleted.
+
 ## KQL Database
 
 - **Parameterization:**
