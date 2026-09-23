@@ -1167,7 +1167,9 @@ in
 
 **Solution:** Use `find_replace` with dynamic replacement variables to replace the source Workspace and Lakehouse IDs.
 
-**Note:** Before deploying the Graph Model, the target Lakehouse must contain the expected schema, specifically the `factsales` table referenced in this example. Graph Model creation will fail if the Lakehouse is empty or its schema is incompatible.
+**Note:** Before deploying the Graph Model, the target Lakehouse must contain the expected schema. Graph Model creation will fail if the Lakehouse is empty or its schema is incompatible.
+
+In the example below, the Graph Model references the `factsales` table in the Lakehouse.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
@@ -1195,7 +1197,7 @@ find_replace:
             "name": "factsales",
             "type": "DeltaTable",
             "properties": {
-                "path": "abfss://2af52fd8-85d2-4e47-a295-6e7b311165c7@onelake.dfs.fabric.microsoft.com/c9b37ed0-6db2-43af-b3d2-fd5ea6d8aa44/Tables/factsales"
+                "path": "abfss://2af52fd8-85d2-4e47-a295-6e7b311165c7@onelake.dfs.fabric.microsoft.com/a4d9b672-3e81-4f5c-9a20-7b16d8c043ef/Tables/factsales"
             }
         }
     ]
