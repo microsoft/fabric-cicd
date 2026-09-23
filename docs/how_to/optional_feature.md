@@ -33,6 +33,7 @@ append_feature_flag("<specific_flag>")
 | `enable_sqldatabase_unpublish` | Enable the deletion of SQL Databases                                                               |
 | `enable_eventhouse_unpublish`  | Enable the deletion of Eventhouses                                                                 |
 | `enable_kqldatabase_unpublish` | Enable the deletion of KQL Databases (attached to Eventhouses)                                     |
+| `enable_graphmodel_unpublish`  | Enable the deletion of Graph Models                                                                |
 | `enable_hard_delete`           | Enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. |
 
 <span class="md-h3-nonanchor">Selective deployment</span>
