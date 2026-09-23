@@ -56,6 +56,7 @@ class ItemType(str, Enum):
     ENVIRONMENT = "Environment"
     EVENTHOUSE = "Eventhouse"
     EVENTSTREAM = "Eventstream"
+    GRAPH_MODEL = "GraphModel"
     GRAPHQL_API = "GraphQLApi"
     KQL_DASHBOARD = "KQLDashboard"
     KQL_DATABASE = "KQLDatabase"
@@ -111,6 +112,7 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     28: ItemType.DATA_AGENT,
     29: ItemType.ML_EXPERIMENT,
     30: ItemType.MAP,
+    31: ItemType.GRAPH_MODEL,
 }
 
 
@@ -129,6 +131,8 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
     ENABLE_COSMOSDBDATABASE_UNPUBLISH = "enable_cosmosdbdatabase_unpublish"
     """Set to enable the deletion of Cosmos DB Databases."""
+    ENABLE_GRAPHMODEL_UNPUBLISH = "enable_graphmodel_unpublish"
+    """Set to enable the deletion of Graph Models."""
     ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
     """Set to enable deploying shortcuts with the lakehouse."""
     DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
@@ -172,6 +176,7 @@ UNPUBLISH_FLAG_MAPPING = {
     ItemType.EVENTHOUSE.value: FeatureFlag.ENABLE_EVENTHOUSE_UNPUBLISH.value,
     ItemType.KQL_DATABASE.value: FeatureFlag.ENABLE_KQLDATABASE_UNPUBLISH.value,
     ItemType.COSMOS_DB_DATABASE.value: FeatureFlag.ENABLE_COSMOSDBDATABASE_UNPUBLISH.value,
+    ItemType.GRAPH_MODEL.value: FeatureFlag.ENABLE_GRAPHMODEL_UNPUBLISH.value,
 }
 
 # Item Type

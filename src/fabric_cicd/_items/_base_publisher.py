@@ -150,6 +150,7 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._environment import EnvironmentPublisher
         from fabric_cicd._items._eventhouse import EventhousePublisher
         from fabric_cicd._items._eventstream import EventstreamPublisher
+        from fabric_cicd._items._graphmodel import GraphModelPublisher
         from fabric_cicd._items._graphqlapi import GraphQLApiPublisher
         from fabric_cicd._items._kqldashboard import KQLDashboardPublisher
         from fabric_cicd._items._kqldatabase import KQLDatabasePublisher
@@ -201,6 +202,7 @@ class ItemPublisher(Publisher):
             ItemType.ML_EXPERIMENT: MLExperimentPublisher,
             ItemType.ONTOLOGY: OntologyPublisher,
             ItemType.MAP: MapPublisher,
+            ItemType.GRAPH_MODEL: GraphModelPublisher,
         }
 
         publisher_class = publisher_mapping.get(item_type)

@@ -73,6 +73,18 @@ find_replace:
         PROD: "$items.SemanticModel.ABC.$id"
       item_type: "PaginatedReport"
       file_path: "/ABC Paginated.PaginatedReport/ABC Paginated.rdl"
+    # Graph Model - replace source Lakehouse GUIDs
+    - find_value: "2af52fd8-85d2-4e47-a295-6e7b311165c7"
+      replace_value:
+          PPE: "$workspace.$id"
+          PROD: "$workspace.$id"
+      file_path: "/Sample_Graph.GraphModel/dataSources.json"
+    - find_value: "a4d9b672-3e81-4f5c-9a20-7b16d8c043ef"
+      replace_value:
+          PPE: "$items.Lakehouse.Graph_Source_LH.$id"
+          PROD: "$items.Lakehouse.Graph_Source_LH.$id"
+      file_path: "/Sample_Graph.GraphModel/dataSources.json"
+
 
 key_value_replace:
     - find_key: $.variables[?(@.name=="SQL_Server")].value
