@@ -26,15 +26,16 @@ append_feature_flag("<specific_flag>")
 
 <span class="md-h3-nonanchor">Unpublish behavior</span>
 
-| Flag Name                      | Description                                                                                        |
-| ------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `enable_lakehouse_unpublish`   | Enable the deletion of Lakehouses                                                                  |
-| `enable_warehouse_unpublish`   | Enable the deletion of Warehouses                                                                  |
-| `enable_sqldatabase_unpublish` | Enable the deletion of SQL Databases                                                               |
-| `enable_eventhouse_unpublish`  | Enable the deletion of Eventhouses                                                                 |
-| `enable_kqldatabase_unpublish` | Enable the deletion of KQL Databases (attached to Eventhouses)                                     |
-| `enable_graphmodel_unpublish`  | Enable the deletion of Graph Models                                                                |
-| `enable_hard_delete`           | Enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. |
+| Flag Name                           | Description                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `enable_cosmosdbdatabase_unpublish` | Enable the deletion of Cosmos DB Databases                                                         |
+| `enable_eventhouse_unpublish`       | Enable the deletion of Eventhouses                                                                 |
+| `enable_graphmodel_unpublish`       | Enable the deletion of Graph Models                                                                |
+| `enable_kqldatabase_unpublish`      | Enable the deletion of KQL Databases (attached to Eventhouses)                                     |
+| `enable_lakehouse_unpublish`        | Enable the deletion of Lakehouses                                                                  |
+| `enable_sqldatabase_unpublish`      | Enable the deletion of SQL Databases                                                               |
+| `enable_warehouse_unpublish`        | Enable the deletion of Warehouses                                                                  |
+| `enable_hard_delete`                | Enable hard deletion of items, bypassing the workspace recycle bin. Requires workspace Admin role. |
 
 <span class="md-h3-nonanchor">Selective deployment</span>
 
