@@ -127,6 +127,8 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of Eventhouses."""
     ENABLE_KQLDATABASE_UNPUBLISH = "enable_kqldatabase_unpublish"
     """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
+    ENABLE_GRAPHMODEL_UNPUBLISH = "enable_graphmodel_unpublish"
+    """Set to enable the deletion of Graph Models."""
     ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
     """Set to enable deploying shortcuts with the lakehouse."""
     DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
@@ -169,6 +171,7 @@ UNPUBLISH_FLAG_MAPPING = {
     ItemType.WAREHOUSE.value: FeatureFlag.ENABLE_WAREHOUSE_UNPUBLISH.value,
     ItemType.EVENTHOUSE.value: FeatureFlag.ENABLE_EVENTHOUSE_UNPUBLISH.value,
     ItemType.KQL_DATABASE.value: FeatureFlag.ENABLE_KQLDATABASE_UNPUBLISH.value,
+    ItemType.GRAPH_MODEL.value: FeatureFlag.ENABLE_GRAPHMODEL_UNPUBLISH.value,
 }
 
 # Item Type
