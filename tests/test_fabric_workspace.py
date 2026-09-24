@@ -1614,8 +1614,8 @@ def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace
         assert mock_endpoint.invoke.call_count == 0  # No API call made
 
 
-def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, valid_workspace_id):
-    """When find_value contains dynamic replacement variables, _refresh_deployed_items collects extra attributes."""
+def test_dynamic_find_value_does_not_trigger_attribute_collection(temp_workspace_dir, valid_workspace_id):
+    """A cross-workspace variable in find_value does not require current-workspace item attributes."""
     # Create a parameter file with dynamic replacement variable in find_value
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
@@ -1685,18 +1685,16 @@ def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, va
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is True
+        assert workspace.contains_param_item_vars is False
 
-        # Now call _refresh_deployed_items to exercise the contains_param_vars guard
         workspace._refresh_deployed_items()
 
-        # Verify _get_item_attribute was called (lakehouse detail API)
+        # Cross-workspace find values do not require current-workspace item attributes
         lakehouse_calls = [c for c in mock_ep.invoke.call_args_list if "lakehouses/" in str(c)]
-        assert len(lakehouse_calls) > 0
+        assert lakehouse_calls == []
 
-        # Verify workspace_items has the resolved attributes
-        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpoint"] == "server.db"
-        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == "sqlep-id"
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpoint"] == ""
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == ""
 
 
 def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir, valid_workspace_id, caplog):
@@ -1708,8 +1706,8 @@ def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir
         yaml.safe_dump({
             "find_replace": [
                 {
-                    "find_value": "$workspace.source_ws.$items.Lakehouse.MyLakehouse.$id",
-                    "replace_value": {"PPE": "replacement-id"},
+                    "find_value": "old-endpoint",
+                    "replace_value": {"PPE": "$items.Lakehouse.MyLakehouse.$sqlendpoint"},
                 }
             ]
         }),
@@ -1769,7 +1767,7 @@ def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is True
+        assert workspace.contains_param_item_vars is True
 
         # Should not raise even though the staging lakehouse SQL endpoint is unresolved
         with caplog.at_level("WARNING"):
@@ -1844,7 +1842,7 @@ find_replace:
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is False
+        assert workspace.contains_param_item_vars is False
 
         # Now call _refresh_deployed_items
         workspace._refresh_deployed_items()

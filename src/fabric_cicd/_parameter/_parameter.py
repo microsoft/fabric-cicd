@@ -1047,9 +1047,8 @@ class Parameter:
 
     # region Dynamic Var Checks
 
-    def _search_dynamic_replacement_variables_in_parameter_file(self) -> bool:
-        """Search for dynamic replacement variables in the parameter file."""
-        dynamic_replacement_var_pattern = re.compile(constants.DYNAMIC_VARIABLES_REGEX, re.IGNORECASE)
+    def _search_dynamic_replacement_item_variables_in_parameter_file(self) -> bool:
+        """Return whether a replace value contains a current-workspace item variable."""
         dynamic_param_names = {"find_replace", "key_value_replace"}
 
         for param_name, param_values in self.environment_parameter.items():
@@ -1057,24 +1056,23 @@ class Parameter:
                 continue
             if isinstance(param_values, list):
                 for param_dict in param_values:
-                    # Check find_value for dynamic replacement variables
-                    find_value = param_dict.get("find_value", "")
-                    if isinstance(find_value, str) and dynamic_replacement_var_pattern.search(find_value):
-                        return True
-
-                    # Check replace_value for dynamic replacement variables
                     replace_value = param_dict.get("replace_value")
                     if isinstance(replace_value, dict):
                         for env_value in replace_value.values():
-                            if isinstance(env_value, str) and dynamic_replacement_var_pattern.search(env_value):
+                            if isinstance(env_value, str) and env_value.lower().startswith(
+                                constants.ITEM_VARIABLE_PREFIX
+                            ):
                                 return True
 
         return False
 
     def _validate_dynamic_replacement_variables(self) -> tuple[bool, str]:
         """Validate every dynamic replacement variable and report all syntax errors with their locations."""
-        errors = []
+        dynamic_errors = []
+        environment_errors = []
         has_cross_workspace_variables = False
+        environment_variable_references = []
+        active_environment_variable_references = []
 
         # Validate dynamic replacement variables in find_replace and key_value_replace parameters
         for param_name in ("find_replace", "key_value_replace"):
@@ -1091,7 +1089,7 @@ class Parameter:
                     find_value = param_dict.get("find_value")
                     # Dynamic items variables ($items.type.name.$attribute) are not supported in find_value
                     if isinstance(find_value, str) and find_value.startswith(constants.ITEM_VARIABLE_PREFIX):
-                        errors.append(
+                        dynamic_errors.append(
                             f"{param_name}[{index}].find_value: "
                             f"{constants.PARAMETER_MSGS['unsupported_find_value_variable'].format(find_value)}"
                         )
@@ -1100,7 +1098,7 @@ class Parameter:
                         try:
                             parsed_variable = parse_dynamic_variable(find_value)
                         except ParsingError as error:
-                            errors.append(f"{param_name}[{index}].find_value: {error}")
+                            dynamic_errors.append(f"{param_name}[{index}].find_value: {error}")
                         else:
                             if parsed_variable.workspace_name:
                                 has_cross_workspace_variables = True
@@ -1113,10 +1111,20 @@ class Parameter:
                 for environment, value in replace_value.items():
                     if not isinstance(value, str) or not value.startswith("$"):
                         continue
+
+                    # Ignore the supported environment variable prefix that also starts with "$"
+                    if value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
+                        reference = (f"{param_name}[{index}].replace_value.{environment}", value)
+                        environment_variable_references.append(reference)
+                        # Get the environment variable reference for the target environment
+                        if environment == self.environment or environment.lower() == "_all_":
+                            active_environment_variable_references.append(reference)
+                        continue
+
                     try:
                         parsed_variable = parse_dynamic_variable(value)
                     except ParsingError as error:
-                        errors.append(f"{param_name}[{index}].replace_value.{environment}: {error}")
+                        dynamic_errors.append(f"{param_name}[{index}].replace_value.{environment}: {error}")
                     else:
                         if parsed_variable.workspace_name:
                             has_cross_workspace_variables = True
@@ -1124,8 +1132,29 @@ class Parameter:
         if has_cross_workspace_variables:
             logger.warning(constants.PARAMETER_MSGS["cross_workspace_variable_warning"])
 
-        if errors:
-            return False, "Invalid dynamic replacement variables:\n- " + "\n- ".join(errors)
+        # Remaining environment variable tokens are unresolved
+        if environment_variable_references:
+            # Report all references when replacement is disabled
+            if "enable_environment_variable_replacement" not in constants.FEATURE_FLAG:
+                environment_errors.extend(
+                    f"{location}: {constants.PARAMETER_MSGS['environment_variable_feature_disabled'].format(value)}"
+                    for location, value in environment_variable_references
+                )
+            # Otherwise, report only active references
+            elif active_environment_variable_references:
+                environment_errors.extend(
+                    f"{location}: {constants.PARAMETER_MSGS['environment_variable_unresolved'].format(value)}"
+                    for location, value in active_environment_variable_references
+                )
+
+        if dynamic_errors or environment_errors:
+            if dynamic_errors and environment_errors:
+                header = "Invalid replacement variables"
+            elif environment_errors:
+                header = "Invalid environment variable reference(s)"
+            else:
+                header = "Invalid dynamic replacement variable(s)"
+            return False, f"{header}:\n- " + "\n- ".join(dynamic_errors + environment_errors)
 
         return True, "Valid dynamic replacement variables"
 

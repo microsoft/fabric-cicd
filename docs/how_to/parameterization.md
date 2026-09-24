@@ -233,9 +233,9 @@ The `find_replace` and `key_value_replace` parameters support fabric-cicd define
     - **Cannot be combined with `is_regex: "true"`** — use either a dynamic replacement variable OR a regex pattern, not both
 - **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
 
-!!! note "Bulk Publish Limitation"
+!!! note "Bulk Publish Note"
 
-    Dynamic replacement variables (`$workspace`, `$items`) are not supported when using [bulk publish](optional_feature.md#bulk-publish) mode. When dynamic replacement variables are detected in the parameter file, the deployment automatically falls back to standard publishing. To use bulk publish, replace dynamic replacement variables with static values or use logical IDs directly.
+    Dynamic replacement variables (`$workspace`, `$items`) are supported in [bulk publish](optional_feature.md#bulk-publish) mode. Current-workspace `$items.*` references are published in dependency-ordered batches so referenced items are available before their dependents. However, a current-workspace `$items.*` `replace_value` without an `item_type`, `item_name`, or `file_path` filter causes a fallback to standard publishing because its dependency scope cannot be determined. `$workspace.*` and cross-workspace item variables do not create in-batch dependencies.
 
 Additional notes:
 
@@ -287,7 +287,9 @@ Additional notes:
 
 ### Environment Variable Replacement
 
-In the `find_replace` parameter, if the `enable_environment_variable_replacement` feature flag is set, pipeline/environment variables will be used to replace the values in the `parameter.yml` file with the corresponding values from the variables dictionary. **Only Environment Variable beginning with '$ENV:' will be used as replacement values.** See example below:
+In the `find_replace` parameter, if the `enable_environment_variable_replacement` feature flag is set, environment variables will be used to replace the values in the `parameter.yml` file. In the `parameter.yml` file, reference an environment variable using the `$ENV:` token prefix followed by the variable's plain name (for example, `$ENV:ppe_lakehouse`). The `$ENV:` prefix is **only** the in-file token marker — the actual OS/pipeline environment variable is looked up by its plain name (`ppe_lakehouse`), **not** `$ENV:ppe_lakehouse`. If a referenced environment variable is not set, the token is left unchanged. See example below:
+
+For example, set the environment variables `ppe_lakehouse` and `prod_lakehouse` in your shell or pipeline, then reference them in `parameter.yml` with the `$ENV:` prefix:
 
 ```yaml
 find_replace:
@@ -1157,6 +1159,51 @@ shared Table_DataDestination = let
   TableNavigation = Navigation_2{[Id = "Items", ItemKind = "Table"]}?[Data]?
 in
   TableNavigation;
+```
+
+### Graph Models
+
+#### Lakehouse Data Source Parameterization Case
+
+**Case:** A Graph Model reads Delta tables from a Lakehouse. Each table path in the Graph Model's `dataSources.json` file contains the source Workspace and Lakehouse IDs, which must be updated for the target environment.
+
+**Solution:** Use `find_replace` with dynamic replacement variables to replace the source Workspace and Lakehouse IDs.
+
+**Note:** Before deploying the Graph Model, the target Lakehouse must contain the expected schema. Graph Model creation will fail if the Lakehouse is empty or its schema is incompatible.
+
+In the example below, the Graph Model references the `factsales` table in the Lakehouse.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    - find_value: "2af52fd8-85d2-4e47-a295-6e7b311165c7" # source workspace ID
+      replace_value:
+          PPE: "$workspace.$id"
+          PROD: "$workspace.$id"
+            file_path: "/SalesGraphModel.GraphModel/dataSources.json"
+    - find_value: "a4d9b672-3e81-4f5c-9a20-7b16d8c043ef" # source Lakehouse ID
+      replace_value:
+          PPE: "$items.Lakehouse.Sales_Lakehouse.$id"
+          PROD: "$items.Lakehouse.Sales_Lakehouse.$id"
+            file_path: "/SalesGraphModel.GraphModel/dataSources.json"
+```
+
+<span class="md-h4-nonanchor">dataSources.json file</span>
+
+```json
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/graphIndex/definition/dataSources/1.0.0/schema.json",
+    "dataSources": [
+        {
+            "name": "factsales",
+            "type": "DeltaTable",
+            "properties": {
+                "path": "abfss://2af52fd8-85d2-4e47-a295-6e7b311165c7@onelake.dfs.fabric.microsoft.com/a4d9b672-3e81-4f5c-9a20-7b16d8c043ef/Tables/factsales"
+            }
+        }
+    ]
+}
 ```
 
 ### Reports
