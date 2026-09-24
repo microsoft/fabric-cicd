@@ -247,6 +247,35 @@ def test_process_environment_file_pool_no_match(tmp_path):
     assert parsed["instance_pool_id"] == "unmatched-pool"
 
 
+def test_process_environment_file_pool_no_match_for_na_environment(tmp_path):
+    """When environment is 'N/A' and replace_value has no matching key, instance_pool_id is left as-is (no KeyError)."""
+    env_dir = tmp_path / "EnvG"
+    setting_dir = env_dir / "Setting"
+    setting_dir.mkdir(parents=True, exist_ok=True)
+    sc = setting_dir / "Sparkcompute.yml"
+    sc.write_text("instance_pool_id: f967b14a-28aa-4785-9702-e2a4d532b3fc\n", encoding="utf-8")
+
+    class FakeWS:
+        environment = "N/A"
+        environment_parameter: ClassVar[dict] = {
+            "spark_pool": [
+                {
+                    "instance_pool_id": "f967b14a-28aa-4785-9702-e2a4d532b3fc",
+                    "replace_value": {"PPE": {"type": "Workspace", "name": "large_pool"}},
+                }
+            ]
+        }
+        base_api_url = "https://api.example/v1/workspaces/ws-id"
+
+        def _get_workspace_pools(self):
+            return [{"id": "guid-large", "name": "large_pool", "type": "Workspace"}]
+
+    dummy = DummyFile(sc)
+    result = env_module._process_environment_file(FakeWS(), DummyItem("EnvG", [sc]), dummy)
+    parsed = yaml.safe_load(result)
+    assert parsed["instance_pool_id"] == "f967b14a-28aa-4785-9702-e2a4d532b3fc"
+
+
 def test_process_environment_file_no_spark_pool_param(tmp_path):
     """When environment_parameter has no spark_pool, instance_pool_id is left as-is."""
     env_dir = tmp_path / "EnvF"

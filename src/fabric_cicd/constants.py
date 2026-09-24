@@ -357,6 +357,7 @@ PARAMETER_MSGS = {
     "no target env": "target environment '{}' not found",
     "all target env": "The replace value: '{}' will be applied for any target environment",
     "other target env": "The '{}' environment key can only be used alone. Other environment keys found in replace_value: '{}'",
+    "target env missing": "No target environment was specified in the deployment. Parameter values must use the '_ALL_' environment key when no target environment is provided",
     "no filter match": "unmatched optional filters",
     # Path resolution messages
     "resolving_relative_path": "Resolving path '{}' to be relative to repository directory",
@@ -488,6 +489,7 @@ CONFIG_VALIDATION_MSGS = {
     # Environment validation
     "environment": {
         "no_env_with_mappings": "Configuration contains environment mappings but no environment was provided. Please specify an environment or remove environment mappings.",
+        "parameter_requires_env": "Configuration includes 'core.parameter' but no target environment was provided. Please pass an environment or remove the 'parameter' field.",
         "env_not_found": "Environment '{}' not found in '{}' mappings. Available: {}",
         "empty_mapping": "'{}' environment mapping cannot be empty",
         "invalid_env_key": "Environment key in '{}' must be a non-empty string, got: {}",
