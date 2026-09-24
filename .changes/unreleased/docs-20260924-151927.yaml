@@ -1,0 +1,8 @@
+kind: docs
+body: Add an end-to-end deployment tutorial for fabric-cicd
+time: 2026-09-24T15:19:27.8411616+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "836"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/836

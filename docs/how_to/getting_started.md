@@ -63,6 +63,7 @@ This library deploys from a directory containing files and directories committed
 
 ## Next steps
 
+- Follow the [My First Deployment](tutorial.md) tutorial for an end-to-end walkthrough.
 - Review the recommended [Git flow](deployment_overview.md#git-flow) and [deployment philosophy](deployment_overview.md#deployment-philosophy) for fabric-cicd deployments.
 - Configure deployment behavior with [Configuration Deployment](config_deployment.md).
 - Learn how to manage environment-specific values with [Parameterization](parameterization.md).
