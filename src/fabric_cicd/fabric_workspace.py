@@ -17,7 +17,7 @@ from azure.core.credentials import TokenCredential
 from fabric_cicd import constants
 from fabric_cicd._common._check_utils import check_regex, check_valid_json_content, check_valid_yaml_content
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
-from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._fabric_endpoint import FabricEndpoint, handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -141,8 +141,11 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
-        self.contains_param_vars = False
+        self.contains_param_item_vars = False
         self.bulk_publish_enabled = False
+
+        # Cache for pre-resolved dynamic replacement variable values (used during bulk publish only)
+        self._dynamic_var_cache: dict[str, str] = {}
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
@@ -282,6 +285,59 @@ class FabricWorkspace:
             self._item_attribute_cache[cache_key] = attribute_value
         return attribute_value
 
+    def _wait_for_item_attribute_provisioning(
+        self, item_type: str, item_guid: str, item_name: str, attribute_name: str
+    ) -> None:
+        """
+        Poll an item until an asynchronously provisioned attribute becomes available.
+
+        SQL endpoints (`sqlendpoint` / `sqlendpointid`) and the Eventhouse query URI
+        (`queryserviceuri`) are provisioned asynchronously after the item is created, so a
+        freshly deployed item may not expose them immediately. Serial publishing waits for this
+        via `check_sqlendpoint_provision_status`; staged bulk publishing calls this method
+        between stages so a downstream stage does not resolve a dynamic variable to an empty value.
+
+        Args:
+            item_type: The item type.
+            item_guid: The deployed item ID.
+            item_name: The item display name.
+            attribute_name: The asynchronously provisioned attribute to wait for.
+        """
+        if not item_guid:
+            return
+
+        property_path = constants.PROPERTY_PATH_ATTR_MAPPING.get(item_type, {}).get(attribute_name)
+        if property_path is None:
+            return
+
+        item_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+        iteration = 1
+
+        while True:
+            response = self.endpoint.invoke(method="GET", url=item_url)
+
+            if dpath.get(response, property_path, default=""):
+                logger.debug(
+                    f"{constants.INDENT}Attribute '{attribute_name}' provisioned for {item_type} '{item_name}'"
+                )
+                return
+
+            # Terminal-failure detection where the API exposes a provisioning status (Lakehouse / Mirrored Database)
+            provisioning_status = dpath.get(
+                response, "body/properties/sqlEndpointProperties/provisioningStatus", default=None
+            )
+            if provisioning_status == "Failed":
+                msg = f"Cannot resolve '{attribute_name}' for {item_type} '{item_name}' (provisioning failed)"
+                raise FailedPublishedItemStatusError(msg, logger)
+
+            handle_retry(
+                attempt=iteration,
+                base_delay=5,
+                response_retry_after=30,
+                prepend_message=f"{constants.INDENT}Waiting for '{attribute_name}' provisioning on {item_type} '{item_name}'",
+            )
+            iteration += 1
+
     def _get_workspace_pools(self) -> list[dict]:
         """Return the list of workspace custom Spark pools, fetching from the API on first call.
 
@@ -325,7 +381,9 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
-            self.contains_param_vars = bool(parameter_obj._search_dynamic_replacement_variables_in_parameter_file())
+            self.contains_param_item_vars = bool(
+                parameter_obj._search_dynamic_replacement_item_variables_in_parameter_file()
+            )
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -460,8 +518,8 @@ class FabricWorkspace:
             if item_type not in self.workspace_items:
                 self.workspace_items[item_type] = {}
 
-            # Only collect attribute values when parameterization with dynamic variables is in use
-            if self.contains_param_vars:
+            # Only collect attribute values when parameterization with dynamic replacement variables is in use
+            if self.contains_param_item_vars:
                 # Get additional properties - eagerly fetch attribute values for specific item types
                 if item_type in [
                     ItemType.LAKEHOUSE.value,
@@ -609,16 +667,17 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file: str) -> str:
+    def _replace_workspace_ids(self, raw_file: str, item_obj: Item) -> str:
         """
-        Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
-        (actual workspace ID guid) values, with target workspace ID in the raw file content.
+        Replaces default workspace ID references (00000000-0000-0000-0000-000000000000)
+        with the target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
+            item_obj: The Item object instance that provides the item type.
         """
         # Use re.sub to replace all matches
-        return re.sub(
+        raw_file = re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
                 match.group(0).replace(constants.DEFAULT_GUID, self.workspace_id)
@@ -627,6 +686,15 @@ class FabricWorkspace:
             ),
             raw_file,
         )
+        # For Reflex items, also replace default workspace IDs embedded in escaped action definitions
+        if item_obj.type == ItemType.REFLEX.value:
+            raw_file = re.sub(
+                constants.REFLEX_WORKSPACE_ID_REFERENCE_REGEX,
+                rf"\g<1>{self.workspace_id}\g<2>",
+                raw_file,
+            )
+
+        return raw_file
 
     def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
@@ -717,7 +785,7 @@ class FabricWorkspace:
                             file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file, item)
-                            file.contents = self._replace_workspace_ids(file.contents)
+                            file.contents = self._replace_workspace_ids(file.contents, item)
 
                     item_payload.append(file.base64_payload)
             # Some item definitions require specifying the format as multiple API versions exist (i.e. Spark Job Definitions)
@@ -818,10 +886,10 @@ class FabricWorkspace:
 
         logger.info(f"Publishing {len(items_with_context)} item(s) in bulk")
 
-        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions
         response = self.endpoint.invoke(
             method="POST",
-            url=f"{self.base_api_url}/items/bulkImportDefinitions?beta=True",
+            url=f"{self.base_api_url}/items/bulkImportDefinitions",
             body={
                 "definitionParts": definition_parts,
                 "options": {"allowPairingByName": True},

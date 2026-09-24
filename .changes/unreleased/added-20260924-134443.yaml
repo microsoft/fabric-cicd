@@ -1,0 +1,8 @@
+kind: added
+body: Add support for Python 3.14 in the library
+time: 2026-09-24T13:44:43.4590174+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "868"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/868

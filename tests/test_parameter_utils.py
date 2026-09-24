@@ -50,8 +50,8 @@ def temp_repository():
 
 from fabric_cicd._common._exceptions import InputError, ParsingError
 from fabric_cicd._parameter._utils import (
+    ParsedDynamicVariable,
     _check_parameter_structure,
-    _extract_item_attribute,
     _find_match,
     _process_regular_path,
     _process_wildcard_path,
@@ -62,11 +62,30 @@ from fabric_cicd._parameter._utils import (
     extract_parameter_filters,
     extract_replace_value,
     is_valid_structure,
+    parse_cross_workspace_item_variable,
+    parse_dynamic_variable,
+    parse_item_variable,
     process_environment_key,
     process_input_path,
     replace_key_value,
     replace_variables_in_parameter_file,
 )
+from fabric_cicd._parameter._utils import (
+    _extract_item_attribute as _resolve_item_attribute,
+)
+from fabric_cicd._parameter._utils import (
+    _extract_workspace_id as _resolve_workspace_id,
+)
+
+
+def _extract_item_attribute(workspace_obj, variable, get_dataflow_name=False):
+    parsed_variable = parse_dynamic_variable(variable)
+    return _resolve_item_attribute(workspace_obj, get_dataflow_name, parsed_variable)
+
+
+def _extract_workspace_id(workspace_obj, variable):
+    parsed_variable = parse_dynamic_variable(variable)
+    return _resolve_workspace_id(workspace_obj, variable, parsed_variable)
 
 
 class TestParameterUtilities:
@@ -222,6 +241,92 @@ class TestParameterUtilities:
 
         assert result == {"pattern": "cross-item-id", "is_regex": False, "has_matches": True, "ignore_case": False}
 
+    @pytest.mark.parametrize(
+        "variable",
+        [
+            "$workspace.$items.Lakehouse.Example.$id",
+            "$workspace. .$items.Lakehouse.Example.$id",
+        ],
+    )
+    def test_parse_cross_workspace_item_variable_reports_missing_workspace_name(self, variable):
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_name_missing"].format(variable)
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            parse_cross_workspace_item_variable(variable)
+
+    @pytest.mark.parametrize(
+        ("variable", "expected"),
+        [
+            ("$items.Lakehouse.Example.$id", ("Lakehouse", "Example", "id")),
+            ("$items.Lakehouse.Example.id", ("Lakehouse", "Example", "id")),
+            ("$items.Notebook.Sales.Daily.$id", ("Notebook", "Sales.Daily", "id")),
+            ("$items.Notebook.Sales.Daily.id", ("Notebook", "Sales.Daily", "id")),
+            (
+                "$items.Lakehouse.Example.$SQLENDPOINT",
+                ("Lakehouse", "Example", "sqlendpoint"),
+            ),
+        ],
+    )
+    def test_parse_item_variable(self, variable, expected):
+        assert parse_item_variable(variable) == expected
+
+    def test_parse_cross_workspace_item_variable_preserves_periods_in_item_name(self):
+        variable = "$workspace.dev.$items.Notebook.Sales.Daily.$id"
+
+        assert parse_cross_workspace_item_variable(variable) == (
+            "dev",
+            "Notebook",
+            "Sales.Daily",
+            "id",
+        )
+
+    @pytest.mark.parametrize(
+        ("variable", "message_key"),
+        [
+            ("$items..$id", "item_type_and_name_missing"),
+            ("$items..Example.$id", "item_type_missing"),
+        ],
+    )
+    def test_parse_item_variable_reports_missing_components(self, variable, message_key):
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS[message_key].format(variable)
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            parse_item_variable(variable)
+
+    def test_parse_cross_workspace_item_variable_reports_invalid_attribute(self):
+        variable = "$workspace.dev.$items.Notebook.Example.$guid"
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS["cross_workspace_attribute"].format(
+            variable,
+            "$workspace.name.$items.type.name.$attribute",
+            ", ".join(constants.ITEM_ATTR_LOOKUP),
+        )
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            parse_cross_workspace_item_variable(variable)
+
+    @pytest.mark.parametrize(
+        ("variable", "expected"),
+        [
+            ("$workspace.$name", ("workspace", None, None, None, "name")),
+            ("$workspace.dev.$id", ("workspace", "dev", None, None, "id")),
+            ("$items.Lakehouse.Example.$id", ("item", None, "Lakehouse", "Example", "id")),
+            (
+                "$workspace.dev.$items.Lakehouse.Example.$sqlendpoint",
+                ("item", "dev", "Lakehouse", "Example", "sqlendpoint"),
+            ),
+        ],
+    )
+    def test_parse_dynamic_variable(self, variable, expected):
+        parsed = parse_dynamic_variable(variable)
+
+        assert (
+            parsed.kind,
+            parsed.workspace_name,
+            parsed.item_type,
+            parsed.item_name,
+            parsed.attribute,
+        ) == expected
+
     def test_extract_find_value_rejects_items_variable(self, mock_workspace):
         """Tests extract_find_value raises InputError when $items.* is used in find_value."""
         find_value = "$items.Lakehouse.Example.$id"
@@ -231,7 +336,7 @@ class TestParameterUtilities:
             extract_find_value(param_dict, "some content", True, workspace_obj=mock_workspace)
 
     def test_extract_find_value_dynamic_variable_resolves_empty(self, mock_workspace):
-        """Tests extract_find_value returns no-op when dynamic variable resolves to empty string."""
+        """Tests extract_find_value returns no-op when dynamic replacement variable resolves to empty string."""
         mock_workspace._resolve_workspace_id.return_value = ""
         param_dict = {"find_value": "$workspace.nonexistent"}
         expected = {"pattern": "", "is_regex": False, "has_matches": False, "ignore_case": False}
@@ -268,6 +373,14 @@ class TestParameterUtilities:
         # Regular string should be returned as is
         assert extract_replace_value(mock_workspace, "literal string") == "literal string"
 
+        # Non-dynamic tokens should be returned without dynamic variable parsing
+        with mock.patch("fabric_cicd._parameter._utils.parse_dynamic_variable") as mock_parse:
+            assert extract_replace_value(mock_workspace, "$ENV:LAKEHOUSE_ID") == "$ENV:LAKEHOUSE_ID"
+            mock_parse.assert_not_called()
+
+        with pytest.raises(ParsingError, match="Invalid dynamic replacement variable format"):
+            extract_replace_value(mock_workspace, "$env:LAKEHOUSE_ID")
+
         # Workspace ID variable should return the workspace ID
         assert extract_replace_value(mock_workspace, "$workspace.id", False) == "mock-workspace-id"
 
@@ -279,25 +392,39 @@ class TestParameterUtilities:
             mock_extract_ws.return_value = "resolved-workspace-id"
             result = extract_replace_value(mock_workspace, "$workspace.dev")
             assert result == "resolved-workspace-id"
-            mock_extract_ws.assert_called_once_with(mock_workspace, "$workspace.dev")
+            mock_extract_ws.assert_called_once_with(
+                mock_workspace,
+                "$workspace.dev",
+                ParsedDynamicVariable(kind="workspace", workspace_name="dev", attribute="id"),
+            )
 
         # Item attribute variables should extract values from workspace items
         with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
             mock_extract.return_value = "notebook-id"
             result = extract_replace_value(mock_workspace, "$items.Notebook.Test Notebook.id")
             assert result == "notebook-id"
-            mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.Test Notebook.id", False)
+            mock_extract.assert_called_once_with(
+                mock_workspace,
+                False,
+                ParsedDynamicVariable(
+                    kind="item",
+                    item_type="Notebook",
+                    item_name="Test Notebook",
+                    attribute="id",
+                ),
+            )
 
     def test_extract_replace_value_get_dataflow_name(self, mock_workspace):
         """Tests extract_replace_value with different inputs, get_dataflow_name=True."""
         # With get_dataflow_name=True for regular string, should return None
         assert extract_replace_value(mock_workspace, "literal string", True) is None
+        assert extract_replace_value(mock_workspace, "$ENV:DATAFLOW_ID", True) is None
 
         # With get_dataflow_name=True for workspace ID, should return an error
         with pytest.raises(
             InputError,
             match=re.escape(
-                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: $items.type.name.$attribute"
+                "Invalid replace_value variable: '$workspace'. Expected format to get dataflow name: '$items.type.name.$attribute'"
             ),
         ):
             result = extract_replace_value(mock_workspace, "$workspace.id", True)
@@ -307,14 +434,49 @@ class TestParameterUtilities:
             mock_extract.return_value = None
             result = extract_replace_value(mock_workspace, "$items.Notebook.Test Notebook.id", True)
             assert result is None
-            mock_extract.assert_called_once_with(mock_workspace, "$items.Notebook.Test Notebook.id", True)
+            mock_extract.assert_called_once_with(
+                mock_workspace,
+                True,
+                ParsedDynamicVariable(
+                    kind="item",
+                    item_type="Notebook",
+                    item_name="Test Notebook",
+                    attribute="id",
+                ),
+            )
 
         # With get_dataflow_name=True for a Dataflow item, should return the Dataflow name
         with mock.patch("fabric_cicd._parameter._utils._extract_item_attribute") as mock_extract:
             mock_extract.return_value = "Source Dataflow"
             result = extract_replace_value(mock_workspace, "$items.Dataflow.Source Dataflow.id", True)
             assert result == "Source Dataflow"
-            mock_extract.assert_called_once_with(mock_workspace, "$items.Dataflow.Source Dataflow.id", True)
+            mock_extract.assert_called_once_with(
+                mock_workspace,
+                True,
+                ParsedDynamicVariable(
+                    kind="item",
+                    item_type="Dataflow",
+                    item_name="Source Dataflow",
+                    attribute="id",
+                ),
+            )
+
+    @pytest.mark.parametrize(
+        "variable",
+        [
+            "$workspace.dev",
+            "$workspace.dev.$items.Notebook.Test Notebook.$id",
+            "$items.Notebook.Test Notebook.$id",
+        ],
+    )
+    def test_extract_replace_value_parses_dynamic_variable_once(self, mock_workspace, variable):
+        with mock.patch(
+            "fabric_cicd._parameter._utils.parse_dynamic_variable",
+            wraps=parse_dynamic_variable,
+        ) as mock_parse:
+            extract_replace_value(mock_workspace, variable)
+
+        mock_parse.assert_called_once_with(variable)
 
     def test_extract_item_attribute_valid(self, mock_workspace):
         """Tests _extract_item_attribute with valid variables."""
@@ -380,18 +542,35 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.Dataflow.NonExistentDataflow.id", True)
         assert result is None
 
-        # Test when source Dataflow type doesn't match (case sensitive) - should return None
-        result = _extract_item_attribute(mock_workspace, "$items.dataflow.Source Dataflow.id", get_dataflow_name=True)
-        assert result is None
+        # Unsupported item type casing is rejected consistently by the shared parser
+        with pytest.raises(ParsingError, match="Item type 'dataflow' is invalid or not supported"):
+            _extract_item_attribute(mock_workspace, "$items.dataflow.Source Dataflow.id", get_dataflow_name=True)
 
         # Test when source Dataflow name doesn't match (case sensitive) - should return None
         result = _extract_item_attribute(mock_workspace, "$items.Dataflow.source dataflow.id", get_dataflow_name=True)
         assert result is None
 
+    def test_extract_item_attribute_rejects_missing_deployed_item_type(self, mock_workspace):
+        mock_workspace.workspace_items = {}
+
+        with pytest.raises(ParsingError, match="Item type 'Notebook' is invalid or not found in deployed items"):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Example.$id")
+
+    @pytest.mark.parametrize(
+        ("error", "expected_message"),
+        [
+            (RuntimeError("Refresh failed"), "Error parsing $items variable: Refresh failed"),
+            (ParsingError("Refresh parsing failed", logger), "Refresh parsing failed"),
+        ],
+    )
+    def test_extract_item_attribute_handles_refresh_errors(self, mock_workspace, error, expected_message):
+        mock_workspace._refresh_deployed_items.side_effect = error
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            _extract_item_attribute(mock_workspace, "$items.Notebook.Example.$id")
+
     def test_extract_workspace_id_direct(self, mock_workspace):
         """Tests _extract_workspace_id with direct workspace ID variable."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Test with $workspace.id - should return workspace_id directly
         result = _extract_workspace_id(mock_workspace, "$workspace.id")
         assert result == "mock-workspace-id"
@@ -401,8 +580,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_resolve(self, mock_workspace):
         """Tests _extract_workspace_id with workspace name resolution."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Mock the _resolve_workspace_id method
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
 
@@ -418,8 +595,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_with_workspace_name_variable(self, mock_workspace):
         """Tests _extract_workspace_id with workspace name variable."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
 
         result = _extract_workspace_id(mock_workspace, "$workspace.$name")
@@ -428,8 +603,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_name_encoded(self, mock_workspace):
         """Tests _extract_workspace_id with $workspace.$name_encoded returns URL-encoded name."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         mock_workspace._resolve_workspace_name = mock.MagicMock(return_value="My Target Workspace [PPE]")
 
         result = _extract_workspace_id(mock_workspace, "$workspace.$name_encoded")
@@ -438,8 +611,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_resolve_error(self, mock_workspace):
         """Tests _extract_workspace_id when workspace name resolution fails."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Mock the _resolve_workspace_id method to raise InputError
         mock_workspace._resolve_workspace_id.side_effect = InputError("Workspace name not found", logger)
 
@@ -449,14 +620,27 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_general_error(self, mock_workspace):
         """Tests _extract_workspace_id with unexpected errors."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Mock the _resolve_workspace_id method to raise a general exception
         mock_workspace._resolve_workspace_id.side_effect = Exception("Unexpected error")
 
         # Should wrap general exceptions in ParsingError
         with pytest.raises(ParsingError, match=r"Error parsing \$workspace variable"):
             _extract_workspace_id(mock_workspace, "$workspace.test_workspace")
+
+    def test_extract_workspace_id_rejects_unsupported_parsed_variable(self, mock_workspace):
+        variable = "$workspace.invalid"
+        parsed_variable = ParsedDynamicVariable(
+            kind="item",
+            item_type="Notebook",
+            item_name="Example",
+            attribute="id",
+        )
+        expected_message = constants.DYNAMIC_VARIABLE_MSGS["workspace_syntax"].format(
+            variable, "$workspace.name.$items.type.name.$attribute"
+        )
+
+        with pytest.raises(ParsingError, match=re.escape(expected_message)):
+            _resolve_workspace_id(mock_workspace, variable, parsed_variable)
 
     def test_extract_item_attribute_null_return(self, mock_workspace):
         """Tests _extract_item_attribute cases that return None."""
@@ -484,7 +668,7 @@ class TestParameterUtilities:
 
         This guards the boundary: the deployed-items refresh now skips
         (rather than raising for) an item whose attribute is unavailable, leaving an empty value in
-        workspace_items. If a dynamic variable actually references that item, resolution must still
+        workspace_items. If a dynamic replacement variable actually references that item, resolution must still
         fail loudly instead of substituting ''.
         """
         # Item exists (passes the type/name existence checks) but its sqlendpoint was left empty,
@@ -515,8 +699,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_with_item_lookup(self, mock_workspace):
         """Tests _extract_workspace_id with item lookup in another workspace."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Mock the _resolve_workspace_id method
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
 
@@ -535,8 +717,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_with_item_lookup_not_found(self, mock_workspace):
         """Tests _extract_workspace_id when item lookup fails."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Mock the _resolve_workspace_id method
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
 
@@ -565,16 +745,12 @@ class TestParameterUtilities:
     )
     def test_extract_workspace_id_with_item_lookup_invalid_format(self, mock_workspace, invalid_var):
         """Tests _extract_workspace_id with invalid item lookup format."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         # Test with invalid formats
         with pytest.raises(ParsingError):
             _extract_workspace_id(mock_workspace, invalid_var)
 
     def test_extract_workspace_id_with_item_lookup_sqlendpoint(self, mock_workspace):
         """Tests _extract_workspace_id resolves sqlendpoint from another workspace via $items reference."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
         mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="lakehouse-endpoint-value")
 
@@ -590,8 +766,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_with_item_lookup_queryserviceuri(self, mock_workspace):
         """Tests _extract_workspace_id resolves queryserviceuri from another workspace via $items reference."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
         mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="eventhouse-query-uri-value")
 
@@ -607,8 +781,6 @@ class TestParameterUtilities:
 
     def test_extract_workspace_id_with_item_lookup_sqlendpointid(self, mock_workspace):
         """Tests _extract_workspace_id resolves sqlendpointid from another workspace via $items reference."""
-        from fabric_cicd._parameter._utils import _extract_workspace_id
-
         mock_workspace._resolve_workspace_id.return_value = "resolved-workspace-id"
         mock_workspace._lookup_item_attribute = mock.MagicMock(return_value="lakehouse-sql-endpoint-id-value")
 
@@ -1476,11 +1648,12 @@ runtime_version: "1.2"
 
     def test_replace_variables_in_parameter_file(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
-        # Set up test environment variables
+        # OS environment variables use plain names; $ENV: is only the in-file token prefix
         test_env_vars = {
-            "$ENV:TEST_VAR": "test_value",
-            "$ENV:ANOTHER_VAR": "another_value",
-            "NORMAL_VAR": "normal_value",  # Should be ignored
+            "TEST_VAR": "test_value",
+            "ANOTHER_VAR": "another_value",
+            "MULTI_WORD_VAR": "value with multiple words",
+            "NORMAL_VAR": "normal_value",  # Not referenced with $ENV:, so ignored
         }
         # Mock os.environ
         monkeypatch.setattr("os.environ", test_env_vars)
@@ -1493,20 +1666,89 @@ runtime_version: "1.2"
         parameter:
           value: $ENV:TEST_VAR
           other: $ENV:ANOTHER_VAR
+          phrase: "$ENV:MULTI_WORD_VAR"
           normal: NORMAL_VAR
         """
         result = replace_variables_in_parameter_file(test_content)
         # Verify replacements
         assert "value: test_value" in result
         assert "other: another_value" in result
+        assert 'phrase: "value with multiple words"' in result
         assert "normal: NORMAL_VAR" in result  # Normal var unchanged
+
+    def test_replace_variables_in_parameter_file_missing_env_var(self, monkeypatch):
+        """Test that tokens are left unchanged when the OS environment variable is not set."""
+        mock_logger = mock.MagicMock()
+        monkeypatch.setattr("fabric_cicd._parameter._utils.logger", mock_logger)
+        # Only SET_VAR is defined; MISSING_VAR is not present in the environment
+        test_env_vars = {
+            "SET_VAR": "set_value",
+        }
+        monkeypatch.setattr("os.environ", test_env_vars)
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        test_content = """
+        parameter:
+          present: $ENV:SET_VAR
+          absent: $ENV:MISSING_VAR
+        """
+        result = replace_variables_in_parameter_file(test_content)
+
+        # The set variable is replaced, the missing one is left untouched
+        assert "present: set_value" in result
+        assert "absent: $ENV:MISSING_VAR" in result
+        mock_logger.debug.assert_any_call("Environment variable 'MISSING_VAR' is not set; keeping '$ENV:MISSING_VAR'")
+
+    def test_replace_variables_in_parameter_file_multiple_tokens(self, monkeypatch):
+        """Test replacement of multiple tokens, including repeated tokens for the same variable."""
+        test_env_vars = {
+            "ppe_lakehouse": "ppe-guid",
+            "prod_lakehouse": "prod-guid",
+        }
+        monkeypatch.setattr("os.environ", test_env_vars)
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        test_content = """
+        find_replace:
+          - find_value: "db52be81-c2b2-4261-84fa-840c67f4bbd0"
+            replace_value:
+              PPE: "$ENV:ppe_lakehouse"
+              PROD: "$ENV:prod_lakehouse"
+              PPE_DUP: "$ENV:ppe_lakehouse"
+        """
+        result = replace_variables_in_parameter_file(test_content)
+
+        assert 'PPE: "ppe-guid"' in result
+        assert 'PROD: "prod-guid"' in result
+        assert 'PPE_DUP: "ppe-guid"' in result
+        assert "$ENV:" not in result
+
+    def test_replace_variables_in_parameter_file_shared_prefix(self, monkeypatch):
+        """Test that variable names sharing a prefix are replaced independently."""
+        monkeypatch.setattr("os.environ", {"FOO": "x", "FOO_BAR": "y"})
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        result = replace_variables_in_parameter_file("short: $ENV:FOO\nlong: $ENV:FOO_BAR")
+
+        assert result == "short: x\nlong: y"
+
+    def test_replace_variables_in_parameter_file_prefix_is_case_sensitive(self, monkeypatch):
+        """Only the exact uppercase $ENV: token prefix triggers replacement."""
+        monkeypatch.setattr("os.environ", {"TEST_VAR": "replaced"})
+        monkeypatch.setattr(constants, "FEATURE_FLAG", ["enable_environment_variable_replacement"])
+
+        result = replace_variables_in_parameter_file(
+            "uppercase: $ENV:TEST_VAR\nlowercase: $env:TEST_VAR\nmixed_case: $Env:TEST_VAR"
+        )
+
+        assert result == "uppercase: replaced\nlowercase: $env:TEST_VAR\nmixed_case: $Env:TEST_VAR"
 
     def test_replace_variables_in_parameter_file_feature_disabled(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag disabled."""
-        # Set up test environment variables with $ENV: prefix
+        # OS environment variables use plain names
         test_env_vars = {
-            "$ENV:TEST_VAR": "test_value",
-            "$ENV:ANOTHER_VAR": "another_value",
+            "TEST_VAR": "test_value",
+            "ANOTHER_VAR": "another_value",
         }
         # Mock os.environ
         monkeypatch.setattr("os.environ", test_env_vars)
@@ -1535,12 +1777,11 @@ runtime_version: "1.2"
 
     def test_replace_env_variables_in_content(self, monkeypatch):
         """Test replace_variables_in_parameter_file with feature flag enabled."""
-        # Set up test environment variables with $ENV: prefix
-        # This is required because the function filters os.environ for keys starting with $ENV:
+        # OS environment variables use plain names; $ENV: is only the in-file token prefix
         test_env_vars = {
-            "$ENV:TEST_VAR": "test_value",
-            "$ENV:ANOTHER_VAR": "another_value",
-            "NORMAL_VAR": "normal_value",  # Should be ignored (no $ENV: prefix)
+            "TEST_VAR": "test_value",
+            "ANOTHER_VAR": "another_value",
+            "NORMAL_VAR": "normal_value",  # Not referenced with $ENV:, so ignored
         }
         # Mock os.environ
         monkeypatch.setattr("os.environ", test_env_vars)
@@ -1656,6 +1897,17 @@ class TestPathUtilities:
         """Tests process_input_path with none input."""
         result = process_input_path(temp_repository, None)
         assert result is None
+
+    def test_process_input_path_resolves_wildcards_from_relative_repository(self, tmp_path, monkeypatch):
+        repository = tmp_path / "repository"
+        repository.mkdir()
+        expected_path = repository / "file.txt"
+        expected_path.write_text("content", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        result = process_input_path(Path("repository"), "*.txt")
+
+        assert result == [expected_path.resolve()]
 
     def test_process_input_path_string(self, temp_repository, monkeypatch):
         """Tests process_input_path with string input."""

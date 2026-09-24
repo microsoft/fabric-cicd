@@ -230,15 +230,16 @@ The `find_replace` and `key_value_replace` parameters support fabric-cicd define
 - **`find_value`** (`find_replace`): 
     - Supports `$workspace.*` variables (e.g., `$workspace.Dev Workspace.$id`)
     - Does **not** support `$items.<item_type>.<item_name>.$<attribute>` because it resolves to target workspace values that cannot exist in source files being searched
-    - **Cannot be combined with `is_regex: "true"`** — use either a dynamic variable OR a regex pattern, not both
+    - **Cannot be combined with `is_regex: "true"`** — use either a dynamic replacement variable OR a regex pattern, not both
 - **`find_key`** (`key_value_replace`): does **not** support variables — must be a valid JSONPath expression
 
-!!! note "Bulk Publish Limitation"
+!!! note "Bulk Publish Note"
 
-    Dynamic replacement variables (`$workspace`, `$items`) are not supported when using [bulk publish](optional_feature.md#bulk-publish) mode. When dynamic variables are detected in the parameter file, the deployment automatically falls back to standard publishing. To use bulk publish, replace dynamic variables with static values or use logical IDs directly.
+    Dynamic replacement variables (`$workspace`, `$items`) are supported in [bulk publish](optional_feature.md#bulk-publish) mode. Current-workspace `$items.*` references are published in dependency-ordered batches so referenced items are available before their dependents. However, a current-workspace `$items.*` `replace_value` without an `item_type`, `item_name`, or `file_path` filter causes a fallback to standard publishing because its dependency scope cannot be determined. `$workspace.*` and cross-workspace item variables do not create in-batch dependencies.
 
 Additional notes:
 
+- **Workspace and item dynamic replacement variable syntax is validated before deployment.** Validation checks the variable format and verifies required components, including workspace names, item types, item names, and attributes. It does not resolve the referenced workspace or item, so a syntactically valid variable can still fail during deployment if the resource does not exist or is inaccessible.
 - **`$items` variables resolve for items that exist in the `repository_directory`.** Cross-workspace variables (`$workspace.<name>.$items...`) reference items outside the repository — these items must exist in the specified workspace at deployment time.
 - Within a single parameter entry, `replace_value` can mix static strings and variables across environments, e.g. `PPE` set to a literal GUID and `PROD` set to a `$workspace.$id` variable.
 
@@ -282,11 +283,13 @@ Additional notes:
         - **Example:** `$items.Notebook.Hello World.$id` → returns the item ID of the "Hello World" Notebook in the target workspace.
         - **Important**: Deployment will fail if the variable contains any error — including a typo in the syntax (e.g., `$item` instead of `$items`), a non-existent item type or name, or an unsupported attribute for the given item type.
         - See the **Notebook/Dataflow Advanced `find_replace` Parameterization Case** for examples.
-        - **SQL endpoint resolution is eager:** whenever any dynamic variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace (and `$sqlendpointid` for every Lakehouse and MirroredDatabase) — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning, the deployment fails before any item is published; ensure these items are fully provisioned in the target workspace before deploying.
+        - **SQL endpoint resolution is eager:** whenever any dynamic replacement variable is used, `$sqlendpoint` is resolved for **every** Lakehouse, MirroredDatabase, Warehouse, and SQLDatabase in the target workspace (and `$sqlendpointid` for every Lakehouse and MirroredDatabase) — not only the items referenced in your parameter file. If any such item's SQL analytics endpoint is still provisioning, the deployment fails before any item is published; ensure these items are fully provisioned in the target workspace before deploying.
 
 ### Environment Variable Replacement
 
-In the `find_replace` parameter, if the `enable_environment_variable_replacement` feature flag is set, pipeline/environment variables will be used to replace the values in the `parameter.yml` file with the corresponding values from the variables dictionary. **Only Environment Variable beginning with '$ENV:' will be used as replacement values.** See example below:
+In the `find_replace` parameter, if the `enable_environment_variable_replacement` feature flag is set, environment variables will be used to replace the values in the `parameter.yml` file. In the `parameter.yml` file, reference an environment variable using the `$ENV:` token prefix followed by the variable's plain name (for example, `$ENV:ppe_lakehouse`). The `$ENV:` prefix is **only** the in-file token marker — the actual OS/pipeline environment variable is looked up by its plain name (`ppe_lakehouse`), **not** `$ENV:ppe_lakehouse`. If a referenced environment variable is not set, the token is left unchanged. See example below:
+
+For example, set the environment variables `ppe_lakehouse` and `prod_lakehouse` in your shell or pipeline, then reference them in `parameter.yml` with the `$ENV:` prefix:
 
 ```yaml
 find_replace:
@@ -406,7 +409,7 @@ find_replace:
 - Include `is_regex` field when setting the `find_value` to a **valid regex pattern.**
 - When the `is_regex` field is set to the **string** value `"true"` or `"True"` (case-insensitive), regex pattern matching is enabled.
 - When regex pattern matching is enabled, the `find_value` is interpreted as a regex pattern rather than a literal string.
-- **`is_regex` cannot be combined with dynamic replacement variables** (e.g., `$workspace.*`) in `find_value`. Dynamic variables resolve to plain strings at runtime, making regex matching redundant. Use one feature or the other.
+- **`is_regex` cannot be combined with dynamic replacement variables** (e.g., `$workspace.*`) in `find_value`. Dynamic replacement variables resolve to plain strings at runtime, making regex matching redundant. Use one feature or the other.
 
 ### Supported File Filters
 
@@ -717,7 +720,7 @@ display(df)
 
 **Case:** A Notebook is attached to a Lakehouse which resides in the same workspace. When deploying both the Lakehouse and the Notebook to a target environment (PPE/PROD/etc), the Workspace and Lakehouse GUIDs referenced in the Notebook must be updated to ensure it correctly points to the corresponding Lakehouse in the new environment.
 
-**Solution:** This approach uses `find_value` [**regex**](#find_value-regex)\*\* and [**dynamic variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
+**Solution:** This approach uses `find_value` [**regex**](#find_value-regex)\*\* and [**dynamic replacement variables**](#dynamic-replacement) to manage replacement. In the `find_replace` input in the `parameter.yml` file, the `is_regex` field is set to `"true"`, enabling fabric-cicd to find a string value within the _specified_ repository files that matches the provided regex pattern.
 
 This approach is particularly useful for replacing values that are not known until deployment time, such as item IDs.
 
@@ -1158,6 +1161,51 @@ in
   TableNavigation;
 ```
 
+### Graph Models
+
+#### Lakehouse Data Source Parameterization Case
+
+**Case:** A Graph Model reads Delta tables from a Lakehouse. Each table path in the Graph Model's `dataSources.json` file contains the source Workspace and Lakehouse IDs, which must be updated for the target environment.
+
+**Solution:** Use `find_replace` with dynamic replacement variables to replace the source Workspace and Lakehouse IDs.
+
+**Note:** Before deploying the Graph Model, the target Lakehouse must contain the expected schema. Graph Model creation will fail if the Lakehouse is empty or its schema is incompatible.
+
+In the example below, the Graph Model references the `factsales` table in the Lakehouse.
+
+<span class="md-h4-nonanchor">parameter.yml file</span>
+
+```yaml
+find_replace:
+    - find_value: "2af52fd8-85d2-4e47-a295-6e7b311165c7" # source workspace ID
+      replace_value:
+          PPE: "$workspace.$id"
+          PROD: "$workspace.$id"
+            file_path: "/SalesGraphModel.GraphModel/dataSources.json"
+    - find_value: "a4d9b672-3e81-4f5c-9a20-7b16d8c043ef" # source Lakehouse ID
+      replace_value:
+          PPE: "$items.Lakehouse.Sales_Lakehouse.$id"
+          PROD: "$items.Lakehouse.Sales_Lakehouse.$id"
+            file_path: "/SalesGraphModel.GraphModel/dataSources.json"
+```
+
+<span class="md-h4-nonanchor">dataSources.json file</span>
+
+```json
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/graphIndex/definition/dataSources/1.0.0/schema.json",
+    "dataSources": [
+        {
+            "name": "factsales",
+            "type": "DeltaTable",
+            "properties": {
+                "path": "abfss://2af52fd8-85d2-4e47-a295-6e7b311165c7@onelake.dfs.fabric.microsoft.com/a4d9b672-3e81-4f5c-9a20-7b16d8c043ef/Tables/factsales"
+            }
+        }
+    ]
+}
+```
+
 ### Reports
 
 Reports can reference Semantic Models in two ways: `byPath` (relative path to a model in the same repository) or `byConnection` (connection string to a model in Power BI service).
@@ -1180,7 +1228,7 @@ When Reports and Semantic Models are deployed separately (e.g., models first, th
 
 #### `find_replace` Parameterization Case
 
-This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This enables granular control over each component in the connection string and allows the option to apply dynamic variables where needed.
+This approach replaces individual parts of the connection string (workspace ID, model name, model ID) with environment-specific values. This enables granular control over each component in the connection string and allows the option to apply dynamic replacement variables where needed.
 
 **Note:** The examples below use placeholder values (e.g., `MyReport`, `YourSemanticModelName`). Replace these with your actual report and semantic model names. For a working example, see `sample/workspace/parameter.yml` which references the `ByConnection.Report` and `ABC.SemanticModel` items.
 
@@ -1229,7 +1277,7 @@ find_replace:
 
 #### `key_value_replace` Parameterization Case
 
-This approach replaces the entire connection string with environment-specific values. This simplifies the parameter configuration, however, dynamic variables are not supported in this example as they cannot be embedded within a larger string value.
+This approach replaces the entire connection string with environment-specific values. This simplifies the parameter configuration, however, dynamic replacement variables are not supported in this example as they cannot be embedded within a larger string value.
 
 <span class="md-h4-nonanchor">parameter.yml file</span>
 
