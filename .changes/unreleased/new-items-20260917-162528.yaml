@@ -1,0 +1,8 @@
+kind: new-items
+body: Add support for Cosmos DB item
+time: 2026-09-17T16:25:28.7956566+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1134"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1134

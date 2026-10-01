@@ -29,6 +29,7 @@ from fabric_cicd._common._validate_input import (
     validate_items_to_include,
     validate_shortcut_exclude_regex,
 )
+from fabric_cicd._items._bulk_publish_dependencies import has_unfiltered_items_variable
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -220,15 +221,23 @@ def publish_all_items(
 
         reasons = []
         unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
-        # Fall back to standard deployment if unsupported item types or dynamic parameter variables are detected, otherwise enable bulk publish
-        if unsupported or fabric_workspace_obj.contains_param_vars:
-            if unsupported:
-                reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
+        if unsupported:
+            reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
 
-            if fabric_workspace_obj.contains_param_vars:
-                reasons.append(
-                    "parameter file contains dynamic replacement variables ($workspace/$items) requiring runtime resolution"
-                )
+        # Dynamic replacement variables are supported in bulk mode via staged publishing, EXCEPT
+        # when an $items.* replace_value has no file filter — dependency scope cannot be narrowed, so fall back to standard deployment in that case only
+        if (
+            not unsupported
+            and fabric_workspace_obj.contains_param_item_vars
+            and has_unfiltered_items_variable(fabric_workspace_obj)
+        ):
+            reasons.append(
+                "parameter file contains $items.* replace_value entries without an item_type, "
+                "item_name, or file_path filter; add at least one filter to each to enable bulk publish"
+            )
+
+        # Fall back to standard deployment if any blocking reason was found, otherwise enable bulk publish
+        if reasons:
             logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
 
         else:

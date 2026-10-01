@@ -1,0 +1,55 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/graphIndex/definition/graphType/1.0.0/schema.json",
+  "nodeTypes": [
+    {
+      "primaryKeyProperties": [
+        "holidayName"
+      ],
+      "alias": "274edfe1-62a0-4887-8a55-8bca8aaf13ae",
+      "labels": [
+        "H1"
+      ],
+      "properties": [
+        {
+          "name": "holidayName",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "primaryKeyProperties": [
+        "holidayName"
+      ],
+      "alias": "b966c4b0-248c-44bb-8a81-92ab494acd01",
+      "labels": [
+        "H2"
+      ],
+      "properties": [
+        {
+          "name": "holidayName",
+          "type": "STRING"
+        }
+      ]
+    }
+  ],
+  "edgeTypes": [
+    {
+      "alias": "24650015-a772-4504-af4e-0cae7fa0cba2",
+      "sourceNodeType": {
+        "alias": "274edfe1-62a0-4887-8a55-8bca8aaf13ae"
+      },
+      "labels": [
+        "H1toH2"
+      ],
+      "destinationNodeType": {
+        "alias": "b966c4b0-248c-44bb-8a81-92ab494acd01"
+      },
+      "properties": [
+        {
+          "name": "holidayName",
+          "type": "STRING"
+        }
+      ]
+    }
+  ]
+}

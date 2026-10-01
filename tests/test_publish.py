@@ -165,6 +165,33 @@ def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
         mock_ontology_instance.publish_all.assert_called_once()
 
 
+def test_publish_cosmosdbdatabase_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes Cosmos DB Database items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestCosmosDB", "CosmosDBDatabase", "test-cosmosdb-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._cosmosdbdatabase.CosmosDBDatabasePublisher") as mock_cosmos_cls,
+    ):
+        mock_cosmos_instance = mock_cosmos_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "CosmosDBDatabase" in workspace.repository_items
+        mock_cosmos_cls.assert_called_once_with(workspace)
+        mock_cosmos_instance.publish_all.assert_called_once()
+
+
 def test_publish_map_item(mock_endpoint, temp_workspace_dir):
     """Test that publish_all_items publishes Map items when present in repository."""
     create_test_item(temp_workspace_dir, None, "TestMap", "Map", "test-map-id")
@@ -190,6 +217,33 @@ def test_publish_map_item(mock_endpoint, temp_workspace_dir):
         assert "Map" in workspace.repository_items
         mock_map_cls.assert_called_once_with(workspace)
         mock_map_instance.publish_all.assert_called_once()
+
+
+def test_publish_graph_model_item(mock_endpoint, temp_workspace_dir):
+    """Test that publish_all_items publishes GraphModel items when present in repository."""
+    create_test_item(temp_workspace_dir, None, "TestGraphModel", "GraphModel", "test-graph-model-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch("fabric_cicd._items._graphmodel.GraphModelPublisher") as mock_graph_model_cls,
+    ):
+        mock_graph_model_instance = mock_graph_model_cls.return_value
+
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert "GraphModel" in workspace.repository_items
+        mock_graph_model_cls.assert_called_once_with(workspace)
+        mock_graph_model_instance.publish_all.assert_called_once()
 
 
 def test_publish_data_build_tool_job_item(mock_endpoint, temp_workspace_dir):
@@ -340,7 +394,9 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
         ("legacy", "TestLakehouse", "Lakehouse", "test-lakehouse-id"),
         ("legacy", "TestWarehouse", "Warehouse", "test-warehouse-id"),
         ("legacy", "TestSQLDB", "SQLDatabase", "test-sqldb-id"),
+        ("legacy", "TestCosmosDB", "CosmosDBDatabase", "test-cosmosdb-id"),
         ("legacy", "TestEventhouse", "Eventhouse", "test-eventhouse-id"),
+        ("legacy", "TestGraphModel", "GraphModel", "test-graph-model-id"),
     ]
 
     for folder, name, item_type, logical_id in test_items:
@@ -364,7 +420,7 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
-            item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "Eventhouse"],
+            item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "CosmosDBDatabase", "Eventhouse", "GraphModel"],
             token_credential=DummyTokenCredential(),
         )
 
@@ -374,7 +430,9 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
             "Skipping unpublish for Lakehouse items because the 'enable_lakehouse_unpublish' feature flag is not enabled.",
             "Skipping unpublish for Warehouse items because the 'enable_warehouse_unpublish' feature flag is not enabled.",
             "Skipping unpublish for SQLDatabase items because the 'enable_sqldatabase_unpublish' feature flag is not enabled.",
+            "Skipping unpublish for CosmosDBDatabase items because the 'enable_cosmosdbdatabase_unpublish' feature flag is not enabled.",
             "Skipping unpublish for Eventhouse items because the 'enable_eventhouse_unpublish' feature flag is not enabled.",
+            "Skipping unpublish for GraphModel items because the 'enable_graphmodel_unpublish' feature flag is not enabled.",
         ]
 
         for expected_warning in expected_warnings:
@@ -416,6 +474,54 @@ def test_unpublish_with_feature_flags_enabled(mock_endpoint, temp_workspace_dir,
 
             assert "enable_lakehouse_unpublish" not in caplog.text
             assert "Skipping unpublish for Lakehouse" not in caplog.text
+
+    finally:
+        constants.FEATURE_FLAG.clear()
+        constants.FEATURE_FLAG.update(original_flags)
+
+
+def test_unpublish_graph_model_with_feature_flag_enabled(mock_endpoint, temp_workspace_dir, caplog):
+    """Test that orphaned Graph Models are unpublished only when their feature flag is enabled."""
+    deployed_items = {"GraphModel": {"OrphanGraph": MagicMock(guid="orphan-graph-id")}}
+    unpublish_calls = []
+
+    def track_unpublish(_self, item_name, item_type):
+        unpublish_calls.append((item_name, item_type))
+
+    original_flags = constants.FEATURE_FLAG.copy()
+    constants.FEATURE_FLAG.add("enable_graphmodel_unpublish")
+
+    try:
+        with (
+            patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+            patch.object(
+                FabricWorkspace,
+                "_refresh_deployed_items",
+                new=lambda self: setattr(self, "deployed_items", deployed_items),
+            ),
+            patch.object(
+                FabricWorkspace,
+                "_refresh_repository_items",
+                new=lambda self: setattr(self, "repository_items", {}),
+            ),
+            patch.object(
+                FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+            ),
+            patch.object(FabricWorkspace, "_unpublish_folders", new=lambda _: None),
+            patch.object(FabricWorkspace, "_unpublish_item", new=track_unpublish),
+            caplog.at_level(logging.WARNING),
+        ):
+            workspace = FabricWorkspace(
+                workspace_id="12345678-1234-5678-abcd-1234567890ab",
+                repository_directory=str(temp_workspace_dir),
+                item_type_in_scope=["GraphModel"],
+                token_credential=DummyTokenCredential(),
+            )
+
+            publish.unpublish_all_orphan_items(workspace)
+
+            assert unpublish_calls == [("OrphanGraph", "GraphModel")]
+            assert "enable_graphmodel_unpublish" not in caplog.text
 
     finally:
         constants.FEATURE_FLAG.clear()

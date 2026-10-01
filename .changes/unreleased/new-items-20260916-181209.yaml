@@ -1,0 +1,8 @@
+kind: new-items
+body: Add support for Graph Model item
+time: 2026-09-16T18:12:09.6489657+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1000"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1000
