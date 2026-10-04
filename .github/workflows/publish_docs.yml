@@ -1,9 +1,9 @@
 name: Publish Docs
 
 on:
-    workflow_run:
-        workflows: ["Bump Version"]
-        types: [completed]
+    push:
+        tags:
+            - "v*.*.*"
     workflow_dispatch:
 
 permissions:
@@ -13,7 +13,6 @@ jobs:
     publish-docs:
         name: Publish Docs
         runs-on: ubuntu-latest
-        if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
         steps:
             - name: Generate GitHub App Token
               id: app-token
@@ -26,6 +25,7 @@ jobs:
               uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   fetch-depth: 0
+                  ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
                   token: ${{ steps.app-token.outputs.token }}
 
             - name: Extract version
