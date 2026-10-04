@@ -48,6 +48,7 @@ class ItemType(str, Enum):
 
     APACHE_AIRFLOW_JOB = "ApacheAirflowJob"
     COPY_JOB = "CopyJob"
+    COSMOS_DB_DATABASE = "CosmosDBDatabase"
     DATA_AGENT = "DataAgent"
     DATA_BUILD_TOOL_JOB = "DataBuildToolJob"
     DATA_PIPELINE = "DataPipeline"
@@ -55,6 +56,7 @@ class ItemType(str, Enum):
     ENVIRONMENT = "Environment"
     EVENTHOUSE = "Eventhouse"
     EVENTSTREAM = "Eventstream"
+    GRAPH_MODEL = "GraphModel"
     GRAPHQL_API = "GraphQLApi"
     KQL_DASHBOARD = "KQLDashboard"
     KQL_DATABASE = "KQLDatabase"
@@ -87,30 +89,32 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     4: ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG,
     5: ItemType.LAKEHOUSE,
     6: ItemType.SQL_DATABASE,
-    7: ItemType.ENVIRONMENT,
-    8: ItemType.USER_DATA_FUNCTION,
-    9: ItemType.EVENTHOUSE,
-    10: ItemType.SPARK_JOB_DEFINITION,
-    11: ItemType.NOTEBOOK,
-    12: ItemType.SEMANTIC_MODEL,
-    13: ItemType.REPORT,
-    14: ItemType.PAGINATED_REPORT,
-    15: ItemType.COPY_JOB,
-    16: ItemType.DATA_BUILD_TOOL_JOB,
-    17: ItemType.KQL_DATABASE,
-    18: ItemType.KQL_QUERYSET,
-    19: ItemType.DATAFLOW,
-    20: ItemType.DATA_PIPELINE,
-    21: ItemType.REFLEX,
-    22: ItemType.EVENTSTREAM,
-    23: ItemType.KQL_DASHBOARD,
-    24: ItemType.GRAPHQL_API,
-    25: ItemType.APACHE_AIRFLOW_JOB,
-    26: ItemType.MOUNTED_DATA_FACTORY,
-    27: ItemType.ONTOLOGY,
-    28: ItemType.DATA_AGENT,
-    29: ItemType.ML_EXPERIMENT,
-    30: ItemType.MAP,
+    7: ItemType.COSMOS_DB_DATABASE,
+    8: ItemType.ENVIRONMENT,
+    9: ItemType.USER_DATA_FUNCTION,
+    10: ItemType.EVENTHOUSE,
+    11: ItemType.SPARK_JOB_DEFINITION,
+    12: ItemType.NOTEBOOK,
+    13: ItemType.SEMANTIC_MODEL,
+    14: ItemType.REPORT,
+    15: ItemType.PAGINATED_REPORT,
+    16: ItemType.COPY_JOB,
+    17: ItemType.DATA_BUILD_TOOL_JOB,
+    18: ItemType.KQL_DATABASE,
+    19: ItemType.KQL_QUERYSET,
+    20: ItemType.DATAFLOW,
+    21: ItemType.DATA_PIPELINE,
+    22: ItemType.REFLEX,
+    23: ItemType.EVENTSTREAM,
+    24: ItemType.KQL_DASHBOARD,
+    25: ItemType.GRAPHQL_API,
+    26: ItemType.APACHE_AIRFLOW_JOB,
+    27: ItemType.MOUNTED_DATA_FACTORY,
+    28: ItemType.ONTOLOGY,
+    29: ItemType.DATA_AGENT,
+    30: ItemType.ML_EXPERIMENT,
+    31: ItemType.MAP,
+    32: ItemType.GRAPH_MODEL,
 }
 
 
@@ -127,6 +131,10 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of Eventhouses."""
     ENABLE_KQLDATABASE_UNPUBLISH = "enable_kqldatabase_unpublish"
     """Set to enable the deletion of KQL Databases (attached to Eventhouses)."""
+    ENABLE_COSMOSDBDATABASE_UNPUBLISH = "enable_cosmosdbdatabase_unpublish"
+    """Set to enable the deletion of Cosmos DB Databases."""
+    ENABLE_GRAPHMODEL_UNPUBLISH = "enable_graphmodel_unpublish"
+    """Set to enable the deletion of Graph Models."""
     ENABLE_SHORTCUT_PUBLISH = "enable_shortcut_publish"
     """Set to enable deploying shortcuts with the lakehouse."""
     DISABLE_WORKSPACE_FOLDER_PUBLISH = "disable_workspace_folder_publish"
@@ -169,6 +177,8 @@ UNPUBLISH_FLAG_MAPPING = {
     ItemType.WAREHOUSE.value: FeatureFlag.ENABLE_WAREHOUSE_UNPUBLISH.value,
     ItemType.EVENTHOUSE.value: FeatureFlag.ENABLE_EVENTHOUSE_UNPUBLISH.value,
     ItemType.KQL_DATABASE.value: FeatureFlag.ENABLE_KQLDATABASE_UNPUBLISH.value,
+    ItemType.COSMOS_DB_DATABASE.value: FeatureFlag.ENABLE_COSMOSDBDATABASE_UNPUBLISH.value,
+    ItemType.GRAPH_MODEL.value: FeatureFlag.ENABLE_GRAPHMODEL_UNPUBLISH.value,
 }
 
 # Item Type
@@ -246,6 +256,11 @@ API_FORMAT_MAPPING = {
 
 # REGEX Constants
 WORKSPACE_ID_REFERENCE_REGEX = r"\"?(default_lakehouse_workspace_id|workspaceId|workspace)\"?\s*[:=]\s*\"(.*?)\""
+REFLEX_WORKSPACE_ID_REFERENCE_REGEX = (
+    r'(\\"name\\":\\"workspaceId\\",\\"type\\":\\"string\\",\\"value\\":\\")'
+    rf"{DEFAULT_GUID}"
+    r'(\\")'
+)
 DATAFLOW_SOURCE_REGEX = (
     r'(PowerPlatform\.Dataflows)(?:\(\[\]\))?[\s\S]*?workspaceId\s*=\s*"(.*?)"[\s\S]*?dataflowId\s*=\s*"(.*?)"'
 )
@@ -280,6 +295,9 @@ PROPERTY_PATH_ATTR_MAPPING = {
     },
 }
 
+# Attributes that require waits between publish tiers. Excludes immediately available "id".
+ASYNC_PROVISIONED_ATTRIBUTES = frozenset({"sqlendpoint", "sqlendpointid", "queryserviceuri"})
+
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
 # Parameters to validate
@@ -288,6 +306,7 @@ PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_mode
 ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
 ITEM_VARIABLE_PREFIX = "$items."
 WORKSPACE_VARIABLE_PREFIX = "$workspace."
+ENVIRONMENT_VARIABLE_PREFIX = "$ENV:"
 CROSS_WORKSPACE_ITEM_SEPARATOR = ".$items."
 WORKSPACE_VARIABLE_ATTRIBUTES = {
     "$workspace.id": "id",
@@ -296,6 +315,7 @@ WORKSPACE_VARIABLE_ATTRIBUTES = {
     "$workspace.$name_encoded": "name_encoded",
 }
 WORKSPACE_VARIABLES_FIXED = list(WORKSPACE_VARIABLE_ATTRIBUTES)
+PARAMETER_FILE_FILTERS = ("item_type", "item_name", "file_path")
 
 # Parameter file validation messages
 INVALID_REPLACE_VALUE_SPARK_POOL = {
@@ -358,6 +378,8 @@ PARAMETER_MSGS = {
     "duplicate_semantic_model": "Duplicate semantic model names found: {}. Each semantic model should only appear once in the configuration as only one connection can be bound per semantic model. Please remove duplicate entries to avoid unpredictable binding behavior.",
     "unsupported_find_value_variable": "Dynamic replacement variable '{}' is not supported in find_value. Same-workspace item attributes ($items.*) resolve to the target environment's item ID, which cannot be present in the source file",
     "cross_workspace_variable_warning": "Cross-workspace dynamic replacement variable(s) were found. Ensure the referenced workspace(s) and item(s), if applicable, exist before deployment",
+    "environment_variable_feature_disabled": "Environment variable reference '{}' requires the 'enable_environment_variable_replacement' feature flag",
+    "environment_variable_unresolved": "Environment variable reference '{}' could not be resolved. Ensure the referenced OS environment variable is set",
     "incompatible_find_value_regex_variable": "Dynamic replacement variable '{}' in find_value cannot be combined with is_regex. Use either a dynamic replacement variable OR a regex pattern, not both",
     # Template parameter file messages
     "template_file_not_found": "Template parameter file not found: {}",

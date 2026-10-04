@@ -701,7 +701,7 @@ class TestDeployWithConfig:
         mock_workspace_instance.responses = None
         mock_workspace_instance.unpublish_responses = None
         mock_workspace_instance.item_type_in_scope = ["Notebook"]
-        mock_workspace_instance.contains_param_vars = False
+        mock_workspace_instance.contains_param_item_vars = False
         mock_workspace_instance.bulk_publish_enabled = False
         mock_workspace_instance.workspace_id = "77777777-7777-7777-7777-777777777777"
         mock_workspace_instance.publish_item_name_exclude_regex = None
@@ -750,7 +750,7 @@ class TestDeployWithConfig:
         mock_workspace_instance.responses = None
         mock_workspace_instance.unpublish_responses = None
         mock_workspace_instance.item_type_in_scope = ["Notebook"]
-        mock_workspace_instance.contains_param_vars = False
+        mock_workspace_instance.contains_param_item_vars = False
         mock_workspace_instance.bulk_publish_enabled = False
         mock_workspace_instance.workspace_id = "77777777-7777-7777-7777-777777777777"
         mock_workspace_instance.publish_item_name_exclude_regex = None
