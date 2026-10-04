@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 🔧 Bug Fix
+
+- Pin `jsonpath-ng<1.8.0` to avoid an upstream regression that mutates source objects during filter-predicate evaluation, corrupting Data Pipeline payloads in `key_value_replace` parameterization (`Cannot cast JArray to JToken`) by [shirasassoon](https://github.com/shirasassoon) ([#1142](https://github.com/microsoft/fabric-cicd/issues/1142))
+
 ## [v1.3.0](https://pypi.org/project/fabric-cicd/1.3.0) - August 10, 2026
 
 ### ✨ New Functionality
