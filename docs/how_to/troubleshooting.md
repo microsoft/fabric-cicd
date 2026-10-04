@@ -216,26 +216,6 @@ Certain item types are explicitly unsupported by the bulk import API due to lack
 4. Validate the find value regex and/or dynamic replacement variables in `parameter.yml`
 5. Use the [debug_parameterization.py](#debug_parameterizationpy) script to validate parameter files
 
-#### Data Pipeline Parameterization Fails with "Cannot cast JArray to JToken"
-
-**Symptom**: Deploying a Data Pipeline (or any item) that uses `key_value_replace` with a JSONPath filter expression (e.g. `$.properties.activities[?(@.type=='InvokePipeline')]`) fails with the Fabric/Power BI API error:
-
-```
-Cannot cast Newtonsoft.Json.Linq.JArray to Newtonsoft.Json.Linq.JToken
-```
-
-The deployed payload is malformed — JSON objects are converted into arrays (e.g. `"policy": {"secureOutput": false, "secureInput": false}` becomes `"policy": [false, false]`).
-
-**Cause**: This is an upstream regression in `jsonpath-ng` **1.8.0**, which mutates the source object in place while evaluating filter predicates. It is not a fabric-cicd bug. See [jsonpath-ng#214](https://github.com/h2non/jsonpath-ng/issues/214).
-
-**Solution**: Use `jsonpath-ng` **1.7.0**, which does not have this regression:
-
-```bash
-pip install "jsonpath-ng==1.7.0"
-```
-
-fabric-cicd pins `jsonpath-ng<1.8.0` for this reason, so a fresh install already resolves to a working version. The cap will be lifted once a fixed `jsonpath-ng` release is published.
-
 #### Private Link Connection Failures
 
 **Symptom**: API calls fail with connection errors when deploying to a workspace with "Allow connections only from workspace level private links" enabled.
