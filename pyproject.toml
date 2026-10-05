@@ -20,7 +20,7 @@ dependencies = [
     "azure-identity>=1.25.0",
     "dpath>=2.2.0",
     "filetype>=1.2.0",
-    "jsonpath-ng>=1.8.0",
+    "jsonpath-ng>=1.7.0,<1.8.0",
     "pyyaml>=6.0.3",
     "requests>=2.32.3",
     "urllib3>=2.7.0; python_version>='3.10'",

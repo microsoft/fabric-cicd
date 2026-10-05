@@ -1,0 +1,8 @@
+kind: fixed
+body: Pin jsonpath-ng to an earlier version to prevent an upstream regression from corrupting Data Pipeline payloads during `key_value_replace` parameterization
+time: 2026-10-04T13:45:36.2772781+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1142"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1142
