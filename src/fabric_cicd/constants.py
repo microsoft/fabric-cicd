@@ -158,7 +158,7 @@ class FeatureFlag(str, Enum):
     ENABLE_BULK_PUBLISH = "enable_bulk_publish"
     """Set to enable publishing of items using the bulk import API."""
     ENABLE_PURGE_DATA = "enable_purge_data"
-    """Set to allow purging a Semantic Model's existing data when applying an updated definition."""
+    """Set to allow purging a Semantic Model's existing data when applying a definition update."""
 
 
 class OperationType(str, Enum):
