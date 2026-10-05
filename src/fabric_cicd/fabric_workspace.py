@@ -735,6 +735,7 @@ class FabricWorkspace:
         item_type: str,
         exclude_path: str = r"^(?!.*)",
         func_process_file: Optional[callable] = None,
+        options: Optional[dict] = None,
         **kwargs,
     ) -> None:
         """
@@ -745,6 +746,7 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
             exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
             func_process_file: Custom function to process file contents. Defaults to None.
+            options: Dictionary of additional options for the update definition operation (e.g., {"allowPurgeData": True}). Defaults to None.
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
@@ -814,13 +816,7 @@ class FabricWorkspace:
         elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
-            update_body = definition_body
-            # Optionally allow purging a Semantic Model's existing data when applying an updated definition
-            if (
-                item_type == ItemType.SEMANTIC_MODEL.value
-                and FeatureFlag.ENABLE_PURGE_DATA.value in constants.FEATURE_FLAG
-            ):
-                update_body = {**definition_body, "options": {"allowPurgeData": True}}
+            update_body = {**definition_body, "options": options} if options is not None else definition_body
             update_response = self.endpoint.invoke(
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
