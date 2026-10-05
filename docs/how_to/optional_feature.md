@@ -21,6 +21,7 @@ append_feature_flag("<specific_flag>")
 | `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API) | ☑️           |
 | `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                            |              |
 | `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                               |              |
+| `enable_purge_data`                       | Allow purging a Semantic Model's existing data when its updated definition requires clearing data (a refresh is needed afterward) |              |
 | `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                        |              |
 | `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                      |              |
 

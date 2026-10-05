@@ -157,6 +157,8 @@ class FeatureFlag(str, Enum):
     """Set to enable hard deletion of items, bypassing the workspace recycle bin."""
     ENABLE_BULK_PUBLISH = "enable_bulk_publish"
     """Set to enable publishing of items using the bulk import API."""
+    ENABLE_PURGE_DATA = "enable_purge_data"
+    """Set to allow purging a Semantic Model's existing data when applying an updated definition."""
 
 
 class OperationType(str, Enum):
