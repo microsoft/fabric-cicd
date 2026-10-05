@@ -883,11 +883,20 @@ class FabricWorkspace:
         """
         # Prepare the definition parts for all items to be published in bulk
         definition_parts = []
+        item_options_by_logical_id = []
         for _item_name, item, publisher in items_with_context:
             item_parts = self._prepare_bulk_item_parts(item, publisher)
             definition_parts.extend(item_parts)
 
+            opts = publisher.get_definition_options(item)
+            if opts:
+                item_options_by_logical_id.append({"logicalId": item.logical_id, "options": opts})
+
         logger.info(f"Publishing {len(items_with_context)} item(s) in bulk")
+
+        options = {"allowPairingByName": True}
+        if item_options_by_logical_id:
+            options["itemOptionsByLogicalId"] = item_options_by_logical_id
 
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions
         response = self.endpoint.invoke(
@@ -895,7 +904,7 @@ class FabricWorkspace:
             url=f"{self.base_api_url}/items/bulkImportDefinitions",
             body={
                 "definitionParts": definition_parts,
-                "options": {"allowPairingByName": True},
+                "options": options,
             },
             max_duration=1800,  # 30 minutes, as bulk operations can take longer time to complete
         )

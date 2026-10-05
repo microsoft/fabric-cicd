@@ -479,6 +479,20 @@ class ItemPublisher(Publisher):
         """
         self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
 
+    def get_definition_options(self, _item: "Item") -> Optional[dict]:
+        """
+        Item-type-specific updateDefinition / bulk-import options.
+
+        Args:
+            _item: The Item object being published.
+
+        Returns:
+            A dictionary of options to merge into the request body, or None.
+            Default implementation returns None. Subclasses can override to
+            provide item-type-specific options (e.g. Semantic Model allowPurgeData).
+        """
+        return None
+
     def get_items_to_publish(self) -> dict[str, "Item"]:
         """
         Get the items to publish for this item type.

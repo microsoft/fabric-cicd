@@ -11,6 +11,7 @@ from fixtures.credentials import DummyTokenCredential
 
 from fabric_cicd import constants, get_supported_feature_flags
 from fabric_cicd._common._item import Item
+from fabric_cicd._items._semanticmodel import SemanticModelPublisher
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -73,8 +74,10 @@ def _clear_feature_flags():
 
 
 def _publish(workspace):
-    # exclude all files so no real item definition files are required for this focused test
-    workspace._publish_item("MyModel", ItemType.SEMANTIC_MODEL.value, exclude_path=r".*")
+    # Route through the publisher so the get_definition_options() flag mapping is exercised.
+    # The test item has no definition files, so the empty-parts updateDefinition branch runs.
+    item = workspace.repository_items[ItemType.SEMANTIC_MODEL.value]["MyModel"]
+    SemanticModelPublisher(workspace).publish_one("MyModel", item)
 
 
 def test_purge_data_flag_adds_options_to_update_body(deployed_semantic_model_workspace, mock_endpoint):

@@ -347,8 +347,14 @@ class SemanticModelPublisher(ItemPublisher):
             item_type=self.item_type,
             exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
             # Optionally allow purging a Semantic Model's existing data when applying an updated definition
-            options={"allowPurgeData": True} if FeatureFlag.ENABLE_PURGE_DATA.value in constants.FEATURE_FLAG else None,
+            options=self.get_definition_options(_item),
         )
+
+    def get_definition_options(self, _item: Item) -> dict | None:
+        """Return Semantic Model definition options, gated by the ENABLE_PURGE_DATA feature flag."""
+        if FeatureFlag.ENABLE_PURGE_DATA.value in constants.FEATURE_FLAG:
+            return {"allowPurgeData": True}
+        return None
 
     def post_publish_all(self) -> None:
         """Bind semantic models to connections after all models are published."""
