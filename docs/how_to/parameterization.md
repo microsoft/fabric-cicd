@@ -265,13 +265,13 @@ Additional notes:
     - **Item attribute variables:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
     - **Variable format:** `$items.<item_type>.<item_name>.$<attribute>`
 
-        | Attribute          | Supported Items                                     | Example                                             | Sample Replace Value                                           |
-        | ------------------ | --------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
-        | `$id`              | All                                                 | `$items.Notebook.MyNotebook.$id`                    | `123e4567-e89b-12d3-a456-426614174000`                         |
-        | `$sqlendpoint`     | Lakehouse, MirroredDatabase, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`         | `abc123def456.datawarehouse.fabric.microsoft.com`              |
-        | `$sqlendpointhost` | SQLDatabase                                         | `$items.SQLDatabase.MySQLDatabase.$sqlendpointhost` | `abc123def456.database.fabric.microsoft.com`                   |
-        | `$sqlendpointid`   | Lakehouse, MirroredDatabase                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`       | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
-        | `$queryserviceuri` | Eventhouse                                          | `$items.Eventhouse.MyEventhouse.$queryserviceuri`   | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
+        | Attribute          | Supported Items                                     | Example                                             |
+        | ------------------ | --------------------------------------------------- | --------------------------------------------------- |
+        | `$id`              | All                                                 | `$items.Notebook.MyNotebook.$id`                    |
+        | `$sqlendpoint`     | Lakehouse, MirroredDatabase, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`         |
+        | `$sqlendpointhost` | SQLDatabase                                         | `$items.SQLDatabase.MySQLDatabase.$sqlendpointhost` |
+        | `$sqlendpointid`   | Lakehouse, MirroredDatabase                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`       |
+        | `$queryserviceuri` | Eventhouse                                          | `$items.Eventhouse.MyEventhouse.$queryserviceuri`   |
         
         > **Notes:**
         >
