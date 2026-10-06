@@ -1440,6 +1440,44 @@ def test_get_item_attribute_mirrored_database(patched_fabric_workspace, valid_wo
         )
 
 
+def test_get_item_attribute_sqldatabase_host_strips_port(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir
+):
+    """Test that _get_item_attribute strips the server port for the sqlendpointhost attribute."""
+    mock_endpoint = MagicMock()
+
+    # Mock response mirrors the Fabric "Get SQL Database" API shape (serverFqdn includes the port)
+    mock_endpoint.invoke.return_value = {
+        "body": {"properties": {"serverFqdn": "test-sql-server.database.fabric.microsoft.com,1433"}}
+    }
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        sqlendpoint = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpoint",
+        )
+        sqlendpointhost = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpointhost",
+        )
+
+        # sqlendpoint keeps the port; sqlendpointhost strips it
+        assert sqlendpoint == "test-sql-server.database.fabric.microsoft.com,1433"
+        assert sqlendpointhost == "test-sql-server.database.fabric.microsoft.com"
+
+
 def test_get_item_attribute_caching_prevents_api_call(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
     """Test that fetching the same attribute again uses cache and doesn't make API call."""
     mock_endpoint = MagicMock()

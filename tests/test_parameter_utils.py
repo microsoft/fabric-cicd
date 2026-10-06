@@ -99,12 +99,19 @@ class TestParameterUtilities:
         mock_ws.workspace_id = "mock-workspace-id"
         mock_ws.workspace_items = {
             "Notebook": {
-                "Test Notebook": {"id": "notebook-id", "sqlendpoint": "", "sqlendpointid": "", "queryserviceuri": ""},
+                "Test Notebook": {
+                    "id": "notebook-id",
+                    "sqlendpoint": "",
+                    "sqlendpointhost": "",
+                    "sqlendpointid": "",
+                    "queryserviceuri": "",
+                },
             },
             "Warehouse": {
                 "TestWarehouse": {
                     "id": "warehouse-id",
                     "sqlendpoint": "warehouse-endpoint",
+                    "sqlendpointhost": "",
                     "sqlendpointid": "",
                     "queryserviceuri": "",
                 },
@@ -113,6 +120,7 @@ class TestParameterUtilities:
                 "Test_Lakehouse": {
                     "id": "lakehouse-id",
                     "sqlendpoint": "lakehouse-endpoint",
+                    "sqlendpointhost": "",
                     "sqlendpointid": "lakehouse-sql-endpoint-id",
                     "queryserviceuri": "",
                 },
@@ -121,6 +129,7 @@ class TestParameterUtilities:
                 "Test Eventhouse": {
                     "id": "eventhouse-id",
                     "sqlendpoint": "",
+                    "sqlendpointhost": "",
                     "sqlendpointid": "",
                     "queryserviceuri": "eventhouse-query-uri",
                 },
@@ -129,6 +138,7 @@ class TestParameterUtilities:
                 "TestSQLDatabase": {
                     "id": "sqldatabase-id",
                     "sqlendpoint": "test-sql-server.database.fabric.microsoft.com,1433",
+                    "sqlendpointhost": "test-sql-server.database.fabric.microsoft.com",
                     "sqlendpointid": "",
                     "queryserviceuri": "",
                 },
@@ -510,11 +520,27 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.$sqlendpoint", False)
         assert result == "test-sql-server.database.fabric.microsoft.com,1433"
 
+        # Test with valid SQLDatabase sqlendpointhost attribute (port stripped)
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.sqlendpointhost", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com"
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.$sqlendpointhost", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com"
+
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
         assert result == "eventhouse-query-uri"
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.$queryserviceuri", False)
         assert result == "eventhouse-query-uri"
+
+    def test_extract_item_attribute_sqlendpointhost_unsupported_type(self, mock_workspace):
+        """sqlendpointhost is only populated for SQLDatabase; other types resolve empty and must error."""
+        with pytest.raises(
+            ParsingError,
+            match=re.escape(
+                "Value does not exist for attribute 'sqlendpointhost' in the Lakehouse item 'Test_Lakehouse'"
+            ),
+        ):
+            _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.$sqlendpointhost", False)
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
         """Tests _extract_item_attribute with invalid variable cases."""

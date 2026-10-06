@@ -268,12 +268,14 @@ Additional notes:
         | ------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
         | `$items.<item_type>.<item_name>.$id`              | All                                                 | `$items.Notebook.MyNotebook.$id`                  | `123e4567-e89b-12d3-a456-426614174000`                         |
         | `$items.<item_type>.<item_name>.$sqlendpoint`     | Lakehouse, MirroredDatabase, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`       | `abc123def456.datawarehouse.fabric.microsoft.com`              |
+        | `$items.<item_type>.<item_name>.$sqlendpointhost` | SQLDatabase                                         | `$items.SQLDatabase.MySQLDatabase.$sqlendpointhost` | `abc123def456.database.fabric.microsoft.com`                 |
         | `$items.<item_type>.<item_name>.$sqlendpointid`   | Lakehouse, MirroredDatabase                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`     | `37dc8a41-dea9-465d-b528-3e95043b2356`                         |
         | `$items.<item_type>.<item_name>.$queryserviceuri` | Eventhouse                                          | `$items.Eventhouse.MyEventhouse.$queryserviceuri` | `https://trd-a1b2c3d4e5f6g7h8i9.z4.kusto.fabric.microsoft.com` |
         
         > **Notes:**
         >
         > - Attributes should be **lowercase**.
+        > - `$sqlendpointhost` returns the SQLDatabase SQL endpoint **without** the server port. A SQLDatabase's `$sqlendpoint` value includes a trailing `,<port>` (e.g. `server.database.fabric.microsoft.com,1433`) that breaks direct string matches; `$sqlendpointhost` returns just the host. It is supported for SQLDatabase items only.
         > - The legacy format without `$` prefix on the attribute is also supported
         > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
         > - Item type must be valid and in scope.
