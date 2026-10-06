@@ -276,7 +276,7 @@ Additional notes:
         > **Notes:**
         >
         > - Attributes should be **lowercase**.
-        > - `$sqlendpointhost` returns the SQLDatabase SQL endpoint **without** the server port. A SQLDatabase's `$sqlendpoint` value includes a trailing `,<port>` (e.g. `server.database.fabric.microsoft.com,1433`) that breaks direct string matches; `$sqlendpointhost` returns just the host. It is supported for SQLDatabase items only.
+        > - For SQLDatabase items, `$sqlendpoint` includes the server port (for example, `server.database.fabric.microsoft.com,1433`); use `$sqlendpointhost` when only the hostname is needed.
         > - The legacy format without `$` prefix on the attribute is also supported
         > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
         > - Item type must be valid and in scope.
