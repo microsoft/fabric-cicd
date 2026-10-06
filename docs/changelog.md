@@ -1,5 +1,34 @@
 # Changelog
 
+## [v1.4.0](https://pypi.org/project/fabric-cicd/1.4.0) - October 07, 2026
+
+### 🆕 New Items Support
+
+- Add support for Graph Model item by [shirasassoon](https://github.com/shirasassoon) ([#1000](https://github.com/microsoft/fabric-cicd/issues/1000))
+- Add support for Cosmos DB item by [shirasassoon](https://github.com/shirasassoon) ([#1134](https://github.com/microsoft/fabric-cicd/issues/1134))
+
+### ✨ New Functionality
+
+- Add support for dynamic replacement variables in bulk publish mode by [shirasassoon](https://github.com/shirasassoon) ([#1117](https://github.com/microsoft/fabric-cicd/issues/1117))
+- Add support for Python 3.14 in the library by [shirasassoon](https://github.com/shirasassoon) ([#868](https://github.com/microsoft/fabric-cicd/issues/868))
+
+### 🔧 Bug Fix
+
+- Fix cluster URI resolution for KQL Queryset items by [shirasassoon](https://github.com/shirasassoon) ([#1105](https://github.com/microsoft/fabric-cicd/issues/1105))
+- Fix intermittent failures in Paginated Report deployment by publishing reports serially by [shirasassoon](https://github.com/shirasassoon) ([#1065](https://github.com/microsoft/fabric-cicd/issues/1065))
+- Fix replacement of escaped default workspace IDs in Activator item definitions by [shirasassoon](https://github.com/shirasassoon) ([#1118](https://github.com/microsoft/fabric-cicd/issues/1118))
+- Fix Semantic Model connection binding for OneLake paths missing a trailing `/` by [shirasassoon](https://github.com/shirasassoon) ([#1128](https://github.com/microsoft/fabric-cicd/issues/1128))
+- Fix `$ENV:` token replacement to use plain OS environment variable names by [shirasassoon](https://github.com/shirasassoon) ([#1129](https://github.com/microsoft/fabric-cicd/issues/1129))
+- Pin jsonpath-ng to an earlier version to prevent an upstream regression from corrupting Data Pipeline payloads during `key_value_replace` parameterization by [shirasassoon](https://github.com/shirasassoon) ([#1142](https://github.com/microsoft/fabric-cicd/issues/1142))
+
+### ⚡ Additional Optimizations
+
+- Move validation for dynamic replacement variables before deployment by [shirasassoon](https://github.com/shirasassoon) ([#1103](https://github.com/microsoft/fabric-cicd/issues/1103))
+
+### 📝 Documentation Update
+
+- Add an end-to-end deployment tutorial for fabric-cicd by [shirasassoon](https://github.com/shirasassoon) ([#836](https://github.com/microsoft/fabric-cicd/issues/836))
+
 ## [v1.3.0](https://pypi.org/project/fabric-cicd/1.3.0) - August 10, 2026
 
 ### ✨ New Functionality
