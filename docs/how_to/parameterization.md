@@ -263,6 +263,7 @@ Additional notes:
     <br>
     
     - **Item attribute variables:** replaces the item's attribute value with the corresponding attribute value of the item in the deployed/target workspace.
+    - **Variable format:** `$items.<item_type>.<item_name>.$<attribute>`
 
         | Attribute          | Supported Items                                     | Example                                             | Sample Replace Value                                           |
         | ------------------ | --------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
