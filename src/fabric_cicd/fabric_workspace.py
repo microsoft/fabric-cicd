@@ -272,9 +272,9 @@ class FabricWorkspace:
         # Extract the attribute value using the path
         attribute_value = dpath.get(response, property_path, default="")
 
-        # The host-only variant strips the server port from the SQL endpoint
+        # The fqdn-only variant strips the server port from the SQL endpoint
         # (e.g. "server.database.fabric.microsoft.com,1433" -> "server.database.fabric.microsoft.com")
-        if attribute_name == "sqlendpointhost" and attribute_value:
+        if attribute_name == "sqlendpointfqdn" and attribute_value:
             attribute_value = attribute_value.split(",", 1)[0]
 
         if not attribute_value:
@@ -296,7 +296,7 @@ class FabricWorkspace:
         """
         Poll an item until an asynchronously provisioned attribute becomes available.
 
-        SQL endpoints (`sqlendpoint` / `sqlendpointhost` / `sqlendpointid`) and the Eventhouse query URI
+        SQL endpoints (`sqlendpoint` / `sqlendpointfqdn` / `sqlendpointid`) and the Eventhouse query URI
         (`queryserviceuri`) are provisioned asynchronously after the item is created, so a
         freshly deployed item may not expose them immediately. Serial publishing waits for this
         via `check_sqlendpoint_provision_status`; staged bulk publishing calls this method
@@ -515,7 +515,7 @@ class FabricWorkspace:
             sql_endpoint = ""
             sql_endpoint_id = ""
             query_service_uri = ""
-            sql_endpoint_host = ""
+            sql_endpoint_fqdn = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
@@ -539,9 +539,9 @@ class FabricWorkspace:
                     sql_endpoint_id = self._get_item_attribute(
                         self.workspace_id, item_type, item_guid, item_name, "sqlendpointid", required=False
                     )
-                    # Derived host-only endpoint (port stripped); only SQLDatabase exposes a port
+                    # Derived fqdn-only endpoint (port stripped); only SQLDatabase exposes a port
                     if item_type == ItemType.SQL_DATABASE.value:
-                        sql_endpoint_host = sql_endpoint.split(",", 1)[0] if sql_endpoint else sql_endpoint
+                        sql_endpoint_fqdn = sql_endpoint.split(",", 1)[0] if sql_endpoint else sql_endpoint
                 if item_type in [ItemType.EVENTHOUSE.value]:
                     query_service_uri = self._get_item_attribute(
                         self.workspace_id, item_type, item_guid, item_name, "queryserviceuri", required=False
@@ -560,7 +560,7 @@ class FabricWorkspace:
             self.workspace_items[item_type][item_name] = {
                 "id": item_guid,
                 "sqlendpoint": sql_endpoint,
-                "sqlendpointhost": sql_endpoint_host,
+                "sqlendpointfqdn": sql_endpoint_fqdn,
                 "sqlendpointid": sql_endpoint_id,
                 "queryserviceuri": query_service_uri,
             }

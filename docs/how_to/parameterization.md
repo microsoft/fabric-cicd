@@ -269,15 +269,15 @@ Additional notes:
         | ------------------ | --------------------------------------------------- | --------------------------------------------------- |
         | `$id`              | All                                                 | `$items.Notebook.MyNotebook.$id`                    |
         | `$sqlendpoint`     | Lakehouse, MirroredDatabase, SQLDatabase, Warehouse | `$items.Lakehouse.MyLakehouse.$sqlendpoint`         |
-        | `$sqlendpointhost` | SQLDatabase                                         | `$items.SQLDatabase.MySQLDatabase.$sqlendpointhost` |
+        | `$sqlendpointfqdn` | SQLDatabase                                         | `$items.SQLDatabase.MySQLDatabase.$sqlendpointfqdn` |
         | `$sqlendpointid`   | Lakehouse, MirroredDatabase                         | `$items.Lakehouse.MyLakehouse.$sqlendpointid`       |
         | `$queryserviceuri` | Eventhouse                                          | `$items.Eventhouse.MyEventhouse.$queryserviceuri`   |
         
         > **Notes:**
         >
         > - Attributes should be **lowercase**.
-        > - For SQLDatabase items, `$sqlendpoint` includes the server port (for example, `server.database.fabric.microsoft.com,1433`); use `$sqlendpointhost` when only the hostname is needed.
-        > - The legacy format without `$` prefix on the attribute is also supported
+        > - For SQLDatabase items, `$sqlendpoint` includes the server port (e.g., `server.database.fabric.microsoft.com,1433`); use `$sqlendpointfqdn` when only the FQDN is needed (e.g., `server.database.fabric.microsoft.com`).
+        > - The legacy format without `$` prefix on the attribute is also supported.
         > - Item type and name are **case-sensitive**; item name must be an **exact match** (include spaces, if present).
         > - Item type must be valid and in scope.
         
