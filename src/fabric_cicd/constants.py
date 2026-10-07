@@ -271,22 +271,22 @@ DATA_PIPELINE_CONTENT_FILE_JSON = "pipeline-content.json"
 # Item Type to File Mapping (to check for item dependencies)
 ITEM_TYPE_TO_FILE = {ItemType.DATA_PIPELINE.value: DATA_PIPELINE_CONTENT_FILE_JSON}
 
-_SQL_ENDPOINT_PROPERTIES_ATTR_MAPPING = {
-    "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
-    "sqlendpointid": "body/properties/sqlEndpointProperties/id",
-}
-_SQL_DATABASE_ENDPOINT_PATH = "body/properties/serverFqdn"
-
-# Property paths to get SQL Endpoint or Eventhouse URI
+# Property path to get SQL Endpoint or Eventhouse URI
 PROPERTY_PATH_ATTR_MAPPING = {
-    ItemType.LAKEHOUSE.value: _SQL_ENDPOINT_PROPERTIES_ATTR_MAPPING.copy(),
-    ItemType.MIRRORED_DATABASE.value: _SQL_ENDPOINT_PROPERTIES_ATTR_MAPPING.copy(),
+    ItemType.LAKEHOUSE.value: {
+        "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+        "sqlendpointid": "body/properties/sqlEndpointProperties/id",
+    },
+    ItemType.MIRRORED_DATABASE.value: {
+        "sqlendpoint": "body/properties/sqlEndpointProperties/connectionString",
+        "sqlendpointid": "body/properties/sqlEndpointProperties/id",
+    },
     ItemType.WAREHOUSE.value: {
         "sqlendpoint": "body/properties/connectionString",
     },
     ItemType.SQL_DATABASE.value: {
-        "sqlendpoint": _SQL_DATABASE_ENDPOINT_PATH,
-        "sqlendpointfqdn": _SQL_DATABASE_ENDPOINT_PATH,
+        "sqlendpoint": "body/properties/serverFqdn",
+        "sqlendpointfqdn": "body/properties/serverFqdn",
     },
     ItemType.EVENTHOUSE.value: {
         "queryserviceuri": "body/properties/queryServiceUri",
