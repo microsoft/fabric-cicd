@@ -1440,6 +1440,50 @@ def test_get_item_attribute_mirrored_database(patched_fabric_workspace, valid_wo
         )
 
 
+@pytest.mark.parametrize(
+    "server_fqdn",
+    [
+        "test-sql-server.database.fabric.microsoft.com,1433",
+        "test-sql-server.database.fabric.microsoft.com,1433,unexpected",
+    ],
+)
+def test_get_item_attribute_sqldatabase_host_strips_port(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir, server_fqdn
+):
+    """Test that _get_item_attribute returns only the host for the sqlendpointfqdn attribute."""
+    mock_endpoint = MagicMock()
+
+    # Mock response mirrors the Fabric "Get SQL Database" API shape (serverFqdn includes the port)
+    mock_endpoint.invoke.return_value = {"body": {"properties": {"serverFqdn": server_fqdn}}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        sqlendpoint = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpoint",
+        )
+        sqlendpointfqdn = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpointfqdn",
+        )
+
+        # sqlendpoint keeps the port; sqlendpointfqdn strips it
+        assert sqlendpoint == server_fqdn
+        assert sqlendpointfqdn == "test-sql-server.database.fabric.microsoft.com"
+        assert mock_endpoint.invoke.call_count == 1
+
+
 def test_get_item_attribute_caching_prevents_api_call(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
     """Test that fetching the same attribute again uses cache and doesn't make API call."""
     mock_endpoint = MagicMock()
