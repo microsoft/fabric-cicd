@@ -240,7 +240,8 @@ class FabricWorkspace:
             return ""
 
         # Create a cache key for this request
-        cache_key = (workspace_id, item_type, item_guid, item_name, attribute_name)
+        cache_key_prefix = (workspace_id, item_type, item_guid, item_name)
+        cache_key = (*cache_key_prefix, attribute_name)
 
         # Check if result is already cached
         with self._item_attribute_cache_lock:
@@ -272,11 +273,6 @@ class FabricWorkspace:
         # Extract the attribute value using the path
         attribute_value = dpath.get(response, property_path, default="")
 
-        # The fqdn-only variant strips the server port from the SQL endpoint
-        # (e.g. "server.database.fabric.microsoft.com,1433" -> "server.database.fabric.microsoft.com")
-        if attribute_name == "sqlendpointfqdn" and attribute_value:
-            attribute_value = attribute_value.split(",", 1)[0]
-
         if not attribute_value:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
             # required=False allows skipping items whose attributes aren't yet available (asynchronous provisioning)
@@ -284,6 +280,17 @@ class FabricWorkspace:
                 logger.warning(f"{msg} (attribute='{attribute_name}'); skipping (item may be newly provisioned)")
                 return ""
             raise InputError(msg, logger)
+
+        # Special handling for SQL Database attributes that require additional processing
+        if item_type == ItemType.SQL_DATABASE.value and attribute_name in {"sqlendpoint", "sqlendpointfqdn"}:
+            sql_endpoint = attribute_value
+            sql_endpoint_fqdn = sql_endpoint.split(",", 1)[0]
+            with self._item_attribute_cache_lock:
+                self._item_attribute_cache.update({
+                    (*cache_key_prefix, "sqlendpoint"): sql_endpoint,
+                    (*cache_key_prefix, "sqlendpointfqdn"): sql_endpoint_fqdn,
+                })
+            return sql_endpoint if attribute_name == "sqlendpoint" else sql_endpoint_fqdn
 
         # Cache the result before returning
         with self._item_attribute_cache_lock:
@@ -539,9 +546,10 @@ class FabricWorkspace:
                     sql_endpoint_id = self._get_item_attribute(
                         self.workspace_id, item_type, item_guid, item_name, "sqlendpointid", required=False
                     )
-                    # Derived fqdn-only endpoint (port stripped); only SQLDatabase exposes a port
                     if item_type == ItemType.SQL_DATABASE.value:
-                        sql_endpoint_fqdn = sql_endpoint.split(",", 1)[0] if sql_endpoint else sql_endpoint
+                        sql_endpoint_fqdn = self._get_item_attribute(
+                            self.workspace_id, item_type, item_guid, item_name, "sqlendpointfqdn", required=False
+                        )
                 if item_type in [ItemType.EVENTHOUSE.value]:
                     query_service_uri = self._get_item_attribute(
                         self.workspace_id, item_type, item_guid, item_name, "queryserviceuri", required=False
