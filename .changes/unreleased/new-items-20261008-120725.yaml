@@ -1,0 +1,8 @@
+kind: new-items
+body: Add OrgApp item type support
+time: 2026-10-08T12:07:25.20395+03:00
+custom:
+    Author: ayeshurun
+    AuthorLink: https://github.com/ayeshurun
+    Issue: "1026"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1026
