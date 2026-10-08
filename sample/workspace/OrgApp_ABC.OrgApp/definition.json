@@ -1,0 +1,13 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/orgapp/definition/orgAppDefinition/2.0.0/schema.json",
+  "settings": {},
+  "elements": [
+    {
+      "elementType": "item",
+      "elementId": "d41e08fa-7283-4cb2-82ce-b9d3f7f62044",
+      "itemType": "Notebook",
+      "itemLogicalId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c",
+      "displayName": "Hello World"
+    }
+  ]
+}

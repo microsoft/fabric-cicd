@@ -68,6 +68,8 @@ class ItemType(str, Enum):
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
     NOTEBOOK = "Notebook"
     ONTOLOGY = "Ontology"
+    ORG_APP = "OrgApp"
+    ORG_APP_AUDIENCE = "OrgAppAudience"
     PAGINATED_REPORT = "PaginatedReport"
     REFLEX = "Reflex"
     REPORT = "Report"
@@ -113,6 +115,8 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     29: ItemType.ML_EXPERIMENT,
     30: ItemType.MAP,
     31: ItemType.GRAPH_MODEL,
+    32: ItemType.ORG_APP,
+    33: ItemType.ORG_APP_AUDIENCE,
 }
 
 
@@ -243,6 +247,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.REPORT.value: r".*\.pbi[/\\].*",
     ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
     ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
+    ItemType.ORG_APP.value: r".*\.children[/\\].*",
 }
 
 # API Format Mapping for item types that require specific API formats
