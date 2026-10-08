@@ -121,6 +121,8 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
         "MLExperiment",
         "Notebook",
         "Ontology",
+        "OrgApp",
+        "OrgAppAudience",
         "PaginatedReport",
         "Reflex",
         "Report",

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/orgappaudience/definition/orgAppAudienceDefinition/1.0.0/schema.json",
+  "settings": {
+    "hasAccessToHiddenContent": false,
+    "tabOrder": 0
+  },
+  "parentAppId": "13889f2d-6b42-8aca-4ff0-5528b5e9c284",
+  "elementReferences": [
+    {
+      "elementId": "d41e08fa-7283-4cb2-82ce-b9d3f7f62044",
+      "itemType": "Notebook",      
+      "itemLogicalId": "99b570c5-0c79-9dc4-4c9b-fa16c621384c"
+    }
+  ]
+}
