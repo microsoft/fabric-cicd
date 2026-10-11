@@ -631,9 +631,8 @@ class FabricWorkspace:
                     file_suffix = Path(file_path).suffix.lower()
                     if check_valid_json_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
-                    elif file_suffix in constants.YAML_PARAMETERIZATION_EXTENSIONS and check_valid_yaml_content(
-                        raw_file
-                    ):
+
+                    elif file_suffix in constants.YAML_FILE_EXTENSIONS and check_valid_yaml_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
 
         if "find_replace" in self.environment_parameter:
