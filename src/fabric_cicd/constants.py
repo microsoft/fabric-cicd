@@ -300,6 +300,12 @@ ASYNC_PROVISIONED_ATTRIBUTES = frozenset({"sqlendpoint", "sqlendpointfqdn", "sql
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+# File extensions whose contents are treated as YAML for key_value_replace parameterization.
+# Restricted to an explicit allow-list so non-YAML source files (e.g. notebook .py files whose
+# uncommented code happens to parse as a YAML mapping) are never dispatched through the YAML path
+# and re-serialized, which would drop comments and corrupt them. JSON dispatch stays content-based
+# because non-JSON source files do not parse as valid JSON. See issue #1153.
+YAML_PARAMETERIZATION_EXTENSIONS = (".yml", ".yaml")
 # Parameters to validate
 PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
 
