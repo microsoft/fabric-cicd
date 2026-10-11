@@ -687,10 +687,7 @@ def replace_key_value(
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
 
-    # Return the original content untouched when no replacement occurred. Re-serializing would
-    # drop comments and reformat the file, which corrupts non-YAML/JSON files (e.g. notebook .py
-    # files whose uncommented code happens to parse as a YAML mapping) that merely pass the
-    # content-based format check but never match find_key. See issue #1153.
+    # Return the original content untouched when no replacement occurred
     if not replacement_made:
         return content
 
