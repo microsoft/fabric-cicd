@@ -1560,12 +1560,7 @@ server:
         assert result == test_yaml
 
     def test_replace_key_value_notebook_parsing_as_mapping_preserved(self, mock_workspace):
-        """Regression test for issue #1153.
-
-        A notebook .py file whose only uncommented code parses as a YAML mapping must be
-        returned unchanged when find_key matches nothing, instead of being re-serialized
-        (which would drop all comment lines and corrupt the notebook).
-        """
+        """Ensure unmatched YAML content is returned unchanged without re-serialization."""
         notebook = """# Fabric notebook source
 
 # METADATA ********************

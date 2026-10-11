@@ -722,13 +722,7 @@ find_replace:
 def test_key_value_replace_notebook_py_not_treated_as_yaml(
     patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
 ):
-    """Regression test for issue #1153.
-
-    A notebook .py file whose only uncommented code parses as a YAML mapping must never be
-    dispatched through the YAML parameterization path, even when a wildcard key_value_replace
-    find_key would match the accidental mapping. The .py extension is not in the YAML allow-list,
-    so the file is left untouched (prologue and cell markers preserved).
-    """
+    """Ensure non-YAML files are not impacted by YAML parameterization even when their content parses as YAML."""
     parameter_content = """
 key_value_replace:
     - find_key: $.*

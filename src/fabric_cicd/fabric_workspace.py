@@ -632,6 +632,7 @@ class FabricWorkspace:
                     if check_valid_json_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
 
+                    # Avoid treating content from non-YAML files as YAML
                     elif file_suffix in constants.YAML_FILE_EXTENSIONS and check_valid_yaml_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
 
