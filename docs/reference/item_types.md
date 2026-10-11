@@ -164,15 +164,14 @@
 ## Org App
 
 - **Parameterization:**
-    - Referenced items that use logical IDs and exist in the deployment repository are automatically re-pointed to the deployed items in the target workspace.
-    - References that use environment-specific item IDs, or point to items outside the deployment repository, must be parameterized using `find_replace` or `key_value_replace` in the `parameter.yml` file.
+    - Embedded items within the same workspace are automatically re-pointed to the new item in the target workspace.
+    - Embedded items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
 
 ## Org App Audience
 
 - **Parameterization:**
-    - The parent Org App reference (`parentAppId`) and referenced content items are automatically re-pointed to the deployed items in the target workspace when they use logical IDs that exist in the deployment repository.
-    - References that use environment-specific item IDs, or point to items outside the deployment repository, must be parameterized using `find_replace` or `key_value_replace` in the `parameter.yml` file.
-    - When parameterization is required for `parentAppId`, use `$items.OrgApp.<The Parent App Name>.id` to resolve the target parent app ID.
+    - The parent Org App reference (`parentAppId`) and referenced content items are automatically re-pointed to the deployed items in the target workspace.
+- In Fabric, an Org App Audience is not a standalone item. However, during deployment, it is treated as such. Its source control files are located within a `.children` folder under the directory of the parent Org App.
 
 ## Paginated Report
 
