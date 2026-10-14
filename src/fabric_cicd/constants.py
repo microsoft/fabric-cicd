@@ -228,6 +228,11 @@ SENSITIVE_RESPONSE_HEADERS = frozenset({
 })
 
 # Publish
+NON_MOVABLE_ITEM_TYPES = [
+    ItemType.ORG_APP_AUDIENCE.value,
+]
+"""Item types whose folder location is managed by a parent and cannot move independently."""
+
 SHELL_ONLY_PUBLISH = [
     ItemType.LAKEHOUSE.value,
     ItemType.WAREHOUSE.value,
@@ -268,6 +273,7 @@ DATAFLOW_SOURCE_REGEX = (
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
+ORG_APP_AUDIENCE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.OrgApp/\.children(?:/.*)?$"
 DYNAMIC_VARIABLES_REGEX = r"^\$(workspace|items)\."
 
 # Well known file names
