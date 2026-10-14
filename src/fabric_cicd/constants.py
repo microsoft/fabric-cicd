@@ -302,6 +302,8 @@ ASYNC_PROVISIONED_ATTRIBUTES = frozenset({"sqlendpoint", "sqlendpointfqdn", "sql
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+# Allowed YAML file extensions for key_value_replace parameterization
+YAML_FILE_EXTENSIONS = (".yml", ".yaml")
 # Parameters to validate
 PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
 

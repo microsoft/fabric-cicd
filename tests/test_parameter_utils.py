@@ -1543,6 +1543,58 @@ class TestParameterUtilities:
         result_data = yaml.safe_load(result)
         assert result_data["server"]["host"] == "localhost"  # Original value unchanged
 
+    def test_replace_key_value_yaml_no_match_preserves_content(self, mock_workspace):
+        """Tests that content is returned untouched (comments/formatting preserved) when find_key matches nothing."""
+        test_yaml = """# top-level comment
+server:
+  host: localhost  # inline comment
+  port: 8080
+"""
+        param_dict = {
+            "find_key": "$.database.host",  # does not exist in the content
+            "replace_value": {"dev": "dev-server.example.com"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        # Unchanged content, including comments, since nothing matched
+        assert result == test_yaml
+
+    def test_replace_key_value_notebook_parsing_as_mapping_preserved(self, mock_workspace):
+        """Ensure unmatched YAML content is returned unchanged without re-serialization."""
+        notebook = """# Fabric notebook source
+
+# METADATA ********************
+
+# META {
+# META   "kernel_info": {
+# META     "name": "synapse_pyspark"
+# META   }
+# META }
+
+# CELL ********************
+
+for p in ["a", "b"]:
+    spark.conf.set(p, globals()[p])
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+"""
+        # Sanity check: the uncommented code parses as a YAML mapping
+        assert isinstance(yaml.safe_load(notebook), dict)
+
+        param_dict = {
+            "find_key": "$.schedules[*].enabled",
+            "replace_value": {"dev": False},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, notebook, "dev", is_yaml=True)
+        # Notebook is published unchanged: prologue and cell markers preserved
+        assert result == notebook
+
     def test_replace_key_value_yaml_invalid(self, mock_workspace):
         """Tests replace_key_value_yaml with invalid YAML content."""
         invalid_yaml = "invalid: yaml: content: [unclosed"
