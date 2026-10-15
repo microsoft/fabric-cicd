@@ -194,6 +194,14 @@ def publish_all_items(
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
+    # Publish selections are per-call options, not persistent workspace state.
+    # Clear them before applying the options supplied for this invocation.
+    fabric_workspace_obj.publish_item_name_exclude_regex = None
+    fabric_workspace_obj.publish_folder_path_exclude_regex = None
+    fabric_workspace_obj.publish_folder_path_to_include = None
+    fabric_workspace_obj.items_to_include = None
+    fabric_workspace_obj.shortcut_exclude_regex = None
+
     # Initialize response collection if feature flag is enabled
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
