@@ -1,0 +1,8 @@
+kind: new-items
+body: Add support for MirroredAzureDatabricksCatalog item type
+time: 2026-09-08T06:51:05.0000000+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1066"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1066
