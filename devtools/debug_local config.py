@@ -6,7 +6,11 @@
 import sys
 from pathlib import Path
 
-from azure.identity import AzureCliCredential, AzurePowerShellCredential, ClientSecretCredential
+from azure.identity import (
+    AzureCliCredential,
+    AzurePowerShellCredential,
+    ClientSecretCredential,
+)
 
 root_directory = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_directory / "src"))
@@ -14,7 +18,7 @@ sys.path.insert(0, str(root_directory / "src"))
 from fabric_cicd import append_feature_flag, change_log_level, deploy_with_config
 
 # Uncomment to enable debug
-# change_log_level()
+change_log_level()
 
 # In this example, the config file sits within the root/sample/workspace directory
 config_file = str(root_directory / "sample" / "workspace" / "config.yml")
@@ -22,6 +26,7 @@ config_file = str(root_directory / "sample" / "workspace" / "config.yml")
 # Azure CLI auth - comment out to use a different auth method
 token_credential = AzureCliCredential()
 
+# append_feature_flag("enable_bulk_publish")
 # Uncomment to use PowerShell auth
 # token_credential = AzurePowerShellCredential()
 
