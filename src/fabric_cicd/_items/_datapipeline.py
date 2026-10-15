@@ -5,8 +5,7 @@
 
 import logging
 import re
-
-import dpath
+from collections.abc import Iterator
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
@@ -17,32 +16,60 @@ from fabric_cicd.constants import ItemType
 logger = logging.getLogger(__name__)
 
 
-def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
-    """
-    Scan through pipeline file json dictionary and find pipeline references (including nested pipelines).
+def _iter_pipeline_reference_ids(activities: object) -> Iterator[str]:
+    """Yield referenced IDs from actual pipeline activities, including nested ones."""
+    if not isinstance(activities, list):
+        return
 
-    Args:
-        fabric_workspace_obj: The FabricWorkspace object.
-        file_content: Dict representation of the pipeline-content file.
-        lookup_type: Finding references in deployed file or repo file (Deployed or Repository).
+    for activity in activities:
+        if not isinstance(activity, dict):
+            continue
+        activity_type = activity.get("type")
+        properties = activity.get("typeProperties")
+        if not isinstance(properties, dict):
+            continue
+
+        if activity_type == "ExecutePipeline":
+            pipeline = properties.get("pipeline")
+            if isinstance(pipeline, dict):
+                reference_name = pipeline.get("referenceName")
+                if isinstance(reference_name, str):
+                    yield reference_name
+        elif activity_type == "InvokePipeline":
+            pipeline_id = properties.get("pipelineId")
+            if isinstance(pipeline_id, str):
+                yield pipeline_id
+
+        # Fabric control-flow activities embed their child activity lists here.
+        for field in ("activities", "ifTrueActivities", "ifFalseActivities", "defaultActivities"):
+            yield from _iter_pipeline_reference_ids(properties.get(field))
+        cases = properties.get("cases")
+        if isinstance(cases, list):
+            for case in cases:
+                if isinstance(case, dict):
+                    yield from _iter_pipeline_reference_ids(case.get("activities"))
+
+
+def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_content: dict, lookup_type: str) -> list:
+    """Find pipeline dependencies in ExecutePipeline and InvokePipeline activities.
+
+    Only actual pipeline-reference fields count as dependencies. Other GUID-valued
+    fields (such as pipeline parameters) must not affect publishing order.
+    Nested control-flow activities are included.
     """
     item_type = ItemType.DATA_PIPELINE.value
     reference_list = []
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
+    activities = file_content.get("properties", {}).get("activities", [])
 
-    # Use the dpath library to search through the dictionary for all values that match the GUID pattern
-    for _, value in dpath.search(file_content, "**", yielded=True):
-        if isinstance(value, str):
-            match = guid_pattern.search(value)
-            if match:
-                # If a valid GUID is found, convert it to name. If name is not None, it's a pipeline and will be added to the reference list
-                referenced_id = match.group(0)
-                referenced_name = fabric_workspace_obj._convert_id_to_name(
-                    item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
-                )
-                # Add pipeline to the reference list if it's not already present
-                if referenced_name and referenced_name not in reference_list:
-                    reference_list.append(referenced_name)
+    for referenced_id in _iter_pipeline_reference_ids(activities):
+        if not guid_pattern.fullmatch(referenced_id):
+            continue
+        referenced_name = fabric_workspace_obj._convert_id_to_name(
+            item_type=item_type, generic_id=referenced_id, lookup_type=lookup_type
+        )
+        if referenced_name and referenced_name not in reference_list:
+            reference_list.append(referenced_name)
 
     return reference_list
 
