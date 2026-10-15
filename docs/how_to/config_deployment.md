@@ -503,6 +503,60 @@ deploy_with_config(
     - New values can only be added for optional fields that aren't present in the original configuration.
     - Required fields must exist in the original configuration in order to override.
 
+## Deploying with the Fabric CLI
+
+The [Microsoft Fabric CLI](https://microsoft.github.io/fabric-cli/) (`fab`) provides a [`deploy` command](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) that integrates directly with fabric-cicd. It lets you deploy multiple Fabric items into a workspace from the command line — no Python code required — while using the exact same `config.yml` and `parameter.yml` files described on this page.
+
+This is a great option when you want to:
+
+- Run deployments from a terminal, shell script, or CI/CD pipeline step without writing Python.
+- Reuse an existing fabric-cicd configuration file across both the Python API and the CLI.
+- Combine deployments with other Fabric CLI operations (for example, exporting items with `fab export`).
+
+### Installation
+
+Install the Fabric CLI from PyPI:
+
+```bash
+pip install ms-fabric-cli
+```
+
+### Usage
+
+```bash
+fab deploy --config <config_file> [--target_env <environment>] [--params <parameters>] [--bulk_publish] [--force]
+```
+
+Refer to the [Fabric CLI `deploy` command documentation](https://microsoft.github.io/fabric-cli/commands/fs/deploy/) for the complete list of behaviors and options.
+
+### Examples
+
+<span class="md-h4-nonanchor">Deploy to a specific environment:</span>
+
+```bash
+fab deploy --config config.yml --target_env prod
+```
+
+<span class="md-h4-nonanchor">Deploy with runtime configuration overrides:</span>
+
+```bash
+fab deploy --config config.yml --target_env test -P config_override='{"core":{"item_types_in_scope":["Notebook"]}}'
+```
+
+<span class="md-h4-nonanchor">Deploy without confirmation prompts (useful in pipelines):</span>
+
+```bash
+fab deploy --config config.yml --target_env dev --force
+```
+
+<span class="md-h4-nonanchor">Deploy using bulk publish (experimental):</span>
+
+```bash
+fab deploy --config config.yml --target_env dev --bulk_publish
+```
+
+The `--bulk_publish` flag enables [bulk publish](optional_feature.md#bulk-publish) mode, which deploys all items in a single bulk import API call instead of one at a time. When set, the CLI automatically turns on the required `enable_experimental_features` and `enable_bulk_publish` fabric-cicd feature flags for you — no need to add them to the `features` section of your `config.yml`. As this relies on the fabric-cicd bulk import (beta) API, it is experimental and recommended for non-production environments only.
+
 ## Troubleshooting Guide
 
 The configuration file undergoes validation prior to reaching the deployment phase. Here are some common issues that may occur:

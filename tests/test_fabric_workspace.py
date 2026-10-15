@@ -12,6 +12,7 @@ import yaml
 from fixtures.credentials import DummyTokenCredential
 
 from fabric_cicd import configure_fabric_fqdn
+from fabric_cicd._common._item import Item
 from fabric_cicd.fabric_workspace import FabricWorkspace, constants
 
 
@@ -51,6 +52,11 @@ def temp_workspace_dir():
 def valid_workspace_id():
     """Return a valid workspace ID in GUID format."""
     return "12345678-1234-5678-abcd-1234567890ab"
+
+
+def create_test_item(item_type):
+    """Create a minimal item for workspace ID replacement tests."""
+    return Item(type=item_type, name="TestItem", description="", guid="")
 
 
 @pytest.fixture
@@ -218,12 +224,37 @@ def test_workspace_id_replacement_in_json(patched_fabric_workspace, valid_worksp
         )
 
     # Test the workspace ID replacement function
-    result = workspace._replace_workspace_ids(json_content)
+    result = workspace._replace_workspace_ids(json_content, create_test_item("DataPipeline"))
 
     # Verify that the default workspace ID was replaced with the target workspace ID
     assert "00000000-0000-0000-0000-000000000000" not in result
     assert valid_workspace_id in result
     assert '"workspaceId": "' + valid_workspace_id + '"' in result
+
+
+def test_workspace_id_replacement_in_reflex_definition(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir
+):
+    """Test replacement of a workspace ID embedded in an escaped Reflex action definition."""
+    reflex_content = (
+        r'{"name":"FabricItemBinding","arguments":['
+        r"{\"name\":\"workspaceId\",\"type\":\"string\","
+        r"\"value\":\"00000000-0000-0000-0000-000000000000\"}]}"
+    )
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Reflex"],
+        )
+
+    assert constants.DEFAULT_GUID in workspace._replace_workspace_ids(reflex_content, create_test_item("Notebook"))
+
+    result = workspace._replace_workspace_ids(reflex_content, create_test_item("Reflex"))
+
+    assert constants.DEFAULT_GUID not in result
+    assert rf"\"value\":\"{valid_workspace_id}\"" in result
 
 
 def test_workspace_id_replacement_in_python(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
@@ -246,7 +277,7 @@ def test_workspace_id_replacement_in_python(patched_fabric_workspace, valid_work
         )
 
     # Test the workspace ID replacement function
-    result = workspace._replace_workspace_ids(python_content)
+    result = workspace._replace_workspace_ids(python_content, create_test_item("Notebook"))
 
     # Verify that the default workspace ID was replaced with the target workspace ID
     assert "00000000-0000-0000-0000-000000000000" not in result
@@ -292,7 +323,7 @@ def test_workspace_id_replacement_eventstream_json(patched_fabric_workspace, val
             item_type_in_scope=["Eventstream"],
         )
 
-    result = workspace._replace_workspace_ids(eventstream_content)
+    result = workspace._replace_workspace_ids(eventstream_content, create_test_item("Eventstream"))
 
     # Verify all three workspace IDs were replaced
     assert "00000000-0000-0000-0000-000000000000" not in result
@@ -318,7 +349,7 @@ configuration:
             item_type_in_scope=["Environment"],
         )
 
-    result = workspace._replace_workspace_ids(yaml_content)
+    result = workspace._replace_workspace_ids(yaml_content, create_test_item("Environment"))
 
     # Verify all different property name formats are replaced
     assert "00000000-0000-0000-0000-000000000000" not in result
@@ -348,7 +379,7 @@ def test_workspace_id_replacement_mixed_formats(patched_fabric_workspace, valid_
             item_type_in_scope=["DataPipeline"],
         )
 
-    result = workspace._replace_workspace_ids(mixed_content)
+    result = workspace._replace_workspace_ids(mixed_content, create_test_item("DataPipeline"))
 
     # Verify all formats are replaced correctly
     assert "00000000-0000-0000-0000-000000000000" not in result
@@ -385,7 +416,7 @@ def test_workspace_id_replacement_whitespace_variations(
             item_type_in_scope=["DataPipeline"],
         )
 
-    result = workspace._replace_workspace_ids(whitespace_content)
+    result = workspace._replace_workspace_ids(whitespace_content, create_test_item("DataPipeline"))
 
     # Verify all whitespace variations are handled
     assert "00000000-0000-0000-0000-000000000000" not in result
@@ -426,7 +457,7 @@ def test_workspace_id_replacement_non_default_values_preserved(
             item_type_in_scope=["DataPipeline"],
         )
 
-    result = workspace._replace_workspace_ids(content_with_other_id)
+    result = workspace._replace_workspace_ids(content_with_other_id, create_test_item("DataPipeline"))
 
     # Verify only default workspace ID was replaced, other ID preserved
     assert "00000000-0000-0000-0000-000000000000" not in result
@@ -465,7 +496,7 @@ def test_workspace_id_replacement_edge_cases(patched_fabric_workspace, valid_wor
             item_type_in_scope=["DataPipeline"],
         )
 
-    result = workspace._replace_workspace_ids(edge_cases_content)
+    result = workspace._replace_workspace_ids(edge_cases_content, create_test_item("DataPipeline"))
 
     # Current regex behavior: matches comments and partial matches like "notworkspaceId"
     # This documents the current behavior for regression testing
@@ -523,7 +554,7 @@ def test_workspace_id_replacement_comprehensive_item_types(
                 item_type_in_scope=[item_type],
             )
 
-        result = workspace._replace_workspace_ids(comprehensive_content)
+        result = workspace._replace_workspace_ids(comprehensive_content, create_test_item(item_type))
 
         # Verify all workspace IDs are replaced regardless of item type context
         assert "00000000-0000-0000-0000-000000000000" not in result, f"Failed for item type: {item_type}"
@@ -686,6 +717,94 @@ find_replace:
     # Regex captured group should be replaced, surrounding text preserved
     assert "dev-server.database.windows.net" not in result
     assert 'SERVER_NAME="ppe-server.database.windows.net"' in result
+
+
+def test_key_value_replace_notebook_py_not_treated_as_yaml(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
+    """Ensure non-YAML files are not impacted by YAML parameterization even when their content parses as YAML."""
+    parameter_content = """
+key_value_replace:
+    - find_key: $.*
+      replace_value:
+        PPE: replaced-value
+      item_type: Notebook
+"""
+
+    notebook_dir = temp_workspace_dir / "Test Notebook.Notebook"
+    notebook_dir.mkdir(parents=True)
+
+    # Uncommented code parses as a YAML mapping; everything else is a YAML comment
+    notebook_content = (
+        "# Fabric notebook source\n\n"
+        "# CELL ********************\n\n"
+        'for p in ["a", "b"]:\n'
+        "    spark.conf.set(p, globals()[p])\n"
+    )
+
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (notebook_dir / "notebook-content.py").write_text(notebook_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+        )
+
+    test_item = Item(type="Notebook", name="Test Notebook", description="", guid="test-guid", path=notebook_dir)
+    test_file = File(item_path=notebook_dir, file_path=notebook_dir / "notebook-content.py")
+
+    result = workspace._replace_parameters(test_file, test_item)
+
+    # Notebook content is returned unchanged: prologue and cell markers preserved
+    assert result == notebook_content
+
+
+def test_key_value_replace_yaml_extension_still_applied(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
+    """Ensures the YAML allow-list still dispatches genuine .yml files through the YAML path."""
+    parameter_content = """
+key_value_replace:
+    - find_key: $.driver_cores
+      replace_value:
+        PPE: 16
+"""
+
+    env_dir = temp_workspace_dir / "Test Environment.Environment" / "Setting"
+    env_dir.mkdir(parents=True)
+
+    yaml_content = "enable_native_execution_engine: false\ndriver_cores: 8\n"
+
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (env_dir / "Sparkcompute.yml").write_text(yaml_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Environment"],
+            environment="PPE",
+        )
+
+    item_dir = temp_workspace_dir / "Test Environment.Environment"
+    test_item = Item(type="Environment", name="Test Environment", description="", guid="test-guid", path=item_dir)
+    test_file = File(item_path=item_dir, file_path=env_dir / "Sparkcompute.yml")
+
+    result = workspace._replace_parameters(test_file, test_item)
+
+    # .yml is in the allow-list, so the replacement is applied
+    import yaml as _yaml
+
+    assert _yaml.safe_load(result)["driver_cores"] == 16
 
 
 def test_empty_logical_id_validation(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
@@ -1359,6 +1478,100 @@ def test_get_item_attribute_caching_basic(patched_fabric_workspace, valid_worksp
         )
 
 
+def test_get_item_attribute_mirrored_database(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
+    """Test that _get_item_attribute resolves sqlendpoint and sqlendpointid for MirroredDatabase items."""
+    mock_endpoint = MagicMock()
+
+    # Mock response mirrors the Fabric "Get Mirrored Database" API shape
+    mock_response = {
+        "body": {
+            "properties": {
+                "sqlEndpointProperties": {
+                    "connectionString": "mirrored-connection-string",
+                    "id": "mirrored-endpoint-id",
+                }
+            }
+        }
+    }
+    mock_endpoint.invoke.return_value = mock_response
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        sqlendpoint = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="MirroredDatabase",
+            item_guid="test-item-guid",
+            item_name="Test Mirrored Database",
+            attribute_name="sqlendpoint",
+        )
+        sqlendpointid = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="MirroredDatabase",
+            item_guid="test-item-guid",
+            item_name="Test Mirrored Database",
+            attribute_name="sqlendpointid",
+        )
+
+        # Both attributes resolve from the mirrored database's sqlEndpointProperties
+        assert sqlendpoint == "mirrored-connection-string"
+        assert sqlendpointid == "mirrored-endpoint-id"
+
+        # Endpoint is queried via the (case-insensitive) mirroreddatabases collection segment
+        mock_endpoint.invoke.assert_called_with(
+            method="GET",
+            url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/test-workspace-id/mirroreddatabases/test-item-guid",
+        )
+
+
+@pytest.mark.parametrize(
+    "server_fqdn",
+    [
+        "test-sql-server.database.fabric.microsoft.com,1433",
+        "test-sql-server.database.fabric.microsoft.com,1433,unexpected",
+    ],
+)
+def test_get_item_attribute_sqldatabase_host_strips_port(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir, server_fqdn
+):
+    """Test that _get_item_attribute returns only the host for the sqlendpointfqdn attribute."""
+    mock_endpoint = MagicMock()
+
+    # Mock response mirrors the Fabric "Get SQL Database" API shape (serverFqdn includes the port)
+    mock_endpoint.invoke.return_value = {"body": {"properties": {"serverFqdn": server_fqdn}}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        sqlendpoint = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpoint",
+        )
+        sqlendpointfqdn = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpointfqdn",
+        )
+
+        # sqlendpoint keeps the port; sqlendpointfqdn strips it
+        assert sqlendpoint == server_fqdn
+        assert sqlendpointfqdn == "test-sql-server.database.fabric.microsoft.com"
+        assert mock_endpoint.invoke.call_count == 1
+
+
 def test_get_item_attribute_caching_prevents_api_call(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):
     """Test that fetching the same attribute again uses cache and doesn't make API call."""
     mock_endpoint = MagicMock()
@@ -1533,17 +1746,19 @@ def test_get_item_attribute_edge_cases(patched_fabric_workspace, valid_workspace
         assert mock_endpoint.invoke.call_count == 0  # No API call made
 
 
-def test_dynamic_find_value_triggers_attribute_collection(temp_workspace_dir, valid_workspace_id):
-    """When find_value contains dynamic variables, _refresh_deployed_items collects extra attributes."""
-    # Create a parameter file with dynamic variable in find_value
+def test_dynamic_find_value_does_not_trigger_attribute_collection(temp_workspace_dir, valid_workspace_id):
+    """A cross-workspace variable in find_value does not require current-workspace item attributes."""
+    # Create a parameter file with dynamic replacement variable in find_value
     param_file = temp_workspace_dir / "parameter.yml"
     param_file.write_text(
-        """
-find_replace:
-  - find_value: "$workspace.source_ws.$items.Lakehouse.MyLakehouse.id"
-    replace_value:
-      PPE: "replacement-id"
-""",
+        yaml.safe_dump({
+            "find_replace": [
+                {
+                    "find_value": "$workspace.source_ws.$items.Lakehouse.MyLakehouse.$id",
+                    "replace_value": {"PPE": "replacement-id"},
+                }
+            ]
+        }),
         encoding="utf-8",
     )
 
@@ -1602,18 +1817,98 @@ find_replace:
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is True
+        assert workspace.contains_param_item_vars is False
 
-        # Now call _refresh_deployed_items to exercise the contains_param_vars guard
         workspace._refresh_deployed_items()
 
-        # Verify _get_item_attribute was called (lakehouse detail API)
+        # Cross-workspace find values do not require current-workspace item attributes
         lakehouse_calls = [c for c in mock_ep.invoke.call_args_list if "lakehouses/" in str(c)]
-        assert len(lakehouse_calls) > 0
+        assert lakehouse_calls == []
 
-        # Verify workspace_items has the resolved attributes
-        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpoint"] == "server.db"
-        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == "sqlep-id"
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpoint"] == ""
+        assert workspace.workspace_items["Lakehouse"]["TestLH"]["sqlendpointid"] == ""
+
+
+def test_refresh_deployed_items_tolerates_missing_sqlendpoint(temp_workspace_dir, valid_workspace_id, caplog):
+    """A newly provisioned lakehouse (e.g. Dataflow Gen2 staging lakehouse)
+    with an unpopulated SQL endpoint must not fail the deployed-items refresh."""
+
+    param_file = temp_workspace_dir / "parameter.yml"
+    param_file.write_text(
+        yaml.safe_dump({
+            "find_replace": [
+                {
+                    "find_value": "old-endpoint",
+                    "replace_value": {"PPE": "$items.Lakehouse.MyLakehouse.$sqlendpoint"},
+                }
+            ]
+        }),
+        encoding="utf-8",
+    )
+
+    item_dir = temp_workspace_dir / "MyNotebook.Notebook"
+    item_dir.mkdir()
+    platform = item_dir / ".platform"
+    platform.write_text(
+        json.dumps({
+            "metadata": {"type": "Notebook", "displayName": "MyNotebook", "description": ""},
+            "config": {"logicalId": "nb-001"},
+        }),
+        encoding="utf-8",
+    )
+
+    mock_ep = MagicMock()
+
+    items_response = {
+        "body": {
+            "value": [
+                {
+                    "type": "Lakehouse",
+                    "displayName": "StagingLakehouseForDataflows_20260318145744",
+                    "description": "",
+                    "id": "staging-lh-guid",
+                    "folderId": "",
+                }
+            ],
+            "capacityId": "test-cap",
+        }
+    }
+    # SQL endpoint never becomes available (simulates eventual consistency window)
+    lakehouse_detail = {"body": {"properties": {"sqlEndpointProperties": {"connectionString": "", "id": ""}}}}
+
+    def mock_invoke(method, url, **_kwargs):
+        if method == "GET" and url.endswith("/items"):
+            return items_response
+        if method == "GET" and "lakehouses/" in url:
+            return lakehouse_detail
+        return {"body": {"value": [], "capacityId": "test-cap"}}
+
+    mock_ep.invoke.side_effect = mock_invoke
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_ep),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+            token_credential=DummyTokenCredential(),
+        )
+
+        assert workspace.contains_param_item_vars is True
+
+        # Should not raise even though the staging lakehouse SQL endpoint is unresolved
+        with caplog.at_level("WARNING"):
+            workspace._refresh_deployed_items()
+
+        staging = workspace.workspace_items["Lakehouse"]["StagingLakehouseForDataflows_20260318145744"]
+        assert staging["sqlendpoint"] == ""
+        assert staging["sqlendpointid"] == ""
+        assert "Attribute value not found" in caplog.text
 
 
 def test_static_params_skip_attribute_collection(temp_workspace_dir, valid_workspace_id):
@@ -1679,7 +1974,7 @@ find_replace:
             token_credential=DummyTokenCredential(),
         )
 
-        assert workspace.contains_param_vars is False
+        assert workspace.contains_param_item_vars is False
 
         # Now call _refresh_deployed_items
         workspace._refresh_deployed_items()
@@ -1733,8 +2028,32 @@ def test_get_item_attribute_unsupported_and_empty(patched_fabric_workspace, vali
         # Verify the error case was not cached
         with pytest.raises(InputError):
             workspace._get_item_attribute("ws1", "Lakehouse", "guid1", "name1", "sqlendpoint")
-        # Should still be only 1 API call (cached error)
+        # Should still be only 1 API call per lookup (cached error not stored)
         assert mock_endpoint.invoke.call_count == 2
+
+
+def test_get_item_attribute_not_required_returns_empty(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir, caplog
+):
+    """When required=False, an unresolved attribute returns '' with a warning instead of raising."""
+    mock_endpoint = MagicMock()
+    mock_endpoint.invoke.return_value = {"body": {"properties": {"sqlEndpointProperties": {"connectionString": ""}}}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        with caplog.at_level("WARNING"):
+            result = workspace._get_item_attribute(
+                "ws1", "Lakehouse", "StagingLakehouseForDataflows_1", "name1", "sqlendpoint", required=False
+            )
+
+        assert result == ""
+        assert mock_endpoint.invoke.call_count == 1
+        assert "Attribute value not found" in caplog.text
 
 
 def test_multiple_items_with_default_guid_logical_id(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
@@ -1986,18 +2305,30 @@ def test_publish_variable_library_only_calls_replace_parameters(
         mock_ws.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("item_type", "item_name", "relative_path"),
+    [
+        ("Notebook", "TestNotebook", "notebook-content.py"),
+        ("DataPipeline", "TestPipeline", "pipeline-content.json"),
+    ],
+)
 def test_publish_non_variable_library_calls_all_replacements(
-    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+    temp_workspace_dir,
+    patched_fabric_workspace,
+    valid_workspace_id,
+    item_type,
+    item_name,
+    relative_path,
 ):
-    """Test that non-Variable Library items still go through the full replacement pipeline."""
+    """Test that standard item types go through the full replacement pipeline."""
     workspace = patched_fabric_workspace(valid_workspace_id, str(temp_workspace_dir))
 
     mock_file = MagicMock()
-    mock_file.relative_path = "notebook-content.py"
+    mock_file.relative_path = relative_path
     mock_file.type = "text"
-    mock_file.file_path = Path("notebook-content.py")
-    mock_file.contents = "print('hello')"
-    mock_file.base64_payload = {"path": "notebook-content.py", "payloadType": "InlineBase64"}
+    mock_file.file_path = Path(relative_path)
+    mock_file.contents = f'{{"workspaceId": "{constants.DEFAULT_GUID}"}}'
+    mock_file.base64_payload = {"path": relative_path, "payloadType": "InlineBase64"}
 
     mock_item = MagicMock()
     mock_item.guid = None
@@ -2007,23 +2338,57 @@ def test_publish_non_variable_library_calls_all_replacements(
     mock_item.logical_id = "test-logical-id"
     mock_item.item_files = [mock_file]
     mock_item.skip_publish = False
-    mock_item.type = "Notebook"
-    mock_item.name = "TestNotebook"
+    mock_item.type = item_type
+    mock_item.name = item_name
 
-    workspace.repository_items = {"Notebook": {"TestNotebook": mock_item}}
+    workspace.repository_items = {item_type: {item_name: mock_item}}
     workspace.deployed_items = {}
 
     with (
         patch.object(workspace, "_replace_logical_ids", side_effect=lambda x: x) as mock_logical,
         patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents) as mock_params,
-        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda x: x) as mock_ws,
+        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda contents, _item_obj: contents) as mock_ws,
     ):
-        workspace._publish_item(item_name="TestNotebook", item_type="Notebook")
+        workspace._publish_item(item_name=item_name, item_type=item_type)
 
         # All three replacement methods should be called
         mock_logical.assert_called_once()
         mock_params.assert_called_once()
-        mock_ws.assert_called_once()
+        mock_ws.assert_called_once_with(mock_file.contents, mock_item)
+
+
+def test_publish_reflex_enables_reflex_workspace_id_replacement(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id
+):
+    """Test that Reflex definitions enable the Reflex-specific workspace ID replacement."""
+    workspace = patched_fabric_workspace(valid_workspace_id, str(temp_workspace_dir))
+
+    mock_file = MagicMock()
+    mock_file.relative_path = "ReflexEntities.json"
+    mock_file.type = "text"
+    mock_file.file_path = Path("ReflexEntities.json")
+    mock_file.contents = "activator definition"
+    mock_file.base64_payload = {"path": "ReflexEntities.json", "payloadType": "InlineBase64"}
+
+    mock_item = MagicMock()
+    mock_item.guid = None
+    mock_item.folder_id = ""
+    mock_item.description = ""
+    mock_item.logical_id = "test-logical-id"
+    mock_item.item_files = [mock_file]
+    mock_item.skip_publish = False
+
+    workspace.repository_items = {"Reflex": {"TestActivator": mock_item}}
+    workspace.deployed_items = {}
+
+    with (
+        patch.object(workspace, "_replace_logical_ids", side_effect=lambda contents: contents),
+        patch.object(workspace, "_replace_parameters", side_effect=lambda file, _: file.contents),
+        patch.object(workspace, "_replace_workspace_ids", side_effect=lambda contents, _item_obj: contents) as mock_ws,
+    ):
+        workspace._publish_item(item_name="TestActivator", item_type="Reflex")
+
+        mock_ws.assert_called_once_with("activator definition", mock_item)
 
 
 def test_api_root_url_snapshot_is_not_retargeted_by_second_configure_call(

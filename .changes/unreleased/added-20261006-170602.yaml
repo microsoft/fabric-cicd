@@ -1,0 +1,8 @@
+kind: added
+body: Add the `$sqlendpointfqdn` dynamic replacement variable for resolving a SQL Database endpoint FQDN without the server port
+time: 2026-10-06T17:06:02.8051723+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1140"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1140

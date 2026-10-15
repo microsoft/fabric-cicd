@@ -212,7 +212,9 @@ class ShortcutPublisher(Publisher):
         if shortcut_file_obj:
             shortcut_file_obj.contents = self.fabric_workspace_obj._replace_parameters(shortcut_file_obj, self.item_obj)
             shortcut_file_obj.contents = self.fabric_workspace_obj._replace_logical_ids(shortcut_file_obj.contents)
-            shortcut_file_obj.contents = self.fabric_workspace_obj._replace_workspace_ids(shortcut_file_obj.contents)
+            shortcut_file_obj.contents = self.fabric_workspace_obj._replace_workspace_ids(
+                shortcut_file_obj.contents, self.item_obj
+            )
 
             shortcuts = json.loads(shortcut_file_obj.contents) or []
         else:
@@ -240,7 +242,6 @@ class ShortcutPublisher(Publisher):
             self._unpublish_shortcuts(shortcut_paths_to_unpublish)
             # Deploy and overwrite shortcuts
             for shortcut_path, shortcut in shortcuts_to_publish.items():
-                self.publish_one(shortcut_path, shortcut)     
+                self.publish_one(shortcut_path, shortcut)
         else:
             logger.info(f"{constants.INDENT}No shortcuts found for Lakehouse '{self.item_obj.name}'")
-           

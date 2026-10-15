@@ -174,11 +174,15 @@ class FileTracer:
         Raises:
             ValueError: If the path fails validation.
         """
+        if "\x00" in raw_path:
+            msg = f"Failed to resolve HTTP trace file path {raw_path!r}: embedded null character"
+            raise ValueError(msg)
+
         try:
             resolved = Path(raw_path).resolve()
             cwd = Path.cwd().resolve()
         except (OSError, ValueError) as e:
-            msg = f"Failed to resolve HTTP trace file path '{raw_path}': {e}"
+            msg = f"Failed to resolve HTTP trace file path {raw_path!r}: {e}"
             raise ValueError(msg) from e
 
         if resolved.suffix != ".json":
@@ -279,7 +283,13 @@ class FileTracer:
             "traces": existing_traces,
         }
 
-        with output_path.open("w") as f:
+        from fabric_cicd._common._secure_io import restrict_file, restricted_opener
+
+        # Tighten pre-existing files before writing (so truncation doesn't
+        # expose content through a previously world-readable fd).
+        restrict_file(self.output_file)
+
+        with open(self.output_file, "w", opener=restricted_opener) as f:
             json.dump(output_data, f, indent=2)
 
 

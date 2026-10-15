@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/graphIndex/definition/graphSettings/1.0.0/schema.json",
+  "saveConfiguration": {
+    "mode": "SaveOnly"
+  },
+  "scalingConfiguration": {
+    "sku": {
+      "tier": "small"
+    }
+  }
+}

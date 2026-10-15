@@ -564,6 +564,24 @@ class TestConfigValidator:
         assert len(self.validator.errors) == 1
         assert "Unknown constant 'UNKNOWN_CONSTANT'" in self.validator.errors[0]
 
+    def test_validate_constants_dict_user_agent_not_overridable(self):
+        """Test USER_AGENT is not an overridable constant (moved out of the constants module)."""
+        constants_dict = {"USER_AGENT": "spoofed-agent/1.0"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "Unknown constant 'USER_AGENT'" in self.validator.errors[0]
+
+    def test_validate_constants_dict_host_app_allowlist_not_overridable(self):
+        """Test HOST_APP_ALLOWLIST_REGEX is not an overridable constant (moved out of the constants module)."""
+        constants_dict = {"HOST_APP_ALLOWLIST_REGEX": ".*"}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "Unknown constant 'HOST_APP_ALLOWLIST_REGEX'" in self.validator.errors[0]
+
     def test_validate_constants_dict_valid_various_types(self):
         """Test _validate_constants_section with valid constants of various types."""
         constants_dict = {

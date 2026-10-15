@@ -1,0 +1,47 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/graphIndex/definition/graphDefinition/1.0.0/schema.json",
+  "nodeTables": [
+    {
+      "nodeTypeAlias": "274edfe1-62a0-4887-8a55-8bca8aaf13ae",
+      "id": "5a921cfe-3747-4ee1-b9f7-e5e3c6a8bbec",
+      "dataSourceName": "publicholidays",
+      "propertyMappings": [
+        {
+          "propertyName": "holidayName",
+          "sourceColumn": "holidayName"
+        }
+      ]
+    },
+    {
+      "nodeTypeAlias": "b966c4b0-248c-44bb-8a81-92ab494acd01",
+      "id": "7ed04448-045e-46b0-ba11-dd323a97b64b",
+      "dataSourceName": "publicholidays",
+      "propertyMappings": [
+        {
+          "propertyName": "holidayName",
+          "sourceColumn": "holidayName"
+        }
+      ]
+    }
+  ],
+  "edgeTables": [
+    {
+      "edgeTypeAlias": "24650015-a772-4504-af4e-0cae7fa0cba2",
+      "id": "70336d48-4be6-4f14-9bb4-f6da72bbd4ac",
+      "edgeIdMapping": null,
+      "dataSourceName": "publicholidays",
+      "sourceNodeKeyColumns": [
+        "holidayName"
+      ],
+      "propertyMappings": [
+        {
+          "propertyName": "holidayName",
+          "sourceColumn": "holidayName"
+        }
+      ],
+      "destinationNodeKeyColumns": [
+        "holidayName"
+      ]
+    }
+  ]
+}

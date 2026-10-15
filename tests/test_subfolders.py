@@ -626,3 +626,45 @@ def test_large_number_of_folders_and_items(tmp_path, patched_fabric_workspace, v
         last_level_1_index = max(sorted_folders.index(f) for f in level_1_folders)
         first_level_2_index = min(sorted_folders.index(f) for f in level_2_folders)
         assert last_level_1_index < first_level_2_index, "Folder sorting is incorrect with large numbers"
+
+
+def test_refresh_repository_folders_excludes_children_containers(
+    tmp_path, patched_fabric_workspace, valid_workspace_id
+):
+    """Intermediate ancestors are included, but '.children' containers and item folders are excluded."""
+    # Ancestor chain that routes through a ".children" folder (enhanced-metadata style layout).
+    create_platform_file(
+        tmp_path / "Reports" / ".children" / "MyReport.Report",
+        item_type="Report",
+        item_name="My Report",
+    )
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(tmp_path),
+        item_type_in_scope=["Report"],
+    )
+
+    workspace._refresh_repository_folders()
+
+    # Organizational ancestors are included...
+    assert "/Reports" in workspace.repository_folders
+    # ...even when their path passes through a ".children" folder.
+    assert "/Reports/.children/MyReport.Report" not in workspace.repository_folders
+    # The ".children" container itself is never emitted as a workspace folder.
+    assert "/Reports/.children" not in workspace.repository_folders
+
+
+def test_refresh_repository_folders_platform_at_root(tmp_path, patched_fabric_workspace, valid_workspace_id):
+    """A .platform directly under the repository root yields no folder entries (no out-of-root paths)."""
+    create_platform_file(tmp_path, item_type="Notebook", item_name="Root Item")
+
+    workspace = patched_fabric_workspace(
+        workspace_id=valid_workspace_id,
+        repository_directory=str(tmp_path),
+        item_type_in_scope=["Notebook"],
+    )
+
+    workspace._refresh_repository_folders()
+
+    assert workspace.repository_folders == {}

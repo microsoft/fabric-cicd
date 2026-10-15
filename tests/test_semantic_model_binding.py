@@ -19,6 +19,7 @@ from fabric_cicd._items._semanticmodel import (
     _normalize_connection_ids,
     bind_semanticmodel_to_connection,
     build_binding_mapping,
+    build_request_body,
 )
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -50,7 +51,17 @@ def _make_connections(*conn_ids: str) -> dict:
 
 def _invoke_side_effect(method: str, url: str, **_kwargs):
     if method == "GET" and url.endswith("/connections"):
-        return {"body": {"value": [{"id": "cccccccc-cccc-cccc-cccc-cccccccccccc", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
+        return {
+            "body": {
+                "value": [
+                    {
+                        "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                        "connectivityType": "ShareableCloud",
+                        "connectionDetails": {},
+                    }
+                ]
+            }
+        }
     if method == "POST" and "bindConnection" in url:
         return {"status_code": 200}
     return {"body": {}}
@@ -75,7 +86,12 @@ def test_normalize_list_passthrough():
 def test_normalize_list_filters_non_strings(caplog):
     """Non-string elements in a list are skipped with a warning."""
     with caplog.at_level("WARNING"):
-        result = _normalize_connection_ids(["11111111-1111-1111-1111-111111111111", {"id": "bad"}, 42, "22222222-2222-2222-2222-222222222222"])
+        result = _normalize_connection_ids([
+            "11111111-1111-1111-1111-111111111111",
+            {"id": "bad"},
+            42,
+            "22222222-2222-2222-2222-222222222222",
+        ])
     assert result == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
     assert "non-string" in caplog.text.lower() or "skipping" in caplog.text.lower()
 
@@ -97,7 +113,10 @@ def test_build_binding_mapping_default_single_string():
         "default": {"connection_id": {"PPE": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
     }
     result = build_binding_mapping(workspace, binding, "PPE")
-    assert result == {"ModelA": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"], "ModelB": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]}
+    assert result == {
+        "ModelA": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"],
+        "ModelB": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"],
+    }
 
 
 def test_build_binding_mapping_models_single_string():
@@ -130,7 +149,9 @@ def test_build_binding_mapping_default_list():
     """Default section with a list of connection IDs assigns all IDs to each model."""
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
-        "default": {"connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
+        "default": {
+            "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}
+        },
     }
     result = build_binding_mapping(workspace, binding, "PPE")
     assert result["ModelA"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
@@ -142,7 +163,12 @@ def test_build_binding_mapping_models_list():
     workspace = _make_workspace("ModelA", "ModelB")
     binding = {
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
+            {
+                "semantic_model_name": "ModelA",
+                "connection_id": {
+                    "PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+                },
+            },
         ]
     }
     result = build_binding_mapping(workspace, binding, "PPE")
@@ -156,7 +182,12 @@ def test_build_binding_mapping_explicit_overrides_default_with_list():
     binding = {
         "default": {"connection_id": {"PPE": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"}},
         "models": [
-            {"semantic_model_name": "ModelA", "connection_id": {"PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]}},
+            {
+                "semantic_model_name": "ModelA",
+                "connection_id": {
+                    "PPE": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+                },
+            },
         ],
     }
     result = build_binding_mapping(workspace, binding, "PPE")
@@ -230,8 +261,22 @@ def test_bind_multiple_connection_ids_calls_bind_n_times():
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
-    connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333"]})
+    connections = _make_connections(
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+        "33333333-3333-3333-3333-333333333333",
+    )
+    bind_semanticmodel_to_connection(
+        workspace,
+        connections,
+        {
+            "ModelA": [
+                "11111111-1111-1111-1111-111111111111",
+                "22222222-2222-2222-2222-222222222222",
+                "33333333-3333-3333-3333-333333333333",
+            ]
+        },
+    )
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
     assert len(post_calls) == 3
@@ -246,7 +291,10 @@ def test_bind_multiple_models_multiple_connections():
     bind_semanticmodel_to_connection(
         workspace,
         connections,
-        {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"], "ModelB": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]},
+        {
+            "ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"],
+            "ModelB": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"],
+        },
     )
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
@@ -259,7 +307,11 @@ def test_bind_item_connections_fetched_once_per_model():
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
     connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]})
+    bind_semanticmodel_to_connection(
+        workspace,
+        connections,
+        {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]},
+    )
 
     get_item_conn_calls = [
         c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "GET" and "/connections" in c[1]["url"]
@@ -274,7 +326,11 @@ def test_bind_invalid_connection_id_warns_and_skips(caplog):
 
     connections = _make_connections("11111111-1111-1111-1111-111111111111")
     with caplog.at_level("WARNING"):
-        bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"]})
+        bind_semanticmodel_to_connection(
+            workspace,
+            connections,
+            {"ModelA": ["11111111-1111-1111-1111-111111111111", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"]},
+        )
 
     assert "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" in caplog.text
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
@@ -288,7 +344,11 @@ def test_bind_all_connection_ids_invalid_skips_model():
     workspace.endpoint.invoke.side_effect = _invoke_side_effect
 
     connections = _make_connections("11111111-1111-1111-1111-111111111111")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"]})
+    bind_semanticmodel_to_connection(
+        workspace,
+        connections,
+        {"ModelA": ["xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"]},
+    )
 
     # No GET or POST calls for ModelA because all IDs are invalid
     assert workspace.endpoint.invoke.call_count == 0
@@ -303,12 +363,26 @@ def test_bind_correct_connection_id_in_request_body():
         if method == "POST":
             captured_bodies.append(kwargs.get("body", {}))
             return {"status_code": 200}
-        return {"body": {"value": [{"id": "66666666-6666-6666-6666-666666666666", "connectivityType": "ShareableCloud", "connectionDetails": {}}]}}
+        return {
+            "body": {
+                "value": [
+                    {
+                        "id": "66666666-6666-6666-6666-666666666666",
+                        "connectivityType": "ShareableCloud",
+                        "connectionDetails": {},
+                    }
+                ]
+            }
+        }
 
     workspace.endpoint.invoke.side_effect = capture_invoke
 
     connections = _make_connections("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222")
-    bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]})
+    bind_semanticmodel_to_connection(
+        workspace,
+        connections,
+        {"ModelA": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]},
+    )
 
     assert len(captured_bodies) == 2
     bound_ids = {body["connectionBinding"]["id"] for body in captured_bodies}
@@ -324,7 +398,62 @@ def test_bind_list_with_non_string_elements_does_not_raise(caplog):
     connections = _make_connections("11111111-1111-1111-1111-111111111111")
     with caplog.at_level("WARNING"):
         # {"id": "bad"} is an unhashable dict — must not cause TypeError
-        bind_semanticmodel_to_connection(workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", {"id": "bad"}, 42]})
+        bind_semanticmodel_to_connection(
+            workspace, connections, {"ModelA": ["11111111-1111-1111-1111-111111111111", {"id": "bad"}, 42]}
+        )
 
     post_calls = [c for c in workspace.endpoint.invoke.call_args_list if c[1]["method"] == "POST"]
     assert len(post_calls) == 1  # only the valid "11111111-1111-1111-1111-111111111111" is bound
+
+
+# ---------------------------------------------------------------------------
+# build_request_body — OneLake path trailing slash normalization
+# ---------------------------------------------------------------------------
+
+
+def _make_body(conn_type, path):
+    return {
+        "connectionBinding": {
+            "id": "conn-id",
+            "connectivityType": "ShareableCloud",
+            "connectionDetails": {"type": conn_type, "path": path},
+        }
+    }
+
+
+def test_build_request_body_appends_slash_for_adls_path_without_slash():
+    """AzureDataLakeStorage path without a trailing slash must get one appended."""
+    result = build_request_body(_make_body("AzureDataLakeStorage", "https://onelake/ws/item.Lakehouse/Tables"))
+    details = result["connectionBinding"]["connectionDetails"]
+    assert details["type"] == "AzureDataLakeStorage"
+    assert details["path"] == "https://onelake/ws/item.Lakehouse/Tables/"
+    # Field ordering is preserved
+    assert list(result["connectionBinding"].keys()) == ["id", "connectivityType", "connectionDetails"]
+    assert list(details.keys()) == ["type", "path"]
+
+
+def test_build_request_body_leaves_adls_path_with_slash_unchanged():
+    """AzureDataLakeStorage path already ending in '/' must be left unchanged."""
+    result = build_request_body(_make_body("AzureDataLakeStorage", "https://onelake/ws/item.Lakehouse/Tables/"))
+    assert result["connectionBinding"]["connectionDetails"]["path"] == "https://onelake/ws/item.Lakehouse/Tables/"
+
+
+def test_build_request_body_leaves_non_adls_type_untouched():
+    """A non-AzureDataLakeStorage type must not have its path modified."""
+    result = build_request_body(_make_body("SQL", "myserver/mydb"))
+    details = result["connectionBinding"]["connectionDetails"]
+    assert details["type"] == "SQL"
+    assert details["path"] == "myserver/mydb"
+
+
+def test_build_request_body_handles_empty_and_none_path():
+    """Empty or None paths must be handled gracefully without appending a slash."""
+    empty_result = build_request_body(_make_body("AzureDataLakeStorage", ""))
+    assert empty_result["connectionBinding"]["connectionDetails"]["path"] == ""
+
+    none_result = build_request_body(_make_body("AzureDataLakeStorage", None))
+    assert none_result["connectionBinding"]["connectionDetails"]["path"] is None
+
+    missing_result = build_request_body({"connectionBinding": {"id": "x", "connectivityType": "ShareableCloud"}})
+    assert missing_result["connectionBinding"]["connectionDetails"]["path"] is None
+    assert missing_result["connectionBinding"]["connectionDetails"]["type"] is None

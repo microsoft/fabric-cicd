@@ -1,8 +1,0 @@
-kind: new-items
-body: Add support for Paginated Report item
-time: 2026-06-22T15:57:11.5259012+03:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "845"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/845

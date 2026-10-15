@@ -30,6 +30,13 @@
     - Connections will always point to the original data source unless parameterized in the `find_replace` section of the `parameter.yml` file.
 - **Initial deployment** requires manual configuration of the connection after deployment.
 
+## Cosmos DB Database
+
+- **Parameterization:**
+    - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Initial deployment** creates the item definition without the data loaded; data must be added afterward.
+- **Unpublish** is disabled by default, enable with feature flag `enable_cosmosdbdatabase_unpublish`.
+
 ## Dataflow
 
 - **Parameterization:**
@@ -84,6 +91,14 @@
     - Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
 - **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
+
+## Graph Model
+
+- **Parameterization:**
+    - The data source (e.g., Lakehouse) will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
+    - It is recommended to use the supported variables in `find_replace` for dynamic replacement of the source workspace and item IDs.
+- **Initial deployment** requires the target Lakehouse to contain the schema and Delta tables expected by the Graph Model. Creating an empty Lakehouse alongside the Graph Model is not sufficient, even if the Lakehouse item is created successfully. Populate the Lakehouse before deploying the dependent Graph Model.
+- **Unpublish** is disabled by default. Enable it with the `enable_graphmodel_unpublish` feature flag. Use cautiously: in-scope Graph Models missing from the repository, including automatically created child items, will be deleted.
 
 ## KQL Database
 

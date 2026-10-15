@@ -21,6 +21,8 @@ To install fabric-cicd, run:
 pip install fabric-cicd
 ```
 
+New to fabric-cicd? Follow the [My First Deployment](how_to/tutorial.md) tutorial for an end-to-end walkthrough.
+
 ## Basic Example
 
 ```python

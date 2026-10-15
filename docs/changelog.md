@@ -1,5 +1,86 @@
 # Changelog
 
+## [v1.4.0](https://pypi.org/project/fabric-cicd/1.4.0) - October 07, 2026
+
+### 🆕 New Items Support
+
+- Add support for Graph Model item by [shirasassoon](https://github.com/shirasassoon) ([#1000](https://github.com/microsoft/fabric-cicd/issues/1000))
+- Add support for Cosmos DB item by [shirasassoon](https://github.com/shirasassoon) ([#1134](https://github.com/microsoft/fabric-cicd/issues/1134))
+
+### ✨ New Functionality
+
+- Add support for dynamic replacement variables in bulk publish mode by [shirasassoon](https://github.com/shirasassoon) ([#1117](https://github.com/microsoft/fabric-cicd/issues/1117))
+- Add support for Python 3.14 in the library by [shirasassoon](https://github.com/shirasassoon) ([#868](https://github.com/microsoft/fabric-cicd/issues/868))
+
+### 🔧 Bug Fix
+
+- Fix cluster URI resolution for KQL Queryset items by [shirasassoon](https://github.com/shirasassoon) ([#1105](https://github.com/microsoft/fabric-cicd/issues/1105))
+- Fix intermittent failures in Paginated Report deployment by publishing reports serially by [shirasassoon](https://github.com/shirasassoon) ([#1065](https://github.com/microsoft/fabric-cicd/issues/1065))
+- Fix replacement of escaped default workspace IDs in Activator item definitions by [shirasassoon](https://github.com/shirasassoon) ([#1118](https://github.com/microsoft/fabric-cicd/issues/1118))
+- Fix Semantic Model connection binding for OneLake paths missing a trailing `/` by [shirasassoon](https://github.com/shirasassoon) ([#1128](https://github.com/microsoft/fabric-cicd/issues/1128))
+- Fix `$ENV:` token replacement to use plain OS environment variable names by [shirasassoon](https://github.com/shirasassoon) ([#1129](https://github.com/microsoft/fabric-cicd/issues/1129))
+- Pin jsonpath-ng to an earlier version to prevent an upstream regression from corrupting Data Pipeline payloads during `key_value_replace` parameterization by [shirasassoon](https://github.com/shirasassoon) ([#1142](https://github.com/microsoft/fabric-cicd/issues/1142))
+
+### ⚡ Additional Optimizations
+
+- Move validation for dynamic replacement variables before deployment by [shirasassoon](https://github.com/shirasassoon) ([#1103](https://github.com/microsoft/fabric-cicd/issues/1103))
+
+### 📝 Documentation Update
+
+- Add an end-to-end deployment tutorial for fabric-cicd by [shirasassoon](https://github.com/shirasassoon) ([#836](https://github.com/microsoft/fabric-cicd/issues/836))
+
+## [v1.3.0](https://pypi.org/project/fabric-cicd/1.3.0) - August 10, 2026
+
+### ✨ New Functionality
+
+- Add `FABRIC_CICD_RETRY_API_MAX_DURATION_SECONDS` environment variable to configure the maximum duration for API request execution, including long-running operation polling and connection retries (default 300 seconds) by [shirasassoon](https://github.com/shirasassoon) ([#1022](https://github.com/microsoft/fabric-cicd/issues/1022))
+- Add `$sqlendpoint` and `$sqlendpointid` dynamic replacement variable support for MirroredDatabase items by [ecgang](https://github.com/ecgang) ([#1055](https://github.com/microsoft/fabric-cicd/issues/1055))
+- Add `get_supported_feature_flags` function to return all supported feature flags by [ayeshurun](https://github.com/ayeshurun) ([#1059](https://github.com/microsoft/fabric-cicd/issues/1059))
+- Add support for removing globally enabled feature flags via `remove_feature_flag` function by [shirasassoon](https://github.com/shirasassoon) ([#1097](https://github.com/microsoft/fabric-cicd/issues/1097))
+
+### 🔧 Bug Fix
+
+- Fix `item_name` list filter in `spark_pool` parameter by [shirasassoon](https://github.com/shirasassoon) ([#1071](https://github.com/microsoft/fabric-cicd/issues/1071))
+- Fix deployment failure when item attributes are not yet available due to asynchronous provisioning by [shirasassoon](https://github.com/shirasassoon) ([#887](https://github.com/microsoft/fabric-cicd/issues/887))
+
+### ⚡ Additional Optimizations
+
+- Improve performance of the `file_path` parameter filter and repository folder refresh by [ayeshurun](https://github.com/ayeshurun) ([#1044](https://github.com/microsoft/fabric-cicd/issues/1044))
+
+### 📝 Documentation Update
+
+- Extract Git flow guidance into a dedicated page and add a Next Steps section to Getting Started by [nkwork9999](https://github.com/nkwork9999) ([#1019](https://github.com/microsoft/fabric-cicd/issues/1019))
+- Rename Git Flow page to Deployment Overview and add Deployment Philosophy section by [shirasassoon](https://github.com/shirasassoon) ([#1018](https://github.com/microsoft/fabric-cicd/issues/1018))
+- Fix broken link to contribution docs in README.md by [isaakchoi](https://github.com/isaakchoi) ([#1099](https://github.com/microsoft/fabric-cicd/issues/1099))
+
+## [v1.2.0](https://pypi.org/project/fabric-cicd/1.2.0) - June 30, 2026
+
+### 🆕 New Items Support
+
+- Add support for Map item by [shirasassoon](https://github.com/shirasassoon) ([#874](https://github.com/microsoft/fabric-cicd/issues/874))
+- Add support for Paginated Report item by [shirasassoon](https://github.com/shirasassoon) ([#845](https://github.com/microsoft/fabric-cicd/issues/845))
+
+### ✨ New Functionality
+
+- Add dynamic replacement variable support for the `find_value` of `find_replace` by [shirasassoon](https://github.com/shirasassoon) ([#931](https://github.com/microsoft/fabric-cicd/issues/931))
+- Support case-insensitive matching option in `find_replace` parameter by [shirasassoon](https://github.com/shirasassoon) ([#929](https://github.com/microsoft/fabric-cicd/issues/929))
+- Add bulk publish mode to deploy items in a single API call via the Fabric bulk import API by [shirasassoon](https://github.com/shirasassoon) ([#1020](https://github.com/microsoft/fabric-cicd/issues/1020))
+- Add support for multiple connection ids in semantic model binding parameters by [alwortma2](https://github.com/alwortma2) ([#1003](https://github.com/microsoft/fabric-cicd/issues/1003))
+
+### 🔧 Bug Fix
+
+- Fix management of Activator item dependencies by [shirasassoon](https://github.com/shirasassoon) ([#1013](https://github.com/microsoft/fabric-cicd/issues/1013))
+
+### ⚡ Additional Optimizations
+
+- Make log file creation opt-in via `FABRIC_CICD_FILE_LOGGING_ENABLED` environment variable by [shirasassoon](https://github.com/shirasassoon) ([#1032](https://github.com/microsoft/fabric-cicd/issues/1032))
+- Enforce owner-only file permissions on sensitive files created by the library on POSIX systems by [shirasassoon](https://github.com/shirasassoon) ([#1040](https://github.com/microsoft/fabric-cicd/issues/1040))
+
+### 📝 Documentation Update
+
+- Add devcontainer and a section about contributing to documentation by [cmaneu](https://github.com/cmaneu) ([#946](https://github.com/microsoft/fabric-cicd/issues/946))
+- Move item type documentation under "Reference" section by [cmaneu](https://github.com/cmaneu) ([#838](https://github.com/microsoft/fabric-cicd/issues/838))
+
 ## [v1.1.0](https://pypi.org/project/fabric-cicd/1.1.0) - May 27, 2026
 
 ### 🆕 New Items Support

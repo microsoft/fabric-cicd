@@ -22,7 +22,7 @@ from fabric_cicd._common._check_utils import (
     check_valid_yaml_content,
 )
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
-from fabric_cicd._common._fabric_endpoint import FabricEndpoint
+from fabric_cicd._common._fabric_endpoint import FabricEndpoint, handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -116,7 +116,7 @@ class FabricWorkspace:
         token_credential = validate_token_credential(token_credential)
 
         # Initialize endpoint
-        self.endpoint = FabricEndpoint(token_credential=token_credential)
+        self.endpoint = FabricEndpoint(token_credential=token_credential, host_app=kwargs.get("host_app"))
 
         # Snapshot at construction so subsequent configure_fabric_fqdn calls for a
         # different workspace don't retarget this instance.
@@ -146,8 +146,11 @@ class FabricWorkspace:
         self.repository_items = {}
         self.deployed_folders = {}
         self.deployed_items = {}
-        self.contains_param_vars = False
+        self.contains_param_item_vars = False
         self.bulk_publish_enabled = False
+
+        # Cache for pre-resolved dynamic replacement variable values (used during bulk publish only)
+        self._dynamic_var_cache: dict[str, str] = {}
 
         # Initialize dataflow dependencies dictionary (used in dataflow item processing)
         self.dataflow_dependencies = {}
@@ -159,6 +162,13 @@ class FabricWorkspace:
         # Initialize cache for _get_item_attribute method
         self._item_attribute_cache = {}
         self._item_attribute_cache_lock = threading.Lock()
+
+        # Initialize cache for resolved parameter file_path filters. The resolved
+        # set depends only on (repository_directory, file_path filter), which is
+        # invariant across all files in a single publish, so it is memoized to
+        # avoid re-globbing the entire repository once per file per parameter entry.
+        self._parameter_filter_path_cache = {}
+        self._parameter_filter_path_cache_lock = threading.Lock()
 
         # Get parameter_file_path from kwargs
         self.parameter_file_path = kwargs.get("parameter_file_path")
@@ -221,7 +231,13 @@ class FabricWorkspace:
         raise InputError(msg, logger)
 
     def _get_item_attribute(
-        self, workspace_id: str, item_type: str, item_guid: str, item_name: str, attribute_name: str
+        self,
+        workspace_id: str,
+        item_type: str,
+        item_guid: str,
+        item_name: str,
+        attribute_name: str,
+        required: bool = True,
     ) -> str:
         """Returns the attribute value of an item in the specified workspace based on item type and id"""
         # No need to make API calls if we don't have an item guid
@@ -229,7 +245,8 @@ class FabricWorkspace:
             return ""
 
         # Create a cache key for this request
-        cache_key = (workspace_id, item_type, item_guid, item_name, attribute_name)
+        cache_key_prefix = (workspace_id, item_type, item_guid, item_name)
+        cache_key = (*cache_key_prefix, attribute_name)
 
         # Check if result is already cached
         with self._item_attribute_cache_lock:
@@ -260,14 +277,83 @@ class FabricWorkspace:
         )
         # Extract the attribute value using the path
         attribute_value = dpath.get(response, property_path, default="")
+
         if not attribute_value:
             msg = f"Attribute value not found for {item_type} '{item_name}'"
+            # required=False allows skipping items whose attributes aren't yet available (asynchronous provisioning)
+            if not required:
+                logger.warning(f"{msg} (attribute='{attribute_name}'); skipping (item may be newly provisioned)")
+                return ""
             raise InputError(msg, logger)
+
+        # Special handling for SQL Database attributes that require additional processing
+        if item_type == ItemType.SQL_DATABASE.value and attribute_name in {"sqlendpoint", "sqlendpointfqdn"}:
+            sql_endpoint = attribute_value
+            sql_endpoint_fqdn = sql_endpoint.split(",", 1)[0]
+            with self._item_attribute_cache_lock:
+                self._item_attribute_cache.update({
+                    (*cache_key_prefix, "sqlendpoint"): sql_endpoint,
+                    (*cache_key_prefix, "sqlendpointfqdn"): sql_endpoint_fqdn,
+                })
+            return sql_endpoint if attribute_name == "sqlendpoint" else sql_endpoint_fqdn
 
         # Cache the result before returning
         with self._item_attribute_cache_lock:
             self._item_attribute_cache[cache_key] = attribute_value
         return attribute_value
+
+    def _wait_for_item_attribute_provisioning(
+        self, item_type: str, item_guid: str, item_name: str, attribute_name: str
+    ) -> None:
+        """
+        Poll an item until an asynchronously provisioned attribute becomes available.
+
+        SQL endpoints (`sqlendpoint` / `sqlendpointfqdn` / `sqlendpointid`) and the Eventhouse query URI
+        (`queryserviceuri`) are provisioned asynchronously after the item is created, so a
+        freshly deployed item may not expose them immediately. Serial publishing waits for this
+        via `check_sqlendpoint_provision_status`; staged bulk publishing calls this method
+        between stages so a downstream stage does not resolve a dynamic variable to an empty value.
+
+        Args:
+            item_type: The item type.
+            item_guid: The deployed item ID.
+            item_name: The item display name.
+            attribute_name: The asynchronously provisioned attribute to wait for.
+        """
+        if not item_guid:
+            return
+
+        property_path = constants.PROPERTY_PATH_ATTR_MAPPING.get(item_type, {}).get(attribute_name)
+        if property_path is None:
+            return
+
+        item_url = f"{self.base_api_url}/{item_type.lower()}s/{item_guid}"
+        iteration = 1
+
+        while True:
+            response = self.endpoint.invoke(method="GET", url=item_url)
+
+            if dpath.get(response, property_path, default=""):
+                logger.debug(
+                    f"{constants.INDENT}Attribute '{attribute_name}' provisioned for {item_type} '{item_name}'"
+                )
+                return
+
+            # Terminal-failure detection where the API exposes a provisioning status (Lakehouse / Mirrored Database)
+            provisioning_status = dpath.get(
+                response, "body/properties/sqlEndpointProperties/provisioningStatus", default=None
+            )
+            if provisioning_status == "Failed":
+                msg = f"Cannot resolve '{attribute_name}' for {item_type} '{item_name}' (provisioning failed)"
+                raise FailedPublishedItemStatusError(msg, logger)
+
+            handle_retry(
+                attempt=iteration,
+                base_delay=5,
+                response_retry_after=30,
+                prepend_message=f"{constants.INDENT}Waiting for '{attribute_name}' provisioning on {item_type} '{item_name}'",
+            )
+            iteration += 1
 
     def _get_workspace_pools(self) -> list[dict]:
         """Return the list of workspace custom Spark pools, fetching from the API on first call.
@@ -312,7 +398,9 @@ class FabricWorkspace:
         is_valid = parameter_obj._validate_parameter_file()
         if is_valid:
             self.environment_parameter = parameter_obj.environment_parameter
-            self.contains_param_vars = bool(parameter_obj._search_dynamic_replacement_variables_in_parameter_file())
+            self.contains_param_item_vars = bool(
+                parameter_obj._search_dynamic_replacement_item_variables_in_parameter_file()
+            )
         else:
             msg = "Deployment terminated due to an invalid parameter file"
             raise ParameterFileError(msg, logger)
@@ -439,6 +527,7 @@ class FabricWorkspace:
             sql_endpoint = ""
             sql_endpoint_id = ""
             query_service_uri = ""
+            sql_endpoint_fqdn = ""
 
             # Add an empty dictionary if the item type hasn't been added yet
             if item_type not in self.deployed_items:
@@ -447,19 +536,28 @@ class FabricWorkspace:
             if item_type not in self.workspace_items:
                 self.workspace_items[item_type] = {}
 
-            # Only collect attribute values when parameterization with dynamic variables is in use
-            if self.contains_param_vars:
-                # Get additional properties
-                if item_type in [ItemType.LAKEHOUSE.value, ItemType.WAREHOUSE.value, ItemType.SQL_DATABASE.value]:
+            # Only collect attribute values when parameterization with dynamic replacement variables is in use
+            if self.contains_param_item_vars:
+                # Get additional properties - eagerly fetch attribute values for specific item types
+                if item_type in [
+                    ItemType.LAKEHOUSE.value,
+                    ItemType.MIRRORED_DATABASE.value,
+                    ItemType.WAREHOUSE.value,
+                    ItemType.SQL_DATABASE.value,
+                ]:
                     sql_endpoint = self._get_item_attribute(
-                        self.workspace_id, item_type, item_guid, item_name, "sqlendpoint"
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpoint", required=False
                     )
                     sql_endpoint_id = self._get_item_attribute(
-                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid"
+                        self.workspace_id, item_type, item_guid, item_name, "sqlendpointid", required=False
                     )
+                    if item_type == ItemType.SQL_DATABASE.value:
+                        sql_endpoint_fqdn = self._get_item_attribute(
+                            self.workspace_id, item_type, item_guid, item_name, "sqlendpointfqdn", required=False
+                        )
                 if item_type in [ItemType.EVENTHOUSE.value]:
                     query_service_uri = self._get_item_attribute(
-                        self.workspace_id, item_type, item_guid, item_name, "queryserviceuri"
+                        self.workspace_id, item_type, item_guid, item_name, "queryserviceuri", required=False
                     )
 
             # Add item details to the deployed_items dictionary
@@ -475,6 +573,7 @@ class FabricWorkspace:
             self.workspace_items[item_type][item_name] = {
                 "id": item_guid,
                 "sqlendpoint": sql_endpoint,
+                "sqlendpointfqdn": sql_endpoint_fqdn,
                 "sqlendpointid": sql_endpoint_id,
                 "queryserviceuri": query_service_uri,
             }
@@ -535,9 +634,12 @@ class FabricWorkspace:
 
                 # Perform replacement if condition is met and file contains valid JSON or YAML
                 if filter_match:
+                    file_suffix = Path(file_path).suffix.lower()
                     if check_valid_json_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment)
-                    elif check_valid_yaml_content(raw_file):
+
+                    # Avoid treating content from non-YAML files as YAML
+                    elif file_suffix in constants.YAML_FILE_EXTENSIONS and check_valid_yaml_content(raw_file):
                         raw_file = replace_key_value(self, parameter_dict, raw_file, self.environment, is_yaml=True)
                     elif check_tmdl_file(file_obj.file_path):
                         raw_file = replace_key_value_tmdl(self, parameter_dict, raw_file, self.environment)
@@ -594,16 +696,17 @@ class FabricWorkspace:
 
         return raw_file
 
-    def _replace_workspace_ids(self, raw_file: str) -> str:
+    def _replace_workspace_ids(self, raw_file: str, item_obj: Item) -> str:
         """
-        Replaces feature branch workspace ID, default (i.e. 00000000-0000-0000-0000-000000000000) and non-default
-        (actual workspace ID guid) values, with target workspace ID in the raw file content.
+        Replaces default workspace ID references (00000000-0000-0000-0000-000000000000)
+        with the target workspace ID in the raw file content.
 
         Args:
             raw_file: The raw file content where workspace IDs need to be replaced.
+            item_obj: The Item object instance that provides the item type.
         """
         # Use re.sub to replace all matches
-        return re.sub(
+        raw_file = re.sub(
             constants.WORKSPACE_ID_REFERENCE_REGEX,
             lambda match: (
                 match.group(0).replace(constants.DEFAULT_GUID, self.workspace_id)
@@ -612,6 +715,15 @@ class FabricWorkspace:
             ),
             raw_file,
         )
+        # For Reflex items, also replace default workspace IDs embedded in escaped action definitions
+        if item_obj.type == ItemType.REFLEX.value:
+            raw_file = re.sub(
+                constants.REFLEX_WORKSPACE_ID_REFERENCE_REGEX,
+                rf"\g<1>{self.workspace_id}\g<2>",
+                raw_file,
+            )
+
+        return raw_file
 
     def _convert_id_to_name(self, item_type: str, generic_id: str, lookup_type: str) -> str:
         """
@@ -652,6 +764,7 @@ class FabricWorkspace:
         item_type: str,
         exclude_path: str = r"^(?!.*)",
         func_process_file: Optional[callable] = None,
+        options: Optional[dict] = None,
         **kwargs,
     ) -> None:
         """
@@ -662,6 +775,7 @@ class FabricWorkspace:
             item_type: Type of the item (e.g., Notebook, Environment).
             exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
             func_process_file: Custom function to process file contents. Defaults to None.
+            options: Dictionary of additional options for the update definition operation (e.g., {"allowPurgeData": True}). Defaults to None.
             **kwargs: Additional keyword arguments.
         """
         item = self.repository_items[item_type][item_name]
@@ -702,7 +816,7 @@ class FabricWorkspace:
                             file.contents = func_process_file(self, item, file) if func_process_file else file.contents
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file, item)
-                            file.contents = self._replace_workspace_ids(file.contents)
+                            file.contents = self._replace_workspace_ids(file.contents, item)
 
                     item_payload.append(file.base64_payload)
             # Some item definitions require specifying the format as multiple API versions exist (i.e. Spark Job Definitions)
@@ -731,10 +845,11 @@ class FabricWorkspace:
         elif is_deployed and not shell_only_publish:
             # Update the item's definition if full publish is required
             # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item-definition
+            update_body = {**definition_body, "options": options} if options is not None else definition_body
             update_response = self.endpoint.invoke(
                 method="POST",
                 url=f"{self.base_api_url}/items/{item_guid}/updateDefinition?updateMetadata=True",
-                body=definition_body,
+                body=update_body,
             )
             api_response = update_response
         elif is_deployed and shell_only_publish:
@@ -797,19 +912,28 @@ class FabricWorkspace:
         """
         # Prepare the definition parts for all items to be published in bulk
         definition_parts = []
+        item_options_by_logical_id = []
         for _item_name, item, publisher in items_with_context:
             item_parts = self._prepare_bulk_item_parts(item, publisher)
             definition_parts.extend(item_parts)
 
+            opts = publisher.get_definition_options(item)
+            if opts:
+                item_options_by_logical_id.append({"logicalId": item.logical_id, "options": opts})
+
         logger.info(f"Publishing {len(items_with_context)} item(s) in bulk")
 
-        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions(beta)
+        options = {"allowPairingByName": True}
+        if item_options_by_logical_id:
+            options["itemOptionsByLogicalId"] = item_options_by_logical_id
+
+        # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions
         response = self.endpoint.invoke(
             method="POST",
-            url=f"{self.base_api_url}/items/bulkImportDefinitions?beta=True",
+            url=f"{self.base_api_url}/items/bulkImportDefinitions",
             body={
                 "definitionParts": definition_parts,
-                "options": {"allowPairingByName": True},
+                "options": options,
             },
             max_duration=1800,  # 30 minutes, as bulk operations can take longer time to complete
         )
@@ -983,22 +1107,30 @@ class FabricWorkspace:
         root_path = Path(self.repository_directory)
         folder_hierarchy = {}
 
-        # Collect all folders that directly contain a .platform file
+        # Collect all folders that directly contain a .platform file (single traversal)
         platform_folders = set(p.parent for p in root_path.rglob(".platform"))
 
-        # Now, for every folder, check if any of its subfolders is in platform_folders
-        for folder in root_path.rglob("*"):
-            if not folder.is_dir() or folder == root_path or folder.name == ".children":
-                continue
+        # A folder is included if it is a strict ancestor (under the repository root) of at least
+        # one platform folder, excluding platform folders themselves and ".children" containers.
+        # Walking up each platform folder's ancestors is O(tree) overall, avoiding the previous
+        # O(tree^2) behavior of re-globbing every folder's subtree.
+        for platform_folder in platform_folders:
+            for ancestor in platform_folder.parents:
+                # Reached the repository root itself; exclude it and stop walking up.
+                if ancestor == root_path:
+                    break
 
-            # Skip folders that directly contain a .platform file
-            if folder in platform_folders:
-                continue
+                try:
+                    relative = ancestor.relative_to(root_path)
+                except ValueError:
+                    # Ancestor is above the repository root; stop walking up.
+                    break
 
-            # Check if any subfolder (at any depth) is in platform_folders
-            if any(sub in platform_folders for sub in folder.rglob("*") if sub.is_dir()):
-                relative_path = f"/{folder.relative_to(root_path).as_posix()}"
-                folder_hierarchy[relative_path] = ""
+                # Skip item folders (directly contain .platform) and ".children" containers.
+                if ancestor in platform_folders or ancestor.name == ".children":
+                    continue
+
+                folder_hierarchy[f"/{relative.as_posix()}"] = ""
 
         self.repository_folders = folder_hierarchy
 

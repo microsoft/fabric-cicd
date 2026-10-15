@@ -31,6 +31,7 @@ def main():
     environment = "PPE"
     repository_directory = str(root_directory / "sample" / "workspace")
     item_type_in_scope = [
+        "CosmosDBDatabase",
         "DataBuildToolJob",
         "Dataflow",
         "DataPipeline",
@@ -40,10 +41,12 @@ def main():
         "KQLDatabase",
         "KQLQueryset",
         "Lakehouse",
+        "Map",
         "MirroredDatabase",
         "MLExperiment",
         "Notebook",
         "Ontology",
+        "PaginatedReport",
         "Reflex",
         "Report",
         "SemanticModel",

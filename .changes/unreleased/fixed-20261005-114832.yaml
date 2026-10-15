@@ -1,0 +1,8 @@
+kind: fixed
+body: Add a feature flag to allow data purging during Semantic Model updates
+time: 2026-10-05T11:48:32.5019866+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1035"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1035
