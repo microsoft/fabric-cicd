@@ -91,6 +91,10 @@
     - Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
 - **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
+- **Note** when deploying Eventstream items with private endpoint sources, enable the
+  [`enable_eventstream_source_pause`](../how_to/optional_feature.md#feature-flags) feature flag.
+  It pauses running sources before updating the definition and resumes them afterward, preventing
+  Fabric from rejecting the update.
 
 ## Graph Model
 

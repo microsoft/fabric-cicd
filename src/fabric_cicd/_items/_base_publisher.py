@@ -6,6 +6,7 @@
 import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import AbstractContextManager, ExitStack, nullcontext
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -388,9 +389,18 @@ class ItemPublisher(Publisher):
                         [f"{item.type}: {item_name}" for item_name, item, _publisher in batch_items],
                     )
 
-                fabric_workspace_obj._publish_items(
-                    batch_items, skipped_items=skipped_items if batch_index == 0 else None
-                )
+                # Apply each publisher's setup and teardown (e.g., pausing Eventstream sources) around bulk publishing
+                items_by_publisher: dict[ItemPublisher, list[Item]] = {}
+                for _item_name, item, publisher in batch_items:
+                    items_by_publisher.setdefault(publisher, []).append(item)
+
+                with ExitStack() as batch_stack:
+                    for publisher, publisher_items in items_by_publisher.items():
+                        batch_stack.enter_context(publisher.publish_items_context(publisher_items))
+
+                    fabric_workspace_obj._publish_items(
+                        batch_items, skipped_items=skipped_items if batch_index == 0 else None
+                    )
 
                 # Refresh deployed items and invalidate cached $items.* values between batches
                 if batch_index < len(batches) - 1:
@@ -453,13 +463,15 @@ class ItemPublisher(Publisher):
 
         config = getattr(self.__class__, "parallel_config", ParallelConfig())
 
-        if config.ordered_items_func is not None:
-            order = config.ordered_items_func(self)
-            errors = self._publish_items_ordered(items, order)
-        elif config.enabled:
-            errors = self._publish_items_parallel(items)
-        else:
-            errors = self._publish_items_sequential(items)
+        # Apply publisher-specific setup and teardown around standard publishing
+        with self.publish_items_context(list(items.values())):
+            if config.ordered_items_func is not None:
+                order = config.ordered_items_func(self)
+                errors = self._publish_items_ordered(items, order)
+            elif config.enabled:
+                errors = self._publish_items_parallel(items)
+            else:
+                errors = self._publish_items_sequential(items)
 
         self.post_publish_all()
 
@@ -556,6 +568,19 @@ class ItemPublisher(Publisher):
         Default implementation does nothing.
         """
         pass
+
+    def publish_items_context(self, items: list["Item"]) -> AbstractContextManager[None]:  # noqa: ARG002
+        """
+        Return a context manager wrapping the publish of this type's items.
+
+        The default is a no-op. Subclasses can override to set up and tear down external
+        state around the publish of their items (e.g. pausing resources before the update
+        and resuming them afterward), with a guaranteed teardown even if the publish fails.
+
+        Args:
+            items: The Item objects of this type being published.
+        """
+        return nullcontext()
 
     def post_publish_all_check(self) -> None:
         """
