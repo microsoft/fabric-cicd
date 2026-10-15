@@ -41,30 +41,22 @@ def _get_eventstream_topology(fabric_workspace_obj: FabricWorkspace, eventstream
     return response["body"]
 
 
-def _get_sources_to_pause(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, exc: Exception) -> list[dict]:
+def _get_running_sources(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str) -> list[dict]:
     """
-    Determine which eventstream sources should be paused before retrying the definition update.
+    Return every currently running source in the eventstream topology.
 
-    Sources are matched by name against the names referenced in the validation error message.
-    When no source name can be matched, all currently running sources are returned as a fallback.
+    All running sources are paused before retrying the definition update. Pausing
+    is a no-op for sources that do not require it, so this intentionally avoids the
+    fragile logic of parsing the validation error to determine which specific
+    sources are backed by a private endpoint.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
         eventstream_guid: The GUID of the eventstream.
-        exc: The private-endpoint validation error raised by the definition update.
     """
     topology = _get_eventstream_topology(fabric_workspace_obj, eventstream_guid)
     sources = topology.get("sources", []) or []
-
-    error_message = str(exc).lower()
-    implicated = [source for source in sources if source.get("name", "").lower() in error_message]
-
-    if not implicated:
-        # Fall back to pausing every running source when the error message does not
-        # reference a specific source name.
-        implicated = [source for source in sources if source.get("status", "").lower() == "running"]
-
-    return implicated
+    return [source for source in sources if source.get("status", "").lower() == "running"]
 
 
 def _pause_source(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, source: dict) -> None:
@@ -117,8 +109,8 @@ class EventstreamPublisher(ItemPublisher):
 
         When the ``enable_eventstream_source_pause`` feature flag is not set, this behaves
         exactly like the default publisher. When the flag is set and the definition update
-        fails because a source is bound to a datasource behind a private endpoint, the
-        implicated sources are paused, the update is retried, and the sources are resumed
+        fails because a source is bound to a datasource behind a private endpoint, all
+        running sources are paused, the update is retried, and the sources are resumed
         afterward (always resumed via a ``finally`` block so a failure cannot leave them paused).
 
         Args:
@@ -148,7 +140,7 @@ class EventstreamPublisher(ItemPublisher):
 
             paused_sources = []
             try:
-                for source in _get_sources_to_pause(self.fabric_workspace_obj, eventstream_guid, exc):
+                for source in _get_running_sources(self.fabric_workspace_obj, eventstream_guid):
                     _pause_source(self.fabric_workspace_obj, eventstream_guid, source)
                     paused_sources.append(source)
 

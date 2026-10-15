@@ -85,7 +85,7 @@ def test_flag_on_success_no_pause_resume():
 
 
 def test_flag_on_private_endpoint_error_pauses_retries_resumes():
-    """With the flag, the implicated source is paused, the update retried, and the source resumed."""
+    """With the flag, the running source is paused, the update retried, and the source resumed."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
 
     # First publish raises the private-endpoint error, second (retry) succeeds.
@@ -129,17 +129,12 @@ def test_flag_on_retry_still_fails_source_is_resumed():
     assert any(url.endswith(f"/sources/{SOURCE_ID}/resume") for url in urls)
 
 
-def test_flag_on_fallback_pauses_running_sources():
-    """When the error references no known source name, all running sources are paused."""
+def test_flag_on_only_running_sources_are_paused():
+    """Only running sources are paused; stopped sources are left untouched."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
 
-    generic_error = (
-        "Operation failed. Error Code: DataSourcesValidationError. "
-        "Error Message: Data source is currently using a private endpoint. "
-        "Pause the data source before attempting to update."
-    )
     publisher, workspace = _make_publisher(
-        publish_side_effect=[Exception(generic_error), None],
+        publish_side_effect=[Exception(PRIVATE_ENDPOINT_ERROR), None],
         topology_sources=[
             {"id": "running-1", "name": "RunningSource", "status": "Running"},
             {"id": "stopped-1", "name": "StoppedSource", "status": "Stopped"},
