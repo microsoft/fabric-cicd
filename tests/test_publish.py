@@ -168,6 +168,8 @@ def test_publish_filters_do_not_leak_between_calls(mock_endpoint, temp_workspace
 
         publish.publish_all_items(workspace)
         assert workspace.repository_items["Notebook"]["Private"].skip_publish is False
+        assert workspace.items_to_include is None
+        assert workspace.publish_item_name_exclude_regex is None
 
         # Verify the previously excluded item actually reaches the API on the second call.
         created_names = [
