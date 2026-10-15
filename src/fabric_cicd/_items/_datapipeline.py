@@ -5,7 +5,7 @@
 
 import logging
 import re
-from typing import Iterator
+from collections.abc import Iterator
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
