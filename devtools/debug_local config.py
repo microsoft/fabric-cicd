@@ -26,7 +26,6 @@ config_file = str(root_directory / "sample" / "workspace" / "config.yml")
 # Azure CLI auth - comment out to use a different auth method
 token_credential = AzureCliCredential()
 
-# append_feature_flag("enable_bulk_publish")
 # Uncomment to use PowerShell auth
 # token_credential = AzurePowerShellCredential()
 

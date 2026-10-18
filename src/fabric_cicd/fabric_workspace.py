@@ -465,7 +465,7 @@ class FabricWorkspace:
                     match = pattern.match(relative_path)
                     relative_parent_path = match.group(1) if match else None
                 elif item_type == ItemType.ORG_APP_AUDIENCE.value:
-                    # Audiences share the app's containing Fabric folder, not its Git container.
+                    # Set the OrgAppAudience to the same workspace folder as its parent OrgApp.
                     match = re.match(constants.ORG_APP_AUDIENCE_FOLDER_PATH_REGEX, relative_path)
                     relative_parent_path = match.group(1) if match else None
                 else:
