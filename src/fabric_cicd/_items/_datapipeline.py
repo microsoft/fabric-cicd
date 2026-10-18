@@ -6,6 +6,7 @@
 import logging
 import re
 from collections.abc import Iterator
+from typing import Optional
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
@@ -16,7 +17,7 @@ from fabric_cicd.constants import ItemType
 logger = logging.getLogger(__name__)
 
 
-def _reference_value(value: object) -> str | None:
+def _reference_value(value: object) -> Optional[str]:
     """Return a literal reference or the value of an Expression wrapper."""
     if isinstance(value, dict) and value.get("type") == "Expression":
         value = value.get("value")
