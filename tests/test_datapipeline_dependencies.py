@@ -140,6 +140,49 @@ def test_invoke_pipeline_dependency_is_discovered(workspace):
     assert find_referenced_datapipelines(workspace, definition, "Repository") == ["B"]
 
 
+def test_expression_wrapped_literal_ids_preserve_publish_order(workspace):
+    # Fabric can wrap a fixed GUID when "Add dynamic content" is enabled.
+    expression_id = {"value": PIPELINE_B_ID, "type": "Expression"}
+    definitions = {
+        "A": pipeline(
+            execute_pipeline(expression_id),
+            {
+                "name": "Invoke child pipeline",
+                "type": "InvokePipeline",
+                "typeProperties": {"pipelineId": expression_id},
+            },
+        ),
+        "B": pipeline(),
+    }
+    assert find_referenced_datapipelines(workspace, definitions["A"], "Repository") == ["B"]
+    assert sort_items(workspace, definitions, "Repository", find_referenced_datapipelines) == ["B", "A"]
+
+
+def test_dynamic_expression_reference_is_ignored(workspace):
+    definition = pipeline(
+        execute_pipeline({"value": "@pipeline().parameters.childPipelineId", "type": "Expression"}),
+        {
+            "type": "InvokePipeline",
+            "typeProperties": {"pipelineId": {"value": "@variables('childId')", "type": "Expression"}},
+        },
+    )
+    assert find_referenced_datapipelines(workspace, definition, "Repository") == []
+
+
+@pytest.mark.parametrize(
+    "definition",
+    [
+        {},
+        {"properties": None},
+        {"properties": []},
+        {"properties": {"activities": None}},
+        {"properties": {"activities": "not a list"}},
+    ],
+)
+def test_missing_or_malformed_properties_do_not_crash(workspace, definition):
+    assert find_referenced_datapipelines(workspace, definition, "Repository") == []
+
+
 def test_unresolved_and_expression_pipeline_references_are_ignored(workspace):
     definition = pipeline(
         execute_pipeline("@pipeline().parameters.childPipelineId"),
