@@ -228,10 +228,11 @@ SENSITIVE_RESPONSE_HEADERS = frozenset({
 })
 
 # Publish
+
+# Item types whose folder location is managed by a parent and cannot move independently
 NON_MOVABLE_ITEM_TYPES = [
     ItemType.ORG_APP_AUDIENCE.value,
 ]
-"""Item types whose folder location is managed by a parent and cannot move independently."""
 
 SHELL_ONLY_PUBLISH = [
     ItemType.LAKEHOUSE.value,
