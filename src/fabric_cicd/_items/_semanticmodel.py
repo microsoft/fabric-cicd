@@ -11,7 +11,7 @@ from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._parameter._utils import process_environment_key
-from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, ItemType
+from fabric_cicd.constants import EXCLUDE_PATH_REGEX_MAPPING, FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
@@ -343,8 +343,18 @@ class SemanticModelPublisher(ItemPublisher):
     def publish_one(self, item_name: str, _item: Item) -> None:
         """Publish a single Semantic Model item."""
         self.fabric_workspace_obj._publish_item(
-            item_name=item_name, item_type=self.item_type, exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type)
+            item_name=item_name,
+            item_type=self.item_type,
+            exclude_path=EXCLUDE_PATH_REGEX_MAPPING.get(self.item_type),
+            # Optionally allow purging a Semantic Model's existing data when applying an updated definition
+            options=self.get_definition_options(_item),
         )
+
+    def get_definition_options(self, _item: Item) -> dict | None:
+        """Return Semantic Model definition options, gated by the ENABLE_PURGE_DATA feature flag."""
+        if FeatureFlag.ENABLE_PURGE_DATA.value in constants.FEATURE_FLAG:
+            return {"allowPurgeData": True}
+        return None
 
     def post_publish_all(self) -> None:
         """Bind semantic models to connections after all models are published."""

@@ -1,0 +1,8 @@
+kind: fixed
+body: Prevent `key_value_replace` from corrupting non-YAML/JSON files
+time: 2026-10-11T15:15:54.7896245+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1153"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1153

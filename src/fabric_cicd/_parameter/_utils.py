@@ -180,7 +180,7 @@ def extract_replace_value(workspace_obj: FabricWorkspace, replace_value: str, ge
     # Return early for environment variable replace_value
     if replace_value.startswith(constants.ENVIRONMENT_VARIABLE_PREFIX):
         return None if get_dataflow_name else replace_value
-      
+
     # Check the dynamic replacement variable cache first (only populated during bulk publish)
     if (
         not get_dataflow_name
@@ -670,6 +670,7 @@ def replace_key_value(
     # Extract the jsonpath expression from the find_key attribute of the param_dict
     jsonpath_expr = parse(param_dict["find_key"])
     replace_value_dict = process_environment_key(workspace_obj.environment, param_dict["replace_value"])
+    replacement_made = False
     for match in jsonpath_expr.find(data):
         # If the env is present in the replace_value array perform the replacement
         if env in replace_value_dict:
@@ -679,11 +680,16 @@ def replace_key_value(
                 if isinstance(processed_value, str):
                     processed_value = extract_replace_value(workspace_obj, processed_value)
                 match.full_path.update(data, processed_value)
+                replacement_made = True
                 logger.debug(
                     f"Value: {match.value} found at path: {match.full_path} to be replaced with value: {processed_value}"
                 )
             except Exception as match_e:
                 raise ValueError(match_e) from match_e
+
+    # Return the original content untouched when no replacement occurred
+    if not replacement_made:
+        return content
 
     return yaml.dump(data, default_flow_style=False, allow_unicode=True) if is_yaml else json.dumps(data)
 
