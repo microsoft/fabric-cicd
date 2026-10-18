@@ -138,6 +138,74 @@ def test_publish_only_existing_item_types(mock_endpoint, temp_workspace_dir):
         mock_env_cls.assert_not_called()
 
 
+@pytest.mark.usefixtures("experimental_feature_flags")
+@pytest.mark.parametrize(
+    "first_filters",
+    [
+        {"item_name_exclude_regex": r"^Private"},
+        {"items_to_include": ["Public.Notebook"]},
+    ],
+)
+def test_publish_filters_do_not_leak_between_calls(mock_endpoint, temp_workspace_dir, first_filters):
+    """A selective publish must not silently constrain a later full publish."""
+    create_test_item(temp_workspace_dir, None, "Public", "Notebook", "public-id")
+    create_test_item(temp_workspace_dir, None, "Private", "Notebook", "private-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace, **first_filters)
+        assert workspace.repository_items["Notebook"]["Private"].skip_publish is True
+
+        publish.publish_all_items(workspace)
+        assert workspace.repository_items["Notebook"]["Private"].skip_publish is False
+        assert workspace.items_to_include is None
+        assert workspace.publish_item_name_exclude_regex is None
+
+        # Verify the previously excluded item actually reaches the API on the second call.
+        created_names = [
+            call.kwargs["body"]["displayName"]
+            for call in mock_endpoint.invoke.call_args_list
+            if call.kwargs.get("method") == "POST" and call.kwargs.get("url", "").endswith("/items")
+        ]
+        assert created_names.count("Private") == 1
+
+
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_filters_do_not_leak_when_switching_selection(mock_endpoint, temp_workspace_dir):
+    """Switching from exclusion to inclusion must not leave both filters active."""
+    create_test_item(temp_workspace_dir, "archive", "Archived", "Notebook", "archived-id")
+    create_test_item(temp_workspace_dir, "active", "Active", "Notebook", "active-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace, folder_path_exclude_regex=r"^/archive$")
+        assert workspace.repository_items["Notebook"]["Archived"].skip_publish is True
+
+        publish.publish_all_items(workspace, folder_path_to_include=["/archive"])
+        assert workspace.repository_items["Notebook"]["Archived"].skip_publish is False
+        assert workspace.repository_items["Notebook"]["Active"].skip_publish is True
+
+
 def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
     """Test that publish_all_items publishes Ontology items when present in repository."""
     create_test_item(temp_workspace_dir, None, "TestOntology", "Ontology", "test-ontology-id")
