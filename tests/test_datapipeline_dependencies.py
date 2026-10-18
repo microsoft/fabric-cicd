@@ -140,20 +140,16 @@ def test_invoke_pipeline_dependency_is_discovered(workspace):
     assert find_referenced_datapipelines(workspace, definition, "Repository") == ["B"]
 
 
-def test_expression_wrapped_literal_ids_preserve_publish_order(workspace):
+@pytest.mark.parametrize("activity_type", ["ExecutePipeline", "InvokePipeline"])
+def test_expression_wrapped_literal_ids_preserve_publish_order(workspace, activity_type):
     # Fabric can wrap a fixed GUID when "Add dynamic content" is enabled.
     expression_id = {"value": PIPELINE_B_ID, "type": "Expression"}
-    definitions = {
-        "A": pipeline(
-            execute_pipeline(expression_id),
-            {
-                "name": "Invoke child pipeline",
-                "type": "InvokePipeline",
-                "typeProperties": {"pipelineId": expression_id},
-            },
-        ),
-        "B": pipeline(),
-    }
+    activity = (
+        execute_pipeline(expression_id)
+        if activity_type == "ExecutePipeline"
+        else {"type": "InvokePipeline", "typeProperties": {"pipelineId": expression_id}}
+    )
+    definitions = {"A": pipeline(activity), "B": pipeline()}
     assert find_referenced_datapipelines(workspace, definitions["A"], "Repository") == ["B"]
     assert sort_items(workspace, definitions, "Repository", find_referenced_datapipelines) == ["B", "A"]
 
