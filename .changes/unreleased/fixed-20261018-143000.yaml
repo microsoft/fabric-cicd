@@ -1,0 +1,8 @@
+kind: fixed
+body: Fix import failure on Python 3.9 and run unit tests on each supported Python version in CI
+time: 2026-10-18T14:30:00+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1166"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1166
