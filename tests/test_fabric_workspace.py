@@ -719,6 +719,94 @@ find_replace:
     assert 'SERVER_NAME="ppe-server.database.windows.net"' in result
 
 
+def test_key_value_replace_notebook_py_not_treated_as_yaml(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
+    """Ensure non-YAML files are not impacted by YAML parameterization even when their content parses as YAML."""
+    parameter_content = """
+key_value_replace:
+    - find_key: $.*
+      replace_value:
+        PPE: replaced-value
+      item_type: Notebook
+"""
+
+    notebook_dir = temp_workspace_dir / "Test Notebook.Notebook"
+    notebook_dir.mkdir(parents=True)
+
+    # Uncommented code parses as a YAML mapping; everything else is a YAML comment
+    notebook_content = (
+        "# Fabric notebook source\n\n"
+        "# CELL ********************\n\n"
+        'for p in ["a", "b"]:\n'
+        "    spark.conf.set(p, globals()[p])\n"
+    )
+
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (notebook_dir / "notebook-content.py").write_text(notebook_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            environment="PPE",
+        )
+
+    test_item = Item(type="Notebook", name="Test Notebook", description="", guid="test-guid", path=notebook_dir)
+    test_file = File(item_path=notebook_dir, file_path=notebook_dir / "notebook-content.py")
+
+    result = workspace._replace_parameters(test_file, test_item)
+
+    # Notebook content is returned unchanged: prologue and cell markers preserved
+    assert result == notebook_content
+
+
+def test_key_value_replace_yaml_extension_still_applied(
+    patched_fabric_workspace, temp_workspace_dir, valid_workspace_id
+):
+    """Ensures the YAML allow-list still dispatches genuine .yml files through the YAML path."""
+    parameter_content = """
+key_value_replace:
+    - find_key: $.driver_cores
+      replace_value:
+        PPE: 16
+"""
+
+    env_dir = temp_workspace_dir / "Test Environment.Environment" / "Setting"
+    env_dir.mkdir(parents=True)
+
+    yaml_content = "enable_native_execution_engine: false\ndriver_cores: 8\n"
+
+    (temp_workspace_dir / "parameter.yml").write_text(parameter_content)
+    (env_dir / "Sparkcompute.yml").write_text(yaml_content)
+
+    from fabric_cicd._common._file import File
+    from fabric_cicd._common._item import Item
+
+    with patch.object(FabricWorkspace, "_refresh_repository_items"):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Environment"],
+            environment="PPE",
+        )
+
+    item_dir = temp_workspace_dir / "Test Environment.Environment"
+    test_item = Item(type="Environment", name="Test Environment", description="", guid="test-guid", path=item_dir)
+    test_file = File(item_path=item_dir, file_path=env_dir / "Sparkcompute.yml")
+
+    result = workspace._replace_parameters(test_file, test_item)
+
+    # .yml is in the allow-list, so the replacement is applied
+    import yaml as _yaml
+
+    assert _yaml.safe_load(result)["driver_cores"] == 16
+
+
 def test_empty_logical_id_validation(temp_workspace_dir, patched_fabric_workspace, valid_workspace_id):
     """Test that empty logical IDs raise a ParsingError during repository refresh."""
     from fabric_cicd._common._exceptions import ParsingError
@@ -1438,6 +1526,50 @@ def test_get_item_attribute_mirrored_database(patched_fabric_workspace, valid_wo
             method="GET",
             url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/test-workspace-id/mirroreddatabases/test-item-guid",
         )
+
+
+@pytest.mark.parametrize(
+    "server_fqdn",
+    [
+        "test-sql-server.database.fabric.microsoft.com,1433",
+        "test-sql-server.database.fabric.microsoft.com,1433,unexpected",
+    ],
+)
+def test_get_item_attribute_sqldatabase_host_strips_port(
+    patched_fabric_workspace, valid_workspace_id, temp_workspace_dir, server_fqdn
+):
+    """Test that _get_item_attribute returns only the host for the sqlendpointfqdn attribute."""
+    mock_endpoint = MagicMock()
+
+    # Mock response mirrors the Fabric "Get SQL Database" API shape (serverFqdn includes the port)
+    mock_endpoint.invoke.return_value = {"body": {"properties": {"serverFqdn": server_fqdn}}}
+
+    with patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint):
+        workspace = patched_fabric_workspace(
+            workspace_id=valid_workspace_id,
+            repository_directory=str(temp_workspace_dir),
+        )
+        workspace.endpoint = mock_endpoint
+
+        sqlendpoint = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpoint",
+        )
+        sqlendpointfqdn = workspace._get_item_attribute(
+            workspace_id="test-workspace-id",
+            item_type="SQLDatabase",
+            item_guid="test-item-guid",
+            item_name="Test SQL Database",
+            attribute_name="sqlendpointfqdn",
+        )
+
+        # sqlendpoint keeps the port; sqlendpointfqdn strips it
+        assert sqlendpoint == server_fqdn
+        assert sqlendpointfqdn == "test-sql-server.database.fabric.microsoft.com"
+        assert mock_endpoint.invoke.call_count == 1
 
 
 def test_get_item_attribute_caching_prevents_api_call(patched_fabric_workspace, valid_workspace_id, temp_workspace_dir):

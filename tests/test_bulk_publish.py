@@ -1680,3 +1680,55 @@ class TestWaitForItemAttributeProvisioning:
         FabricWorkspace._wait_for_item_attribute_provisioning(ws, "Notebook", "guid-1", "NB", "sqlendpoint")
 
         endpoint.invoke.assert_not_called()
+
+
+# =============================================================================
+# Bulk Publish Item Definition Options (allowPurgeData) Tests
+# =============================================================================
+
+
+@pytest.mark.usefixtures("bulk_publish_flags")
+class TestBulkPublishPurgeData:
+    """Tests for the enable_purge_data feature flag in the bulk publish path."""
+
+    def _make_model(self, temp_workspace_dir, mock_endpoint):
+        create_test_item_dir(temp_workspace_dir, None, "TestModel", "SemanticModel", "sm-id-001")
+        set_bulk_response(
+            mock_endpoint,
+            [
+                {
+                    "itemType": "SemanticModel",
+                    "itemDisplayName": "TestModel",
+                    "itemId": "sm-guid-001",
+                    "operationType": "Update",
+                },
+            ],
+        )
+        return capture_bulk_bodies(mock_endpoint)
+
+    def test_purge_data_flag_adds_item_options_by_logical_id(self, mock_endpoint, temp_workspace_dir):
+        """With ENABLE_PURGE_DATA set, bulk body carries per-item allowPurgeData keyed by logicalId."""
+        bodies = self._make_model(temp_workspace_dir, mock_endpoint)
+
+        with (
+            extra_flags(FeatureFlag.ENABLE_PURGE_DATA),
+            patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["SemanticModel"]) as workspace,
+        ):
+            publish.publish_all_items(workspace)
+
+        assert len(bodies) == 1
+        options = bodies[0]["options"]
+        assert options["allowPairingByName"] is True
+        assert options["itemOptionsByLogicalId"] == [{"logicalId": "sm-id-001", "options": {"allowPurgeData": True}}]
+
+    def test_no_purge_data_flag_omits_item_options_by_logical_id(self, mock_endpoint, temp_workspace_dir):
+        """Without ENABLE_PURGE_DATA, bulk body has no itemOptionsByLogicalId key (unchanged from today)."""
+        bodies = self._make_model(temp_workspace_dir, mock_endpoint)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["SemanticModel"]) as workspace:
+            publish.publish_all_items(workspace)
+
+        assert len(bodies) == 1
+        options = bodies[0]["options"]
+        assert options == {"allowPairingByName": True}
+        assert "itemOptionsByLogicalId" not in options
