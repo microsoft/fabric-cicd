@@ -768,7 +768,8 @@ class FabricWorkspace:
             exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
             func_process_file: Custom function to process file contents. Defaults to None.
             options: Dictionary of additional options for the update definition operation (e.g., {"allowPurgeData": True}). Defaults to None.
-            **kwargs: Additional keyword arguments.
+            **kwargs: Additional keyword arguments (e.g., additional_parts: list of base64 definition part dicts
+                to append to the definition payload).
         """
         item = self.repository_items[item_type][item_name]
 
@@ -811,6 +812,8 @@ class FabricWorkspace:
                             file.contents = self._replace_workspace_ids(file.contents, item)
 
                     item_payload.append(file.base64_payload)
+            # Append any synthesized definition parts not present in the repository (e.g., required default parts)
+            item_payload.extend(kwargs.get("additional_parts") or [])
             # Some item definitions require specifying the format as multiple API versions exist (i.e. Spark Job Definitions)
             if kwargs.get("api_format"):
                 definition_body = {"definition": {"format": kwargs["api_format"], "parts": item_payload}}

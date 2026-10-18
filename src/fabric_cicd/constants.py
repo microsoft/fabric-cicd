@@ -227,7 +227,6 @@ SENSITIVE_RESPONSE_HEADERS = frozenset({
 
 # Publish
 SHELL_ONLY_PUBLISH = [
-    ItemType.LAKEHOUSE.value,
     ItemType.WAREHOUSE.value,
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,
