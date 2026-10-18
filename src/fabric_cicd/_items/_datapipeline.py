@@ -16,6 +16,13 @@ from fabric_cicd.constants import ItemType
 logger = logging.getLogger(__name__)
 
 
+def _reference_value(value: object) -> str | None:
+    """Return a literal reference or the value of an Expression wrapper."""
+    if isinstance(value, dict) and value.get("type") == "Expression":
+        value = value.get("value")
+    return value if isinstance(value, str) else None
+
+
 def _iter_pipeline_reference_ids(activities: object) -> Iterator[str]:
     """Yield referenced IDs from actual pipeline activities, including nested ones."""
     if not isinstance(activities, list):
@@ -32,12 +39,12 @@ def _iter_pipeline_reference_ids(activities: object) -> Iterator[str]:
         if activity_type == "ExecutePipeline":
             pipeline = properties.get("pipeline")
             if isinstance(pipeline, dict):
-                reference_name = pipeline.get("referenceName")
-                if isinstance(reference_name, str):
+                reference_name = _reference_value(pipeline.get("referenceName"))
+                if reference_name is not None:
                     yield reference_name
         elif activity_type == "InvokePipeline":
-            pipeline_id = properties.get("pipelineId")
-            if isinstance(pipeline_id, str):
+            pipeline_id = _reference_value(properties.get("pipelineId"))
+            if pipeline_id is not None:
                 yield pipeline_id
 
         # Fabric control-flow activities embed their child activity lists here.
@@ -56,11 +63,17 @@ def find_referenced_datapipelines(fabric_workspace_obj: FabricWorkspace, file_co
     Only actual pipeline-reference fields count as dependencies. Other GUID-valued
     fields (such as pipeline parameters) must not affect publishing order.
     Nested control-flow activities are included.
+
+    Args:
+        fabric_workspace_obj: Workspace used to resolve pipeline IDs to names.
+        file_content: Parsed pipeline-content.json definition.
+        lookup_type: "Repository" or "Deployed" reference resolution mode.
     """
     item_type = ItemType.DATA_PIPELINE.value
     reference_list = []
     guid_pattern = re.compile(constants.VALID_GUID_REGEX)
-    activities = file_content.get("properties", {}).get("activities", [])
+    properties = file_content.get("properties") if isinstance(file_content, dict) else None
+    activities = properties.get("activities", []) if isinstance(properties, dict) else []
 
     for referenced_id in _iter_pipeline_reference_ids(activities):
         if not guid_pattern.fullmatch(referenced_id):
