@@ -911,7 +911,7 @@ class FabricWorkspace:
         return
 
     def _publish_items(
-        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: list[str] | None = None
+        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: Optional[list[str]] = None
     ) -> None:
         """
         Publishes or updates items in bulk via the bulk import API.

@@ -5,6 +5,7 @@
 
 import copy
 import logging
+from typing import Optional
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
@@ -350,7 +351,7 @@ class SemanticModelPublisher(ItemPublisher):
             options=self.get_definition_options(_item),
         )
 
-    def get_definition_options(self, _item: Item) -> dict | None:
+    def get_definition_options(self, _item: Item) -> Optional[dict]:
         """Return Semantic Model definition options, gated by the ENABLE_PURGE_DATA feature flag."""
         if FeatureFlag.ENABLE_PURGE_DATA.value in constants.FEATURE_FLAG:
             return {"allowPurgeData": True}
