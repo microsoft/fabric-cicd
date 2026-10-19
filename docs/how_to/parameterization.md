@@ -189,6 +189,7 @@ semantic_model_binding:
 - The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
 - Connection ID values must be valid GUIDs.
 - Each environment value under `connection_id` may be a **single GUID string** or a **list of GUID strings**. When a list is supplied, `bindConnection` is called once per connection ID, allowing models that use multiple data sources (e.g., a SQL database and a Lakehouse) to be fully bound in a single deployment pass.
+- By default, a failed binding is logged and the deployment continues. Examples are a connection ID that is not found or a `bindConnection` call that returns an error. To fail the deployment instead, set the `enable_strict_semantic_model_binding` [feature flag](optional_feature.md#feature-flags). All bindings are attempted first, and then one error lists every failed binding. Items published before the error stay deployed, and nothing is rolled back. In the standard publish order, item types after semantic models, such as reports, are not published. The publish state check for environments and the unpublish of orphan items in `deploy_with_config` also do not run. With bulk publish, the error comes after all items are published. Semantic models excluded from the deployment are not checked.
 
 ## Advanced Find and Replace
 

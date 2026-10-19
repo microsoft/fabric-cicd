@@ -7,6 +7,7 @@ import copy
 import logging
 
 from fabric_cicd import FabricWorkspace, constants
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
@@ -177,33 +178,32 @@ def get_connections(fabric_workspace_obj: FabricWorkspace) -> dict:
 
     Returns:
         Dictionary with connection ID as key and connection details as value
+
+    Raises:
+        Exception: If the list connections call fails.
     """
     # https://learn.microsoft.com/en-us/rest/api/fabric/core/connections/list-connections
     connections_url = f"{constants.FABRIC_API_ROOT_URL}/v1/connections"
 
-    try:
-        response = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)
-        connections_list = response.get("body", {}).get("value", [])
+    response = fabric_workspace_obj.endpoint.invoke(method="GET", url=connections_url)
+    connections_list = response.get("body", {}).get("value", [])
 
-        connections_dict = {}
-        for connection in connections_list:
-            connection_id = connection.get("id")
-            if connection_id:
-                connections_dict[connection_id] = {
-                    "id": connection_id,
-                    "connectivityType": connection.get("connectivityType"),
-                    "connectionDetails": connection.get("connectionDetails", {}),
-                }
+    connections_dict = {}
+    for connection in connections_list:
+        connection_id = connection.get("id")
+        if connection_id:
+            connections_dict[connection_id] = {
+                "id": connection_id,
+                "connectivityType": connection.get("connectivityType"),
+                "connectionDetails": connection.get("connectionDetails", {}),
+            }
 
-        return connections_dict
-    except Exception as e:
-        logger.error(f"Failed to retrieve connections: {e}")
-        return {}
+    return connections_dict
 
 
 def bind_semanticmodel_to_connection(
     fabric_workspace_obj: FabricWorkspace, connections: dict, connection_details: dict
-) -> None:
+) -> list[str]:
     """
     Binds semantic models to their specified connections.
 
@@ -216,8 +216,13 @@ def bind_semanticmodel_to_connection(
         connections: Dictionary of connection objects with connection ID as key.
         connection_details: Dictionary mapping semantic model names to one or more connection IDs
             from parameter.yml.  Values may be a single string or a list of strings.
+
+    Returns:
+        A message per binding that did not happen for a deployed model. Excluded models and
+        models without existing connections are skipped and do not count as failures.
     """
     item_type = ItemType.SEMANTIC_MODEL.value
+    failures = []
 
     for model_name, raw_connection_ids in connection_details.items():
         # Always normalize through the helper so non-string list elements are safely filtered
@@ -225,14 +230,13 @@ def bind_semanticmodel_to_connection(
 
         # Validate every connection ID exists before touching the API
         valid_connection_ids = []
+        missing_connection_ids = []
         for cid in connection_ids:
             if cid not in connections:
                 logger.warning(f"Connection ID '{cid}' not found for semantic model '{model_name}'")
+                missing_connection_ids.append(cid)
             else:
                 valid_connection_ids.append(cid)
-
-        if not valid_connection_ids:
-            continue
 
         # Get the semantic model object (validated during binding mapping creation)
         item_obj = fabric_workspace_obj.repository_items[item_type][model_name]
@@ -246,6 +250,14 @@ def bind_semanticmodel_to_connection(
             )
             continue
 
+        # Recorded after the skip check, so a stale ID on a model this run does not deploy won't count as failure
+        failures.extend(
+            f"Semantic model '{model_name}': connection '{cid}' not found" for cid in missing_connection_ids
+        )
+
+        if not valid_connection_ids:
+            continue
+
         model_id = item_obj.guid
 
         # Get the connection details for this semantic model from Fabric API (once per model)
@@ -256,6 +268,11 @@ def bind_semanticmodel_to_connection(
             connections_data = connections_response.get("body", {}).get("value", [])
         except Exception as e:
             logger.error(f"Failed to retrieve connections for semantic model '{model_name}': {e!s}")
+            failures.extend(
+                f"Semantic model '{model_name}': connection '{cid}' was not bound because its existing "
+                f"connections could not be retrieved ({e!s})"
+                for cid in valid_connection_ids
+            )
             continue
 
         if not connections_data:
@@ -296,10 +313,19 @@ def bind_semanticmodel_to_connection(
                         f"Failed to bind semantic model '{model_name}' to connection '{connection_id}'. "
                         f"Status code: {status_code}"
                     )
+                    failures.append(
+                        f"Semantic model '{model_name}': binding to connection '{connection_id}' "
+                        f"returned status code {status_code}"
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to bind '{model_name}' to connection '{connection_id}': {e!s}")
+                failures.append(
+                    f"Semantic model '{model_name}': binding to connection '{connection_id}' failed ({e!s})"
+                )
                 continue
+
+    return failures
 
 
 def build_request_body(body: dict) -> dict:
@@ -379,9 +405,27 @@ class SemanticModelPublisher(ItemPublisher):
             return
 
         if binding_mapping:
-            connections = get_connections(self.fabric_workspace_obj)
-            bind_semanticmodel_to_connection(
+            list_error = None
+            try:
+                connections = get_connections(self.fabric_workspace_obj)
+            except Exception as e:
+                logger.error(f"Failed to retrieve connections: {e}")
+                connections, list_error = {}, str(e)
+
+            failures = bind_semanticmodel_to_connection(
                 fabric_workspace_obj=self.fabric_workspace_obj,
                 connections=connections,
                 connection_details=binding_mapping,
             )
+
+            # Without the connection list every ID reads as "not found", so report the real cause instead
+            if list_error is not None and failures:
+                failures = [f"Could not list connections, so no semantic model connection was bound ({list_error})"]
+
+            if FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value in constants.FEATURE_FLAG and failures:
+                details = "\n".join(f"{constants.INDENT}{failure}" for failure in failures)
+                msg = (
+                    f"Semantic model connection binding failed for {len(failures)} binding(s) "
+                    f"while the '{FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value}' feature flag is set:\n{details}"
+                )
+                raise FailedPublishedItemStatusError(msg, logger)
