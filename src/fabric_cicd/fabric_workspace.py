@@ -15,8 +15,17 @@ import dpath
 from azure.core.credentials import TokenCredential
 
 from fabric_cicd import constants
-from fabric_cicd._common._check_utils import check_regex, check_valid_json_content, check_valid_yaml_content
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, ParameterFileError, ParsingError
+from fabric_cicd._common._check_utils import (
+    check_regex,
+    check_valid_json_content,
+    check_valid_yaml_content,
+)
+from fabric_cicd._common._exceptions import (
+    FailedPublishedItemStatusError,
+    InputError,
+    ParameterFileError,
+    ParsingError,
+)
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, handle_retry
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
@@ -467,6 +476,10 @@ class FabricWorkspace:
                     pattern = re.compile(constants.KQL_DATABASE_FOLDER_PATH_REGEX)
                     match = pattern.match(relative_path)
                     relative_parent_path = match.group(1) if match else None
+                elif item_type == ItemType.ORG_APP_AUDIENCE.value:
+                    # Set the OrgAppAudience to the same workspace folder as its parent OrgApp.
+                    match = re.match(constants.ORG_APP_AUDIENCE_FOLDER_PATH_REGEX, relative_path)
+                    relative_parent_path = match.group(1) if match else None
                 else:
                     relative_parent_path = "/".join(relative_path.split("/")[:-1])
 
@@ -857,7 +870,12 @@ class FabricWorkspace:
             )
             api_response = metadata_update_response
 
-        if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
+        # Parent-managed items cannot move independently, even if their cached
+        # folder differs after a parent move.
+        if (
+            FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG
+            and item_type not in constants.NON_MOVABLE_ITEM_TYPES
+        ):
             deployed_item = self.deployed_items.get(item_type, {}).get(item_name) if is_deployed else None
             # Check if the folder has changed
             if deployed_item is not None and deployed_item.folder_id != item.folder_id:
@@ -893,7 +911,7 @@ class FabricWorkspace:
         return
 
     def _publish_items(
-        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: list[str] | None = None
+        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: Optional[list[str]] = None
     ) -> None:
         """
         Publishes or updates items in bulk via the bulk import API.
