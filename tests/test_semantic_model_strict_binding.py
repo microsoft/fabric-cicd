@@ -268,6 +268,9 @@ def test_strict_flag_lists_every_failed_model_in_one_error():
 
     assert "ModelA" in str(error.value)
     assert "ModelB" in str(error.value)
+    # Turns out log formatter treats constants.INDENT as marker for indentation and thus drops the [error] tag. 
+    # So message must not contain it.
+    assert constants.INDENT not in str(error.value)
 
 
 def test_strict_flag_reports_list_call_failure_as_the_cause(caplog):

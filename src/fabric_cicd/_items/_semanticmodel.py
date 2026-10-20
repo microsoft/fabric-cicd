@@ -423,7 +423,7 @@ class SemanticModelPublisher(ItemPublisher):
                 failures = [f"Could not list connections, so no semantic model connection was bound ({list_error})"]
 
             if FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value in constants.FEATURE_FLAG and failures:
-                details = "\n".join(f"{constants.INDENT}{failure}" for failure in failures)
+                details = "\n".join(f"  - {failure}" for failure in failures)
                 msg = (
                     f"Semantic model connection binding failed for {len(failures)} binding(s) "
                     f"while the '{FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value}' feature flag is set:\n{details}"
