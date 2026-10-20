@@ -25,6 +25,10 @@ from fabric_cicd.fabric_workspace import FabricWorkspace
 STRICT_FLAG = FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value
 GOOD_ID = "11111111-1111-1111-1111-111111111111"
 MISSING_ID = "00000000-0000-0000-0000-00000000dead"
+# The text FabricEndpoint raises when the identity has no permission on connections
+LIST_ERROR = (
+    "The executing identity is not authorized to call GET on 'https://api.fabric.microsoft.com/v1/connections'."
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -77,7 +81,7 @@ def _endpoint(
     def invoke(method, url, **_kwargs):
         if method == "GET" and url.endswith("/v1/connections"):
             if list_fails:
-                msg = "list connections failed"
+                msg = LIST_ERROR
                 raise RuntimeError(msg)
             return {"body": {"value": list(_make_connections(GOOD_ID).values())}}
         if method == "GET" and url.endswith("/connections"):
@@ -290,7 +294,7 @@ def test_strict_flag_reports_list_call_failure_as_the_cause_and_keeps_every_bind
 
     assert "Failed to retrieve connections" in caplog.text
     assert "failed for 2 binding(s)" in str(error.value)
-    assert "Could not list connections (list connections failed)" in str(error.value)
+    assert f"Could not list connections ({LIST_ERROR})" in str(error.value)
     assert f"Semantic model 'ModelA': connection '{GOOD_ID}'" in str(error.value)
     assert f"Semantic model 'ModelB': connection '{GOOD_ID}'" in str(error.value)
 
@@ -347,7 +351,7 @@ FAILURE_PATHS = {
     "list_connections_call_fails": (
         {"list_fails": True},
         GOOD_ID,
-        "Failed to retrieve connections: list connections failed",
+        f"Failed to retrieve connections: {LIST_ERROR}",
     ),
 }
 
