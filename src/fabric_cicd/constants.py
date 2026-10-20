@@ -237,7 +237,6 @@ NON_MOVABLE_ITEM_TYPES = [
 ]
 
 SHELL_ONLY_PUBLISH = [
-    ItemType.LAKEHOUSE.value,
     ItemType.WAREHOUSE.value,
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,

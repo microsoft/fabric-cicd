@@ -25,7 +25,7 @@ Before starting, you need only the **display name** (PascalCase, as used by the 
 Before proceeding, confirm all of the following. If any gate fails, **stop** — the item type cannot be onboarded.
 
 1. The item type must be supported in source control / Git integration. Fetch the [item definition overview](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/item-definition-overview) page and check if the item type appears in the **"Definition Details for Supported Item Types"** list.
-2. The Fabric API must support deployment for the item type — either full definition deployment or shell-only creation (like Lakehouse/Warehouse). Verify using the steps in **"How to verify gates 2 and 3"** below.
+2. The Fabric API must support deployment for the item type — either full definition deployment or shell-only creation (like Warehouse). Verify using the steps in **"How to verify gates 2 and 3"** below.
 3. The Fabric API must support service principal (SPN) authentication for the item type's deployment operations. fabric-cicd is primarily used in CI/CD pipelines where SPN is the standard authentication method. Verify using the steps in **"How to verify gates 2 and 3"** below.
 
 #### How to verify gates 2 and 3
@@ -63,7 +63,7 @@ After the eligibility gates pass, you **must** ask the requestor about **every r
 | Does the API use a non-standard definition format? If yes, provide the exact format string and instructions for how it should be handled. | `ipynb`, `SparkJobDefinitionV2`                                                                                                                  | Step 1e     |
 | Does deleting this item destroy user data?                                                                                                | Lakehouse, Eventhouse                                                                                                                            | Step 1f     |
 | Can items of this type reference each other?                                                                                              | Data Pipeline invokes another Data Pipeline                                                                                                      | Steps 1g, 2 |
-| Does the item need custom deployment logic, dependency resolution, or special parameterization? If yes, describe what is needed.          | Lakehouse creation payload, Environment async check, KQL items need query service URI (via dynamic replacement), SemanticModel binding parameter | Step 2      |
+| Does the item need custom deployment logic, dependency resolution, or special parameterization? If yes, describe what is needed.          | Warehouse creation payload, Lakehouse shortcuts/ALM settings, Environment async check, KQL items need query service URI (via dynamic replacement), SemanticModel binding parameter | Step 2      |
 
 ---
 
@@ -270,7 +270,7 @@ Encourage the requestor to:
 | **Exclude paths**                | 1c, 1e, 1f, 1g     | `_dataagent.py`, `_eventhouse.py`                   | Override `publish_one()` to pass `exclude_path` — do step 1d                                   |
 | **API format**                   | 1c, 1d, 1f, 1g     | `_notebook.py`                                      | Override `publish_one()` to pass `api_format` — do step 1e                                     |
 | **Custom file processing**       | 1c, 1d, 1e, 1f, 1g | `_report.py`, `_kqldashboard.py`, `_kqlqueryset.py` | Define `func_process_file` callback, pass to `_publish_item()`                                 |
-| **Shell-only** (metadata only)   | 1d, 1e, 1f, 1g     | `_warehouse.py`, `_lakehouse.py`                    | May need creation payload logic in `publish_one()` — do step 1c                                |
+| **Shell-only** (metadata only)   | 1d, 1e, 1f, 1g     | `_warehouse.py`, `_sqldatabase.py`                  | May need creation payload logic in `publish_one()` — do step 1c                                |
 | **Destructive unpublish**        | 1c, 1d, 1e, 1g     | `_lakehouse.py`, `_eventhouse.py`                   | Add new `FeatureFlag` enum member — do step 1f                                                 |
 | **Intra-type dependencies**      | 1c, 1d, 1e, 1f     | `_datapipeline.py`, `_dataflowgen2.py`              | Set `has_dependency_tracking`, `ParallelConfig`, override `get_unpublish_order()` — do step 1g |
 | **Post-publish actions**         | 1c, 1d, 1e, 1f, 1g | `_semanticmodel.py`                                 | Override `post_publish_all()`                                                                  |
