@@ -418,14 +418,17 @@ class SemanticModelPublisher(ItemPublisher):
                 connection_details=binding_mapping,
             )
 
-            # Without the connection list every ID reads as "not found", so report the real cause instead
-            if list_error is not None and failures:
-                failures = [f"Could not list connections, so no semantic model connection was bound ({list_error})"]
-
             if FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value in constants.FEATURE_FLAG and failures:
                 details = "\n".join(f"  - {failure}" for failure in failures)
+                # Without the connection list every ID reads as "not found", so name the real cause once
+                cause = (
+                    f". Could not list connections ({list_error}), so each connection ID below reads as not found"
+                    if list_error is not None
+                    else ""
+                )
                 msg = (
                     f"Semantic model connection binding failed for {len(failures)} binding(s) "
-                    f"while the '{FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value}' feature flag is set:\n{details}"
+                    f"while the '{FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING.value}' feature flag is set"
+                    f"{cause}:\n{details}"
                 )
                 raise FailedPublishedItemStatusError(msg, logger)

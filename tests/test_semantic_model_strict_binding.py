@@ -229,6 +229,7 @@ def test_bind_skip_for_excluded_model_is_not_a_failure():
     failures = bind_semanticmodel_to_connection(workspace, _make_connections(GOOD_ID), {"ModelA": [GOOD_ID]})
 
     assert failures == []
+    assert _post_calls(workspace) == []
 
 
 # ---------------------------------------------------------------------------
@@ -268,23 +269,30 @@ def test_strict_flag_lists_every_failed_model_in_one_error():
 
     assert "ModelA" in str(error.value)
     assert "ModelB" in str(error.value)
-    # Turns out log formatter treats constants.INDENT as marker for indentation and thus drops the [error] tag. 
+    # Turns out log formatter treats constants.INDENT as marker for indentation and thus drops the [error] tag.
     # So message must not contain it.
     assert constants.INDENT not in str(error.value)
 
 
-def test_strict_flag_reports_list_call_failure_as_the_cause(caplog):
+def test_strict_flag_reports_list_call_failure_as_the_cause_and_keeps_every_binding(caplog):
     constants.FEATURE_FLAG.add(STRICT_FLAG)
-    workspace = _make_workspace("ModelA", parameter=_binding(GOOD_ID))
+    parameter = {
+        "models": [
+            {"semantic_model_name": "ModelA", "connection_id": {"PROD": GOOD_ID}},
+            {"semantic_model_name": "ModelB", "connection_id": {"PROD": GOOD_ID}},
+        ]
+    }
+    workspace = _make_workspace("ModelA", "ModelB", parameter=parameter)
     workspace.endpoint.invoke.side_effect = _endpoint(list_fails=True)
 
     with caplog.at_level("ERROR"), pytest.raises(FailedPublishedItemStatusError) as error:
         SemanticModelPublisher(workspace).post_publish_all()
 
     assert "Failed to retrieve connections" in caplog.text
-    assert "Could not list connections" in str(error.value)
-    assert "list connections failed" in str(error.value)
-    assert "not found" not in str(error.value)
+    assert "failed for 2 binding(s)" in str(error.value)
+    assert "Could not list connections (list connections failed)" in str(error.value)
+    assert f"Semantic model 'ModelA': connection '{GOOD_ID}'" in str(error.value)
+    assert f"Semantic model 'ModelB': connection '{GOOD_ID}'" in str(error.value)
 
 
 def test_strict_flag_ignores_list_call_failure_when_only_excluded_models_are_bound():
@@ -318,18 +326,35 @@ def test_without_strict_flag_binding_failures_only_log(caplog):
     assert f"Connection ID '{MISSING_ID}' not found for semantic model 'ModelA'" in caplog.text
 
 
+# Each path: endpoint behavior, configured connection ID, and the log line it produces without the flag
 FAILURE_PATHS = {
-    "connection_not_found": ({}, MISSING_ID),
-    "item_connections_call_fails": ({"item_connections_fail": True}, GOOD_ID),
-    "bind_returns_non_200": ({"bind_status": 201}, GOOD_ID),
-    "bind_call_raises": ({"bind_fails": True}, GOOD_ID),
-    "list_connections_call_fails": ({"list_fails": True}, GOOD_ID),
+    "connection_not_found": ({}, MISSING_ID, f"Connection ID '{MISSING_ID}' not found for semantic model 'ModelA'"),
+    "item_connections_call_fails": (
+        {"item_connections_fail": True},
+        GOOD_ID,
+        "Failed to retrieve connections for semantic model 'ModelA': item connections failed",
+    ),
+    "bind_returns_non_200": (
+        {"bind_status": 201},
+        GOOD_ID,
+        f"Failed to bind semantic model 'ModelA' to connection '{GOOD_ID}'. Status code: 201",
+    ),
+    "bind_call_raises": (
+        {"bind_fails": True},
+        GOOD_ID,
+        f"Failed to bind 'ModelA' to connection '{GOOD_ID}': You cannot configure",
+    ),
+    "list_connections_call_fails": (
+        {"list_fails": True},
+        GOOD_ID,
+        "Failed to retrieve connections: list connections failed",
+    ),
 }
 
 
 @pytest.mark.parametrize("path", FAILURE_PATHS)
 def test_each_failure_path_raises_with_strict_flag(path):
-    endpoint_kwargs, connection_id = FAILURE_PATHS[path]
+    endpoint_kwargs, connection_id, _ = FAILURE_PATHS[path]
     constants.FEATURE_FLAG.add(STRICT_FLAG)
     workspace = _make_workspace("ModelA", parameter=_binding(connection_id))
     workspace.endpoint.invoke.side_effect = _endpoint(**endpoint_kwargs)
@@ -340,14 +365,16 @@ def test_each_failure_path_raises_with_strict_flag(path):
 
 @pytest.mark.parametrize("path", FAILURE_PATHS)
 def test_each_failure_path_only_logs_without_strict_flag(path, caplog):
-    endpoint_kwargs, connection_id = FAILURE_PATHS[path]
+    endpoint_kwargs, connection_id, expected_log = FAILURE_PATHS[path]
     workspace = _make_workspace("ModelA", parameter=_binding(connection_id))
     workspace.endpoint.invoke.side_effect = _endpoint(**endpoint_kwargs)
 
     with caplog.at_level("WARNING"):
         SemanticModelPublisher(workspace).post_publish_all()
 
-    assert any(record.levelname in ("WARNING", "ERROR") for record in caplog.records)
+    assert any(
+        record.levelname in ("WARNING", "ERROR") and expected_log in record.getMessage() for record in caplog.records
+    )
 
 
 def test_strict_flag_raises_for_legacy_list_format():
