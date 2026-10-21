@@ -1,0 +1,8 @@
+kind: fixed
+body: Prevent false DataPipeline dependency cycles from unrelated GUID-valued fields
+time: 2026-10-15T14:00:00+02:00
+custom:
+    Author: mhatipog
+    AuthorLink: https://github.com/mhatipog
+    Issue: "1163"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1163

@@ -99,12 +99,19 @@ class TestParameterUtilities:
         mock_ws.workspace_id = "mock-workspace-id"
         mock_ws.workspace_items = {
             "Notebook": {
-                "Test Notebook": {"id": "notebook-id", "sqlendpoint": "", "sqlendpointid": "", "queryserviceuri": ""},
+                "Test Notebook": {
+                    "id": "notebook-id",
+                    "sqlendpoint": "",
+                    "sqlendpointfqdn": "",
+                    "sqlendpointid": "",
+                    "queryserviceuri": "",
+                },
             },
             "Warehouse": {
                 "TestWarehouse": {
                     "id": "warehouse-id",
                     "sqlendpoint": "warehouse-endpoint",
+                    "sqlendpointfqdn": "",
                     "sqlendpointid": "",
                     "queryserviceuri": "",
                 },
@@ -113,6 +120,7 @@ class TestParameterUtilities:
                 "Test_Lakehouse": {
                     "id": "lakehouse-id",
                     "sqlendpoint": "lakehouse-endpoint",
+                    "sqlendpointfqdn": "",
                     "sqlendpointid": "lakehouse-sql-endpoint-id",
                     "queryserviceuri": "",
                 },
@@ -121,6 +129,7 @@ class TestParameterUtilities:
                 "Test Eventhouse": {
                     "id": "eventhouse-id",
                     "sqlendpoint": "",
+                    "sqlendpointfqdn": "",
                     "sqlendpointid": "",
                     "queryserviceuri": "eventhouse-query-uri",
                 },
@@ -129,6 +138,7 @@ class TestParameterUtilities:
                 "TestSQLDatabase": {
                     "id": "sqldatabase-id",
                     "sqlendpoint": "test-sql-server.database.fabric.microsoft.com,1433",
+                    "sqlendpointfqdn": "test-sql-server.database.fabric.microsoft.com",
                     "sqlendpointid": "",
                     "queryserviceuri": "",
                 },
@@ -510,11 +520,27 @@ class TestParameterUtilities:
         result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.$sqlendpoint", False)
         assert result == "test-sql-server.database.fabric.microsoft.com,1433"
 
+        # Test with valid SQLDatabase sqlendpointfqdn attribute (port stripped)
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.sqlendpointfqdn", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com"
+        result = _extract_item_attribute(mock_workspace, "$items.SQLDatabase.TestSQLDatabase.$sqlendpointfqdn", False)
+        assert result == "test-sql-server.database.fabric.microsoft.com"
+
         # Test with valid eventhouse item
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.queryserviceuri", False)
         assert result == "eventhouse-query-uri"
         result = _extract_item_attribute(mock_workspace, "$items.Eventhouse.Test Eventhouse.$queryserviceuri", False)
         assert result == "eventhouse-query-uri"
+
+    def test_extract_item_attribute_sqlendpointfqdn_unsupported_type(self, mock_workspace):
+        """sqlendpointfqdn is only populated for SQLDatabase; other types resolve empty and must error."""
+        with pytest.raises(
+            ParsingError,
+            match=re.escape(
+                "Value does not exist for attribute 'sqlendpointfqdn' in the Lakehouse item 'Test_Lakehouse'"
+            ),
+        ):
+            _extract_item_attribute(mock_workspace, "$items.Lakehouse.Test_Lakehouse.$sqlendpointfqdn", False)
 
     def test_extract_item_attribute_invalid(self, mock_workspace):
         """Tests _extract_item_attribute with invalid variable cases."""
@@ -1516,6 +1542,58 @@ class TestParameterUtilities:
         result = replace_key_value(mock_workspace, param_dict, test_yaml, "test", is_yaml=True)
         result_data = yaml.safe_load(result)
         assert result_data["server"]["host"] == "localhost"  # Original value unchanged
+
+    def test_replace_key_value_yaml_no_match_preserves_content(self, mock_workspace):
+        """Tests that content is returned untouched (comments/formatting preserved) when find_key matches nothing."""
+        test_yaml = """# top-level comment
+server:
+  host: localhost  # inline comment
+  port: 8080
+"""
+        param_dict = {
+            "find_key": "$.database.host",  # does not exist in the content
+            "replace_value": {"dev": "dev-server.example.com"},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, test_yaml, "dev", is_yaml=True)
+        # Unchanged content, including comments, since nothing matched
+        assert result == test_yaml
+
+    def test_replace_key_value_notebook_parsing_as_mapping_preserved(self, mock_workspace):
+        """Ensure unmatched YAML content is returned unchanged without re-serialization."""
+        notebook = """# Fabric notebook source
+
+# METADATA ********************
+
+# META {
+# META   "kernel_info": {
+# META     "name": "synapse_pyspark"
+# META   }
+# META }
+
+# CELL ********************
+
+for p in ["a", "b"]:
+    spark.conf.set(p, globals()[p])
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+"""
+        # Sanity check: the uncommented code parses as a YAML mapping
+        assert isinstance(yaml.safe_load(notebook), dict)
+
+        param_dict = {
+            "find_key": "$.schedules[*].enabled",
+            "replace_value": {"dev": False},
+        }
+
+        result = replace_key_value(mock_workspace, param_dict, notebook, "dev", is_yaml=True)
+        # Notebook is published unchanged: prologue and cell markers preserved
+        assert result == notebook
 
     def test_replace_key_value_yaml_invalid(self, mock_workspace):
         """Tests replace_key_value_yaml with invalid YAML content."""

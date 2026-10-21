@@ -162,6 +162,8 @@ class ItemPublisher(Publisher):
         from fabric_cicd._items._mounteddatafactory import MountedDataFactoryPublisher
         from fabric_cicd._items._notebook import NotebookPublisher
         from fabric_cicd._items._ontology import OntologyPublisher
+        from fabric_cicd._items._orgapp import OrgAppPublisher
+        from fabric_cicd._items._orgappaudience import OrgAppAudiencePublisher
         from fabric_cicd._items._paginatedreport import PaginatedReportPublisher
         from fabric_cicd._items._report import ReportPublisher
         from fabric_cicd._items._semanticmodel import SemanticModelPublisher
@@ -203,6 +205,8 @@ class ItemPublisher(Publisher):
             ItemType.ONTOLOGY: OntologyPublisher,
             ItemType.MAP: MapPublisher,
             ItemType.GRAPH_MODEL: GraphModelPublisher,
+            ItemType.ORG_APP: OrgAppPublisher,
+            ItemType.ORG_APP_AUDIENCE: OrgAppAudiencePublisher,
         }
 
         publisher_class = publisher_mapping.get(item_type)
@@ -478,6 +482,20 @@ class ItemPublisher(Publisher):
         Subclasses can override this method for custom publishing logic.
         """
         self.fabric_workspace_obj._publish_item(item_name=item_name, item_type=self.item_type)
+
+    def get_definition_options(self, _item: "Item") -> Optional[dict]:
+        """
+        Item-type-specific updateDefinition / bulk-import options.
+
+        Args:
+            _item: The Item object being published.
+
+        Returns:
+            A dictionary of options to merge into the request body, or None.
+            Default implementation returns None. Subclasses can override to
+            provide item-type-specific options (e.g. Semantic Model allowPurgeData).
+        """
+        return None
 
     def get_items_to_publish(self) -> dict[str, "Item"]:
         """

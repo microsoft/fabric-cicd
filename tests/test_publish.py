@@ -3,6 +3,7 @@
 
 """Test publishing functionality including selective publishing based on repository content."""
 
+import base64
 import json
 import logging
 import tempfile
@@ -16,7 +17,10 @@ from fixtures.credentials import DummyTokenCredential
 import fabric_cicd.publish as publish
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._items._notebook import NotebookPublisher
+from fabric_cicd._items._orgapp import OrgAppPublisher
+from fabric_cicd._items._orgappaudience import OrgAppAudiencePublisher
 from fabric_cicd._items._paginatedreport import PaginatedReportPublisher
 from fabric_cicd.constants import API_FORMAT_MAPPING, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
@@ -107,6 +111,143 @@ def create_test_item(base_path: Path, folder: Optional[str], name: str, item_typ
 # =============================================================================
 
 
+@pytest.mark.parametrize(
+    ("item_type", "publisher_class"),
+    [(ItemType.ORG_APP, OrgAppPublisher), (ItemType.ORG_APP_AUDIENCE, OrgAppAudiencePublisher)],
+)
+def test_org_app_publisher_uses_default_definition(item_type, publisher_class):
+    """Both publishers use the generic definition pipeline, excluding app children."""
+    workspace = MagicMock()
+    publisher = ItemPublisher.create(item_type, workspace)
+
+    assert isinstance(publisher, publisher_class)
+    publisher.publish_one("TestItem", MagicMock())
+
+    expected_kwargs = {"item_name": "TestItem", "item_type": item_type.value}
+    if item_type == ItemType.ORG_APP:
+        expected_kwargs["exclude_path"] = constants.EXCLUDE_PATH_REGEX_MAPPING[item_type.value]
+    else:
+        assert item_type.value not in constants.EXCLUDE_PATH_REGEX_MAPPING
+    workspace._publish_item.assert_called_once_with(**expected_kwargs)
+    assert item_type.value not in constants.SHELL_ONLY_PUBLISH
+    assert item_type.value not in constants.API_FORMAT_MAPPING
+    assert not publisher.has_dependency_tracking
+
+
+def test_publish_org_app_with_nested_audience(mock_endpoint, temp_workspace_dir):
+    """Child definitions stay out of the app payload and resolve the deployed parent ID."""
+    app_logical_id = "11111111-1111-1111-1111-111111111111"
+    app_dir = create_test_item(temp_workspace_dir, None, "TestApp", "OrgApp", app_logical_id)
+    audience_dir = create_test_item(
+        app_dir, ".children", "TestAudience", "OrgAppAudience", "22222222-2222-2222-2222-222222222222"
+    )
+    (app_dir / "definition.json").write_text(json.dumps({"elements": []}), encoding="utf-8")
+    (audience_dir / "definition.json").write_text(
+        json.dumps({"parentAppId": app_logical_id, "elementReferences": []}), encoding="utf-8"
+    )
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["OrgApp", "OrgAppAudience"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        bodies = [
+            call.kwargs["body"]
+            for call in mock_endpoint.invoke.call_args_list
+            if call.kwargs.get("method") == "POST" and call.kwargs.get("url", "").endswith("/items")
+        ]
+        assert [body["type"] for body in bodies] == ["OrgApp", "OrgAppAudience"]
+        app_parts = bodies[0]["definition"]["parts"]
+        assert all(".children" not in part["path"] for part in app_parts)
+        assert "definition.json" in {part["path"] for part in app_parts}
+        audience_definition = next(
+            part for part in bodies[1]["definition"]["parts"] if part["path"] == "definition.json"
+        )
+        assert json.loads(base64.b64decode(audience_definition["payload"]))["parentAppId"] == "mock-item-id"
+
+
+def test_publish_org_app_before_audience(mock_endpoint, temp_workspace_dir):
+    """Repository discovery and publishing place apps before audiences at the end."""
+    create_test_item(temp_workspace_dir, None, "TestApp", "OrgApp", "11111111-1111-1111-1111-111111111111")
+    create_test_item(temp_workspace_dir, None, "TestAudience", "OrgAppAudience", "22222222-2222-2222-2222-222222222222")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch.object(FabricWorkspace, "_publish_item") as mock_publish,
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["OrgAppAudience", "OrgApp"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace)
+
+        assert set(workspace.repository_items) == {"OrgApp", "OrgAppAudience"}
+        assert [call.kwargs for call in mock_publish.call_args_list] == [
+            {
+                "item_name": "TestApp",
+                "item_type": "OrgApp",
+                "exclude_path": constants.EXCLUDE_PATH_REGEX_MAPPING["OrgApp"],
+            },
+            {"item_name": "TestAudience", "item_type": "OrgAppAudience"},
+        ]
+        assert list(constants.SERIAL_ITEM_PUBLISH_ORDER.values())[-2:] == [
+            ItemType.ORG_APP,
+            ItemType.ORG_APP_AUDIENCE,
+        ]
+
+
+def test_unpublish_org_app_audience_before_app(mock_endpoint, temp_workspace_dir):
+    """Orphan audiences are deleted before their apps without feature flags."""
+    deployed_items = {
+        "OrgApp": {"TestApp": MagicMock(guid="11111111-1111-1111-1111-111111111111")},
+        "OrgAppAudience": {"TestAudience": MagicMock(guid="22222222-2222-2222-2222-222222222222")},
+    }
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", deployed_items)
+        ),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+        patch.object(FabricWorkspace, "_unpublish_folders"),
+        patch.object(FabricWorkspace, "_unpublish_item") as mock_unpublish,
+        patch.object(constants, "FEATURE_FLAG", set()),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["OrgApp", "OrgAppAudience"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.unpublish_all_orphan_items(workspace)
+
+        assert [call.kwargs for call in mock_unpublish.call_args_list] == [
+            {"item_name": "TestAudience", "item_type": "OrgAppAudience"},
+            {"item_name": "TestApp", "item_type": "OrgApp"},
+        ]
+
+
 def test_publish_only_existing_item_types(mock_endpoint, temp_workspace_dir):
     """Test that publish_all_items only attempts to publish item types that exist in repository."""
     create_test_item(temp_workspace_dir, None, "TestNotebook", "Notebook", "test-notebook-id")
@@ -136,6 +277,74 @@ def test_publish_only_existing_item_types(mock_endpoint, temp_workspace_dir):
         mock_notebook_cls.assert_called_once_with(workspace)
         mock_notebook_instance.publish_all.assert_called_once()
         mock_env_cls.assert_not_called()
+
+
+@pytest.mark.usefixtures("experimental_feature_flags")
+@pytest.mark.parametrize(
+    "first_filters",
+    [
+        {"item_name_exclude_regex": r"^Private"},
+        {"items_to_include": ["Public.Notebook"]},
+    ],
+)
+def test_publish_filters_do_not_leak_between_calls(mock_endpoint, temp_workspace_dir, first_filters):
+    """A selective publish must not silently constrain a later full publish."""
+    create_test_item(temp_workspace_dir, None, "Public", "Notebook", "public-id")
+    create_test_item(temp_workspace_dir, None, "Private", "Notebook", "private-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace, **first_filters)
+        assert workspace.repository_items["Notebook"]["Private"].skip_publish is True
+
+        publish.publish_all_items(workspace)
+        assert workspace.repository_items["Notebook"]["Private"].skip_publish is False
+        assert workspace.items_to_include is None
+        assert workspace.publish_item_name_exclude_regex is None
+
+        # Verify the previously excluded item actually reaches the API on the second call.
+        created_names = [
+            call.kwargs["body"]["displayName"]
+            for call in mock_endpoint.invoke.call_args_list
+            if call.kwargs.get("method") == "POST" and call.kwargs.get("url", "").endswith("/items")
+        ]
+        assert created_names.count("Private") == 1
+
+
+@pytest.mark.usefixtures("experimental_feature_flags")
+def test_folder_filters_do_not_leak_when_switching_selection(mock_endpoint, temp_workspace_dir):
+    """Switching from exclusion to inclusion must not leave both filters active."""
+    create_test_item(temp_workspace_dir, "archive", "Archived", "Notebook", "archived-id")
+    create_test_item(temp_workspace_dir, "active", "Active", "Notebook", "active-id")
+
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Notebook"],
+            token_credential=DummyTokenCredential(),
+        )
+
+        publish.publish_all_items(workspace, folder_path_exclude_regex=r"^/archive$")
+        assert workspace.repository_items["Notebook"]["Archived"].skip_publish is True
+
+        publish.publish_all_items(workspace, folder_path_to_include=["/archive"])
+        assert workspace.repository_items["Notebook"]["Archived"].skip_publish is False
+        assert workspace.repository_items["Notebook"]["Active"].skip_publish is True
 
 
 def test_publish_ontology_item(mock_endpoint, temp_workspace_dir):
@@ -420,7 +629,14 @@ def test_unpublish_feature_flag_warnings(mock_endpoint, temp_workspace_dir, capl
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
             repository_directory=str(temp_workspace_dir),
-            item_type_in_scope=["Lakehouse", "Warehouse", "SQLDatabase", "CosmosDBDatabase", "Eventhouse", "GraphModel"],
+            item_type_in_scope=[
+                "Lakehouse",
+                "Warehouse",
+                "SQLDatabase",
+                "CosmosDBDatabase",
+                "Eventhouse",
+                "GraphModel",
+            ],
             token_credential=DummyTokenCredential(),
         )
 

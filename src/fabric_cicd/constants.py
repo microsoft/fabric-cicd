@@ -10,7 +10,7 @@ from fabric_cicd._common._validate_env_vars import VALID_GUID_REGEX as VALID_GUI
 from fabric_cicd._common._validate_env_vars import validate_env_var_api_url
 
 # General
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 DEFAULT_GUID = "00000000-0000-0000-0000-000000000000"
 FEATURE_FLAG = set()
 VALID_ENABLE_FLAGS = ["1", "true", "yes"]
@@ -68,6 +68,8 @@ class ItemType(str, Enum):
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
     NOTEBOOK = "Notebook"
     ONTOLOGY = "Ontology"
+    ORG_APP = "OrgApp"
+    ORG_APP_AUDIENCE = "OrgAppAudience"
     PAGINATED_REPORT = "PaginatedReport"
     REFLEX = "Reflex"
     REPORT = "Report"
@@ -113,6 +115,8 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     29: ItemType.ML_EXPERIMENT,
     30: ItemType.MAP,
     31: ItemType.GRAPH_MODEL,
+    32: ItemType.ORG_APP,
+    33: ItemType.ORG_APP_AUDIENCE,
 }
 
 
@@ -157,6 +161,8 @@ class FeatureFlag(str, Enum):
     """Set to enable hard deletion of items, bypassing the workspace recycle bin."""
     ENABLE_BULK_PUBLISH = "enable_bulk_publish"
     """Set to enable publishing of items using the bulk import API."""
+    ENABLE_PURGE_DATA = "enable_purge_data"
+    """Set to allow purging a Semantic Model's existing data when applying a definition update."""
 
 
 class OperationType(str, Enum):
@@ -224,6 +230,12 @@ SENSITIVE_RESPONSE_HEADERS = frozenset({
 })
 
 # Publish
+
+# Item types whose folder location is managed by a parent and cannot move independently
+NON_MOVABLE_ITEM_TYPES = [
+    ItemType.ORG_APP_AUDIENCE.value,
+]
+
 SHELL_ONLY_PUBLISH = [
     ItemType.LAKEHOUSE.value,
     ItemType.WAREHOUSE.value,
@@ -243,6 +255,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.REPORT.value: r".*\.pbi[/\\].*",
     ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
     ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
+    ItemType.ORG_APP.value: r".*\.children[/\\].*",
 }
 
 # API Format Mapping for item types that require specific API formats
@@ -263,6 +276,7 @@ DATAFLOW_SOURCE_REGEX = (
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
+ORG_APP_AUDIENCE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.OrgApp/\.children(?:/.*)?$"
 DYNAMIC_VARIABLES_REGEX = r"^\$(workspace|items)\."
 
 # Well known file names
@@ -286,6 +300,7 @@ PROPERTY_PATH_ATTR_MAPPING = {
     },
     ItemType.SQL_DATABASE.value: {
         "sqlendpoint": "body/properties/serverFqdn",
+        "sqlendpointfqdn": "body/properties/serverFqdn",
     },
     ItemType.EVENTHOUSE.value: {
         "queryserviceuri": "body/properties/queryServiceUri",
@@ -293,14 +308,16 @@ PROPERTY_PATH_ATTR_MAPPING = {
 }
 
 # Attributes that require waits between publish tiers. Excludes immediately available "id".
-ASYNC_PROVISIONED_ATTRIBUTES = frozenset({"sqlendpoint", "sqlendpointid", "queryserviceuri"})
+ASYNC_PROVISIONED_ATTRIBUTES = frozenset({"sqlendpoint", "sqlendpointfqdn", "sqlendpointid", "queryserviceuri"})
 
 # Parameter file configs
 PARAMETER_FILE_NAME = "parameter.yml"
+# Allowed YAML file extensions for key_value_replace parameterization
+YAML_FILE_EXTENSIONS = (".yml", ".yaml")
 # Parameters to validate
 PARAM_NAMES = ["find_replace", "key_value_replace", "spark_pool", "semantic_model_binding"]
 
-ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointid", "queryserviceuri"]
+ITEM_ATTR_LOOKUP = ["id", "sqlendpoint", "sqlendpointfqdn", "sqlendpointid", "queryserviceuri"]
 ITEM_VARIABLE_PREFIX = "$items."
 WORKSPACE_VARIABLE_PREFIX = "$workspace."
 ENVIRONMENT_VARIABLE_PREFIX = "$ENV:"
