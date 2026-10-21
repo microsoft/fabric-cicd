@@ -69,6 +69,16 @@
 - If you are using connections and expect them to change between different environments, then those need to be parameterized in the `parameter.yml` file.
 - The **executing identity** of the deployment must have access to the connections, or the deployment will fail.
 
+## Deployment Plan
+
+- **Parameterization:**
+    - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Application:**
+    - Applying a deployment plan deploys items in the order specified in the plan and runs the intermediate actions it defines.
+    - Publishing a deployment plan item does not automatically apply it. To apply it during publishing, specify its exact display name using the `publish.deployment_plan` configuration field or the optional `deployment_plan` argument to [`publish_all_items()`](code_reference.md#fabric_cicd.publish_all_items).
+    - Applying a plan requires **bulk publish mode**, and the selected plan must be included in the items being published.
+    - See [Deployment Plan Option](../how_to/config_deployment.md#deployment-plan-option) for configuration details and limitations.
+
 ## Environment
 
 - **Parameterization:**

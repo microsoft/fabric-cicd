@@ -1,0 +1,17 @@
+$schema: https://developer.microsoft.com/json-schemas/fabric/item/deploymentPlan/definition/plan/1.0.0/schema.json
+version: 1.0.0
+groups:
+  - name: PL A_Pipeline
+    logicalId: 37e55883-b63a-805d-4391-3a8fd1ffefd4
+    preActions:
+      - name: Hello World_SynapseNotebook
+        job:
+          type: Execute
+          logicalId: 3972f826-a2c1-94ed-48b0-c961176fca37
+  - name: Lakehouse_1_Lakehouse
+    logicalId: 1a24d15e-a3db-4fbc-8780-f54a7457a239
+    postActions:
+      - name: PL A_Pipeline
+        job:
+          type: Execute
+          logicalId: 37e55883-b63a-805d-4391-3a8fd1ffefd4

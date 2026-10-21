@@ -1,0 +1,62 @@
+[
+  {
+    "name": "contributor",
+    "kind": "Policy",
+    "decisionRules": [
+      {
+        "effect": "Permit",
+        "permission": [
+          {
+            "attributeName": "Path",
+            "attributeValueIncludedIn": [
+              "*"
+            ]
+          },
+          {
+            "attributeName": "Action",
+            "attributeValueIncludedIn": [
+              "Read",
+              "ReadWrite"
+            ]
+          }
+        ]
+      }
+    ],
+    "members": {
+      "fabricItemMembers": []
+    }
+  },
+  {
+    "name": "DefaultReader",
+    "kind": "Policy",
+    "decisionRules": [
+      {
+        "effect": "Permit",
+        "permission": [
+          {
+            "attributeName": "Action",
+            "attributeValueIncludedIn": [
+              "Read"
+            ]
+          },
+          {
+            "attributeName": "Path",
+            "attributeValueIncludedIn": [
+              "*"
+            ]
+          }
+        ]
+      }
+    ],
+    "members": {
+      "fabricItemMembers": [
+        {
+          "itemAccess": [
+            "ReadAll"
+          ],
+          "sourcePath": "00000000-0000-0000-0000-000000000000/00000000-0000-0000-0000-000000000000"
+        }
+      ]
+    }
+  }
+]

@@ -123,6 +123,9 @@ The `publish` section is optional and controls item publishing behavior. If this
 
 ```yaml
 publish:
+    # Optional - name of the DeploymentPlan to apply (bulk publish mode only)
+    deployment_plan: <plan_name>
+
     # Optional - pattern to exclude items from publishing (no feature flag required)
     exclude_regex: <regex_pattern_string>
 
@@ -151,6 +154,11 @@ publish:
 
 ```yaml
 publish:
+    # Optional - select a different deployment plan for each environment
+    deployment_plan:
+        <env_1>: <plan_name_1>
+        <env..>: <plan_name..>
+
     # Optional - pattern to exclude items from publishing
     exclude_regex:
         <env_1>: <regex_pattern_string_1>
@@ -188,6 +196,16 @@ publish:
         <env_1>: <bool_value>
         <env..>: <bool_value>
 ```
+
+#### Deployment Plan Option
+
+To apply a deployment plan during publishing, set `publish.deployment_plan` to the exact display name of a deployment plan item in the repository. Specify a non-empty string or an environment-specific mapping, as shown above.
+
+!!! note
+
+    - This option currently requires **bulk publish mode**, with both the `enable_bulk_publish` and `enable_experimental_features` flags enabled.
+    - `DeploymentPlan` must be included in `core.item_types_in_scope`, and the selected plan must not be excluded by publish filters.
+    - Deployment plans cannot be applied automatically in standard publish mode or in bulk publish mode when parameter dependencies require multiple batches.
 
 ### Unpublish Settings
 

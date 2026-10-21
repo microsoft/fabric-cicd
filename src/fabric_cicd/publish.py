@@ -6,7 +6,6 @@
 import logging
 from typing import Optional
 
-import dpath
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
@@ -19,15 +18,17 @@ from fabric_cicd._common._config_utils import (
     load_config_file,
 )
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
+from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
+    validate_deployment_plan,
     validate_environment,
     validate_fabric_workspace_obj,
     validate_folder_path_exclude_regex,
     validate_folder_path_to_include,
     validate_items_to_include,
     validate_shortcut_exclude_regex,
+    validate_workspace_capacity,
 )
 from fabric_cicd._items._bulk_publish_dependencies import has_unfiltered_items_variable
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -43,6 +44,7 @@ def publish_all_items(
     folder_path_to_include: Optional[list[str]] = None,
     items_to_include: Optional[list[str]] = None,
     shortcut_exclude_regex: Optional[str] = None,
+    deployment_plan: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
@@ -54,6 +56,7 @@ def publish_all_items(
         folder_path_to_include: List of folder paths in the format "/folder_name"; only the specified folders and their items will be published.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
         shortcut_exclude_regex: Regex pattern to exclude specific shortcuts from being published in lakehouses.
+        deployment_plan: Name of the repository Deployment Plan item that is applied to the deployment. Supported in bulk publish mode only.
 
     Returns:
         Dict containing all API responses if the ``enable_response_collection`` feature flag is enabled
@@ -179,7 +182,7 @@ def publish_all_items(
         >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
         >>> print(notebook_response["status_code"])  # e.g., 200
 
-        With get_changed_items (deploy only git-changed items)
+        With `get_changed_items` (deploy only git-changed items)
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
         >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
@@ -191,36 +194,41 @@ def publish_all_items(
         >>> changed = get_changed_items(workspace.repository_directory)
         >>> if changed:
         ...     publish_all_items(workspace, items_to_include=changed)
+
+        With a deployment plan
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_bulk_publish")
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["Notebook", "DataPipeline", "Lakehouse", "Environment"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
+        ... )
+        >>> publish_all_items(workspace, deployment_plan="deployment_plan_ppe")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    # Publish selections are per-call options, not persistent workspace state.
-    # Clear them before applying the options supplied for this invocation.
+    # Reset per-call publish selections
     fabric_workspace_obj.publish_item_name_exclude_regex = None
     fabric_workspace_obj.publish_folder_path_exclude_regex = None
     fabric_workspace_obj.publish_folder_path_to_include = None
     fabric_workspace_obj.items_to_include = None
     fabric_workspace_obj.shortcut_exclude_regex = None
+    fabric_workspace_obj.deployment_plan = None
+
+    # Reset bulk publish flag for each publish execution
+    fabric_workspace_obj.bulk_publish_enabled = False
 
     # Initialize response collection if feature flag is enabled
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
         fabric_workspace_obj.responses = {}
 
-    # Check if workspace has assigned capacity, if not, exit
-    has_assigned_capacity = None
-    response_state = fabric_workspace_obj.endpoint.invoke(
-        method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
-    )
-    has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
-    if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
-        set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
-    ):
-        msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
-        raise FailedPublishedItemStatusError(msg, logger)
+    # Validate workspace capacity before proceeding with the publish operation
+    validate_workspace_capacity(fabric_workspace_obj)
 
-    # Reset bulk publish flag to False for each publish execution; it will be set to True if conditions are met for bulk publish
-    fabric_workspace_obj.bulk_publish_enabled = False
     # Determine publishing mode path (standard vs. bulk) based on feature flags and input parameters
     if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
         if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
@@ -232,8 +240,7 @@ def publish_all_items(
         if unsupported:
             reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
 
-        # Dynamic replacement variables are supported in bulk mode via staged publishing, EXCEPT
-        # when an $items.* replace_value has no file filter — dependency scope cannot be narrowed, so fall back to standard deployment in that case only
+        # Fall back to standard deployment when unfiltered $items.* values prevent dependency scoping
         if (
             not unsupported
             and fabric_workspace_obj.contains_param_item_vars
@@ -250,6 +257,9 @@ def publish_all_items(
 
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
+            # Validate and assign it to the workspace object, if provided
+            if deployment_plan is not None:
+                fabric_workspace_obj.deployment_plan = validate_deployment_plan(deployment_plan)
 
     # Apply selective deployment features
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
@@ -599,6 +609,7 @@ def deploy_with_config(  # noqa: D417
                     folder_path_to_include=publish_settings.get("folder_path_to_include"),
                     items_to_include=publish_settings.get("items_to_include"),
                     shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+                    deployment_plan=publish_settings.get("deployment_plan"),
                 )
             else:
                 logger.info(f"Skipping publish operation for environment '{environment}'")

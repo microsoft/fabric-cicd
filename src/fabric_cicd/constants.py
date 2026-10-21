@@ -53,6 +53,7 @@ class ItemType(str, Enum):
     DATA_BUILD_TOOL_JOB = "DataBuildToolJob"
     DATA_PIPELINE = "DataPipeline"
     DATAFLOW = "Dataflow"
+    DEPLOYMENT_PLAN = "DeploymentPlan"
     ENVIRONMENT = "Environment"
     EVENTHOUSE = "Eventhouse"
     EVENTSTREAM = "Eventstream"
@@ -117,6 +118,7 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     31: ItemType.GRAPH_MODEL,
     32: ItemType.ORG_APP,
     33: ItemType.ORG_APP_AUDIENCE,
+    34: ItemType.DEPLOYMENT_PLAN,
 }
 
 
@@ -457,6 +459,7 @@ CONFIG_SECTIONS = {
     "publish": {
         "type": dict,
         "settings": [
+            "deployment_plan",
             "exclude_regex",
             "folder_exclude_regex",
             "folder_path_to_include",
