@@ -2623,6 +2623,85 @@ def empty_parameter(tmp_path):
     return Parameter(repository_directory=tmp_path, item_type_in_scope=["Notebook"], environment="DEV")
 
 
+def test_semantic_model_parameter_is_converted_to_find_replace(tmp_path):
+    parameter_file = tmp_path / "parameter.yml"
+    parameter_file.write_text(
+        """
+find_replace:
+  - find_value: existing
+    replace_value:
+      DEV: replacement
+semantic_model_parameter:
+  - semantic_model_name: MyModel
+    parameter_name: my.Parameter
+    parameter_value:
+      DEV: mytestserver
+      PROD: prodserver
+"""
+    )
+
+    parameter = Parameter(tmp_path, ["SemanticModel"], "DEV")
+
+    assert parameter._validate_parameter_file() is True
+    assert "semantic_model_parameter" not in parameter.environment_parameter
+    assert parameter.environment_parameter["find_replace"] == [
+        {"find_value": "existing", "replace_value": {"DEV": "replacement"}},
+        {
+            "find_value": (r"expression my\.Parameter\s*=\s*(.+?)\s+meta\s+\[IsParameterQuery\s*=\s*true\s*,"),
+            "replace_value": {"DEV": '"mytestserver"', "PROD": '"prodserver"'},
+            "is_regex": "true",
+            "item_name": "MyModel",
+            "file_path": "**/expressions.tmdl",
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    "semantic_model_parameter",
+    [
+        {"semantic_model_name": "MyModel", "parameter_name": "myParameter"},
+        {
+            "semantic_model_name": "MyModel",
+            "parameter_name": "myParameter",
+            "parameter_value": {"DEV": "value"},
+            "unexpected": "value",
+        },
+        {"semantic_model_name": "MyModel", "parameter_name": 123, "parameter_value": {"DEV": "value"}},
+    ],
+)
+def test_semantic_model_parameter_validation_rejects_invalid_entries(empty_parameter, semantic_model_parameter):
+    empty_parameter.environment_parameter = {"semantic_model_parameter": [semantic_model_parameter]}
+
+    assert empty_parameter._validate_parameter_file() is False
+
+
+def test_semantic_model_parameter_formats_scalar_values(empty_parameter):
+    empty_parameter.environment_parameter = {
+        "semantic_model_parameter": [
+            {
+                "semantic_model_name": "MyModel",
+                "parameter_name": "MyParameter",
+                "parameter_value": {
+                    "STRING": "value",
+                    "RAW": "#date(2026, 8, 4)",
+                    "NUMBER": 42,
+                    "FLOAT": 1.5,
+                    "BOOLEAN": True,
+                },
+            }
+        ]
+    }
+
+    assert empty_parameter._validate_parameter_file() is True
+    assert empty_parameter.environment_parameter["find_replace"][0]["replace_value"] == {
+        "STRING": '"value"',
+        "RAW": "#date(2026, 8, 4)",
+        "NUMBER": "42",
+        "FLOAT": "1.5",
+        "BOOLEAN": "true",
+    }
+
+
 def test_validate_key_value_find_key_valid_dot_notation(empty_parameter):
     param = {"find_key": "$.server.host"}
     ok, msg = empty_parameter._validate_key_value_find_key(param)

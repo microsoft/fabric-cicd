@@ -54,6 +54,13 @@ spark_pool:
               type: "Capacity"
               name: "PROD-Pool-name"
 
+semantic_model_parameter:
+    - semantic_model_name: "MyModel"
+      parameter_name: "myParameter"
+      parameter_value:
+          PPE: "my-ppe-server"
+          PROD: "my-prod-server"
+
 semantic_model_binding:
     default:
         connection_id:
@@ -149,6 +156,31 @@ spark_pool:
       # Optional field: value must be a string or array of strings
       item_name: <item-name-filter-value>
 ```
+
+### `semantic_model_parameter`
+
+Replaces the value of a Power Query parameter in a semantic model for the target environment. Specify the semantic model, the parameter name, and its value for each environment. Internally, this is translated to a regex-based `find_replace` entry scoped to the model's `expressions.tmdl` file.
+
+```yaml
+semantic_model_parameter:
+    - semantic_model_name: "MyModel"
+      parameter_name: "myParameter"
+      parameter_value:
+          TEST: "mytestserver"
+          PROD: "prodserver"
+    - semantic_model_name: "MyModel"
+      parameter_name: "MaxRows"
+      parameter_value:
+          TEST: 100
+          PROD: 1000
+    - semantic_model_name: "MyModel"
+      parameter_name: "StartDate"
+      parameter_value:
+          TEST: "#date(2026, 8, 4)"
+          PROD: "#date(2026, 9, 1)"
+```
+
+The matching TMDL expression must be marked as a parameter query, for example `expression DatabaseName = "MyLakehouse" meta [IsParameterQuery=true,`. Strings are written with quotes, while numeric and boolean values are written without quotes. String values beginning with `#` are treated as raw TMDL/M literals and are also written without quotes, such as `#date(2026, 8, 4)`. The expression and metadata remain unchanged, and parameter names containing regex characters are treated literally.
 
 ### `semantic_model_binding`
 
