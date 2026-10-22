@@ -206,13 +206,21 @@ def test_bind_item_connections_failure_records_one_failure_per_connection_id():
     assert other_id in failures[1]
 
 
-def test_bind_skip_for_model_without_existing_connections_is_not_a_failure():
+def test_bind_skip_for_model_without_existing_connections_is_not_a_failure(caplog):
     workspace = _make_workspace("ModelA")
     workspace.endpoint.invoke.side_effect = _endpoint(item_connections=[])
 
-    failures = bind_semanticmodel_to_connection(workspace, _make_connections(GOOD_ID), {"ModelA": [GOOD_ID]})
+    with caplog.at_level("INFO"):
+        failures = bind_semanticmodel_to_connection(workspace, _make_connections(GOOD_ID), {"ModelA": [GOOD_ID]})
 
     assert failures == []
+    assert _post_calls(workspace) == []
+    # The skip is logged at INFO so a model that is never bound stays visible in the deployment log
+    assert any(
+        record.levelname == "INFO"
+        and "No existing connections found for semantic model 'ModelA'" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_bind_unknown_connection_on_excluded_model_is_not_a_failure():
@@ -273,8 +281,7 @@ def test_strict_flag_lists_every_failed_model_in_one_error():
 
     assert "ModelA" in str(error.value)
     assert "ModelB" in str(error.value)
-    # Turns out log formatter treats constants.INDENT as marker for indentation and thus drops the [error] tag.
-    # So message must not contain it.
+    # The log formatter drops the [error] label from messages containing INDENT ("->")
     assert constants.INDENT not in str(error.value)
 
 

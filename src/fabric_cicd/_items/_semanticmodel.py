@@ -219,8 +219,9 @@ def bind_semanticmodel_to_connection(
             from parameter.yml.  Values may be a single string or a list of strings.
 
     Returns:
-        A message per binding that did not happen for a deployed model. Excluded models and
-        models without existing connections are skipped and do not count as failures.
+        A message per binding that did not happen for a deployed model. Excluded models are
+        skipped. On a model without existing connections, valid connection IDs are skipped, and a
+        connection ID that is not found still counts as a failure.
     """
     item_type = ItemType.SEMANTIC_MODEL.value
     failures = []
@@ -277,7 +278,7 @@ def bind_semanticmodel_to_connection(
             continue
 
         if not connections_data:
-            logger.debug(f"No existing connections found for semantic model '{model_name}', skipping binding")
+            logger.info(f"No existing connections found for semantic model '{model_name}', skipping binding")
             continue
 
         # Bind each connection ID to the model; an error on one ID does not abort the remaining IDs
