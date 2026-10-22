@@ -16,14 +16,15 @@ append_feature_flag("<specific_flag>")
 
 <span class="md-h3-nonanchor">Publish behavior</span>
 
-| Flag Name                                 | Description                                                                                                                                                                                            | Experimental |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
-| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                                                         | ☑️           |
-| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                                                                    |              |
-| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                                                       |              |
-| `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward                                     |              |
-| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                                                                |              |
-| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                                                                                                                              |              |
+| Flag Name                                 | Description                                                                                                                                                                                        | Experimental |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                                                     | ☑️           |
+| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                                                                |              |
+| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                                                   |              |
+| `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward                                  |              |
+| `enable_eventstream_source_pause`         | Pause an Eventstream's running sources before applying a definition update and resume them afterward; required when a source is backed by a private endpoint (Fabric otherwise rejects the update) |              |
+| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                                                            |              |
+| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                                                                                                                          |              |
 
 <span class="md-h3-nonanchor">Unpublish behavior</span>
 
