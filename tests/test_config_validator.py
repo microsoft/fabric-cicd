@@ -1558,7 +1558,7 @@ class TestConfigValidatorUtilityFunctions:
         fields = _get_config_fields(config)
 
         # Should return all fields from all sections
-        assert len(fields) == 16  # Updated count with folder_exclude_regex and shortcut_exclude_regex
+        assert len(fields) == 17
 
         # Check some specific fields
         field_names = [field[1] for field in fields]
@@ -1567,6 +1567,7 @@ class TestConfigValidatorUtilityFunctions:
         assert "parameter" in field_names
         assert "folder_exclude_regex" in field_names
         assert "shortcut_exclude_regex" in field_names
+        assert "deployment_plan" in field_names
         assert "features" in field_names
         assert "constants" in field_names
 

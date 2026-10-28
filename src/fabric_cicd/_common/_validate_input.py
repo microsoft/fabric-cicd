@@ -12,10 +12,11 @@ import re
 from pathlib import Path
 from typing import Optional
 
+import dpath
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd.constants as constants
-from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd.constants import FeatureFlag, OperationType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -147,6 +148,19 @@ def validate_fabric_workspace_obj(input_value: FabricWorkspace) -> FabricWorkspa
     return input_value
 
 
+def validate_workspace_capacity(fabric_workspace_obj: FabricWorkspace) -> None:
+    """Require assigned capacity unless all item types in scope are exempt."""
+    response_state = fabric_workspace_obj.endpoint.invoke(
+        method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
+    )
+    has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
+    if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
+        set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
+    ):
+        msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
+        raise FailedPublishedItemStatusError(msg, logger)
+
+
 def validate_token_credential(input_value: TokenCredential) -> TokenCredential:
     """
     Validate the token credential.
@@ -155,6 +169,22 @@ def validate_token_credential(input_value: TokenCredential) -> TokenCredential:
         input_value: The input value to validate.
     """
     validate_data_type("TokenCredential", "credential", input_value)
+
+    return input_value
+
+
+def validate_deployment_plan(input_value: str) -> str:
+    """
+    Validate the deployment plan name.
+
+    Args:
+        input_value: The input value to validate.
+    """
+    validate_data_type("string", "deployment_plan", input_value)
+
+    if not input_value.strip():
+        msg = "'deployment_plan' must be a non-empty string."
+        raise InputError(msg, logger)
 
     return input_value
 

@@ -27,6 +27,7 @@ from fabric_cicd._items._bulk_publish_dependencies import (
     get_async_attributes_to_wait_for,
     has_unfiltered_items_variable,
 )
+from fabric_cicd._items._deploymentplans import set_deployment_plan
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -1517,6 +1518,7 @@ class TestBulkPublishStagedExecution:
         publisher.has_async_publish_check = False
 
         ws = MagicMock()
+        ws.deployment_plan = None
         ws.contains_param_item_vars = False  # skip graph build; batches are injected below
         ws._apply_publish_filters.return_value = False
         ws._dynamic_var_cache = {"$workspace.$id": "wsid", "$items.Notebook.base.$id": "stale"}
@@ -1574,6 +1576,7 @@ class TestBulkPublishStagedExecution:
         publisher.has_async_publish_check = False
 
         ws = MagicMock()
+        ws.deployment_plan = None
         ws.contains_param_item_vars = True
         ws._apply_publish_filters.return_value = False
         ws._dynamic_var_cache = {}
@@ -1781,3 +1784,169 @@ class TestBulkPublishPurgeData:
         options = bodies[0]["options"]
         assert options == {"allowPairingByName": True}
         assert "itemOptionsByLogicalId" not in options
+
+
+@pytest.mark.usefixtures("bulk_publish_flags")
+class TestBulkPublishDeploymentPlan:
+    """Tests for explicit deployment plan selection through the public API."""
+
+    @pytest.mark.parametrize("selection", ["out_of_scope", "filtered", "target_only"])
+    def test_applies_existing_plan_without_publishing_it(self, mock_endpoint, temp_workspace_dir, selection):
+        create_test_item_dir(temp_workspace_dir, None, "Notebook", "Notebook", "notebook-id")
+        if selection != "target_only":
+            create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
+        target_plan = {
+            "type": "DeploymentPlan",
+            "displayName": "Plan",
+            "description": "",
+            "id": "target-item-id",
+            "logicalId": "target-plan-id" if selection == "target_only" else None,
+        }
+        original_invoke = mock_endpoint.invoke.side_effect
+
+        def invoke(method, url, **kwargs):
+            if method == "GET" and url.endswith("/items"):
+                return {"body": {"value": [target_plan]}}
+            return original_invoke(method, url, **kwargs)
+
+        mock_endpoint.invoke.side_effect = invoke
+        bodies = capture_bulk_bodies(mock_endpoint)
+        refresh_deployed_items = FabricWorkspace._refresh_deployed_items
+        item_types = ["Notebook", "DeploymentPlan"] if selection == "filtered" else ["Notebook"]
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=item_types) as ws,
+            patch.object(ws, "_refresh_deployed_items", side_effect=lambda: refresh_deployed_items(ws)),
+        ):
+            if selection == "target_only":
+                with pytest.raises(InputError, match="must exist in the repository"):
+                    publish.publish_all_items(ws, deployment_plan="Plan")
+                assert bodies == []
+                return
+            publish.publish_all_items(
+                ws, deployment_plan="Plan", item_name_exclude_regex="^Plan$" if selection == "filtered" else None
+            )
+
+        assert len(bodies) == 1
+        assert get_bulk_part_names(bodies[0]) == {"Notebook"}
+        assert bodies[0]["options"]["deploymentPlan"] == {
+            "logicalId": "plan-id",
+            "referenceType": "ByLogicalId",
+        }
+
+    def test_resolves_plan_only_once(self, mock_endpoint, temp_workspace_dir):
+        create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DeploymentPlan"]) as ws,
+            patch(
+                "fabric_cicd._items._deploymentplans.set_deployment_plan", wraps=set_deployment_plan
+            ) as mock_set_plan,
+        ):
+            publish.publish_all_items(ws, deployment_plan="Plan")
+
+        mock_set_plan.assert_called_once()
+        assert bodies[0]["options"]["deploymentPlan"] == {
+            "logicalId": "plan-id",
+            "referenceType": "ByLogicalId",
+        }
+
+    def test_selects_plan_and_resets_selection_on_next_call(self, mock_endpoint, temp_workspace_dir):
+        create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
+        create_test_item_dir(temp_workspace_dir, None, "Other", "DeploymentPlan", "other-id")
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DeploymentPlan"]) as ws:
+            publish.publish_all_items(ws, deployment_plan="Other")
+            publish.publish_all_items(ws)
+
+        assert bodies[0]["options"] == {
+            "allowPairingByName": True,
+            "deploymentPlan": {"logicalId": "other-id", "referenceType": "ByLogicalId"},
+        }
+        assert bodies[1]["options"] == {"allowPairingByName": True}
+
+    @pytest.mark.parametrize(
+        ("name", "message"), [("Missing", "must exist in the repository"), ("Plan", "must be included")]
+    )
+    def test_rejects_missing_or_filtered_plan(self, mock_endpoint, temp_workspace_dir, name, message):
+        create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DeploymentPlan"]) as ws,
+            pytest.raises(InputError, match=message),
+        ):
+            publish.publish_all_items(ws, deployment_plan=name, item_name_exclude_regex="^Plan$")
+
+        assert bodies == []
+
+    @pytest.mark.parametrize(
+        ("name", "message"),
+        [
+            ("", "non-empty string"),
+            (" ", "non-empty string"),
+            (123, "not of type string"),
+            (False, "not of type string"),
+        ],
+    )
+    def test_rejects_invalid_plan_name(self, mock_endpoint, temp_workspace_dir, name, message):
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir) as ws,
+            pytest.raises(InputError, match=message),
+        ):
+            publish.publish_all_items(ws, deployment_plan=name)
+
+    def test_rejects_standard_publishing(self, mock_endpoint, temp_workspace_dir):
+        bodies = capture_bulk_bodies(mock_endpoint)
+        with (
+            extra_flags(),
+            patched_workspace(mock_endpoint, temp_workspace_dir) as ws,
+            patch.object(ws, "_publish_item") as mock_publish,
+        ):
+            constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_BULK_PUBLISH.value)
+            with pytest.raises(InputError, match="requires bulk publishing"):
+                publish.publish_all_items(ws, deployment_plan="Plan")
+
+        mock_publish.assert_not_called()
+        assert bodies == []
+
+    @pytest.mark.parametrize("reason", ["unsupported_type", "unfiltered_variable"])
+    def test_rejects_plan_when_bulk_falls_back_to_standard(self, mock_endpoint, temp_workspace_dir, reason):
+        item_type = "Warehouse" if reason == "unsupported_type" else "Notebook"
+        create_test_item_dir(temp_workspace_dir, None, "TestItem", item_type, "item-id")
+        if reason == "unfiltered_variable":
+            create_parameter_file(
+                temp_workspace_dir,
+                'find_replace:\n  - find_value: "some-id"\n    replace_value:\n      PPE: "$items.Notebook.TestItem.$id"\n',
+            )
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with (
+            patched_workspace(
+                mock_endpoint, temp_workspace_dir, item_type_in_scope=[item_type], environment="PPE"
+            ) as ws,
+            patch.object(ws, "_publish_item") as mock_publish,
+            pytest.raises(InputError, match="requires bulk publishing"),
+        ):
+            publish.publish_all_items(ws, deployment_plan="Plan")
+
+        assert ws.bulk_publish_enabled is False
+        assert ws.deployment_plan is None
+        mock_publish.assert_not_called()
+        assert bodies == []
+
+    def test_rejects_multiple_batches_before_publishing(self, mock_endpoint, temp_workspace_dir):
+        create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
+        bodies = capture_bulk_bodies(mock_endpoint)
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DeploymentPlan"]) as ws,
+            patch(
+                "fabric_cicd._items._bulk_publish_dependencies.compute_publish_batches",
+                return_value=[[], []],
+            ),
+            pytest.raises(InputError, match="Cannot apply 'deployment_plan' across multiple bulk publish batches"),
+        ):
+            publish.publish_all_items(ws, deployment_plan="Plan")
+
+        assert bodies == []

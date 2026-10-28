@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 
@@ -139,6 +140,7 @@ class FabricWorkspace:
         self.repository_directory: Path = validate_repository_directory(repository_directory)
         self.item_type_in_scope = validate_item_type_in_scope(item_type_in_scope)
         self.environment = validate_environment(environment)
+        self.deployment_plan: Optional[str] = None
         self.publish_item_name_exclude_regex = None
         self.publish_folder_path_exclude_regex = None
         self.publish_folder_path_to_include = None
@@ -911,7 +913,10 @@ class FabricWorkspace:
         return
 
     def _publish_items(
-        self, items_with_context: list[tuple[str, "Item", object]], skipped_items: Optional[list[str]] = None
+        self,
+        items_with_context: Sequence[tuple[str, "Item", object]],
+        skipped_items: Optional[list[str]] = None,
+        deployment_plan_options: Optional[dict[str, object]] = None,
     ) -> None:
         """
         Publishes or updates items in bulk via the bulk import API.
@@ -919,6 +924,7 @@ class FabricWorkspace:
         Args:
             items_with_context: A list of tuples containing item name, Item object, and publisher context required for processing the item files.
             skipped_items: Optional list of "Type: Name" strings for items skipped by publish filters.
+            deployment_plan_options: Dictionary of bulk import API options that may include a valid deployment plan.
         """
         # Prepare the definition parts for all items to be published in bulk
         definition_parts = []
@@ -933,14 +939,26 @@ class FabricWorkspace:
 
         logger.info(f"Publishing {len(items_with_context)} item(s) in bulk")
 
-        options = {"allowPairingByName": True}
+        options: dict[str, object] = {"allowPairingByName": True}
+        # Apply deployment plan options if provided
+        if deployment_plan_options is not None:
+            options.update(deployment_plan_options)
+
+        # Apply item options by logical ID if provided
         if item_options_by_logical_id:
             options["itemOptionsByLogicalId"] = item_options_by_logical_id
+
+        url = f"{self.base_api_url}/items/bulkImportDefinitions"
+        if "deploymentPlan" in options:
+            url += "?beta=true"
+            logger.info(
+                f"Deployment Plan '{self.deployment_plan}' will be executed as part of the bulk publish operation"
+            )
 
         # https://learn.microsoft.com/en-us/rest/api/fabric/core/items/bulk-import-item-definitions
         response = self.endpoint.invoke(
             method="POST",
-            url=f"{self.base_api_url}/items/bulkImportDefinitions",
+            url=url,
             body={
                 "definitionParts": definition_parts,
                 "options": options,

@@ -1,0 +1,8 @@
+kind: new-items
+body: Add support for Deployment Plan item
+time: 2026-10-21T13:04:12.9047518+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1138"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1138

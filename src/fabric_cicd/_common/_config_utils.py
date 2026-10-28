@@ -113,6 +113,7 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
 
         # Optional settings - validation logs debug if value not found for target environment
         settings_to_update = [
+            "deployment_plan",
             "exclude_regex",
             "folder_exclude_regex",
             "folder_path_to_include",
