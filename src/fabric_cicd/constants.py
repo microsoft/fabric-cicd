@@ -165,6 +165,8 @@ class FeatureFlag(str, Enum):
     """Set to allow purging a Semantic Model's existing data when applying a definition update."""
     ENABLE_STRICT_SEMANTIC_MODEL_BINDING = "enable_strict_semantic_model_binding"
     """Set to fail the deployment when a Semantic Model cannot be bound to its connection."""
+    ENABLE_EVENTSTREAM_SOURCE_PAUSE = "enable_eventstream_source_pause"
+    """Set to pause an Eventstream's running sources before applying a definition update and resume them afterward."""
 
 
 class OperationType(str, Enum):

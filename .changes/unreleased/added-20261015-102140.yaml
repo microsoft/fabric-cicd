@@ -1,0 +1,8 @@
+kind: added
+body: Add the `enable_eventstream_source_pause` feature flag to pause and resume active Eventstream sources around definition updates
+time: 2026-10-15T10:21:40.1713825+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1152"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1152
