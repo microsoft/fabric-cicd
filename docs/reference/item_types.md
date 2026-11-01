@@ -237,10 +237,10 @@
 
 ## Warehouse
 
-- **Full-definition publishing is the default.** Warehouse schema and shared queries are deployed from the Git-exported SQL project. Exactly one `.sqlproj` file is required; DACPAC format is not supported. See [Warehouse definition](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/warehouse-definition).
-- **Parameterization:** Standard `find_replace` and `key_value_replace` apply to text definition files, including SQL scripts and the SQL project.
-- **Breaking change / migration:** Re-export legacy Warehouse folders through Fabric Git integration and remove `metadata.creationPayload` from `.platform` to use full-definition publishing. Publishing now applies schema changes, not just metadata; review and validate schema changes before deploying to production.
-- **Legacy shell-only publishing:** Enable `enable_warehouse_shell_only_publish` to preserve the previous behavior for all Warehouses in the deployment. Only metadata is deployed, even when SQL project files are present; schema deployment must be managed separately. This mode accepts the legacy `.platform` creation payload for new Warehouses.
-- **Collation:** Full-definition creation uses the target workspace's default collation. Configure that setting before creating a Warehouse, or use shell-only publishing with a custom creation payload. Existing Warehouse collation cannot be changed by definition or metadata updates. See [Data Warehouse collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation).
-- **Dependencies:** Warehouse-to-Warehouse dependency ordering is not supported. Deploy referenced Warehouses first in separate deployment scopes when required.
+- **Parameterization:**
+    - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Deployment**:
+    - **Full-definition publish** is the default for Warehouse items. The schema and shared queries are deployed from the Git-exported files. Only SQL project format is supported; DACPAC format is not supported.
+    - **Legacy shell-only publishing** can be enabled via the `enable_warehouse_shell_only_publish` feature flag to preserve the previous behavior for all Warehouses in the deployment. Only metadata is deployed, even when SQL project files are present; schema deployment must be managed separately. This mode accepts the legacy `.platform` **creation payload** for new Warehouses.
+    - **Collation:** Full-definition creation uses the target workspace's default collation. Configure that setting before creating a Warehouse, or use shell-only publishing with a custom creation payload. Existing Warehouse collation cannot be changed by definition or metadata updates. See [Data Warehouse collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation).
 - **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.
