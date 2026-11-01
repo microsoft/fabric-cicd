@@ -127,6 +127,8 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of Lakehouses."""
     ENABLE_WAREHOUSE_UNPUBLISH = "enable_warehouse_unpublish"
     """Set to enable the deletion of Warehouses."""
+    ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH = "enable_warehouse_shell_only_publish"
+    """Set to publish only Warehouse metadata, preserving legacy creation payload support."""
     ENABLE_SQLDATABASE_UNPUBLISH = "enable_sqldatabase_unpublish"
     """Set to enable the deletion of SQL Databases."""
     ENABLE_EVENTHOUSE_UNPUBLISH = "enable_eventhouse_unpublish"
@@ -240,7 +242,6 @@ NON_MOVABLE_ITEM_TYPES = [
 
 SHELL_ONLY_PUBLISH = [
     ItemType.LAKEHOUSE.value,
-    ItemType.WAREHOUSE.value,
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,
 ]
@@ -262,6 +263,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
 
 # API Format Mapping for item types that require specific API formats
 API_FORMAT_MAPPING = {
+    ItemType.WAREHOUSE.value: "sqlproj",
     ItemType.SPARK_JOB_DEFINITION.value: "SparkJobDefinitionV2",
     ItemType.NOTEBOOK.value: "ipynb",
 }

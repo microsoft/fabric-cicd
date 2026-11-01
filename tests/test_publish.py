@@ -15,14 +15,15 @@ import pytest
 from fixtures.credentials import DummyTokenCredential
 
 import fabric_cicd.publish as publish
-from fabric_cicd import constants
+from fabric_cicd import append_feature_flag, constants, get_supported_feature_flags
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._items._notebook import NotebookPublisher
 from fabric_cicd._items._orgapp import OrgAppPublisher
 from fabric_cicd._items._orgappaudience import OrgAppAudiencePublisher
 from fabric_cicd._items._paginatedreport import PaginatedReportPublisher
-from fabric_cicd.constants import API_FORMAT_MAPPING, ItemType
+from fabric_cicd._items._warehouse import WarehousePublisher
+from fabric_cicd.constants import API_FORMAT_MAPPING, FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 # =============================================================================
@@ -109,6 +110,200 @@ def create_test_item(base_path: Path, folder: Optional[str], name: str, item_typ
 # =============================================================================
 # Basic Publishing Tests
 # =============================================================================
+
+
+@pytest.fixture
+def warehouse_workspace(mock_endpoint, temp_workspace_dir, monkeypatch):
+    """Create deterministic SQL project files and a workspace with mocked APIs."""
+    monkeypatch.setattr(
+        constants,
+        "FEATURE_FLAG",
+        constants.FEATURE_FLAG - {FeatureFlag.ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH.value},
+    )
+    item_dir = create_test_item(
+        temp_workspace_dir, None, "TestWarehouse", "Warehouse", "11111111-1111-1111-1111-111111111111"
+    )
+    (item_dir / "sqldw.sqlproj").write_text(
+        '<Project><Sdk Name="Microsoft.Build.Sql" Version="2.3.0" /></Project>', encoding="utf-8"
+    )
+    tables_dir = item_dir / "dbo" / "Tables"
+    tables_dir.mkdir(parents=True)
+    (tables_dir / "Table1.sql").write_text("CREATE TABLE dbo.Table1 (Id int);", encoding="utf-8")
+    queries_dir = item_dir / ".sharedqueries"
+    queries_dir.mkdir()
+    (queries_dir / "query.sql").write_text("SELECT * FROM dbo.Table1;", encoding="utf-8")
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=["Warehouse"],
+            token_credential=DummyTokenCredential(),
+        )
+        workspace._refresh_repository_items()
+        mock_endpoint.invoke.reset_mock()
+        yield workspace
+
+
+@pytest.mark.parametrize("deployed", [False, True])
+def test_warehouse_publishes_sql_project_definition(warehouse_workspace, mock_endpoint, deployed):
+    """The default creates or updates the complete SQL project through the generic pipeline."""
+    workspace = warehouse_workspace
+    item = workspace.repository_items["Warehouse"]["TestWarehouse"]
+    if deployed:
+        item.guid = "22222222-2222-2222-2222-222222222222"
+
+    with (
+        patch.object(workspace, "_refresh_repository_items"),
+        patch.object(workspace, "_replace_logical_ids", side_effect=lambda contents: contents) as logical_ids,
+        patch.object(
+            workspace, "_replace_parameters", side_effect=lambda file, _item: file.contents.replace("Table1", "Table2")
+        ) as parameters,
+        patch.object(
+            workspace, "_replace_workspace_ids", side_effect=lambda contents, _item: contents
+        ) as workspace_ids,
+    ):
+        publish.publish_all_items(workspace)
+
+    api_calls = [call for call in mock_endpoint.invoke.call_args_list if call.kwargs.get("method") in {"POST", "PATCH"}]
+    assert len(api_calls) == 1
+    request = api_calls[0].kwargs
+    assert request["method"] == "POST"
+    if deployed:
+        assert request["url"].endswith(f"/items/{item.guid}/updateDefinition?updateMetadata=True")
+        assert set(request["body"]) == {"definition"}
+    else:
+        assert request["url"].endswith("/items")
+        assert request["body"]["displayName"] == item.name
+        assert request["body"]["description"] == item.description
+        assert item.guid == "mock-item-id"
+    assert "creationPayload" not in request["body"]
+    definition = request["body"]["definition"]
+    assert definition["format"] == "sqlproj"
+    parts = {part["path"]: base64.b64decode(part["payload"]).decode() for part in definition["parts"]}
+    assert "sqldw.sqlproj" in parts
+    assert parts["dbo/Tables/Table1.sql"] == "CREATE TABLE dbo.Table2 (Id int);"
+    assert parts[".sharedqueries/query.sql"] == "SELECT * FROM dbo.Table2;"
+    assert ".platform" in parts
+    assert all(part["payloadType"] == "InlineBase64" for part in definition["parts"])
+    assert parameters.call_count == logical_ids.call_count == workspace_ids.call_count == len(parts) - 1
+    assert ItemType.WAREHOUSE.value not in constants.SHELL_ONLY_PUBLISH
+
+
+@pytest.mark.parametrize("creation_payload", [None, {}, {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}])
+def test_warehouse_default_rejects_legacy_creation_payload(warehouse_workspace, mock_endpoint, creation_payload):
+    """Presence of the legacy key must not silently discard collation or skip schema deployment."""
+    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    platform = next(file for file in item.item_files if file.name == ".platform")
+    contents = json.loads(platform.contents)
+    contents["metadata"]["creationPayload"] = creation_payload
+    platform.contents = json.dumps(contents)
+
+    with pytest.raises(InputError, match="enable_warehouse_shell_only_publish"):
+        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("project_count", [0, 2])
+def test_warehouse_default_requires_one_sql_project(warehouse_workspace, mock_endpoint, project_count):
+    """Missing and ambiguous SQL projects fail before issuing a deployment request."""
+    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    project = next(file for file in item.item_files if file.name == "sqldw.sqlproj")
+    item.item_files = [file for file in item.item_files if file is not project] + [project] * project_count
+
+    with pytest.raises(InputError, match=f"found {project_count}"):
+        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_not_called()
+
+
+def test_warehouse_default_rejects_dacpac(warehouse_workspace, mock_endpoint):
+    """Compiled artifacts must not opt a Git SQL project into DACPAC deployment."""
+    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    artifact = MagicMock()
+    artifact.file_path = Path("sqldw.dacpac")
+    artifact.relative_path = "sqldw.dacpac"
+    item.item_files.append(artifact)
+
+    with pytest.raises(InputError, match="Only Git-exported sqlproj"):
+        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("deployed", [False, True])
+@pytest.mark.parametrize("has_project", [False, True])
+@pytest.mark.parametrize("has_creation_payload", [False, True])
+def test_warehouse_shell_only_flag_preserves_legacy_behavior(
+    warehouse_workspace, mock_endpoint, caplog, deployed, has_project, has_creation_payload
+):
+    """The compatibility flag creates with collation or updates metadata without a definition."""
+    flag = FeatureFlag.ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH.value
+    assert flag in get_supported_feature_flags()
+    append_feature_flag(flag)
+    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    creation_payload = {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}
+    if has_creation_payload:
+        platform = next(file for file in item.item_files if file.name == ".platform")
+        contents = json.loads(platform.contents)
+        contents["metadata"]["creationPayload"] = creation_payload
+        platform.contents = json.dumps(contents)
+    if not has_project:
+        item.item_files = [file for file in item.item_files if file.name == ".platform"]
+    if deployed:
+        item.guid = "22222222-2222-2222-2222-222222222222"
+
+    with patch.object(warehouse_workspace, "_replace_parameters") as parameters:
+        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_called_once()
+    request = mock_endpoint.invoke.call_args.kwargs
+    assert request["method"] == ("PATCH" if deployed else "POST")
+    assert request["url"].endswith(f"/items/{item.guid}" if deployed else "/items")
+    assert "definition" not in request["body"]
+    assert request["body"]["displayName"] == item.name
+    assert request["body"]["description"] == item.description
+    if has_creation_payload and not deployed:
+        assert request["body"]["creationPayload"] == creation_payload
+    else:
+        assert "creationPayload" not in request["body"]
+    parameters.assert_not_called()
+    assert "SQL project definitions are not deployed" in caplog.text
+    assert "cannot change the collation of existing Warehouses" in caplog.text
+
+
+@pytest.mark.parametrize("shell_only", [False, True])
+def test_warehouse_excluded_items_skip_validation_and_warning(warehouse_workspace, mock_endpoint, caplog, shell_only):
+    """Exclusion filters still skip legacy folders even with default definition publishing."""
+    if shell_only:
+        append_feature_flag(FeatureFlag.ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH.value)
+    workspace = warehouse_workspace
+    workspace.publish_item_name_exclude_regex = "TestWarehouse"
+    item = workspace.repository_items["Warehouse"]["TestWarehouse"]
+    item.item_files = []
+
+    WarehousePublisher(workspace).publish_one(item.name, item)
+
+    assert item.skip_publish
+    mock_endpoint.invoke.assert_not_called()
+    assert "SQL project definitions are not deployed" not in caplog.text
+
+
+def test_warehouse_definition_api_failure_is_propagated(warehouse_workspace, mock_endpoint):
+    """A failed definition request must not fall back to shell-only publishing."""
+    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    mock_endpoint.invoke.side_effect = RuntimeError("Definition deployment failed")
+
+    with pytest.raises(RuntimeError, match="Definition deployment failed"):
+        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -295,7 +490,9 @@ def test_publish_filters_do_not_leak_between_calls(mock_endpoint, temp_workspace
     with (
         patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
         patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
-        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
     ):
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
@@ -330,7 +527,9 @@ def test_folder_filters_do_not_leak_when_switching_selection(mock_endpoint, temp
     with (
         patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
         patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
-        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
     ):
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",

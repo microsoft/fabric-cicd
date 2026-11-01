@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Change
+
+- Publish Warehouse SQL project definitions by default instead of only item metadata. Git-exported `.sqlproj` files are required, and legacy `.platform` creation payloads must be removed. Enable `enable_warehouse_shell_only_publish` to retain metadata-only publishing and creation-time collation configuration; this mode does not deploy schema changes or change existing collation.
+
 ## [v1.4.0](https://pypi.org/project/fabric-cicd/1.4.0) - October 07, 2026
 
 ### 🆕 New Items Support
