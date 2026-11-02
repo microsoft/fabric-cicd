@@ -320,6 +320,7 @@ def test_flag_on_only_running_sources_are_paused():
     assert any(url.endswith("/sources/running-1/pause") for url in urls)
     assert not any(url.endswith("/sources/stopped-1/pause") for url in urls)
     assert any(url.endswith("/sources/running-1/resume") for url in urls)
+    assert not any(url.endswith("/sources/stopped-1/resume") for url in urls)
 
 
 def test_flag_on_publish_fails_sources_are_still_resumed():
