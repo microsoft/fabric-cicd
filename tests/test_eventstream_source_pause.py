@@ -373,6 +373,7 @@ def test_resume_failures_are_reported_without_masking_publish_error(publish_fail
 def test_multiple_resume_failures_are_reported_without_masking_original_error(
     publish_mode, publish_fails, orchestration_publisher, mocker, caplog
 ):
+    """Standard and bulk publishing report every resume failure without replacing primary publish errors."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     publisher, workspace = orchestration_publisher
     workspace.bulk_publish_enabled = publish_mode == "bulk"
@@ -436,6 +437,7 @@ def test_multiple_resume_failures_are_reported_without_masking_original_error(
 
 
 def test_eventstream_cleanup_collects_each_resume_failure(mocker):
+    """Cleanup attempts every resume, clears tracked sources, and aggregates only the failed actions."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     publisher, workspace = _make_publisher()
     sources = [{"id": "source-1"}, {"id": "source-2"}, {"id": "source-3"}]

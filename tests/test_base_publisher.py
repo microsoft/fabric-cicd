@@ -71,6 +71,7 @@ def shortcut_publish_enabled():
     ids=["custom", "non-custom"],
 )
 def test_publish_error_names_post_publish_failure_when_both_fail(hook_error_factory):
+    """Combined failures retain item errors and chain the custom or non-custom post-publish error."""
     hook_error = hook_error_factory()
     publisher = _StubPublisher(["LakehouseA"], hook_error)
 
@@ -87,6 +88,7 @@ def test_publish_error_names_post_publish_failure_when_both_fail(hook_error_fact
 
 
 def test_publish_error_keeps_additional_info_of_post_publish_failure():
+    """The combined publish error retains request details from the post-publish failure."""
     # FabricEndpoint.invoke() puts the request and response log in additional_info
     request_log = "URL: https://api.fabric.microsoft.com/v1/workspaces/ws/items/b-guid/shortcuts\nStatus: 403"
     hook_error = InvokeError(Exception("Operation failed. Error Code: Forbidden"), logger, request_log)
@@ -106,6 +108,7 @@ def test_publish_error_keeps_additional_info_of_post_publish_failure():
     ids=["custom", "non-custom"],
 )
 def test_post_publish_failure_is_raised_unchanged_when_no_item_fails(hook_error_factory):
+    """A post-publish failure propagates unchanged when all items publish successfully."""
     hook_error = hook_error_factory()
     publisher = _StubPublisher([], hook_error)
 
@@ -116,6 +119,7 @@ def test_post_publish_failure_is_raised_unchanged_when_no_item_fails(hook_error_
 
 
 def test_publish_error_is_unchanged_when_post_publish_succeeds():
+    """Item failures retain their original error details when the post-publish hook succeeds."""
     publisher = _StubPublisher(["LakehouseA"], None)
 
     with pytest.raises(PublishError) as exc_info:
@@ -175,6 +179,7 @@ def test_lakehouse_publish_error_names_failed_shortcut(shortcut_publish_enabled)
 def test_cleanup_failure_is_reported_without_changing_post_publish_behavior(
     publish_mode, publish_fails, post_publish_fails, mocker, caplog
 ):
+    """Cleanup failures propagate alone but are logged without masking publish or post-publish failures."""
     publisher = _StubPublisher(["LakehouseA"] if publish_fails else [], None)
     mocker.patch.object(
         _StubPublisher,
@@ -214,6 +219,7 @@ def test_cleanup_failure_is_reported_without_changing_post_publish_behavior(
 
 @pytest.mark.parametrize("error_type", [RuntimeError, KeyboardInterrupt])
 def test_setup_and_cleanup_failures_preserve_the_setup_error(error_type, mocker):
+    """Setup failures, including interrupts, survive cleanup failures and skip post-publish hooks."""
     publisher = _StubPublisher([], None)
     setup_error = error_type("Setup failed")
     cleanup_error = RuntimeError("Cleanup failed")
@@ -235,6 +241,7 @@ def test_setup_and_cleanup_failures_preserve_the_setup_error(error_type, mocker)
     ids=["cleanup-only", "operation-error", "item-errors"],
 )
 def test_batch_lifecycle_preserves_primary_error_and_attempts_all_cleanup(operation_fails, item_errors, mocker, caplog):
+    """Batch cleanup runs in reverse order and preserves the operation error or first cleanup failure."""
     first = _StubPublisher([], None)
     second = _StubPublisher([], None)
     second.item_type = "Eventstream"
@@ -272,6 +279,7 @@ def test_batch_lifecycle_preserves_primary_error_and_attempts_all_cleanup(operat
 
 @pytest.mark.parametrize("failing_publisher", ["first", "second"])
 def test_single_batch_cleanup_failure_is_unchanged(failing_publisher, mocker):
+    """A single cleanup error propagates unchanged while both publishers are cleaned up in reverse order."""
     first = _StubPublisher([], None)
     second = _StubPublisher([], None)
     error = RuntimeError("Cleanup failed")
@@ -298,6 +306,7 @@ def test_single_batch_cleanup_failure_is_unchanged(failing_publisher, mocker):
 
 
 def test_batch_setup_failure_survives_cleanup_failures(mocker, caplog):
+    """A later publisher's setup failure prevents publishing but still attempts cleanup for both publishers."""
     first = _StubPublisher([], None)
     second = _StubPublisher([], None)
     second.item_type = "Eventstream"
