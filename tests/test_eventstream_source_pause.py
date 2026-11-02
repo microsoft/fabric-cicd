@@ -900,6 +900,7 @@ def test_base_publish_lifecycle_is_noop():
 
 @pytest.mark.parametrize("chain_kind", ["explicit", "implicit", "suppressed", "none"])
 def test_single_cleanup_failure_preserves_exception_chain(chain_kind, mocker):
+    """Wrapping a resume failure preserves its cause, context, suppression, and traceback visibility."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     publisher, _ = _make_publisher(
         topology_sources=[{"id": SOURCE_ID, "name": "MySource", "status": "Running"}],
