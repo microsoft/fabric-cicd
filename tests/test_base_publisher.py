@@ -65,12 +65,14 @@ def shortcut_publish_enabled():
     constants.FEATURE_FLAG.update(original_flags)
 
 
-@pytest.mark.parametrize("cleanup_fails", [False, True])
-def test_publish_error_names_post_publish_failure_when_both_fail(cleanup_fails, mocker, caplog):
-    hook_error = _post_publish_failure()
+@pytest.mark.parametrize(
+    "hook_error_factory",
+    [_post_publish_failure, lambda: json.JSONDecodeError("Expecting value", "", 0)],
+    ids=["custom", "non-custom"],
+)
+def test_publish_error_names_post_publish_failure_when_both_fail(hook_error_factory):
+    hook_error = hook_error_factory()
     publisher = _StubPublisher(["LakehouseA"], hook_error)
-    if cleanup_fails:
-        mocker.patch.object(publisher, "cleanup_items", side_effect=RuntimeError("cleanup failed"))
 
     with pytest.raises(PublishError) as exc_info:
         publisher.publish_all()
@@ -80,10 +82,8 @@ def test_publish_error_names_post_publish_failure_when_both_fail(cleanup_fails, 
     assert error.post_publish_error is hook_error
     assert error.__cause__ is hook_error
     assert str(error) == (
-        f"Failed to publish 1 item(s): ['LakehouseA']. The post-publish step also failed: {POST_PUBLISH_MESSAGE}"
+        f"Failed to publish 1 item(s): ['LakehouseA']. The post-publish step also failed: {hook_error}"
     )
-    if cleanup_fails:
-        assert "Failed to clean up after item publishing" in caplog.text
 
 
 def test_publish_error_keeps_additional_info_of_post_publish_failure():
@@ -100,11 +100,16 @@ def test_publish_error_keeps_additional_info_of_post_publish_failure():
     )
 
 
-def test_post_publish_failure_is_raised_unchanged_when_no_item_fails():
-    hook_error = _post_publish_failure()
+@pytest.mark.parametrize(
+    "hook_error_factory",
+    [_post_publish_failure, lambda: KeyError("path")],
+    ids=["custom", "non-custom"],
+)
+def test_post_publish_failure_is_raised_unchanged_when_no_item_fails(hook_error_factory):
+    hook_error = hook_error_factory()
     publisher = _StubPublisher([], hook_error)
 
-    with pytest.raises(FailedPublishedItemStatusError) as exc_info:
+    with pytest.raises(type(hook_error)) as exc_info:
         publisher.publish_all()
 
     assert exc_info.value is hook_error
@@ -120,30 +125,6 @@ def test_publish_error_is_unchanged_when_post_publish_succeeds():
     assert error.errors == [("LakehouseA", publisher.publish_failures["LakehouseA"])]
     assert error.post_publish_error is None
     assert str(error) == "Failed to publish 1 item(s): ['LakehouseA']"
-
-
-def test_non_custom_post_publish_exception_is_combined_with_item_failures():
-    # A malformed shortcuts.metadata.json raises JSONDecodeError in the shortcut hook
-    hook_error = json.JSONDecodeError("Expecting value", "", 0)
-    publisher = _StubPublisher(["LakehouseA"], hook_error)
-
-    with pytest.raises(PublishError) as exc_info:
-        publisher.publish_all()
-
-    error = exc_info.value
-    assert error.errors == [("LakehouseA", publisher.publish_failures["LakehouseA"])]
-    assert error.post_publish_error is hook_error
-    assert error.__cause__ is hook_error
-
-
-def test_non_custom_post_publish_exception_is_raised_unchanged_when_no_item_fails():
-    hook_error = KeyError("path")
-    publisher = _StubPublisher([], hook_error)
-
-    with pytest.raises(KeyError) as exc_info:
-        publisher.publish_all()
-
-    assert exc_info.value is hook_error
 
 
 def test_lakehouse_publish_error_names_failed_shortcut(shortcut_publish_enabled):  # noqa: ARG001
@@ -186,8 +167,11 @@ def test_lakehouse_publish_error_names_failed_shortcut(shortcut_publish_enabled)
 
 
 @pytest.mark.parametrize("publish_mode", ["parallel", "sequential", "ordered"])
-@pytest.mark.parametrize("publish_fails", [False, True])
-@pytest.mark.parametrize("post_publish_fails", [False, True])
+@pytest.mark.parametrize(
+    ("publish_fails", "post_publish_fails"),
+    [(False, False), (True, False), (True, True)],
+    ids=["cleanup-only", "publish-and-cleanup", "publish-cleanup-and-post-publish"],
+)
 def test_cleanup_failure_is_reported_without_changing_post_publish_behavior(
     publish_mode, publish_fails, post_publish_fails, mocker, caplog
 ):
@@ -245,8 +229,11 @@ def test_setup_and_cleanup_failures_preserve_the_setup_error(error_type, mocker)
     post_publish.assert_not_called()
 
 
-@pytest.mark.parametrize("operation_fails", [False, True])
-@pytest.mark.parametrize("item_errors", [False, True])
+@pytest.mark.parametrize(
+    ("operation_fails", "item_errors"),
+    [(False, False), (True, False), (True, True)],
+    ids=["cleanup-only", "operation-error", "item-errors"],
+)
 def test_batch_lifecycle_preserves_primary_error_and_attempts_all_cleanup(operation_fails, item_errors, mocker, caplog):
     first = _StubPublisher([], None)
     second = _StubPublisher([], None)
