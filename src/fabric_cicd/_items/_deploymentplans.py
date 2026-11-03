@@ -43,7 +43,7 @@ def set_deployment_plan(
     # Ensure the deployment plan exists in the repository before proceeding
     repository_plan = fabric_workspace_obj.repository_items.get(ItemType.DEPLOYMENT_PLAN.value, {}).get(deployment_plan)
     if repository_plan is None:
-        msg = f"Deployment Plan '{deployment_plan}' must exist in the repository to be executed in the deployment"
+        msg = f"Deployment Plan '{deployment_plan}' must exist in the repository to be executed in the deployment."
         raise InputError(msg, logger)
     # Check if the deployment plan is included in the current publish batch
     in_publish_batch = any(
@@ -55,7 +55,7 @@ def set_deployment_plan(
         if deployed_plan is None:
             msg = (
                 f"Deployment Plan '{deployment_plan}' must be included in the bulk publish batch "
-                "or already exist in the target workspace to be executed in the deployment"
+                "or already exist in the target workspace to be executed in the deployment."
             )
             raise InputError(msg, logger)
 
