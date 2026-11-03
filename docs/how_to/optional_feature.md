@@ -16,16 +16,16 @@ append_feature_flag("<specific_flag>")
 
 <span class="md-h3-nonanchor">Publish behavior</span>
 
-| Flag Name                                 | Description                                                                                                                                                                                            | Experimental |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
-| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                                                         | ☑️           |
-| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                                                                    |              |
-| `enable_warehouse_shell_only_publish`     | Preserve legacy Warehouse metadata-only publishing and creation payloads; SQL project definitions are not deployed and existing collation cannot be changed                                             |              |
-| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                                                       |              |
-| `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward                                     |              |
-| `enable_strict_semantic_model_binding`    | If a `semantic_model_binding` connection cannot be bound, fail the deployment instead of only logging the failure                                                                                      |              |
-| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                                                                |              |
-| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                                                                                                                              |              |
+| Flag Name                                 | Description                                                                                                                                                       | Experimental |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                    | ☑️           |
+| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                               |              |
+| `enable_warehouse_definition_publish`     | Opt in to Warehouse SQL project deployment, including schema, shared queries, and pre/post-deployment scripts                                                     |
+| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                  |              |
+| `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward |              |
+| `enable_strict_semantic_model_binding`    | If a `semantic_model_binding` connection cannot be bound, fail the deployment instead of only logging the failure                                                 |              |
+| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                           |              |
+| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                                                                                         |              |
 
 <span class="md-h3-nonanchor">Unpublish behavior</span>
 

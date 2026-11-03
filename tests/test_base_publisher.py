@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Test error handling in ItemPublisher.publish_all()."""
+"""Test filtering and error handling in ItemPublisher.publish_all()."""
 
 import json
 import logging
 from typing import Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -32,6 +32,7 @@ class _StubPublisher(ItemPublisher):
     def __init__(self, failing_items: list[str], hook_error: Optional[Exception]) -> None:
         workspace = MagicMock(spec=FabricWorkspace)
         workspace.repository_items = {}
+        workspace._apply_publish_filters.return_value = False
         super().__init__(workspace)
         self.failing_items = failing_items
         self.hook_error = hook_error
@@ -52,6 +53,61 @@ class _StubPublisher(ItemPublisher):
 
 def _post_publish_failure() -> FailedPublishedItemStatusError:
     return FailedPublishedItemStatusError(POST_PUBLISH_MESSAGE, logger)
+
+
+@pytest.mark.parametrize("mode", ["sequential", "parallel", "ordered"])
+@pytest.mark.parametrize("excluded_names", [[], ["LakehouseA"], ["LakehouseA", "LakehouseB"]])
+def test_publish_all_filters_items_before_publish_one(mode, excluded_names, monkeypatch, mocker):
+    """Verify every publishing mode filters items, marks skips, and runs the post-publish hook."""
+    publisher = _StubPublisher([], None)
+    workspace = publisher.fabric_workspace_obj
+    items = {
+        name: Item(type=publisher.item_type, name=name, description="", guid="")
+        for name in ["LakehouseA", "LakehouseB"]
+    }
+    config = ParallelConfig(
+        enabled=mode == "parallel",
+        ordered_items_func=(lambda _publisher: list(items)) if mode == "ordered" else None,
+    )
+    monkeypatch.setattr(_StubPublisher, "parallel_config", config)
+
+    def apply_filters(item, name, item_type):
+        assert item_type == publisher.item_type
+        item.skip_publish = name in excluded_names
+        return item.skip_publish
+
+    workspace._apply_publish_filters.side_effect = apply_filters
+    mocker.patch.object(publisher, "get_items_to_publish", return_value=items)
+    publish_one = mocker.patch.object(publisher, "publish_one")
+    post_publish_all = mocker.patch.object(publisher, "post_publish_all")
+
+    publisher.publish_all()
+
+    expected_calls = [call(name, item) for name, item in items.items() if name not in excluded_names]
+    publish_one.assert_has_calls(expected_calls, any_order=True)
+    assert publish_one.call_count == len(expected_calls)
+    for name, item in items.items():
+        workspace._apply_publish_filters.assert_any_call(item, name, publisher.item_type)
+        assert item.skip_publish == (name in excluded_names)
+    assert workspace._apply_publish_filters.call_count == len(items)
+    post_publish_all.assert_called_once_with()
+
+
+def test_publish_all_skips_dispatch_when_all_items_are_filtered(mocker):
+    """Verify filtering out every item bypasses dispatch but still runs the post-publish hook."""
+    publisher = _StubPublisher([], None)
+    publisher.fabric_workspace_obj._apply_publish_filters.return_value = True
+    post_publish_all = mocker.patch.object(publisher, "post_publish_all")
+    publish_methods = [
+        mocker.patch.object(publisher, method)
+        for method in ["_publish_items_parallel", "_publish_items_sequential", "_publish_items_ordered"]
+    ]
+
+    publisher.publish_all()
+
+    for publish_method in publish_methods:
+        publish_method.assert_not_called()
+    post_publish_all.assert_called_once_with()
 
 
 @pytest.fixture
@@ -151,6 +207,7 @@ def test_lakehouse_publish_error_names_failed_shortcut(shortcut_publish_enabled)
     workspace = MagicMock(spec=FabricWorkspace)
     workspace.repository_items = {"Lakehouse": {"LakehouseA": lakehouse_a, "LakehouseB": lakehouse_b}}
     workspace.items_to_include = None
+    workspace._apply_publish_filters.return_value = False
     publisher = LakehousePublisher(workspace)
 
     publish_failure = RuntimeError("definition rejected")

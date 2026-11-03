@@ -118,7 +118,7 @@ def warehouse_workspace(mock_endpoint, temp_workspace_dir, monkeypatch):
     monkeypatch.setattr(
         constants,
         "FEATURE_FLAG",
-        constants.FEATURE_FLAG - {FeatureFlag.ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH.value},
+        constants.FEATURE_FLAG - {FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value},
     )
     item_dir = create_test_item(
         temp_workspace_dir, None, "TestWarehouse", "Warehouse", "11111111-1111-1111-1111-111111111111"
@@ -150,10 +150,66 @@ def warehouse_workspace(mock_endpoint, temp_workspace_dir, monkeypatch):
         yield workspace
 
 
+@pytest.fixture
+def warehouse_definition_workspace(warehouse_workspace):
+    """Enable SQL project definition publishing for an isolated Warehouse workspace."""
+    append_feature_flag(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+    return warehouse_workspace
+
+
+def test_warehouse_definition_publish_flag_is_supported():
+    """Expose the opt-in flag through the public supported-feature list."""
+    assert FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value in get_supported_feature_flags()
+
+
 @pytest.mark.parametrize("deployed", [False, True])
-def test_warehouse_publishes_sql_project_definition(warehouse_workspace, mock_endpoint, deployed):
-    """The default creates or updates the complete SQL project through the generic pipeline."""
-    workspace = warehouse_workspace
+@pytest.mark.parametrize("creation_payload", [None, {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}])
+def test_warehouse_defaults_to_shell_only_with_sql_project(
+    warehouse_workspace, mock_endpoint, deployed, creation_payload
+):
+    """Existing SQL project folders remain metadata-only unless definition publishing is enabled."""
+    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    if creation_payload is not None:
+        platform = next(file for file in item.item_files if file.relative_path == ".platform")
+        contents = json.loads(platform.contents)
+        contents["metadata"]["creationPayload"] = creation_payload
+        platform.contents = json.dumps(contents)
+    if deployed:
+        item.guid = "22222222-2222-2222-2222-222222222222"
+
+    with (
+        patch.object(
+            warehouse_workspace, "_replace_parameters", wraps=warehouse_workspace._replace_parameters
+        ) as parameters,
+        patch.object(
+            warehouse_workspace, "_replace_logical_ids", wraps=warehouse_workspace._replace_logical_ids
+        ) as logical_ids,
+        patch.object(
+            warehouse_workspace, "_replace_workspace_ids", wraps=warehouse_workspace._replace_workspace_ids
+        ) as workspace_ids,
+    ):
+        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_called_once()
+    request = mock_endpoint.invoke.call_args.kwargs
+    assert request["method"] == ("PATCH" if deployed else "POST")
+    assert request["url"].endswith(f"/items/{item.guid}" if deployed else "/items")
+    assert request["body"]["displayName"] == item.name
+    assert request["body"]["description"] == item.description
+    assert "definition" not in request["body"]
+    if creation_payload and not deployed:
+        assert request["body"]["creationPayload"] == creation_payload
+    else:
+        assert "creationPayload" not in request["body"]
+    parameters.assert_not_called()
+    logical_ids.assert_not_called()
+    workspace_ids.assert_not_called()
+
+
+@pytest.mark.parametrize("deployed", [False, True])
+def test_warehouse_publishes_sql_project_definition(warehouse_definition_workspace, mock_endpoint, deployed):
+    """Opting in creates or updates the complete SQL project through the generic pipeline."""
+    workspace = warehouse_definition_workspace
     item = workspace.repository_items["Warehouse"]["TestWarehouse"]
     if deployed:
         item.guid = "22222222-2222-2222-2222-222222222222"
@@ -196,71 +252,115 @@ def test_warehouse_publishes_sql_project_definition(warehouse_workspace, mock_en
 
 
 @pytest.mark.parametrize("creation_payload", [None, {}, {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}])
-def test_warehouse_default_rejects_legacy_creation_payload(warehouse_workspace, mock_endpoint, creation_payload):
-    """Presence of the legacy key must not silently discard collation or skip schema deployment."""
-    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
+@pytest.mark.parametrize("deployed", [False, True])
+def test_warehouse_creation_payload_selects_shell_only(
+    warehouse_definition_workspace, mock_endpoint, caplog, creation_payload, deployed
+):
+    """A non-null creation payload preserves shell-only publishing even when definitions are enabled."""
+    caplog.set_level(logging.DEBUG, logger="fabric_cicd._items._warehouse")
+    item = warehouse_definition_workspace.repository_items["Warehouse"]["TestWarehouse"]
     platform = next(file for file in item.item_files if file.name == ".platform")
     contents = json.loads(platform.contents)
     contents["metadata"]["creationPayload"] = creation_payload
     platform.contents = json.dumps(contents)
-
-    with pytest.raises(InputError, match="enable_warehouse_shell_only_publish"):
-        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
-
-    mock_endpoint.invoke.assert_not_called()
-
-
-@pytest.mark.parametrize("project_count", [0, 2])
-def test_warehouse_default_requires_one_sql_project(warehouse_workspace, mock_endpoint, project_count):
-    """Missing and ambiguous SQL projects fail before issuing a deployment request."""
-    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
-    project = next(file for file in item.item_files if file.name == "sqldw.sqlproj")
-    item.item_files = [file for file in item.item_files if file is not project] + [project] * project_count
-
-    with pytest.raises(InputError, match=f"found {project_count}"):
-        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
-
-    mock_endpoint.invoke.assert_not_called()
-
-
-def test_warehouse_default_rejects_dacpac(warehouse_workspace, mock_endpoint):
-    """Compiled artifacts must not opt a Git SQL project into DACPAC deployment."""
-    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
-    artifact = MagicMock()
-    artifact.file_path = Path("sqldw.dacpac")
-    artifact.relative_path = "sqldw.dacpac"
-    item.item_files.append(artifact)
-
-    with pytest.raises(InputError, match="Only Git-exported sqlproj"):
-        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
-
-    mock_endpoint.invoke.assert_not_called()
-
-
-@pytest.mark.parametrize("deployed", [False, True])
-@pytest.mark.parametrize("has_project", [False, True])
-@pytest.mark.parametrize("has_creation_payload", [False, True])
-def test_warehouse_shell_only_flag_preserves_legacy_behavior(
-    warehouse_workspace, mock_endpoint, caplog, deployed, has_project, has_creation_payload
-):
-    """The compatibility flag creates with collation or updates metadata without a definition."""
-    flag = FeatureFlag.ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH.value
-    assert flag in get_supported_feature_flags()
-    append_feature_flag(flag)
-    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
-    creation_payload = {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}
-    if has_creation_payload:
-        platform = next(file for file in item.item_files if file.name == ".platform")
-        contents = json.loads(platform.contents)
-        contents["metadata"]["creationPayload"] = creation_payload
-        platform.contents = json.dumps(contents)
-    if not has_project:
-        item.item_files = [file for file in item.item_files if file.name == ".platform"]
     if deployed:
         item.guid = "22222222-2222-2222-2222-222222222222"
 
-    with patch.object(warehouse_workspace, "_replace_parameters") as parameters:
-        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
+    WarehousePublisher(warehouse_definition_workspace).publish_one(item.name, item)
+
+    mock_endpoint.invoke.assert_called_once()
+    request = mock_endpoint.invoke.call_args.kwargs
+    body = request["body"]
+    if creation_payload is None:
+        assert request["method"] == "POST"
+        assert body["definition"]["format"] == "sqlproj"
+        assert "shell-only publishing" not in caplog.text
+    else:
+        assert request["method"] == ("PATCH" if deployed else "POST")
+        assert "definition" not in body
+        assert f"Warehouse '{item.name}': shell-only publishing; schema is not deployed." in caplog.text
+    if creation_payload and not deployed:
+        assert body["creationPayload"] == creation_payload
+    else:
+        assert "creationPayload" not in body
+
+
+@pytest.mark.parametrize(
+    ("project_count", "project_contents"),
+    [
+        pytest.param(1, None, id="valid-project"),
+        pytest.param(1, "<invalid", id="malformed-project"),
+        pytest.param(2, "<invalid", id="duplicate-projects"),
+    ],
+)
+def test_warehouse_definition_api_failure_is_propagated(
+    warehouse_definition_workspace, mock_endpoint, project_count, project_contents
+):
+    """API failures propagate for valid or invalid SQL projects without retrying as shell-only."""
+    item = warehouse_definition_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    project = next(file for file in item.item_files if file.name == "sqldw.sqlproj")
+    if project_contents is not None:
+        project.contents = project_contents
+    item.item_files = [file for file in item.item_files if file is not project] + [project] * project_count
+
+    api_error = RuntimeError("Definition deployment failed")
+    mock_endpoint.invoke.side_effect = api_error
+
+    with pytest.raises(RuntimeError, match="Definition deployment failed") as exc_info:
+        WarehousePublisher(warehouse_definition_workspace).publish_one(item.name, item)
+
+    assert exc_info.value is api_error
+    mock_endpoint.invoke.assert_called_once()
+    definition = mock_endpoint.invoke.call_args.kwargs["body"]["definition"]
+    assert definition["format"] == "sqlproj"
+    assert sum(part["path"] == "sqldw.sqlproj" for part in definition["parts"]) == project_count
+
+
+@pytest.mark.parametrize("project_name", ["sqldw.sqlproj", "sqldw.SQLPROJ"])
+def test_warehouse_native_projects_use_sqlproj_format(warehouse_definition_workspace, project_name):
+    """Opted-in SQL project folders use full-definition publishing regardless of extension case."""
+    item = warehouse_definition_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    platform = next(file for file in item.item_files if file.name == ".platform")
+    project = MagicMock()
+    project.file_path = Path(project_name)
+    project.relative_path = project_name
+    item.item_files = [platform, project]
+
+    with patch.object(warehouse_definition_workspace, "_publish_item") as publish_item:
+        WarehousePublisher(warehouse_definition_workspace).publish_one(item.name, item)
+
+    publish_item.assert_called_once_with(item_name=item.name, item_type="Warehouse", api_format="sqlproj")
+
+
+@pytest.mark.parametrize("deployed", [False, True])
+@pytest.mark.parametrize("definition_type", ["platform_only", "dacpac", "other_files"])
+@pytest.mark.parametrize("has_creation_payload", [False, True])
+def test_warehouse_shell_only_fallback_preserves_legacy_behavior(
+    warehouse_definition_workspace, mock_endpoint, caplog, deployed, definition_type, has_creation_payload
+):
+    """Even with the opt-in, items without a SQL project publish only metadata without text replacements."""
+    caplog.set_level(logging.DEBUG, logger="fabric_cicd._items._warehouse")
+    item = warehouse_definition_workspace.repository_items["Warehouse"]["TestWarehouse"]
+    platform = next(file for file in item.item_files if file.name == ".platform")
+    creation_payload = {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}
+    if has_creation_payload:
+        contents = json.loads(platform.contents)
+        contents["metadata"]["creationPayload"] = creation_payload
+        platform.contents = json.dumps(contents)
+    if definition_type == "other_files":
+        item.item_files = [file for file in item.item_files if file.file_path.suffix.lower() != ".sqlproj"]
+    else:
+        item.item_files = [platform]
+        if definition_type == "dacpac":
+            artifact = MagicMock()
+            artifact.file_path = Path("sqldw.dacpac")
+            artifact.relative_path = "sqldw.dacpac"
+            item.item_files.append(artifact)
+    if deployed:
+        item.guid = "22222222-2222-2222-2222-222222222222"
+
+    with patch.object(warehouse_definition_workspace, "_replace_parameters") as parameters:
+        WarehousePublisher(warehouse_definition_workspace).publish_one(item.name, item)
 
     mock_endpoint.invoke.assert_called_once()
     request = mock_endpoint.invoke.call_args.kwargs
@@ -274,36 +374,26 @@ def test_warehouse_shell_only_flag_preserves_legacy_behavior(
     else:
         assert "creationPayload" not in request["body"]
     parameters.assert_not_called()
-    assert "SQL project definitions are not deployed" in caplog.text
-    assert "cannot change the collation of existing Warehouses" in caplog.text
+    assert f"Warehouse '{item.name}': shell-only publishing; schema is not deployed." in caplog.text
 
 
-@pytest.mark.parametrize("shell_only", [False, True])
-def test_warehouse_excluded_items_skip_validation_and_warning(warehouse_workspace, mock_endpoint, caplog, shell_only):
-    """Exclusion filters still skip legacy folders even with default definition publishing."""
-    if shell_only:
-        append_feature_flag(FeatureFlag.ENABLE_WAREHOUSE_SHELL_ONLY_PUBLISH.value)
-    workspace = warehouse_workspace
+@pytest.mark.parametrize("has_project", [False, True])
+def test_warehouse_excluded_items_skip_validation_and_warning(
+    warehouse_definition_workspace, mock_endpoint, caplog, has_project
+):
+    """Exclusion filters skip both native SQL projects and legacy folders without warnings."""
+    caplog.set_level(logging.DEBUG, logger="fabric_cicd._items._warehouse")
+    workspace = warehouse_definition_workspace
     workspace.publish_item_name_exclude_regex = "TestWarehouse"
     item = workspace.repository_items["Warehouse"]["TestWarehouse"]
-    item.item_files = []
+    if not has_project:
+        item.item_files = []
 
-    WarehousePublisher(workspace).publish_one(item.name, item)
+    WarehousePublisher(workspace).publish_all()
 
     assert item.skip_publish
     mock_endpoint.invoke.assert_not_called()
-    assert "SQL project definitions are not deployed" not in caplog.text
-
-
-def test_warehouse_definition_api_failure_is_propagated(warehouse_workspace, mock_endpoint):
-    """A failed definition request must not fall back to shell-only publishing."""
-    item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
-    mock_endpoint.invoke.side_effect = RuntimeError("Definition deployment failed")
-
-    with pytest.raises(RuntimeError, match="Definition deployment failed"):
-        WarehousePublisher(warehouse_workspace).publish_one(item.name, item)
-
-    mock_endpoint.invoke.assert_called_once()
+    assert "shell-only publishing" not in caplog.text
 
 
 @pytest.mark.parametrize(

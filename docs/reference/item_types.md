@@ -239,8 +239,7 @@
 
 - **Parameterization:**
     - The `find_replace` section in the `parameter.yml` file is not applied.
-- **Deployment**:
-    - **Full-definition publish** is the default for Warehouse items. The schema and shared queries are deployed from the Git-exported files. While SQL project format is supported, DACPAC format is currently unsupported.
-    - **Legacy shell-only publishing** can be enabled via the `enable_warehouse_shell_only_publish` feature flag to preserve the previous behavior for all Warehouses in the deployment. Only metadata is deployed, even when SQL project files are present; schema deployment must be managed separately. This mode accepts the legacy `.platform` **creation payload** for new Warehouses.
-    - **Collation:** Full-definition creation uses the target workspace's default collation. Configure that setting before creating a Warehouse, or use shell-only publishing with a custom creation payload. Existing Warehouse collation cannot be changed by definition or metadata updates. See [Data Warehouse collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation).
+- **Deployment:**
+    - **Publishing:** Shell-only publishing deploys metadata only and is the default. Enable `enable_warehouse_definition_publish` to deploy the schema, shared queries, and any pre/post-deployment scripts from Git-exported **SQL projects**. Warehouses with a non-null **creation payload** or no `.sqlproj` file remain shell-only.
+    - **Collation:** New Warehouses use the target workspace's default collation unless overridden by `metadata.creationPayload.defaultCollation` in `.platform`. Collation cannot be changed after creation. See [Data Warehouse collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation).
 - **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.

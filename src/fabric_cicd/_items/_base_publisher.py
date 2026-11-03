@@ -429,7 +429,7 @@ class ItemPublisher(Publisher):
         Execute the publish operation for this item type.
 
         1. Calls pre_publish_all() for any setup operations
-        2. Gets items via get_items_to_publish()
+        2. Gets items via get_items_to_publish() and applies publish filters
         3. Publishes items (parallel or sequential based on parallel_config)
         4. Calls post_publish_all() for any finalization
         5. Raises PublishError if any items failed, including a post_publish_all() error if that also failed
@@ -451,6 +451,12 @@ class ItemPublisher(Publisher):
         skipped = self._mark_skipped_items(self.fabric_workspace_obj, self.item_type, items)
         if skipped:
             logger.info(f"Skipping {self.item_type} item(s) due to items_to_include filter: {skipped}")
+
+        items = {
+            name: item
+            for name, item in items.items()
+            if not self.fabric_workspace_obj._apply_publish_filters(item, name, self.item_type)
+        }
 
         if not items:
             self.post_publish_all()

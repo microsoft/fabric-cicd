@@ -1,5 +1,5 @@
 kind: added
-body: Add support for full definition deployment of Warehouse items
+body: Add opt-in Warehouse SQL project deployment while preserving shell-only publishing by default
 time: 2026-11-02T11:16:38.7679801+02:00
 custom:
     Author: shirasassoon
