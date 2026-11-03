@@ -35,7 +35,12 @@ class WarehousePublisher(ItemPublisher):
             or creation_payload is not None
             or not any(file.file_path.suffix.lower() == ".sqlproj" for file in item.item_files)
         ):
-            logger.debug(f"Warehouse '{item_name}': shell-only publishing; schema is not deployed.")
+            log = (
+                logger.warning
+                if FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value in constants.FEATURE_FLAG
+                else logger.debug
+            )
+            log(f"Warehouse '{item_name}': shell-only publishing; schema is not deployed.")
             self.fabric_workspace_obj._publish_item(
                 item_name=item_name,
                 item_type=self.item_type,

@@ -165,9 +165,10 @@ def test_warehouse_definition_publish_flag_is_supported():
 @pytest.mark.parametrize("deployed", [False, True])
 @pytest.mark.parametrize("creation_payload", [None, {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}])
 def test_warehouse_defaults_to_shell_only_with_sql_project(
-    warehouse_workspace, mock_endpoint, deployed, creation_payload
+    warehouse_workspace, mock_endpoint, caplog, deployed, creation_payload
 ):
     """Existing SQL project folders remain metadata-only unless definition publishing is enabled."""
+    caplog.set_level(logging.DEBUG, logger="fabric_cicd._items._warehouse")
     item = warehouse_workspace.repository_items["Warehouse"]["TestWarehouse"]
     if creation_payload is not None:
         platform = next(file for file in item.item_files if file.relative_path == ".platform")
@@ -204,6 +205,15 @@ def test_warehouse_defaults_to_shell_only_with_sql_project(
     parameters.assert_not_called()
     logical_ids.assert_not_called()
     workspace_ids.assert_not_called()
+    assert (
+        "fabric_cicd._items._warehouse",
+        logging.DEBUG,
+        f"Warehouse '{item.name}': shell-only publishing; schema is not deployed.",
+    ) in caplog.record_tuples
+    assert not any(
+        record.name == "fabric_cicd._items._warehouse" and record.levelno >= logging.WARNING
+        for record in caplog.records
+    )
 
 
 @pytest.mark.parametrize("deployed", [False, True])
@@ -257,7 +267,7 @@ def test_warehouse_creation_payload_selects_shell_only(
     warehouse_definition_workspace, mock_endpoint, caplog, creation_payload, deployed
 ):
     """A non-null creation payload preserves shell-only publishing even when definitions are enabled."""
-    caplog.set_level(logging.DEBUG, logger="fabric_cicd._items._warehouse")
+    caplog.set_level(logging.WARNING, logger="fabric_cicd._items._warehouse")
     item = warehouse_definition_workspace.repository_items["Warehouse"]["TestWarehouse"]
     platform = next(file for file in item.item_files if file.name == ".platform")
     contents = json.loads(platform.contents)
@@ -278,7 +288,11 @@ def test_warehouse_creation_payload_selects_shell_only(
     else:
         assert request["method"] == ("PATCH" if deployed else "POST")
         assert "definition" not in body
-        assert f"Warehouse '{item.name}': shell-only publishing; schema is not deployed." in caplog.text
+        assert (
+            "fabric_cicd._items._warehouse",
+            logging.WARNING,
+            f"Warehouse '{item.name}': shell-only publishing; schema is not deployed.",
+        ) in caplog.record_tuples
     if creation_payload and not deployed:
         assert body["creationPayload"] == creation_payload
     else:
@@ -339,7 +353,7 @@ def test_warehouse_shell_only_fallback_preserves_legacy_behavior(
     warehouse_definition_workspace, mock_endpoint, caplog, deployed, definition_type, has_creation_payload
 ):
     """Even with the opt-in, items without a SQL project publish only metadata without text replacements."""
-    caplog.set_level(logging.DEBUG, logger="fabric_cicd._items._warehouse")
+    caplog.set_level(logging.WARNING, logger="fabric_cicd._items._warehouse")
     item = warehouse_definition_workspace.repository_items["Warehouse"]["TestWarehouse"]
     platform = next(file for file in item.item_files if file.name == ".platform")
     creation_payload = {"defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"}
@@ -374,7 +388,11 @@ def test_warehouse_shell_only_fallback_preserves_legacy_behavior(
     else:
         assert "creationPayload" not in request["body"]
     parameters.assert_not_called()
-    assert f"Warehouse '{item.name}': shell-only publishing; schema is not deployed." in caplog.text
+    assert (
+        "fabric_cicd._items._warehouse",
+        logging.WARNING,
+        f"Warehouse '{item.name}': shell-only publishing; schema is not deployed.",
+    ) in caplog.record_tuples
 
 
 @pytest.mark.parametrize("has_project", [False, True])
