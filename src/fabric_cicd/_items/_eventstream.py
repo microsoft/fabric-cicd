@@ -52,6 +52,7 @@ def _wait_for_sources_paused(
             for source in _get_topology_sources(fabric_workspace_obj, eventstream_guid)
         }
         # Identify sources that have failed to pause and raise an exception (fails the deployment run)
+        # PauseFailed is returned as a valid source state by Fabric's topology action APIs
         failed = {source_id for source_id in pending if statuses.get(source_id) == "pausefailed"}
         if failed:
             msg = f"Failed to pause Eventstream source(s): {sorted(failed)}"
