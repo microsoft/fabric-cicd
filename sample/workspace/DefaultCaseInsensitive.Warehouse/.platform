@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Warehouse",
+    "displayName": "DefaultCaseInsensitive",
+    "creationPayload": {
+      "defaultCollation": "Latin1_General_100_CI_AS_KS_WS_SC_UTF8"
+    }
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "0e63f8ad-3b03-4f91-8d5e-b33750b3beec"
+  }
+}
