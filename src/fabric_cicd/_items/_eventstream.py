@@ -85,14 +85,14 @@ def _pause_source(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, 
 
 
 def _resume_source(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, source: dict) -> None:
-    """Resume a single eventstream source from where it was last stopped."""
+    """Resume Sample Data from now and other sources from where they last stopped."""
     source_name = source.get("name", source["id"])
     logger.info(f"{constants.INDENT}Resuming Eventstream source '{source_name}'")
     # https://learn.microsoft.com/en-us/rest/api/fabric/eventstream/topology/resume-eventstream-source
     fabric_workspace_obj.endpoint.invoke(
         method="POST",
         url=f"{fabric_workspace_obj.base_api_url}/eventstreams/{eventstream_guid}/sources/{source['id']}/resume",
-        body={"startType": "WhenLastStopped"},
+        body={"startType": "Now" if source.get("type") == "SampleData" else "WhenLastStopped"},
     )
 
 

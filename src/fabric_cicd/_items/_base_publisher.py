@@ -395,11 +395,30 @@ class ItemPublisher(Publisher):
                         [f"{item.type}: {item_name}" for item_name, item, _publisher in batch_items],
                     )
 
-                # Publish the current batch within the batch publish context
-                with ItemPublisher._batch_publish_lifecycle(batch_items):
-                    fabric_workspace_obj._publish_items(
-                        batch_items, skipped_items=skipped_items if batch_index == 0 else None
-                    )
+                publish_succeeded = False
+                try:
+                    with ItemPublisher._batch_publish_lifecycle(batch_items):
+                        fabric_workspace_obj._publish_items(
+                            batch_items, skipped_items=skipped_items if batch_index == 0 else None
+                        )
+                        # Record publish success before context exit runs cleanup
+                        publish_succeeded = True
+                except Exception:
+                    if publish_succeeded:
+                        # Cleanup failed while publish succeeded: get the completed batches, including earlier ones,
+                        # before re-raising (the batch lifecycle only knows the current batch)
+                        completed_items = {
+                            (item.type, item_name)
+                            for batch in batches[: batch_index + 1]
+                            for item_name, item, _publisher in batch
+                        }
+                        # Invoke post-publish handling for completed items after cleanup failure
+                        ItemPublisher._post_publish_after_cleanup_failure(
+                            fabric_workspace_obj, publishers, completed_items
+                        )
+                    # Re-raise the original error, aborting later batches and bypassing
+                    # the post-publish in phase 3 to avoid redundant calls
+                    raise
 
                 # Refresh deployed items and invalidate cached $items.* values between batches
                 if batch_index < len(batches) - 1:
@@ -653,6 +672,40 @@ class ItemPublisher(Publisher):
             for publisher, items in items_by_publisher.items():
                 batch_stack.enter_context(publisher._publish_lifecycle(items))
             yield
+
+    @staticmethod
+    def _post_publish_after_cleanup_failure(
+        fabric_workspace_obj: "FabricWorkspace",
+        publishers: list["ItemPublisher"],
+        published_items: set[tuple[str, str]],
+    ) -> None:
+        """Run post-publish hooks for published items without replacing the cleanup error."""
+        temporarily_skipped: list[Item] = []
+        published_types = {item_type for item_type, _item_name in published_items}
+        try:
+            # Post-publish hooks read all repository items for a given type (only item types in publish scope),
+            # temporarily skip those unpublished items (later batches may include them)
+            for item_type in published_types:
+                for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+                    if (item_type, item_name) not in published_items and not item.skip_publish:
+                        item.skip_publish = True
+                        temporarily_skipped.append(item)
+
+            # Preserve publisher order and run hooks only for types that were published
+            for publisher in publishers:
+                if publisher.item_type not in published_types:
+                    continue
+                try:
+                    publisher.post_publish_all()
+                except Exception as error:
+                    # Attempt remaining hooks without replacing the original cleanup error
+                    logger.error(
+                        "Post-publish hook failed for %s after bulk cleanup failure: %s", publisher.item_type, error
+                    )
+        finally:
+            # Restore only flags changed here, even if a hook fails
+            for item in temporarily_skipped:
+                item.skip_publish = False
 
     def post_publish_all_check(self) -> None:
         """

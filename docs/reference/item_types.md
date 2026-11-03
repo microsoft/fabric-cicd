@@ -93,11 +93,14 @@
 - **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
 - **Private endpoint sources:** Enable the
   [`enable_eventstream_source_pause`](../how_to/optional_feature.md#feature-flags) feature flag when deploying Eventstreams that contain private endpoint sources.
-  When enabled, it pauses all running sources in each deployed Eventstream, not just private endpoint
+  When enabled, it attempts to pause all running sources in each deployed Eventstream, not just private endpoint
   sources, before updating the definition. It then attempts to resume those sources afterward. Excluded Eventstreams are not
   queried, paused, or resumed. If a source remains paused after a resume failure, manual recovery
   may be required. Sources are paused and resumed only when updating an existing Eventstream.
   New Eventstreams skip these steps.
+- **Source compatibility:** Not all source types support pause and resume. When enabled, this feature
+  attempts to pause every running source, so unsupported sources can cause deployment failures.
+  Before enabling the flag, check the [Fabric pause/resume support table](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/pause-resume-data-streams).
 
 ## Graph Model
 

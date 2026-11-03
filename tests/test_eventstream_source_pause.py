@@ -13,7 +13,9 @@ from fabric_cicd import FabricWorkspace, constants, get_supported_feature_flags
 from fabric_cicd._common._exceptions import BaseCustomError, InvokeError, ItemCleanupError, PublishError
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher, ParallelConfig
+from fabric_cicd._items._environment import EnvironmentPublisher
 from fabric_cicd._items._eventstream import EventstreamPublisher
+from fabric_cicd._items._variablelibrary import VariableLibraryPublisher
 from fabric_cicd.constants import FeatureFlag, ItemType
 
 EVENTSTREAM_GUID = "8c500070-073f-4a88-b478-8fabe1941c52"
@@ -142,11 +144,19 @@ def test_flag_on_no_running_sources_updates_without_pause():
     assert not any("/resume" in url for url in urls)
 
 
-def test_flag_on_pauses_running_sources_then_resumes():
-    """With the flag, running sources are paused on enter and resumed on exit."""
+@pytest.mark.parametrize(
+    ("source_metadata", "expected_start_type"),
+    [
+        ({"type": "SampleData"}, "Now"),
+        ({"type": "AzureEventHub"}, "WhenLastStopped"),
+        ({}, "WhenLastStopped"),
+    ],
+)
+def test_flag_on_pauses_running_sources_then_resumes(source_metadata, expected_start_type):
+    """Running sources pause on enter and resume with the appropriate start option."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     publisher, workspace = _make_publisher(
-        topology_sources=[{"id": SOURCE_ID, "name": "MySource", "status": "Running"}],
+        topology_sources=[{"id": SOURCE_ID, "name": "MySource", "status": "Running", **source_metadata}],
     )
 
     with publisher._publish_lifecycle([_make_item()]):
@@ -165,7 +175,7 @@ def test_flag_on_pauses_running_sources_then_resumes():
     assert methods.count("POST") == 2  # pause + resume
 
     resume_call = next(call for call in invoke_calls if call.kwargs["url"].endswith("/resume"))
-    assert resume_call.kwargs["body"] == {"startType": "WhenLastStopped"}
+    assert resume_call.kwargs["body"] == {"startType": expected_start_type}
 
 
 def test_flag_on_waits_for_async_pause_before_resuming(monkeypatch):
@@ -430,8 +440,10 @@ def test_multiple_resume_failures_are_reported_without_masking_original_error(
     error_text = caplog.text if publish_fails else str(raised.value)
     for source_id in resume_errors:
         assert f"Eventstream source '{source_id}' in Eventstream '{EVENTSTREAM_GUID}'" in error_text
-    if publish_fails and publish_mode == "standard":
+    if (publish_fails and publish_mode == "standard") or (not publish_fails and publish_mode == "bulk"):
         post_publish.assert_called_once_with()
+        if publish_mode == "bulk":
+            assert "Post-publish failed" in caplog.text
     else:
         post_publish.assert_not_called()
 
@@ -695,15 +707,24 @@ def test_publish_orchestration_orders_pause_publish_and_resume(
             ]
 
     expected_events = ["pre", "topology:Running", "pause", "topology:Paused", "publish", "resume"]
-    if outcome == "success" or (publish_fails and publish_mode != "bulk"):
+    if (
+        outcome == "success"
+        or (publish_fails and publish_mode != "bulk")
+        or (not publish_fails and publish_mode == "bulk")
+    ):
         expected_events.append("post")
     assert events == expected_events
     if resume_fails and publish_fails:
         assert "Resume failed" in caplog.text
 
 
-@pytest.mark.parametrize("first_batch_fails", [False, True])
-def test_bulk_orchestration_cleans_up_each_batch_before_refresh(first_batch_fails, orchestration_publisher, mocker):
+@pytest.mark.parametrize(
+    ("outcome", "failed_batch_index"),
+    [("success", None), ("publish_failure", 0), ("resume_failure", 0), ("resume_failure", 1)],
+)
+def test_bulk_orchestration_cleans_up_each_batch_before_refresh(
+    outcome, failed_batch_index, orchestration_publisher, mocker
+):
     """Real batch planning and publisher contexts resume sources before the next stage."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     publisher, workspace = orchestration_publisher
@@ -718,6 +739,8 @@ def test_bulk_orchestration_cleans_up_each_batch_before_refresh(first_batch_fail
         guid="966a66bd-74b3-4bc5-a34d-6878ca1a40d1",
     )
     workspace.repository_items[ItemType.EVENTSTREAM.value][second.name] = second
+    unrelated = Item(type=ItemType.NOTEBOOK.value, name="UnrelatedNotebook", description="", guid="")
+    workspace.repository_items[unrelated.type] = {unrelated.name: unrelated}
     mocker.patch.object(ItemPublisher, "create", return_value=publisher)
     mocker.patch(
         "fabric_cicd._items._bulk_publish_dependencies.build_dynamic_variable_dependency_graph",
@@ -729,12 +752,16 @@ def test_bulk_orchestration_cleans_up_each_batch_before_refresh(first_batch_fail
     )
     events = []
     invoke = workspace.endpoint.invoke.side_effect
-    publish_error = RuntimeError("First batch publish failed")
+    publish_error = RuntimeError("Batch publish failed")
+    resume_error = RuntimeError("Batch resume failed")
+    failed_guid = [first.guid, second.guid][failed_batch_index] if failed_batch_index is not None else None
 
     def record_invoke(method, url, **kwargs):
         if url.endswith("/pause") or url.endswith("/resume"):
             guid = url.split("/eventstreams/")[1].split("/")[0]
             events.append((url.rsplit("/", 1)[1], guid))
+            if url.endswith("/resume") and outcome == "resume_failure" and guid == failed_guid:
+                raise resume_error
         return invoke(method, url, **kwargs)
 
     def publish(batch_items, **_kwargs):
@@ -743,32 +770,142 @@ def test_bulk_orchestration_cleans_up_each_batch_before_refresh(first_batch_fail
         assert item_name == item.name
         assert batch_publisher is publisher
         events.append(("publish", item.guid))
-        if first_batch_fails:
+        if outcome == "publish_failure" and item.guid == failed_guid:
             raise publish_error
 
     workspace.endpoint.invoke.side_effect = record_invoke
     publish_bulk = mocker.patch.object(workspace, "_publish_items", side_effect=publish)
     refresh = mocker.patch.object(workspace, "_refresh_deployed_items", side_effect=lambda: events.append("refresh"))
-    post_publish = mocker.patch.object(publisher, "post_publish_all")
+    post_item_states = []
+    post_publish = mocker.patch.object(
+        publisher,
+        "post_publish_all",
+        side_effect=lambda: post_item_states.append([first.skip_publish, second.skip_publish, unrelated.skip_publish]),
+    )
 
-    if first_batch_fails:
-        with pytest.raises(RuntimeError) as raised:
+    if outcome != "success":
+        expected_error = RuntimeError if outcome == "publish_failure" else ItemCleanupError
+        with pytest.raises(expected_error) as raised:
             ItemPublisher.publish_all_bulk(workspace)
-        assert raised.value is publish_error
-        refresh.assert_not_called()
-        post_publish.assert_not_called()
-        assert publish_bulk.call_count == 1
+        if outcome == "publish_failure":
+            assert raised.value is publish_error
+            post_publish.assert_not_called()
+        else:
+            assert raised.value.__cause__ is resume_error
+            post_publish.assert_called_once_with()
+            assert post_item_states == [[False, failed_batch_index == 0, False]]
+        assert publish_bulk.call_count == failed_batch_index + 1
     else:
         assert ItemPublisher.publish_all_bulk(workspace) == []
-        refresh.assert_called_once_with()
         post_publish.assert_called_once_with()
         assert publish_bulk.call_count == 2
+
+    if outcome == "success" or failed_batch_index == 1:
+        refresh.assert_called_once_with()
         assert workspace._dynamic_var_cache == {"$workspace.$id": EVENTSTREAM_GUID}
+    else:
+        refresh.assert_not_called()
 
     expected_events = [("pause", first.guid), ("publish", first.guid), ("resume", first.guid)]
-    if not first_batch_fails:
+    if outcome == "success" or failed_batch_index == 1:
         expected_events.extend(["refresh", ("pause", second.guid), ("publish", second.guid), ("resume", second.guid)])
     assert events == expected_events
+    assert not first.skip_publish
+    assert not second.skip_publish
+    assert not unrelated.skip_publish
+
+
+@pytest.mark.parametrize("environment_post_fails", [False, True])
+def test_bulk_resume_failure_runs_post_publish_only_for_completed_items(
+    environment_post_fails, orchestration_publisher, mocker, caplog
+):
+    """Cleanup errors do not skip Environment staging submission or subsequent publishers' hooks."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    eventstream_publisher, workspace = orchestration_publisher
+    workspace.bulk_publish_enabled = True
+    workspace.item_type_in_scope.append(ItemType.ENVIRONMENT.value)
+    environment = Item(type=ItemType.ENVIRONMENT.value, name="MyEnvironment", description="", guid=EVENTSTREAM_GUID)
+    pending_environment = Item(
+        type=ItemType.ENVIRONMENT.value, name="PendingEnvironment", description="", guid=EVENTSTREAM_GUID
+    )
+    excluded_environment = Item(
+        type=ItemType.ENVIRONMENT.value, name="ExcludedEnvironment", description="", guid=EVENTSTREAM_GUID
+    )
+    workspace.repository_items[ItemType.ENVIRONMENT.value] = {
+        environment.name: environment,
+        pending_environment.name: pending_environment,
+        excluded_environment.name: excluded_environment,
+    }
+    pending_library = Item(
+        type=ItemType.VARIABLE_LIBRARY.value, name="PendingLibrary", description="", guid=EVENTSTREAM_GUID
+    )
+    workspace.repository_items[pending_library.type] = {pending_library.name: pending_library}
+    workspace.item_type_in_scope.append(pending_library.type)
+    workspace.publish_item_name_exclude_regex = "^ExcludedEnvironment$"
+    environment_publisher = EnvironmentPublisher(workspace)
+    library_publisher = VariableLibraryPublisher(workspace)
+    publishers = {
+        ItemType.EVENTSTREAM: eventstream_publisher,
+        ItemType.ENVIRONMENT: environment_publisher,
+        ItemType.VARIABLE_LIBRARY: library_publisher,
+    }
+    mocker.patch.object(ItemPublisher, "create", side_effect=lambda item_type, _workspace: publishers[item_type])
+    mocker.patch.object(environment_publisher, "pre_publish_all")
+    pending_names = {pending_environment.name, pending_library.name}
+    mocker.patch(
+        "fabric_cicd._items._bulk_publish_dependencies.compute_publish_batches",
+        side_effect=lambda items, *_args: [
+            [context for context in items if context[0] not in pending_names],
+            [context for context in items if context[0] in pending_names],
+        ],
+    )
+    post_library = mocker.patch.object(library_publisher, "post_publish_all")
+    events = []
+    post_error = RuntimeError("Environment staging publish failed")
+
+    def submit_environment(_workspace, item_name):
+        assert pending_environment.skip_publish
+        assert not pending_library.skip_publish
+        events.append(("environment", item_name))
+        if environment_post_fails:
+            raise post_error
+
+    submit = mocker.patch("fabric_cicd._items._environment._submit_environment_publish", side_effect=submit_environment)
+    post_eventstream = mocker.patch.object(
+        eventstream_publisher, "post_publish_all", side_effect=lambda: events.append("eventstream")
+    )
+    publish = mocker.patch.object(
+        workspace, "_publish_items", side_effect=lambda *_args, **_kwargs: events.append("import")
+    )
+    refresh = mocker.patch.object(workspace, "_refresh_deployed_items")
+    resume_error = InvokeError("Resume failed", logging.getLogger(__name__))
+    _fail_resumes(workspace, {SOURCE_ID: resume_error})
+
+    with pytest.raises(ItemCleanupError) as raised:
+        ItemPublisher.publish_all_bulk(workspace)
+
+    assert raised.value.__cause__ is resume_error
+    submit.assert_called_once_with(workspace, environment.name)
+    post_eventstream.assert_called_once_with()
+    post_library.assert_not_called()
+    publish.assert_called_once()
+    refresh.assert_not_called()
+    assert events == ["import", ("environment", environment.name), "eventstream"]
+    assert excluded_environment.skip_publish
+    assert not environment.skip_publish
+    assert not pending_environment.skip_publish
+    assert not pending_library.skip_publish
+    post_errors = [record for record in caplog.records if record.getMessage().startswith("Post-publish hook failed")]
+    if environment_post_fails:
+        assert len(post_errors) == 1
+        record = post_errors[0]
+        assert record.levelno == logging.ERROR
+        assert record.getMessage() == (
+            "Post-publish hook failed for Environment after bulk cleanup failure: Environment staging publish failed"
+        )
+        assert record.exc_info is None
+    else:
+        assert not post_errors
 
 
 @pytest.mark.parametrize("cleanup_fails", [False, True])
