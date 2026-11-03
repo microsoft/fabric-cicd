@@ -133,14 +133,10 @@ def test_publish_all_items_integration(mock_fabric_api_server, monkeypatch):  # 
 
     token_credential = DummyTokenCredential()
 
-    monkeypatch.setattr(
-        fabric_cicd.constants,
-        "FEATURE_FLAG",
-        fabric_cicd.constants.FEATURE_FLAG - {fabric_cicd.FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value},
-    )
     for flag in [
         "enable_shortcut_publish",
         "continue_on_shortcut_failure",
+        "enable_warehouse_definition_publish",
     ]:
         fabric_cicd.append_feature_flag(flag)
 
