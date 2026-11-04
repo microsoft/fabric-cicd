@@ -10,6 +10,7 @@ from fabric_cicd._common._validate_env_vars import (
     _VALID_HOSTNAME_REGEX,
     validate_api_url,
     validate_env_var_api_url,
+    validate_extra_headers,
 )
 
 
@@ -206,3 +207,40 @@ class TestValidateApiUrlHostname:
         monkeypatch.setenv("TEST_HOSTNAME_VAR", "https:///")
         with pytest.raises(InputError, match="invalid hostname"):
             validate_env_var_api_url("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+
+
+class TestValidateExtraHeaders:
+    """Tests for validate_extra_headers."""
+
+    def test_accepts_valid_headers(self):
+        headers = {"x-correlation-id": "abc-123", "X-Custom_Header.1": ""}
+        assert validate_extra_headers(headers, "EXTRA_HEADERS") == headers
+
+    @pytest.mark.parametrize(
+        ("headers", "error"),
+        [
+            (["x-a"], "must be a mapping"),
+            ({"bad header": "v"}, "invalid header name"),
+            ({"": "v"}, "invalid header name"),
+            ({1: "v"}, "invalid header name"),
+            ({"AUTHORIZATION": "v"}, "reserved header"),
+            ({"user-agent": "v"}, "reserved header"),
+            ({"Content-Type": "v"}, "reserved header"),
+            ({"x-a": 1}, "must be a string"),
+            ({"x-a": "v\nx-b: injected"}, "must be a string without control characters"),
+        ],
+        ids=[
+            "not_mapping",
+            "space_in_name",
+            "empty_name",
+            "non_string_name",
+            "authorization_any_case",
+            "user_agent",
+            "content_type",
+            "non_string_value",
+            "newline_in_value",
+        ],
+    )
+    def test_rejects_invalid_headers(self, headers, error):
+        with pytest.raises(InputError, match=error):
+            validate_extra_headers(headers, "EXTRA_HEADERS")

@@ -12,7 +12,7 @@ import yaml
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
-from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url
+from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url, validate_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -1039,6 +1039,13 @@ class ConfigValidator:
 
     def _validate_single_constant(self, key: str, value: any, context: str) -> None:
         """Validate a single constant value."""
+        if key == "EXTRA_HEADERS":
+            try:
+                validate_extra_headers(value, context)
+            except InputError as e:
+                self.errors.append(str(e))
+            return
+
         if key in _URL_CONSTANTS:
             if not isinstance(value, str):
                 self.errors.append(f"'{context}' must be a string URL, got {type(value).__name__}")

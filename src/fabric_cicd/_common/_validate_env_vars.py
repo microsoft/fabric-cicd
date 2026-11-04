@@ -19,6 +19,7 @@ def is_env_flag_enabled(env_var: str) -> bool:
 
     return os.environ.get(env_var, "").lower() in VALID_ENABLE_FLAGS
 
+
 # Define a regular expression for valid hostnames
 # Matches: any subdomain of [<word>]api.fabric.microsoft.com or [<word>]api.powerbi.com
 _VALID_HOSTNAME_REGEX = re.compile(r"^([\w-]+\.)*[\w-]*api\.(fabric\.microsoft\.com|powerbi\.com)\Z", re.IGNORECASE)
@@ -29,6 +30,13 @@ VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4
 
 # Constants that hold API URLs and require URL validation
 _URL_CONSTANTS = {"DEFAULT_API_ROOT_URL", "FABRIC_API_ROOT_URL"}
+
+# Headers managed by fabric-cicd that cannot be set through EXTRA_HEADERS (compared case-insensitively).
+# Kept outside the constants module so they cannot be overridden through config.
+_RESERVED_REQUEST_HEADERS = frozenset({"authorization", "content-type", "content-length", "host", "user-agent"})
+
+# RFC 9110 token characters for HTTP header field names
+_HEADER_NAME_REGEX = re.compile(r"\A[!#$%&'*+\-.^_`|~0-9A-Za-z]+\Z")
 
 
 def validate_api_url(url: str, label: str) -> str:
@@ -107,3 +115,34 @@ def _get_fabric_fqdn_url(workspace_id: str) -> str:
     no_dashes = workspace_id.replace("-", "")
     first_two = no_dashes[:2]
     return f"https://{no_dashes}.z{first_two}.w.api.fabric.microsoft.com"
+
+
+def validate_extra_headers(headers: object, label: str) -> dict[str, str]:
+    """
+    Validates user-supplied extra HTTP request headers.
+    Validates the value is a mapping of header names to string values, that each name is a
+    valid HTTP token, that values contain no control characters, and that no name is reserved.
+
+    Args:
+        headers: The value to validate.
+        label: A human-readable label for error messages (e.g., constant or config key).
+
+    Returns:
+        dict[str, str]: The validated headers.
+    """
+    if not isinstance(headers, dict):
+        msg = f"'{label}' must be a mapping of header names to string values, got {type(headers).__name__}."
+        raise InputError(msg, logger)
+
+    for name, value in headers.items():
+        if not isinstance(name, str) or not _HEADER_NAME_REGEX.match(name):
+            msg = f"'{label}' contains an invalid header name: {name!r}."
+            raise InputError(msg, logger)
+        if name.lower() in _RESERVED_REQUEST_HEADERS:
+            msg = f"'{label}' cannot set the reserved header '{name}'."
+            raise InputError(msg, logger)
+        if not isinstance(value, str) or any(ch in value for ch in ("\r", "\n", "\0")):
+            msg = f"'{label}' header '{name}' must be a string without control characters."
+            raise InputError(msg, logger)
+
+    return headers

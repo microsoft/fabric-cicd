@@ -20,6 +20,7 @@ from azure.core.exceptions import (
 import fabric_cicd.constants as constants
 from fabric_cicd._common._exceptions import InvokeError, TokenError
 from fabric_cicd._common._http_tracer import HTTPTracer, HTTPTracerFactory
+from fabric_cicd._common._validate_env_vars import validate_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,8 @@ class FabricEndpoint:
         start_time = time.time()
         invoke_log_message = ""
 
+        extra_headers = validate_extra_headers(constants.EXTRA_HEADERS, "EXTRA_HEADERS")
+
         while not exit_loop:
             try:
                 headers = {
@@ -107,7 +110,11 @@ class FabricEndpoint:
                 if files is None:
                     headers["Content-Type"] = "application/json; charset=utf-8"
 
-                self.http_tracer.capture_request(method, url, headers, body, files)
+                headers.update(extra_headers)
+
+                # Extra header values may be sensitive, so they are redacted from traces
+                traced_headers = {k: ("<redacted>" if k in extra_headers else v) for k, v in headers.items()}
+                self.http_tracer.capture_request(method, url, traced_headers, body, files)
                 response = self.requests.request(method=method, url=url, headers=headers, json=body, files=files)
                 self.http_tracer.capture_response(response)
 
