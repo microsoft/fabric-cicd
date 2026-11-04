@@ -98,7 +98,7 @@ def mock_fabric_api_server(allow_localhost_http_for_integration):  # noqa: ARG00
     importlib.reload(fabric_cicd.constants)
 
 
-def test_publish_all_items_integration(mock_fabric_api_server, monkeypatch):  # noqa: ARG001
+def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
     """Test full publish_all_items workflow using mocked API responses."""
     workspace_id = "00000000-0000-0000-0000-000000000000"
     environment_key = "PPE"
@@ -133,11 +133,7 @@ def test_publish_all_items_integration(mock_fabric_api_server, monkeypatch):  # 
 
     token_credential = DummyTokenCredential()
 
-    for flag in [
-        "enable_shortcut_publish",
-        "continue_on_shortcut_failure",
-        "enable_warehouse_definition_publish",
-    ]:
+    for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure", "enable_warehouse_definition_publish"]:
         fabric_cicd.append_feature_flag(flag)
 
     target_workspace = fabric_cicd.FabricWorkspace(

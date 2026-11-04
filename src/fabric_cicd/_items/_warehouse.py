@@ -22,9 +22,9 @@ class WarehousePublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Warehouse item."""
-        shell_only, creation_payload, definition_enabled = self._get_warehouse_publish_settings(item)
         # Publish Warehouse item as shell-only when definition publishing is not enabled,
         # creation payload exists, or no SQL project is present
+        shell_only, creation_payload, definition_enabled = self._get_warehouse_publish_settings(item)
         if shell_only:
             if definition_enabled:
                 logger.warning(f"Warehouse '{item_name}' will be published as shell-only")

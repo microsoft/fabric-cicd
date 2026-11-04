@@ -202,7 +202,7 @@ def publish_all_items(
     fabric_workspace_obj.shortcut_exclude_regex = None
     fabric_workspace_obj.bulk_publish_enabled = False
 
-    # Set relevant feature flags for the current publish operation
+    # Get the relevant feature flags for the current publish operation
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     bulk_publish_requested = FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG
     experimental_features_enabled = FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value in constants.FEATURE_FLAG
