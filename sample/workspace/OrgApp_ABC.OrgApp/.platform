@@ -1,0 +1,11 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+    "metadata": {
+        "type": "OrgApp",
+        "displayName": "OrgApp_ABC"
+    },
+    "config": {
+        "version": "2.0",
+        "logicalId": "13889f2d-6b42-8aca-4ff0-5528b5e9c284"
+    }
+}

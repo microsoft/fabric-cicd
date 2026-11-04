@@ -592,6 +592,55 @@ semantic_model_binding:
 
             assert len(bind_calls) == 1, "bindConnection API should be called exactly once"
 
+    def test_strict_semantic_model_binding_raises_after_bulk_publish(self, mock_endpoint, temp_workspace_dir):
+        """With the strict binding flag, a binding failure raises after the bulk import already published the model."""
+        create_test_item_dir(temp_workspace_dir, None, "TestModel", "SemanticModel", "sm-id-001")
+
+        create_parameter_file(
+            temp_workspace_dir,
+            """
+semantic_model_binding:
+  default:
+    connection_id:
+      PPE: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+""",
+        )
+
+        bulk_calls = []
+        original = mock_endpoint.invoke.side_effect
+
+        def sm_invoke(method, url, **kwargs):
+            if method == "GET" and "connections" in url and "items" not in url:
+                return {"body": {"value": []}}
+            if method == "POST" and "bulkImportDefinitions" in url:
+                bulk_calls.append(url)
+                return {
+                    "body": {
+                        "importItemDefinitionsDetails": [
+                            {
+                                "itemType": "SemanticModel",
+                                "itemDisplayName": "TestModel",
+                                "itemId": "sm-guid-001",
+                                "operationType": "Create",
+                            },
+                        ]
+                    }
+                }
+            return original(method, url, **kwargs)
+
+        mock_endpoint.invoke.side_effect = sm_invoke
+
+        with (
+            extra_flags(FeatureFlag.ENABLE_STRICT_SEMANTIC_MODEL_BINDING),
+            patched_workspace(
+                mock_endpoint, temp_workspace_dir, item_type_in_scope=["SemanticModel"], environment="PPE"
+            ) as workspace,
+            pytest.raises(FailedPublishedItemStatusError, match="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+        ):
+            publish.publish_all_items(workspace)
+
+        assert len(bulk_calls) == 1, "the model is published before the binding error is raised"
+
     def test_variable_library_value_set_activated_in_bulk_mode(self, mock_endpoint, temp_workspace_dir):
         """Variable library value set is activated via post_publish_all hook after bulk publish."""
         item_dir = create_test_item_dir(temp_workspace_dir, None, "TestVarLib", "VariableLibrary", "vl-id-001")

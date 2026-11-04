@@ -55,6 +55,8 @@ unpublish: # Unpublish configuration (optional)
 
 features:  # Feature flags to enable (optional)
   - enable_shortcut_publish
+  - enable_experimental_features
+  - enable_bulk_publish
 
 constants:  # Global constants to override (optional)
   DEFAULT_API_ROOT_URL: "https://msitapi.fabric.microsoft.com"

@@ -68,6 +68,8 @@ class ItemType(str, Enum):
     MOUNTED_DATA_FACTORY = "MountedDataFactory"
     NOTEBOOK = "Notebook"
     ONTOLOGY = "Ontology"
+    ORG_APP = "OrgApp"
+    ORG_APP_AUDIENCE = "OrgAppAudience"
     PAGINATED_REPORT = "PaginatedReport"
     REFLEX = "Reflex"
     REPORT = "Report"
@@ -113,6 +115,8 @@ SERIAL_ITEM_PUBLISH_ORDER: dict[int, ItemType] = {
     29: ItemType.ML_EXPERIMENT,
     30: ItemType.MAP,
     31: ItemType.GRAPH_MODEL,
+    32: ItemType.ORG_APP,
+    33: ItemType.ORG_APP_AUDIENCE,
 }
 
 
@@ -159,6 +163,8 @@ class FeatureFlag(str, Enum):
     """Set to enable publishing of items using the bulk import API."""
     ENABLE_PURGE_DATA = "enable_purge_data"
     """Set to allow purging a Semantic Model's existing data when applying a definition update."""
+    ENABLE_STRICT_SEMANTIC_MODEL_BINDING = "enable_strict_semantic_model_binding"
+    """Set to fail the deployment when a Semantic Model cannot be bound to its connection."""
 
 
 class OperationType(str, Enum):
@@ -226,6 +232,12 @@ SENSITIVE_RESPONSE_HEADERS = frozenset({
 })
 
 # Publish
+
+# Item types whose folder location is managed by a parent and cannot move independently
+NON_MOVABLE_ITEM_TYPES = [
+    ItemType.ORG_APP_AUDIENCE.value,
+]
+
 SHELL_ONLY_PUBLISH = [
     ItemType.WAREHOUSE.value,
     ItemType.SQL_DATABASE.value,
@@ -244,6 +256,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.REPORT.value: r".*\.pbi[/\\].*",
     ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
     ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
+    ItemType.ORG_APP.value: r".*\.children[/\\].*",
 }
 
 # API Format Mapping for item types that require specific API formats
@@ -264,6 +277,7 @@ DATAFLOW_SOURCE_REGEX = (
 )
 INVALID_FOLDER_CHAR_REGEX = r'[~"#.%&*:<>?/\\{|}]'
 KQL_DATABASE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.Eventhouse/\.children(?:/.*)?$"
+ORG_APP_AUDIENCE_FOLDER_PATH_REGEX = r"(?i)^(.*)/[^/]+\.OrgApp/\.children(?:/.*)?$"
 DYNAMIC_VARIABLES_REGEX = r"^\$(workspace|items)\."
 
 # Well known file names

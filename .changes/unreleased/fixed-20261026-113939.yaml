@@ -1,0 +1,8 @@
+kind: fixed
+body: Keep failed items in PublishError when post_publish_all() also fails
+time: 2026-10-26T11:39:39.000000+01:00
+custom:
+    Author: arhx91
+    AuthorLink: https://github.com/arhx91
+    Issue: "1174"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1174
