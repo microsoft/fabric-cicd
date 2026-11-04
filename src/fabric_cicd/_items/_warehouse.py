@@ -22,12 +22,11 @@ class WarehousePublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Publish a single Warehouse item."""
-        full_definition_publish = FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value in constants.FEATURE_FLAG
-        shell_only, creation_payload = self._get_warehouse_publish_settings(item)
+        shell_only, creation_payload, definition_enabled = self._get_warehouse_publish_settings(item)
         # Publish Warehouse item as shell-only when definition publishing is not enabled,
         # creation payload exists, or no SQL project is present
         if shell_only:
-            if full_definition_publish:
+            if definition_enabled:
                 logger.warning(f"Warehouse '{item_name}' will be published as shell-only")
 
             self.fabric_workspace_obj._publish_item(
@@ -47,8 +46,8 @@ class WarehousePublisher(ItemPublisher):
         )
 
     @staticmethod
-    def _get_warehouse_publish_settings(item: Item) -> tuple[bool, Optional[dict]]:
-        """Return whether to publish shell-only and the creation payload."""
+    def _get_warehouse_publish_settings(item: Item) -> tuple[bool, Optional[dict], bool]:
+        """Return shell-only mode, the creation payload, and whether definition publishing is enabled."""
         creation_payload = next(
             (
                 json.loads(file.contents)["metadata"].get("creationPayload")
@@ -60,4 +59,4 @@ class WarehousePublisher(ItemPublisher):
         definition_enabled = FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value in constants.FEATURE_FLAG
         has_sql_project = any(file.file_path.suffix.lower() == ".sqlproj" for file in item.item_files)
         shell_only = not definition_enabled or creation_payload is not None or not has_sql_project
-        return shell_only, creation_payload
+        return shell_only, creation_payload, definition_enabled

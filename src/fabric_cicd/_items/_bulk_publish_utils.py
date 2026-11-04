@@ -41,7 +41,7 @@ def get_bulk_publish_fallback_reasons(fabric_workspace_obj: "FabricWorkspace") -
         for item_name, item in warehouse_publisher.get_items_to_publish().items():
             if fabric_workspace_obj._apply_publish_filters(item, item_name, warehouse_publisher.item_type):
                 continue
-            shell_only, _ = warehouse_publisher._get_warehouse_publish_settings(item)
+            shell_only, _, _ = warehouse_publisher._get_warehouse_publish_settings(item)
             # If the Warehouse item requires shell-only publishing, it is incompatible with bulk publish
             # Mark Warehouse and DBT Job item types as unsupported for bulk publish (DBT Jobs are tightly coupled with Warehouse items)
             if shell_only:

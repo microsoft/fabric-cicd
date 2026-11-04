@@ -397,7 +397,7 @@ def test_warehouse_definition_api_failure_is_propagated(
     ],
 )
 def test_get_warehouse_publish_settings(monkeypatch, definition_enabled, project_name, metadata, expected_shell_only):
-    """The helper returns both the mode and the unchanged payload without publishing."""
+    """The helper returns the mode, unchanged payload, and definition flag without publishing."""
     monkeypatch.setattr(
         constants,
         "FEATURE_FLAG",
@@ -417,6 +417,7 @@ def test_get_warehouse_publish_settings(monkeypatch, definition_enabled, project
     assert WarehousePublisher._get_warehouse_publish_settings(item) == (
         expected_shell_only,
         metadata.get("creationPayload"),
+        definition_enabled,
     )
 
 
