@@ -1,0 +1,8 @@
+kind: added
+body: Deploy Lakehouse items with their full definition (including data access roles and ALM settings) instead of shell-only, while shortcuts continue to be published separately
+time: 2026-10-18T15:30:00.0000000+03:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1073"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1073
