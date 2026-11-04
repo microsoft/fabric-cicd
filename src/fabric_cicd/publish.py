@@ -6,6 +6,7 @@
 import logging
 from typing import Optional
 
+import dpath
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
@@ -18,7 +19,7 @@ from fabric_cicd._common._config_utils import (
     load_config_file,
 )
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
-from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_deployment_plan,
@@ -28,7 +29,6 @@ from fabric_cicd._common._validate_input import (
     validate_folder_path_to_include,
     validate_items_to_include,
     validate_shortcut_exclude_regex,
-    validate_workspace_capacity,
 )
 from fabric_cicd._items._bulk_publish_dependencies import has_unfiltered_items_variable
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -210,7 +210,8 @@ def publish_all_items(
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    # Reset per-call publish selections
+    # Publish selections are per-call options, not persistent workspace state.
+    # Clear them before applying the options supplied for this invocation.
     fabric_workspace_obj.publish_item_name_exclude_regex = None
     fabric_workspace_obj.publish_folder_path_exclude_regex = None
     fabric_workspace_obj.publish_folder_path_to_include = None
@@ -218,17 +219,25 @@ def publish_all_items(
     fabric_workspace_obj.shortcut_exclude_regex = None
     fabric_workspace_obj.deployment_plan = None
 
-    # Reset bulk publish flag for each publish execution
-    fabric_workspace_obj.bulk_publish_enabled = False
-
     # Initialize response collection if feature flag is enabled
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
         fabric_workspace_obj.responses = {}
 
-    # Validate workspace capacity before proceeding with the publish operation
-    validate_workspace_capacity(fabric_workspace_obj)
+    # Check if workspace has assigned capacity, if not, exit
+    has_assigned_capacity = None
+    response_state = fabric_workspace_obj.endpoint.invoke(
+        method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
+    )
+    has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
+    if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
+        set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
+    ):
+        msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
+        raise FailedPublishedItemStatusError(msg, logger)
 
+    # Reset bulk publish flag to False for each publish execution; it will be set to True if conditions are met for bulk publish
+    fabric_workspace_obj.bulk_publish_enabled = False
     # Determine publishing mode path (standard vs. bulk) based on feature flags and input parameters
     if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
         if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
@@ -240,7 +249,8 @@ def publish_all_items(
         if unsupported:
             reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
 
-        # Fall back to standard deployment when unfiltered $items.* values prevent dependency scoping
+        # Dynamic replacement variables are supported in bulk mode via staged publishing, EXCEPT
+        # when an $items.* replace_value has no file filter — dependency scope cannot be narrowed, so fall back to standard deployment in that case only
         if (
             not unsupported
             and fabric_workspace_obj.contains_param_item_vars
@@ -248,7 +258,7 @@ def publish_all_items(
         ):
             reasons.append(
                 "parameter file contains $items.* replace_value entries without an item_type, "
-                "item_name, or file_path filter; add at least one filter to each to enable bulk publish."
+                "item_name, or file_path filter; add at least one filter to each to enable bulk publish"
             )
 
         # Fall back to standard deployment if any blocking reason was found, otherwise enable bulk publish
