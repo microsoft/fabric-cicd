@@ -3,6 +3,8 @@
 
 """Tests for the enable_eventstream_source_pause feature flag on Eventstream definition updates."""
 
+import base64
+import json
 import logging
 import traceback
 from unittest.mock import MagicMock
@@ -85,6 +87,18 @@ def _fail_resumes(workspace, errors):
     workspace.endpoint.invoke.side_effect = fail_resume
 
 
+def _definition_response(source_ids):
+    """Build the deployed Eventstream definition response for the given sources."""
+    payload = base64.b64encode(
+        json.dumps({"sources": [{"id": source_id} for source_id in source_ids]}).encode()
+    ).decode()
+    return {
+        "body": {
+            "definition": {"parts": [{"path": "eventstream.json", "payload": payload, "payloadType": "InlineBase64"}]}
+        }
+    }
+
+
 @pytest.fixture
 def orchestration_publisher():
     publisher, mock_workspace = _make_publisher(
@@ -117,6 +131,78 @@ def test_flag_off_is_noop():
         pass
 
     workspace.endpoint.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("settled_status", ["Running", "running", "Paused", "Stopped"])
+def test_setup_waits_for_updating_sources_before_selecting_running_sources(settled_status, monkeypatch):
+    """Wait for all updates, then pause and resume only sources that have become running."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    monkeypatch.setenv("FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS", "0")
+    sources = [
+        {"id": SOURCE_ID, "status": "Updating"},
+        {"id": "source-2", "status": "updating"},
+        {"id": "already-paused", "status": "Paused"},
+    ]
+    events = []
+    topology_reads = 0
+
+    def invoke(method, url, **_kwargs):
+        nonlocal topology_reads
+        if method == "GET":
+            topology_reads += 1
+            if topology_reads == 2:
+                sources[0]["status"] = settled_status
+            elif topology_reads == 3:
+                sources[1]["status"] = "Running"
+            events.append("topology")
+            return {"body": {"sources": [dict(source) for source in sources]}}
+        source_id = url.split("/sources/")[1].split("/")[0]
+        action = url.rsplit("/", 1)[1]
+        events.append(f"{action}:{source_id}")
+        source = next(source for source in sources if source["id"] == source_id)
+        source["status"] = "Paused" if action == "pause" else "Running"
+        return {"body": {}}
+
+    publisher, _ = _make_publisher(invoke_side_effect=invoke)
+    with publisher._publish_lifecycle([_make_item()]):
+        events.append("publish")
+        expected_paused_ids = {SOURCE_ID, "source-2"} if settled_status.lower() == "running" else {"source-2"}
+        assert {source["id"] for _, source in publisher._paused_sources} == expected_paused_ids
+        assert all(source["status"] != "Updating" for source in sources)
+
+    assert events[:3] == ["topology"] * 3
+    expected_ids = [SOURCE_ID, "source-2"] if settled_status.lower() == "running" else ["source-2"]
+    assert [event for event in events if event.startswith("pause:")] == [
+        f"pause:{source_id}" for source_id in expected_ids
+    ]
+    assert [event for event in events if event.startswith("resume:")] == [
+        f"resume:{source_id}" for source_id in expected_ids
+    ]
+    assert sources[2]["status"] == "Paused"
+
+
+def test_setup_persistent_updating_times_out_without_publishing(monkeypatch):
+    """An update that never settles aborts setup without pausing or resuming any source."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    monkeypatch.setattr(constants, "RETRY_MAX_DURATION_SECONDS", 0)
+    publisher, workspace = _make_publisher(
+        topology_sources=[
+            {"id": SOURCE_ID, "status": "Updating"},
+            {"id": "running-source", "status": "Running"},
+        ],
+    )
+
+    with (
+        pytest.raises(Exception, match=r"Maximum execution duration \(0 seconds\) exceeded"),
+        publisher._publish_lifecycle([_make_item()]),
+    ):
+        pytest.fail("Publishing must not start while a source is Updating")
+
+    assert publisher._paused_sources == []
+    workspace.endpoint.invoke.assert_called_once_with(
+        method="GET",
+        url=f"{workspace.base_api_url}/eventstreams/{EVENTSTREAM_GUID}/topology",
+    )
 
 
 def test_cleanup_flag_off_is_noop():
@@ -227,6 +313,7 @@ def test_flag_on_missing_source_remains_pending_until_it_reappears(monkeypatch):
         [{"id": SOURCE_ID, "name": "MySource", "status": "Running"}],
         [],
         [{"id": SOURCE_ID, "name": "MySource", "status": "Paused"}],
+        [{"id": SOURCE_ID, "name": "MySource", "status": "Paused"}],
     ]
 
     def mock_invoke(method, url, _body=None, **_kwargs):
@@ -241,12 +328,12 @@ def test_flag_on_missing_source_remains_pending_until_it_reappears(monkeypatch):
         pass
 
     urls = [call.kwargs["url"] for call in workspace.endpoint.invoke.call_args_list]
-    assert sum(1 for url in urls if url.endswith("/topology")) == 3
+    assert sum(1 for url in urls if url.endswith("/topology")) == 4
     assert any(url.endswith(f"/sources/{SOURCE_ID}/resume") for url in urls)
 
 
-def test_flag_on_pause_failed_stops_publish_and_resumes_source():
-    """A terminal PauseFailed status aborts before publishing and runs registered cleanup."""
+def test_flag_on_pause_failed_stops_publish_and_reports_recovery_failure(caplog):
+    """A terminal PauseFailed status aborts publishing and is reported during cleanup."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
 
     status = {"value": "Running"}
@@ -271,7 +358,9 @@ def test_flag_on_pause_failed_stops_publish_and_resumes_source():
 
     assert not entered_publish
     urls = [call.kwargs["url"] for call in workspace.endpoint.invoke.call_args_list]
-    assert any(url.endswith(f"/sources/{SOURCE_ID}/resume") for url in urls)
+    assert not any(url.endswith(f"/sources/{SOURCE_ID}/resume") for url in urls)
+    assert "Cannot recover Eventstream source" in caplog.text
+    assert "pausefailed" in caplog.text
 
 
 @pytest.mark.parametrize("resume_fails", [False, True])
@@ -290,6 +379,8 @@ def test_setup_failure_resumes_sources_already_paused(resume_fails, caplog):
         if method == "POST" and url.endswith("/sources/source-2/pause"):
             pause_error = Exception("Second pause failed")
             raise pause_error
+        if method == "POST" and url.endswith("/sources/source-1/pause"):
+            sources[0]["status"] = "Paused"
         if resume_fails and url.endswith("/sources/source-1/resume"):
             resume_error = InvokeError("Resume failed", logging.getLogger(__name__))
             raise resume_error
@@ -305,6 +396,194 @@ def test_setup_failure_resumes_sources_already_paused(resume_fails, caplog):
     assert not any(url.endswith("/sources/source-2/resume") for url in urls)
     if resume_fails:
         assert "Resume failed" in caplog.text
+
+
+@pytest.mark.parametrize("accepted_status", ["Running", "Paused", "Pausing"])
+def test_lost_pause_response_reconciles_source(accepted_status, monkeypatch):
+    """Recover accepted pauses even when invoke raises, without resuming running sources."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    monkeypatch.setenv("FABRIC_CICD_RETRY_DELAY_OVERRIDE_SECONDS", "0")
+    source = {"id": SOURCE_ID, "name": "MySource", "status": "Running"}
+    pause_error = InvokeError("Pause response lost", logging.getLogger(__name__))
+    statuses_at_resume = []
+    topology_statuses = []
+
+    def invoke(method, url, **_kwargs):
+        if method == "GET":
+            topology_statuses.append(source["status"])
+            response = {"body": {"sources": [dict(source)]}}
+            if source["status"] == "Pausing" and topology_statuses.count("Pausing") == 2:
+                source["status"] = "Paused"
+            return response
+        if url.endswith("/pause"):
+            source["status"] = accepted_status
+            raise pause_error
+        if url.endswith("/resume"):
+            statuses_at_resume.append(source["status"])
+            source["status"] = "Running"
+        return {"body": {}}
+
+    publisher, _ = _make_publisher(invoke_side_effect=invoke)
+    with pytest.raises(InvokeError) as raised, publisher._publish_lifecycle([_make_item()]):
+        pytest.fail("Publishing must not start after a pause request failure")
+
+    assert raised.value is pause_error
+    assert statuses_at_resume == ([] if accepted_status == "Running" else ["Paused"])
+    assert source["status"] == "Running"
+    assert publisher._paused_sources == []
+    if accepted_status == "Pausing":
+        assert topology_statuses == ["Running", "Pausing", "Pausing", "Paused"]
+
+
+@pytest.mark.parametrize("status", [None, "Stopped", "PauseFailed", "Unknown"])
+def test_cleanup_reports_unrecoverable_topology_and_continues(status):
+    """Missing or unexpected topology states do not prevent recovery of other sources."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    sources = [{"id": "source-2", "status": "Paused"}]
+    if status is not None:
+        sources.append({"id": "source-1", "status": status})
+    publisher, workspace = _make_publisher(topology_sources=sources)
+    publisher._paused_sources = [(EVENTSTREAM_GUID, {"id": source_id}) for source_id in ("source-1", "source-2")]
+    invoke = workspace.endpoint.invoke.side_effect
+
+    def deployed_definition(method, url, **kwargs):
+        if url.endswith("/getDefinition"):
+            return _definition_response(["source-1", "source-2"])
+        return invoke(method, url, **kwargs)
+
+    workspace.endpoint.invoke.side_effect = deployed_definition
+
+    with pytest.raises(ItemCleanupError) as raised:
+        publisher.cleanup_items([_make_item()])
+
+    assert len(raised.value.errors) == 1
+    assert "source-1" in raised.value.errors[0][0]
+    assert (status.lower() if status else "missing") in str(raised.value.errors[0][1])
+    resume_urls = [
+        call.kwargs["url"]
+        for call in workspace.endpoint.invoke.call_args_list
+        if call.kwargs["url"].endswith("/resume")
+    ]
+    assert resume_urls == [f"{workspace.base_api_url}/eventstreams/{EVENTSTREAM_GUID}/sources/source-2/resume"]
+    assert publisher._paused_sources == []
+
+
+@pytest.mark.parametrize("replacement_ids", [[], ["replacement-source"]])
+def test_cleanup_skips_sources_removed_from_deployed_definition(replacement_ids, caplog):
+    """A successful removal or replacement does not fail cleanup or resume a new source."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    publisher, workspace = _make_publisher(
+        topology_sources=[
+            {"id": "removed-source", "status": "Running"},
+            {"id": "remaining-source", "status": "Running"},
+        ],
+    )
+    invoke = workspace.endpoint.invoke.side_effect
+    published = False
+
+    def deployed_topology(method, url, **kwargs):
+        if url.endswith("/getDefinition"):
+            assert published
+            return _definition_response(["remaining-source", *replacement_ids])
+        result = invoke(method, url, **kwargs)
+        if published and method == "GET":
+            result["body"]["sources"] = [
+                source for source in result["body"]["sources"] if source["id"] != "removed-source"
+            ] + [{"id": source_id, "status": "Paused"} for source_id in replacement_ids]
+        return result
+
+    workspace.endpoint.invoke.side_effect = deployed_topology
+    with publisher._publish_lifecycle([_make_item()]):
+        published = True
+
+    resume_urls = [
+        call.kwargs["url"]
+        for call in workspace.endpoint.invoke.call_args_list
+        if call.kwargs["url"].endswith("/resume")
+    ]
+    assert resume_urls == [f"{workspace.base_api_url}/eventstreams/{EVENTSTREAM_GUID}/sources/remaining-source/resume"]
+    definition_calls = [
+        call for call in workspace.endpoint.invoke.call_args_list if call.kwargs["url"].endswith("/getDefinition")
+    ]
+    assert len(definition_calls) == 1
+    assert definition_calls[0].kwargs == {
+        "method": "POST",
+        "url": f"{workspace.base_api_url}/items/{EVENTSTREAM_GUID}/getDefinition",
+    }
+    assert publisher._paused_sources == []
+    assert "removed-source" in caplog.text
+    assert "no longer in the deployed definition" in caplog.text
+
+
+@pytest.mark.parametrize("definition_failure", ["lookup", "missing-part", "invalid-payload", "missing-sources"])
+def test_cleanup_definition_failure_is_reported_and_other_sources_resume(definition_failure):
+    """Unconfirmed removals remain errors and do not block recovery of other sources."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    publisher, workspace = _make_publisher(topology_sources=[{"id": "remaining-source", "status": "Paused"}])
+    publisher._paused_sources = [
+        (EVENTSTREAM_GUID, {"id": source_id}) for source_id in ("missing-source", "remaining-source")
+    ]
+    invoke = workspace.endpoint.invoke.side_effect
+    lookup_error = InvokeError("Definition unavailable", logging.getLogger(__name__))
+
+    def failed_definition(method, url, **kwargs):
+        if url.endswith("/getDefinition"):
+            if definition_failure == "lookup":
+                raise lookup_error
+            if definition_failure == "missing-part":
+                return {"body": {"definition": {"parts": []}}}
+            result = _definition_response([])
+            result["body"]["definition"]["parts"][0]["payload"] = (
+                "!" if definition_failure == "invalid-payload" else base64.b64encode(b"{}").decode()
+            )
+            return result
+        return invoke(method, url, **kwargs)
+
+    workspace.endpoint.invoke.side_effect = failed_definition
+    with pytest.raises(ItemCleanupError) as raised:
+        publisher.cleanup_items([_make_item()])
+
+    assert len(raised.value.errors) == 1
+    assert "missing-source" in raised.value.errors[0][0]
+    if definition_failure == "lookup":
+        assert raised.value.errors[0][1] is lookup_error
+    assert any(
+        call.kwargs["url"].endswith("/sources/remaining-source/resume")
+        for call in workspace.endpoint.invoke.call_args_list
+    )
+    assert not any(
+        call.kwargs["url"].endswith("/sources/missing-source/resume")
+        for call in workspace.endpoint.invoke.call_args_list
+    )
+
+
+def test_cleanup_reports_topology_failure_and_continues():
+    """A topology lookup failure is surfaced without skipping recovery of later sources."""
+    constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    sources = [{"id": source_id, "status": "Paused"} for source_id in ("source-1", "source-2")]
+    publisher, workspace = _make_publisher(topology_sources=sources)
+    publisher._paused_sources = [(EVENTSTREAM_GUID, source) for source in sources]
+    invoke = workspace.endpoint.invoke.side_effect
+    lookup_error = InvokeError("Topology unavailable", logging.getLogger(__name__))
+    lookup_failed = False
+
+    def fail_first_lookup(method, url, **kwargs):
+        nonlocal lookup_failed
+        if method == "GET" and not lookup_failed:
+            lookup_failed = True
+            raise lookup_error
+        return invoke(method, url, **kwargs)
+
+    workspace.endpoint.invoke.side_effect = fail_first_lookup
+    with pytest.raises(ItemCleanupError) as raised:
+        publisher.cleanup_items([_make_item()])
+
+    assert raised.value.errors == [
+        (f"Resume Eventstream source 'source-1' in Eventstream '{EVENTSTREAM_GUID}'", lookup_error)
+    ]
+    assert any(
+        call.kwargs["url"].endswith("/sources/source-2/resume") for call in workspace.endpoint.invoke.call_args_list
+    )
 
 
 def test_flag_on_only_running_sources_are_paused():
@@ -451,8 +730,8 @@ def test_multiple_resume_failures_are_reported_without_masking_original_error(
 def test_eventstream_cleanup_collects_each_resume_failure(mocker):
     """Cleanup attempts every resume, clears tracked sources, and aggregates only the failed actions."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
-    publisher, workspace = _make_publisher()
     sources = [{"id": "source-1"}, {"id": "source-2"}, {"id": "source-3"}]
+    publisher, workspace = _make_publisher(topology_sources=[{**source, "status": "Paused"} for source in sources])
     publisher._paused_sources = [(EVENTSTREAM_GUID, source) for source in sources]
     errors = [RuntimeError("First resume failed"), RuntimeError("Last resume failed")]
     resume = mocker.patch("fabric_cicd._items._eventstream._resume_source", side_effect=[errors[0], None, errors[1]])
@@ -477,8 +756,8 @@ def test_eventstream_cleanup_collects_each_resume_failure(mocker):
     assert "Traceback" not in raised.value.additional_info
 
 
-def test_pause_timeout_survives_single_resume_conflict(mocker, caplog):
-    """A failed resume is logged without retrying or replacing the pause timeout."""
+def test_pause_timeout_survives_cleanup_wait_timeout(mocker, caplog):
+    """Cleanup does not resume a transitioning source or replace the original pause timeout."""
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     publisher, workspace = _make_publisher()
     pause_timeout = TimeoutError("Original pause timeout")
@@ -510,9 +789,9 @@ def test_pause_timeout_survives_single_resume_conflict(mocker, caplog):
         pytest.fail("Publishing must not start after pause timeout")
 
     assert raised.value is pause_timeout
-    assert resume_attempts == 1
-    retry.assert_called_once()
-    assert "DataSourceStatusConflict" in caplog.text
+    assert resume_attempts == 0
+    assert retry.call_count == 2
+    assert "Original pause timeout" in caplog.text
 
 
 @pytest.mark.parametrize("error_message", ["Access denied", "DataSourceStatusConflict"])
@@ -706,7 +985,7 @@ def test_publish_orchestration_orders_pause_publish_and_resume(
                 (f"Resume Eventstream source '{SOURCE_ID}' in Eventstream '{EVENTSTREAM_GUID}'", resume_error)
             ]
 
-    expected_events = ["pre", "topology:Running", "pause", "topology:Paused", "publish", "resume"]
+    expected_events = ["pre", "topology:Running", "pause", "topology:Paused", "publish", "topology:Paused", "resume"]
     if (
         outcome == "success"
         or (publish_fails and publish_mode != "bulk")
