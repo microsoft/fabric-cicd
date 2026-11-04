@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Dependency and batch-planning helpers for bulk item publishing."""
+"""Compatibility, validation, dependency, and batch-planning helpers for bulk item publishing."""
 
 import logging
 import re
@@ -12,13 +12,14 @@ from typing import TYPE_CHECKING, Optional
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
+from fabric_cicd._items._warehouse import WarehousePublisher
 from fabric_cicd._parameter._utils import (
     ParsedDynamicVariable,
     parse_dynamic_variable,
     process_environment_key,
     process_input_path,
 )
-from fabric_cicd.constants import ASYNC_PROVISIONED_ATTRIBUTES
+from fabric_cicd.constants import ASYNC_PROVISIONED_ATTRIBUTES, ItemType
 
 if TYPE_CHECKING:
     from fabric_cicd._common._item import Item
@@ -27,6 +28,54 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Bulk publish compatibility detection
+
+
+def get_bulk_publish_fallback_reasons(fabric_workspace_obj: "FabricWorkspace") -> list[str]:
+    """Return bulk fallback reasons after repository discovery and selection setup."""
+    reasons = []
+    unsupported_types = set(constants.BULK_UNSUPPORTED_ITEM_TYPES)
+
+    # Check for Warehouse items that require shell-only publishing (incompatible with bulk publish)
+    if ItemType.WAREHOUSE.value in fabric_workspace_obj.item_type_in_scope:
+        warehouse_publisher = WarehousePublisher(fabric_workspace_obj)
+        for item_name, item in warehouse_publisher.get_items_to_publish().items():
+            if fabric_workspace_obj._apply_publish_filters(item, item_name, warehouse_publisher.item_type):
+                continue
+            shell_only, _, _ = warehouse_publisher._get_warehouse_publish_settings(item)
+            # If the Warehouse item requires shell-only publishing, it is incompatible with bulk publish
+            # Mark Warehouse and DBT Job item types as unsupported for bulk publish (DBT Jobs are tightly coupled with Warehouse items)
+            if shell_only:
+                unsupported_types.update({ItemType.WAREHOUSE.value, ItemType.DATA_BUILD_TOOL_JOB.value})
+                break
+
+    # Determine if any unsupported item types are present in the workspace scope
+    unsupported = set(fabric_workspace_obj.item_type_in_scope) & unsupported_types
+    if unsupported:
+        reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
+
+    # Fall back to standard deployment when unfiltered $items.* values prevent dependency scoping
+    if (
+        not unsupported
+        and fabric_workspace_obj.contains_param_item_vars
+        and has_unfiltered_items_variable(fabric_workspace_obj)
+    ):
+        reasons.append(
+            "parameter file contains $items.* replace_value entries without an item_type, "
+            "item_name, or file_path filter; add at least one filter to each to enable bulk publish."
+        )
+    return reasons
+
+
+def validate_bulk_item_logical_ids(fabric_workspace_obj: "FabricWorkspace") -> None:
+    """Reject placeholder logical IDs after bulk publishing has been selected."""
+    for type_items in fabric_workspace_obj.repository_items.values():
+        for item in type_items.values():
+            if item.logical_id == constants.DEFAULT_GUID:
+                msg = (
+                    f"Item '{item.name}.{item.type}' has the default logicalId '{constants.DEFAULT_GUID}' "
+                    f"in the .platform file. The bulk import API only accepts a unique logicalId. "
+                )
+                raise InputError(msg, logger)
 
 
 def has_unfiltered_items_variable(workspace_obj: "FabricWorkspace") -> bool:
