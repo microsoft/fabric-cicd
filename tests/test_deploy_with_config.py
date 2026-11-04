@@ -420,6 +420,18 @@ class TestConfigOverrides:
 
         assert original_url == constants.DEFAULT_API_ROOT_URL
 
+    def test_extra_headers_override_logs_names_only(self, caplog):
+        """Test EXTRA_HEADERS override is applied per environment and logs header names without values."""
+        original_headers = constants.EXTRA_HEADERS
+        config = {"constants": {"EXTRA_HEADERS": {"dev": {"x-correlation-id": "secret-value"}}}}
+
+        with config_overrides_scope(config, "dev"):
+            assert constants.EXTRA_HEADERS == {"x-correlation-id": "secret-value"}
+
+        assert "x-correlation-id" in caplog.text
+        assert "secret-value" not in caplog.text
+        assert constants.EXTRA_HEADERS is original_headers
+
     def test_user_constants_preserved_across_scope(self):
         """Test that constants set by user before scope are preserved after scope exits."""
         original_url = constants.DEFAULT_API_ROOT_URL
