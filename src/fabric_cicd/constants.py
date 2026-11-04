@@ -191,13 +191,7 @@ UNPUBLISH_FLAG_MAPPING = {
 
 # Item Type
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
-BULK_UNSUPPORTED_ITEM_TYPES = [
-    ItemType.DATA_BUILD_TOOL_JOB.value,
-    ItemType.WAREHOUSE.value,
-]
-BULK_ACCEPTED_ITEM_TYPES = tuple(
-    item_type.value for item_type in ItemType if item_type.value not in BULK_UNSUPPORTED_ITEM_TYPES
-)
+BULK_UNSUPPORTED_ITEM_TYPES: list[str] = []
 
 # API URLs
 DEFAULT_API_ROOT_URL = validate_env_var_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
@@ -259,6 +253,7 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
     ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
     ItemType.ORG_APP.value: r".*\.children[/\\].*",
+    ItemType.WAREHOUSE.value: r"(?:.*[/\\])?\.gitignore$",
 }
 
 # API Format Mapping for item types that require specific API formats

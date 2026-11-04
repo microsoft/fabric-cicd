@@ -324,7 +324,7 @@ class ItemPublisher(Publisher):
         Returns:
             List of publishers that have async checks pending.
         """
-        from fabric_cicd._items._bulk_publish_dependencies import (
+        from fabric_cicd._items._bulk_publish_utils import (
             build_dynamic_variable_dependency_graph,
             build_logical_id_links,
             compute_publish_batches,

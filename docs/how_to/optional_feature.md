@@ -178,8 +178,7 @@ Dynamic replacement variables (`$workspace` and `$items`) are supported in bulk 
 
 Bulk publish will automatically fall back to standard publish mode when any of the following conditions are detected. A warning is logged when this occurs.
 
-- **Unsupported item types in scope**: `DataBuildToolJob` and `Warehouse` are not supported. If either is included in `item_type_in_scope`, the entire deployment uses standard publish.
-- **No `item_type_in_scope` specified**: Bulk publish requires an explicit `item_type_in_scope`. When omitted, all supported item types are included — which inevitably contains bulk unsupported types — so standard publish is used instead.
+- **Unsupported item types in scope**: Types listed in `BULK_UNSUPPORTED_ITEM_TYPES` trigger fallback to standard publish when included in `item_type_in_scope`. Warehouse and DBT Job types are also treated as unsupported for a deployment if any selected Warehouse requires shell-only publishing, because DBT jobs are tightly coupled to Warehouses. See [Warehouse](../reference/item_types.md#warehouse) for details. Additional item types may be added to the unsupported list over time.
 - **Unfiltered current-workspace `$items.*` replace values**: A current-workspace `$items.*` `replace_value` with no `item_type`, `item_name`, or `file_path` parameter filter forces fallback, since its dependency scope cannot be narrowed. Add a filter to each such entry to stay on the bulk path. All other dynamic replacement variables — `$workspace.*`, cross-workspace `$items.*`, and dynamic `find_value`s — are fully supported in bulk mode (see [Dynamic Replacement Variable Support](#dynamic-replacement-variable-support)).
 
 Check your deployment logs for the message `"Falling back to standard deployment..."` to confirm whether bulk publish was actually used.

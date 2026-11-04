@@ -71,7 +71,7 @@ uv run pytest -v -s --log-cli-level=INFO tests/test_integration_publish.py::test
 
 ### Important Notes
 
-- The recorded Warehouse trace covers default shell-only publishing. To record full-definition coverage, enable `enable_warehouse_definition_publish`, use real Fabric Git exports containing SQL projects without creation payloads, and regenerate the trace against a real workspace. Do not synthesize sample definitions or recorded responses.
+- The `enable_warehouse_definition_publish` flag is included to record full-definition coverage (for Git exported Warehouse containing SQL projects without creation payloads). Other Warehouses will be recorded as shell-only.
 - The `http_trace.json` must be generated in one shot, i.e. the Mock Server is not guaranteed to incrementally process new lines added to `http_trace.json`.
   What that means is - you should capture as many items as possible in `debug_trace_deployment.py`, and use that payload in the tests.
 
