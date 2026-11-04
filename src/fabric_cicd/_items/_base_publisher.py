@@ -5,7 +5,10 @@
 
 import logging
 from abc import ABC, abstractmethod
+from collections import defaultdict
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -392,9 +395,30 @@ class ItemPublisher(Publisher):
                         [f"{item.type}: {item_name}" for item_name, item, _publisher in batch_items],
                     )
 
-                fabric_workspace_obj._publish_items(
-                    batch_items, skipped_items=skipped_items if batch_index == 0 else None
-                )
+                publish_succeeded = False
+                try:
+                    with ItemPublisher._batch_publish_lifecycle(batch_items):
+                        fabric_workspace_obj._publish_items(
+                            batch_items, skipped_items=skipped_items if batch_index == 0 else None
+                        )
+                        # Record publish success before context exit runs cleanup
+                        publish_succeeded = True
+                except Exception:
+                    if publish_succeeded:
+                        # Cleanup failed while publish succeeded: get the completed batches, including earlier ones,
+                        # before re-raising (the batch lifecycle only knows the current batch)
+                        completed_items = {
+                            (item.type, item_name)
+                            for batch in batches[: batch_index + 1]
+                            for item_name, item, _publisher in batch
+                        }
+                        # Invoke post-publish handling for completed items after cleanup failure
+                        ItemPublisher._post_publish_after_cleanup_failure(
+                            fabric_workspace_obj, publishers, completed_items
+                        )
+                    # Re-raise the original error, aborting later batches and bypassing
+                    # the post-publish in phase 3 to avoid redundant calls
+                    raise
 
                 # Refresh deployed items and invalidate cached $items.* values between batches
                 if batch_index < len(batches) - 1:
@@ -429,7 +453,7 @@ class ItemPublisher(Publisher):
         Execute the publish operation for this item type.
 
         1. Calls pre_publish_all() for any setup operations
-        2. Gets items via get_items_to_publish()
+        2. Gets items via get_items_to_publish() and applies publish filters
         3. Publishes items (parallel or sequential based on parallel_config)
         4. Calls post_publish_all() for any finalization
         5. Raises PublishError if any items failed, including a post_publish_all() error if that also failed
@@ -452,30 +476,45 @@ class ItemPublisher(Publisher):
         if skipped:
             logger.info(f"Skipping {self.item_type} item(s) due to items_to_include filter: {skipped}")
 
+        items = {
+            name: item
+            for name, item in items.items()
+            if not self.fabric_workspace_obj._apply_publish_filters(item, name, self.item_type)
+        }
+
         if not items:
             self.post_publish_all()
             return
 
         config = getattr(self.__class__, "parallel_config", ParallelConfig())
 
-        if config.ordered_items_func is not None:
-            order = config.ordered_items_func(self)
-            errors = self._publish_items_ordered(items, order)
-        elif config.enabled:
-            errors = self._publish_items_parallel(items)
-        else:
-            errors = self._publish_items_sequential(items)
-
+        # The lifecycle runs setup before publishing and cleanup before PublishError
+        # reaches the except PublishError block below
         try:
-            self.post_publish_all()
-        except Exception as e:
-            # Keep the item failures in the exception
-            if errors:
-                raise PublishError(errors, logger, post_publish_error=e) from e
+            with self._publish_lifecycle(list(items.values())):
+                if config.ordered_items_func is not None:
+                    order = config.ordered_items_func(self)
+                    errors = self._publish_items_ordered(items, order)
+                elif config.enabled:
+                    errors = self._publish_items_parallel(items)
+                else:
+                    errors = self._publish_items_sequential(items)
+
+                # Raise inside the lifecycle so cleanup failures cannot mask publish failures
+                if errors:
+                    raise PublishError(errors, logger)
+        except PublishError as publish_error:
+            # Standalone setup/cleanup failures bypass this handler to avoid
+            # further deployment actions in post-publish hooks
+            try:
+                # Attempt to run post-publish hooks even if publishing failed
+                self.post_publish_all()
+            except Exception as post_error:
+                raise PublishError(publish_error.errors, logger, post_publish_error=post_error) from post_error
             raise
 
-        if errors:
-            raise PublishError(errors, logger)
+        # Publishing and lifecycle cleanup both succeeded. Run post-publish hooks
+        self.post_publish_all()
 
     def publish_one(self, item_name: str, _item: "Item") -> None:
         """
@@ -561,12 +600,112 @@ class ItemPublisher(Publisher):
 
     def post_publish_all(self) -> None:
         """
-        Hook called after all items have been published successfully.
+        Hook called after publishing completes or raises PublishError,
+        including when no items are selected.
 
         Subclasses can override to perform cleanup, binding, or finalization.
         Default implementation does nothing.
         """
         pass
+
+    def setup_items(self, items: list["Item"]) -> None:  # noqa: ARG002
+        """
+        Hook for running setup actions before a publish operation or bulk batch.
+        The default is a no-op.
+        """
+        pass
+
+    def cleanup_items(self, items: list["Item"]) -> None:  # noqa: ARG002
+        """
+        Hook for running cleanup actions after a publish operation or
+        bulk batch, even after partial setup failure. The default is a no-op.
+
+        If a cleanup action fails, log what failed and continue attempting the
+        remaining actions. Raise an error after all cleanup actions have been attempted.
+        """
+        pass
+
+    @contextmanager
+    def _publish_lifecycle(self, items: list["Item"]) -> Generator[None, None, None]:
+        """
+        Run setup before publishing the supplied items and cleanup afterward,
+        even if setup or publishing fails. Pre/post-publish hooks run separately.
+
+        Subclasses should override setup_items() and/or cleanup_items(), not this method.
+        Cleanup errors propagate only if setup and publishing succeeded; otherwise,
+        they are logged without replacing the original error.
+
+        Calls on the same publisher must not overlap. Hooks that store instance state must
+        reset it for each operation, since bulk publishing may reuse the same publisher across multiple batches.
+
+        Args:
+            items: Items participating in the current publish operation or bulk batch.
+        """
+        publish_succeeded = False
+        try:
+            self.setup_items(items)
+            # Run the with-body; errors raised back at yield skip the success flag
+            # and propagate after cleanup in finally, without needing an except
+            yield
+            publish_succeeded = True
+        finally:
+            try:
+                self.cleanup_items(items)
+            except Exception as error:
+                # Propagate cleanup errors only if setup and publishing succeeded;
+                # otherwise, log them to preserve the original error
+                if publish_succeeded:
+                    raise
+                logger.error("Failed to clean up after item publishing: %s", error)
+
+    @staticmethod
+    @contextmanager
+    def _batch_publish_lifecycle(
+        batch_items: list[tuple[str, Item, "ItemPublisher"]],
+    ) -> Generator[None, None, None]:
+        """Enter each publisher's lifecycle once per batch and exit them in reverse order."""
+        items_by_publisher: dict[ItemPublisher, list[Item]] = defaultdict(list)
+        for _, item, publisher in batch_items:
+            items_by_publisher[publisher].append(item)
+
+        with ExitStack() as batch_stack:
+            for publisher, items in items_by_publisher.items():
+                batch_stack.enter_context(publisher._publish_lifecycle(items))
+            yield
+
+    @staticmethod
+    def _post_publish_after_cleanup_failure(
+        fabric_workspace_obj: "FabricWorkspace",
+        publishers: list["ItemPublisher"],
+        published_items: set[tuple[str, str]],
+    ) -> None:
+        """Run post-publish hooks for published items without replacing the cleanup error."""
+        temporarily_skipped: list[Item] = []
+        published_types = {item_type for item_type, _item_name in published_items}
+        try:
+            # Post-publish hooks read all repository items for a given type (only item types in publish scope),
+            # temporarily skip those unpublished items (later batches may include them)
+            for item_type in published_types:
+                for item_name, item in fabric_workspace_obj.repository_items.get(item_type, {}).items():
+                    if (item_type, item_name) not in published_items and not item.skip_publish:
+                        item.skip_publish = True
+                        temporarily_skipped.append(item)
+
+            # Preserve publisher order and run hooks only for types that were published
+            for publisher in publishers:
+                if publisher.item_type not in published_types:
+                    continue
+                try:
+                    publisher.post_publish_all()
+                except Exception as error:
+                    # Attempt remaining hooks without replacing the original cleanup error
+                    logger.error(
+                        "Post-publish hook failed for %s after bulk cleanup failure: %s", publisher.item_type, error
+                    )
+        finally:
+            # Restore only flags changed here, even if a hook fails
+            for item in temporarily_skipped:
+                item.skip_publish = False
 
     def post_publish_all_check(self) -> None:
         """

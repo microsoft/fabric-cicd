@@ -54,6 +54,27 @@ class FailedPublishedItemStatusError(BaseCustomError):
     pass
 
 
+class ItemCleanupError(BaseCustomError):
+    """Raised after cleanup when one or more actions fail.
+
+    Attributes:
+        errors: List of (context_label, exception) tuples for failed cleanup actions.
+    """
+
+    def __init__(self, errors: list[tuple[str, Exception]], logger: Logger) -> None:
+        self.errors = errors
+        failures = []
+        details = []
+        for label, error in errors:
+            failures.append(f"{label}: {error}")
+            details.append(f"--- {label} ---\n{error!s}")
+            additional_info = getattr(error, "additional_info", None)
+            if additional_info:
+                details.append(additional_info)
+        message = f"Failed to complete {len(errors)} item cleanup action(s):\n" + "\n".join(failures)
+        super().__init__(message, logger, "\n".join(details))
+
+
 class PublishError(BaseCustomError):
     """Exception raised when one or more publish operations fail.
 
