@@ -73,6 +73,7 @@
 
 - **Parameterization:**
     - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Note:** Standard publishing may leave Deployment Plan references unresolved, showing "Removed from workspace" warnings even when the referenced items exist in the target workspace. Reassign these references manually in the Fabric UI, or use bulk publishing to resolve them automatically.
 - **Execution:**
     - A deployment plan controls the order in which items are deployed and runs the intermediate actions defined in the plan.
     - Publishing a deployment plan item does not automatically execute it. To execute the plan as part of a deployment, specify its exact display name in the `publish.deployment_plan` configuration field or the optional `deployment_plan` argument to [`publish_all_items()`](code_reference.md#fabric_cicd.publish_all_items).

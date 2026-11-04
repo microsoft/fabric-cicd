@@ -816,7 +816,7 @@ class FabricWorkspace:
                 if not re.match(exclude_path, file.relative_path):
                     if file.type == "text" and not str(file.file_path).endswith(".platform"):
                         # Only enable parameter replacement in Variable Library item definition files
-                        if item_type == ItemType.VARIABLE_LIBRARY.value:
+                        if item_type in (ItemType.VARIABLE_LIBRARY.value, ItemType.DEPLOYMENT_PLAN.value):
                             file.contents = self._replace_parameters(file, item)
                         # Apply default processing for all other item definition files
                         else:
