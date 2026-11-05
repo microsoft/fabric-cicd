@@ -189,6 +189,28 @@ semantic_model_binding:
 - The `_ALL_` environment key (case-insensitive) can be used in the `connection_id` dictionary to apply the same connection to any target environment.
 - Connection ID values must be valid GUIDs.
 - Each environment value under `connection_id` may be a **single GUID string** or a **list of GUID strings**. When a list is supplied, `bindConnection` is called once per connection ID, allowing models that use multiple data sources (e.g., a SQL database and a Lakehouse) to be fully bound in a single deployment pass.
+- By default, a failed binding is logged and the deployment continues. To fail the deployment instead, set the `enable_strict_semantic_model_binding` [feature flag](optional_feature.md#feature-flags). See [Binding failures](#binding-failures).
+
+#### Binding failures
+
+Bindings run after semantic models are published, and every configured binding is attempted. By default, failed bindings are logged and the deployment continues. With the `enable_strict_semantic_model_binding` feature flag set, the deployment fails with a single error that lists every failed binding.
+
+A binding fails when:
+
+- The connection ID is not found in the connections that the deploying identity has permission for, or the connections cannot be listed.
+- The semantic model's existing connections cannot be retrieved.
+- The bind request is rejected.
+
+A binding is skipped, and does not count as a failure, when:
+
+- The semantic model is not deployed in this run.
+- The semantic model has no existing connections. A connection ID that is not found still counts as a failure.
+
+!!! warning "Nothing is rolled back"
+    When the flag fails a deployment, items already published, including the semantic models, stay deployed. Item types published after semantic models (such as reports) are not published, and in `deploy_with_config`, orphan items are not unpublished. With bulk publish, all items are published before the deployment fails.
+
+!!! note "Known limitation"
+    Only the first page of connections is read. A valid connection ID on a later page is reported as not found and, with the flag set, fails the deployment.
 
 ## Advanced Find and Replace
 
