@@ -1,0 +1,10 @@
+$schema: https://developer.microsoft.com/json-schemas/fabric/item/deploymentPlan/definition/plan/1.0.0/schema.json
+version: 1.0.0
+groups:
+  - name: Hello World_SynapseNotebook
+    logicalId: 99b570c5-0c79-9dc4-4c9b-fa16c621384c
+    postActions:
+      - name: Run Hello World_Pipeline
+        job:
+          type: Execute
+          logicalId: 70a8992d-af56-801f-4046-ad0813bac453

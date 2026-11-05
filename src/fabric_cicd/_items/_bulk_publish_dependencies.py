@@ -48,6 +48,24 @@ def has_unfiltered_items_variable(workspace_obj: "FabricWorkspace") -> bool:
 # Dependency-aware batch computation
 
 
+def get_publish_dependencies(
+    workspace_obj: "FabricWorkspace",
+    items_with_context: list[tuple[str, "Item", object]],
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], dict[str, set[str]]]:
+    """Return dependency edges, logical-ID links, and async attributes for the publish collection."""
+    # Build dynamic variable dependencies; none yields a single batch
+    if not workspace_obj.contains_param_item_vars:
+        return [], [], {}
+
+    publish_item_keys = {f"{item.type}.{item_name}" for item_name, item, _publisher in items_with_context}
+    dependency_edges = build_dynamic_variable_dependency_graph(workspace_obj, publish_item_keys)
+    async_attributes = get_async_attributes_to_wait_for(workspace_obj, publish_item_keys)
+    # Logical-ID references only matter once ordering splits items across stages
+    logical_id_links = build_logical_id_links(items_with_context) if dependency_edges else []
+
+    return dependency_edges, logical_id_links, async_attributes
+
+
 @dataclass
 class _PublishUnits:
     """Store publish-units in both lookup directions."""

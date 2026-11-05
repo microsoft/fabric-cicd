@@ -159,6 +159,22 @@ def validate_token_credential(input_value: TokenCredential) -> TokenCredential:
     return input_value
 
 
+def validate_deployment_plan(input_value: str) -> str:
+    """
+    Validate the deployment plan name.
+
+    Args:
+        input_value: The input value to validate.
+    """
+    validate_data_type("string", "deployment_plan", input_value)
+
+    if not input_value.strip():
+        msg = "'deployment_plan' must be a non-empty string."
+        raise InputError(msg, logger)
+
+    return input_value
+
+
 def validate_experimental_param(
     param_value: Optional[str],
     required_flag: "FeatureFlag",

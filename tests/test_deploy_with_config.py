@@ -116,6 +116,68 @@ class TestConfigFileLoading:
             load_config_file(str(config_file), "N/A")
 
 
+class TestDeploymentPlanConfig:
+    """Validate, extract, and forward the optional publish deployment plan."""
+
+    def _write_config(self, tmp_path, value, section="publish"):
+        config = {
+            "core": {
+                "workspace_id": "77777777-7777-7777-7777-777777777777",
+                "repository_directory": str(tmp_path),
+            },
+            section: {"deployment_plan": value},
+            "unpublish": {"skip": True},
+        }
+        if section == "unpublish":
+            config["unpublish"]["deployment_plan"] = value
+        path = tmp_path / "config.yml"
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        return str(path)
+
+    @pytest.mark.parametrize("value", ["Plan", {"dev": "Plan", "prod": "Production Plan"}])
+    def test_valid_plan_name_extracted(self, tmp_path, value):
+        config = load_config_file(self._write_config(tmp_path, value), "dev")
+
+        assert extract_publish_settings(config, "dev")["deployment_plan"] == "Plan"
+
+    @pytest.mark.parametrize("value", ["", " ", 123, False, None, [], {}, {"dev": ""}, {"dev": 5}])
+    def test_rejects_invalid_values(self, tmp_path, value):
+        with pytest.raises(ConfigValidationError, match="deployment_plan"):
+            load_config_file(self._write_config(tmp_path, value), "dev")
+
+    def test_rejects_unpublish_setting(self, tmp_path):
+        with pytest.raises(ConfigValidationError, match="only supported in the 'publish' section"):
+            load_config_file(self._write_config(tmp_path, "Plan", section="unpublish"), "dev")
+
+    def test_missing_environment_omits_selection(self, tmp_path):
+        config = load_config_file(self._write_config(tmp_path, {"prod": "Plan"}), "dev")
+
+        assert "deployment_plan" not in extract_publish_settings(config, "dev")
+
+    def test_config_override_selects_plan(self, tmp_path):
+        config = load_config_file(
+            self._write_config(tmp_path, "Plan"),
+            "dev",
+            {"publish": {"deployment_plan": "Override Plan"}},
+        )
+
+        assert extract_publish_settings(config, "dev")["deployment_plan"] == "Override Plan"
+
+    @pytest.mark.parametrize("value", ["Plan", {"dev": "Plan"}])
+    def test_forwards_plan_to_publish(self, tmp_path, value):
+        with (
+            patch("fabric_cicd.publish.FabricWorkspace"),
+            patch("fabric_cicd.publish.publish_all_items") as mock_publish,
+        ):
+            deploy_with_config(
+                self._write_config(tmp_path, value),
+                token_credential=MagicMock(),
+                environment="dev",
+            )
+
+        assert mock_publish.call_args.kwargs["deployment_plan"] == "Plan"
+
+
 class TestWorkspaceSettingsExtraction:
     """Test workspace settings extraction from config."""
 
@@ -669,6 +731,7 @@ class TestDeployWithConfig:
             folder_path_to_include=None,
             items_to_include=None,
             shortcut_exclude_regex=None,
+            deployment_plan=None,
         )
         mock_unpublish.assert_called_once_with(
             mock_workspace_instance,
@@ -950,6 +1013,7 @@ class TestDeployWithConfig:
             folder_path_to_include=None,
             items_to_include=None,
             shortcut_exclude_regex="^temp_.*",
+            deployment_plan=None,
         )
         # Verify unpublish was also called (but without shortcut_exclude_regex since it's publish-only)
         mock_unpublish.assert_called_once()

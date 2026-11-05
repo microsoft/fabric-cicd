@@ -22,6 +22,7 @@ from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentS
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
+    validate_deployment_plan,
     validate_environment,
     validate_fabric_workspace_obj,
     validate_folder_path_exclude_regex,
@@ -43,6 +44,7 @@ def publish_all_items(
     folder_path_to_include: Optional[list[str]] = None,
     items_to_include: Optional[list[str]] = None,
     shortcut_exclude_regex: Optional[str] = None,
+    deployment_plan: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Publishes all items defined in the `item_type_in_scope` list of the given FabricWorkspace object.
@@ -54,6 +56,7 @@ def publish_all_items(
         folder_path_to_include: List of folder paths in the format "/folder_name"; only the specified folders and their items will be published.
         items_to_include: List of items in the format "item_name.item_type" that should be published.
         shortcut_exclude_regex: Regex pattern to exclude specific shortcuts from being published in lakehouses.
+        deployment_plan: Name of the Deployment Plan item in the repository directory to execute, either included in the publish batch or already present in the target workspace. Supported in bulk publish mode only.
 
     Returns:
         Dict containing all API responses if the ``enable_response_collection`` feature flag is enabled
@@ -179,7 +182,7 @@ def publish_all_items(
         >>> notebook_response = workspace.responses["Notebook"]["Hello World"]
         >>> print(notebook_response["status_code"])  # e.g., 200
 
-        With get_changed_items (deploy only git-changed items)
+        With `get_changed_items` (deploy only git-changed items)
         >>> from fabric_cicd import FabricWorkspace, publish_all_items, get_changed_items
         >>> from azure.identity import AzureCliCredential
         >>> workspace = FabricWorkspace(
@@ -191,6 +194,19 @@ def publish_all_items(
         >>> changed = get_changed_items(workspace.repository_directory)
         >>> if changed:
         ...     publish_all_items(workspace, items_to_include=changed)
+
+        With a deployment plan
+        >>> from fabric_cicd import FabricWorkspace, publish_all_items, append_feature_flag
+        >>> from azure.identity import AzureCliCredential
+        >>> append_feature_flag("enable_experimental_features")
+        >>> append_feature_flag("enable_bulk_publish")
+        >>> workspace = FabricWorkspace(
+        ...     workspace_id="your-workspace-id",
+        ...     repository_directory="/path/to/repo",
+        ...     item_type_in_scope=["DeploymentPlan", "Notebook", "DataPipeline", "Lakehouse", "Environment"],
+        ...     token_credential=AzureCliCredential()  # or any other TokenCredential
+        ... )
+        >>> publish_all_items(workspace, deployment_plan="deployment_plan_ppe")
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
@@ -201,6 +217,7 @@ def publish_all_items(
     fabric_workspace_obj.publish_folder_path_to_include = None
     fabric_workspace_obj.items_to_include = None
     fabric_workspace_obj.shortcut_exclude_regex = None
+    fabric_workspace_obj.deployment_plan = None
 
     # Initialize response collection if feature flag is enabled
     responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
@@ -250,6 +267,13 @@ def publish_all_items(
 
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
+
+    # If deployment_plan is specified, ensure bulk publishing is enabled and validate the plan value
+    if deployment_plan is not None:
+        if not fabric_workspace_obj.bulk_publish_enabled:
+            msg = "Executing a deployment plan requires bulk publishing. Use bulk publishing or omit the 'deployment_plan' parameter."
+            raise InputError(msg, logger)
+        fabric_workspace_obj.deployment_plan = validate_deployment_plan(deployment_plan)
 
     # Apply selective deployment features
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
@@ -599,6 +623,7 @@ def deploy_with_config(  # noqa: D417
                     folder_path_to_include=publish_settings.get("folder_path_to_include"),
                     items_to_include=publish_settings.get("items_to_include"),
                     shortcut_exclude_regex=publish_settings.get("shortcut_exclude_regex"),
+                    deployment_plan=publish_settings.get("deployment_plan"),
                 )
             else:
                 logger.info(f"Skipping publish operation for environment '{environment}'")

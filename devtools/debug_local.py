@@ -24,7 +24,8 @@ from fabric_cicd import (
 # change_log_level()
 
 # Uncomment to add feature flag
-append_feature_flag("enable_shortcut_publish")
+# append_feature_flag("enable_experimental_features")
+# append_feature_flag("enable_bulk_publish")
 
 # The defined environment values should match the names found in the parameter.yml file
 workspace_id = "8f5c0cec-a8ea-48cd-9da4-871dc2642f4c"

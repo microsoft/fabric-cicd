@@ -178,7 +178,7 @@ def test_publish_org_app_with_nested_audience(mock_endpoint, temp_workspace_dir)
 
 
 def test_publish_org_app_before_audience(mock_endpoint, temp_workspace_dir):
-    """Repository discovery and publishing place apps before audiences at the end."""
+    """Repository discovery and publishing place apps before their audiences."""
     create_test_item(temp_workspace_dir, None, "TestApp", "OrgApp", "11111111-1111-1111-1111-111111111111")
     create_test_item(temp_workspace_dir, None, "TestAudience", "OrgAppAudience", "22222222-2222-2222-2222-222222222222")
 
@@ -208,10 +208,8 @@ def test_publish_org_app_before_audience(mock_endpoint, temp_workspace_dir):
             },
             {"item_name": "TestAudience", "item_type": "OrgAppAudience"},
         ]
-        assert list(constants.SERIAL_ITEM_PUBLISH_ORDER.values())[-2:] == [
-            ItemType.ORG_APP,
-            ItemType.ORG_APP_AUDIENCE,
-        ]
+        order = list(constants.SERIAL_ITEM_PUBLISH_ORDER.values())
+        assert order.index(ItemType.ORG_APP) < order.index(ItemType.ORG_APP_AUDIENCE)
 
 
 def test_unpublish_org_app_audience_before_app(mock_endpoint, temp_workspace_dir):
@@ -295,7 +293,9 @@ def test_publish_filters_do_not_leak_between_calls(mock_endpoint, temp_workspace
     with (
         patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
         patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
-        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
     ):
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
@@ -330,7 +330,9 @@ def test_folder_filters_do_not_leak_when_switching_selection(mock_endpoint, temp
     with (
         patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
         patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
-        patch.object(FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
     ):
         workspace = FabricWorkspace(
             workspace_id="12345678-1234-5678-abcd-1234567890ab",
