@@ -111,6 +111,9 @@ def create_test_item_dir(base_path: Path, folder, name: str, item_type: str, log
     with (item_dir / "dummy.txt").open("w", encoding="utf-8") as f:
         f.write("Dummy file content")
 
+    if item_type == "DeploymentPlan":
+        (item_dir / "plan.yml").write_text("version: 1.0.0\ngroups: []\n", encoding="utf-8")
+
     return item_dir
 
 
@@ -1580,7 +1583,6 @@ class TestBulkPublishStagedExecution:
         ws.contains_param_item_vars = True
         ws._apply_publish_filters.return_value = False
         ws._dynamic_var_cache = {}
-
         two_batches = [[("base", base, publisher)], [("dep", dep, publisher)]]
 
         with (
@@ -1789,6 +1791,33 @@ class TestBulkPublishPurgeData:
 @pytest.mark.usefixtures("bulk_publish_flags")
 class TestBulkPublishDeploymentPlan:
     """Tests for explicit deployment plan selection through the public API."""
+
+    def test_empty_collection_validates_plan_once(self, mock_endpoint, temp_workspace_dir):
+        bodies = capture_bulk_bodies(mock_endpoint)
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir) as ws,
+            patch(
+                "fabric_cicd._items._deploymentplans.set_deployment_plan", wraps=set_deployment_plan
+            ) as mock_set_plan,
+            pytest.raises(InputError, match="must exist in the repository"),
+        ):
+            publish.publish_all_items(ws, deployment_plan="Missing")
+
+        mock_set_plan.assert_called_once_with(ws, [])
+        assert bodies == []
+
+    def test_empty_collection_without_plan_remains_noop(self, mock_endpoint, temp_workspace_dir):
+        bodies = capture_bulk_bodies(mock_endpoint)
+        with (
+            patched_workspace(mock_endpoint, temp_workspace_dir) as ws,
+            patch(
+                "fabric_cicd._items._deploymentplans.set_deployment_plan", wraps=set_deployment_plan
+            ) as mock_set_plan,
+        ):
+            publish.publish_all_items(ws)
+
+        mock_set_plan.assert_called_once_with(ws, [])
+        assert bodies == []
 
     @pytest.mark.parametrize("selection", ["out_of_scope", "filtered", "target_only"])
     def test_applies_existing_plan_without_publishing_it(self, mock_endpoint, temp_workspace_dir, selection):

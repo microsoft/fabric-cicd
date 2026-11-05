@@ -333,6 +333,7 @@ class ItemPublisher(Publisher):
             get_async_attributes_to_wait_for,
         )
         from fabric_cicd._items._deploymentplans import set_deployment_plan
+        from fabric_cicd._items._variablelibrary import VariableLibraryPublisher
 
         publishers: list[ItemPublisher] = []
         items_with_context: list[tuple[str, Item, ItemPublisher]] = []
@@ -366,7 +367,7 @@ class ItemPublisher(Publisher):
             publishers.append(publisher)
 
         # Set the deployment plan, if specified
-        deployment_plan_options = set_deployment_plan(fabric_workspace_obj, items_with_context)
+        deployment_plan_options, plan_variable_libraries = set_deployment_plan(fabric_workspace_obj, items_with_context)
 
         # Phase 2: Batched bulk API calls (publisher context used inside for per-item transforms)
         if items_with_context:
@@ -392,6 +393,23 @@ class ItemPublisher(Publisher):
             if fabric_workspace_obj.deployment_plan is not None and len(batches) > 1:
                 msg = "Cannot apply 'deployment_plan' across multiple bulk publish batches. Remove it or adjust parameter dependencies to use a single batch."
                 raise InputError(msg, logger)
+
+            if plan_variable_libraries:
+                variable_libraries = [
+                    context for context in items_with_context if context[1].type == ItemType.VARIABLE_LIBRARY.value
+                ]
+                if variable_libraries:
+                    fabric_workspace_obj._publish_items(variable_libraries)
+                    for publisher in publishers:
+                        if isinstance(publisher, VariableLibraryPublisher):
+                            publisher.post_publish_all(plan_variable_libraries)
+                    publishers = [p for p in publishers if p.item_type != ItemType.VARIABLE_LIBRARY.value]
+                    fabric_workspace_obj._dynamic_var_cache = {
+                        key: value
+                        for key, value in fabric_workspace_obj._dynamic_var_cache.items()
+                        if key.startswith("$workspace.")
+                    }
+                    fabric_workspace_obj._refresh_deployed_items()
 
             # Iterate over each batch and publish
             for batch_index, batch_items in enumerate(batches):
