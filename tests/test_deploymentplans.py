@@ -14,7 +14,7 @@ from fabric_cicd._common._validate_input import validate_deployment_plan
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd._items._deploymentplans import (
     DeploymentPlanPublisher,
-    get_plan_variable_libraries,
+    _get_plan_variable_libraries,
     set_deployment_plan,
 )
 from fabric_cicd._items._variablelibrary import VariableLibraryPublisher
@@ -206,7 +206,7 @@ groups:
     )
 
     workspace.deployment_plan = "Other"
-    assert get_plan_variable_libraries(workspace, plan) == {"Explicit": "PROD", "Fallback": None}
+    assert _get_plan_variable_libraries(workspace, plan) == {"Explicit": "PROD", "Fallback": None}
     workspace.deployment_plan = plan.name
     options, selections = set_deployment_plan(workspace, [(plan.name, plan, object())])
     assert options == {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}}
@@ -223,7 +223,7 @@ def test_get_plan_variable_libraries_without_references(contents):
     plan.item_files = [plan_file]
     workspace = make_workspace("Plan", {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}})
 
-    assert get_plan_variable_libraries(workspace, plan) == {}
+    assert _get_plan_variable_libraries(workspace, plan) == {}
 
 
 def test_get_plan_variable_libraries_requires_plan_file():
@@ -232,7 +232,7 @@ def test_get_plan_variable_libraries_requires_plan_file():
     workspace = make_workspace()
 
     with pytest.raises(InputError, match=r"missing plan\.yml"):
-        get_plan_variable_libraries(workspace, plan)
+        _get_plan_variable_libraries(workspace, plan)
 
 
 def test_get_plan_variable_libraries_rejects_invalid_yaml():
@@ -244,7 +244,7 @@ def test_get_plan_variable_libraries_rejects_invalid_yaml():
     workspace = make_workspace("Plan", {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}})
 
     with pytest.raises(InputError, match="invalid YAML"):
-        get_plan_variable_libraries(workspace, plan)
+        _get_plan_variable_libraries(workspace, plan)
 
 
 def test_set_deployment_plan_returns_bulk_options_for_undeployed_plan():

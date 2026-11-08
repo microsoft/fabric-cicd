@@ -24,7 +24,7 @@ class DeploymentPlanPublisher(ItemPublisher):
     item_type = ItemType.DEPLOYMENT_PLAN.value
 
 
-def get_plan_variable_libraries(
+def _get_plan_variable_libraries(
     fabric_workspace_obj: FabricWorkspace, repository_plan: Item
 ) -> dict[str, Optional[str]]:
     """Return repository Variable Libraries referenced by an already-resolved plan.
@@ -99,4 +99,4 @@ def set_deployment_plan(
     options = {
         "deploymentPlan": {"logicalId": repository_plan.logical_id, "referenceType": "ByLogicalId"},
     }
-    return options, get_plan_variable_libraries(fabric_workspace_obj, repository_plan)
+    return options, _get_plan_variable_libraries(fabric_workspace_obj, repository_plan)

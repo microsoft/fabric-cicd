@@ -12,6 +12,7 @@ from typing import Callable, Optional
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError, PublishError
 from fabric_cicd._common._item import Item
+from fabric_cicd._common._logging import log_header
 from fabric_cicd.constants import PARALLEL_MAX_WORKERS, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -378,7 +379,7 @@ class ItemPublisher(Publisher):
             logical_id_links: list[tuple[str, str]] = []
             async_attributes_to_wait_for: dict[str, set[str]] = {}
 
-            # Build dynamic variable dependencies; none yields a single batch
+            # Stage A: Build dynamic variable dependencies; none yields a single batch
             if fabric_workspace_obj.contains_param_item_vars:
                 publish_item_keys = {f"{item.type}.{item_name}" for item_name, item, _publisher in items_with_context}
                 dependency_edges = build_dynamic_variable_dependency_graph(fabric_workspace_obj, publish_item_keys)
@@ -394,6 +395,7 @@ class ItemPublisher(Publisher):
                 msg = "Cannot apply 'deployment_plan' across multiple bulk publish batches. Remove it or adjust parameter dependencies to use a single batch."
                 raise InputError(msg, logger)
 
+            # Stage B: Publish variable libraries first if any are specified in the plan and activate the selected value sets
             if plan_variable_libraries:
                 variable_libraries = [
                     context for context in items_with_context if context[1].type == ItemType.VARIABLE_LIBRARY.value
@@ -403,15 +405,17 @@ class ItemPublisher(Publisher):
                     for publisher in publishers:
                         if isinstance(publisher, VariableLibraryPublisher):
                             publisher.post_publish_all(plan_variable_libraries)
+                    # Remove the variable library post publish hook from running again after the subsequent batches complete
                     publishers = [p for p in publishers if p.item_type != ItemType.VARIABLE_LIBRARY.value]
+                    # Clear dynamic variable cache except the workspace variables to avoid stale values in subsequent batches
                     fabric_workspace_obj._dynamic_var_cache = {
                         key: value
                         for key, value in fabric_workspace_obj._dynamic_var_cache.items()
                         if key.startswith("$workspace.")
                     }
-                    fabric_workspace_obj._refresh_deployed_items()
+                    log_header(logger, "Publishing Items in Bulk")
 
-            # Iterate over each batch and publish
+            # Stage C:Iterate over each batch and publish
             for batch_index, batch_items in enumerate(batches):
                 if len(batches) > 1:
                     logger.info(f"Publishing batch {batch_index + 1}/{len(batches)}")
