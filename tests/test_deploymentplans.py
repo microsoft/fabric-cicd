@@ -161,7 +161,7 @@ def test_bulk_plan_reimports_variable_libraries_after_activation(mocker):
     assert library_context in workspace._publish_items.call_args_list[1].args[0]
     assert workspace._publish_items.call_args_list[1].kwargs["deployment_plan_options"] == plan_options
     activation.assert_called_once_with(selections)
-    assert [event[0] for event in events.mock_calls] == ["publish", "activate", "refresh", "publish"]
+    assert [event[0] for event in events.mock_calls] == ["publish", "activate", "publish"]
     assert workspace._dynamic_var_cache == {"$workspace.id": "workspace-id"}
     notebook_publisher.post_publish_all.assert_called_once_with()
 
