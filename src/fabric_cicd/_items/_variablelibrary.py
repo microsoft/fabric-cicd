@@ -26,16 +26,13 @@ def activate_value_set(
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
         item_obj: The item object.
-        active_value_set: Explicit plan selection, or None to use the workspace environment.
+        active_value_set: Explicit plan selection validated by Fabric, or None to use the workspace environment.
     """
     settings_file_obj = next((file for file in item_obj.item_files if file.name == "settings.json"), None)
 
     if settings_file_obj:
         settings_dict = json.loads(settings_file_obj.contents)
         if active_value_set is not None:
-            if active_value_set != "Default value set" and active_value_set not in settings_dict["valueSetsOrder"]:
-                msg = f"Value set '{active_value_set}' does not exist in Variable Library '{item_obj.name}'."
-                raise InputError(msg, logger)
             if active_value_set != fabric_workspace_obj.environment:
                 logger.warning(
                     f"Variable Library '{item_obj.name}' uses plan value set '{active_value_set}', "
