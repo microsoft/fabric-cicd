@@ -56,3 +56,14 @@ def test_value_set_activation_propagates_fabric_error(activation_context, caplog
         body={"properties": {"activeValueSetName": "DEV"}},
     )
     assert "Active value set changed" not in caplog.text
+
+
+@pytest.mark.parametrize("selection", [None, "PROD", "Default value set"])
+def test_missing_settings_warns_and_skips_activation(activation_context, caplog, selection):
+    workspace, library = activation_context
+    library.item_files = []
+
+    activate_value_set(workspace, library, selection)
+
+    workspace.endpoint.invoke.assert_not_called()
+    assert "settings.json file not found for item Vars. Active value set not changed." in caplog.text

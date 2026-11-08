@@ -8,7 +8,6 @@ import logging
 from typing import Optional
 
 from fabric_cicd import FabricWorkspace, constants
-from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._items._base_publisher import ItemPublisher
@@ -22,6 +21,8 @@ def activate_value_set(
 ) -> None:
     """
     Activates the value set for the given Variable Library item.
+
+    Logs a warning and skips activation if settings.json is missing.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
@@ -55,11 +56,6 @@ def activate_value_set(
         logger.info(f"{constants.INDENT}Active value set changed to '{active_value_set}'")
 
     else:
-        if active_value_set is not None:
-            msg = (
-                f"Cannot activate plan value set '{active_value_set}' for '{item_obj.name}': settings.json is missing."
-            )
-            raise InputError(msg, logger)
         logger.warning(f"settings.json file not found for item {item_obj.name}. Active value set not changed.")
 
 
