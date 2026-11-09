@@ -243,6 +243,7 @@
 
 - **Parameterization:**
     - The active value set of the variable library is defined by the `environment` field passed into the `FabricWorkspace` object. If no `environment` is specified, the active Value Set will not be changed.
+    - When executing a deployment plan, an explicit `ActiveValueSetName` selection in the plan takes precedence over `environment` and cannot be overridden during deployment. To use a different value set, edit the deployment plan.
 - **Changing Value Sets:**
     - Variable Libraries do not support programmatically changing the name of value set which is active
     - After the initial deployment, if an active set is renamed, or removed, the deployment will fail

@@ -204,6 +204,7 @@ To apply a deployment plan during publishing, set `publish.deployment_plan` to t
 !!! note
 
     - This option requires **bulk publish mode**, with both the `enable_bulk_publish` and `enable_experimental_features` flags enabled. If `deployment_plan` is specified but bulk publishing is disabled or falls back to standard publishing, the deployment stops with an error before any items are published.
+    - Only **one** deployment plan can be selected for execution per deployment, even if multiple Deployment Plan items are published.
     - The selected plan must exist in the repository directory, even if it already exists in the target workspace. Target-only plans are not supported.
     - Executing a deployment plan requires a single bulk publish batch. Plans cannot be executed when parameter dependencies split the deployment into multiple batches.
     - If the plan references a repository Variable Library, all Variable Libraries included by scope and publish filters are published first and their value sets activated. Explicit `ActiveValueSetName` plan selections take precedence; other libraries use the target environment or default value set. These libraries remain in the final bulk batch that executes the plan.
@@ -317,6 +318,7 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `core.repository_directory`             | ✅       | Validation error                |
 | `core.item_types_in_scope`              | ❌       | Warning logged, setting skipped |
 | `core.parameter`                        | ❌       | Warning logged, setting skipped |
+| `publish.deployment_plan`               | ❌       | Debug logged, setting skipped   |
 | `publish.exclude_regex`                 | ❌       | Debug logged, setting skipped   |
 | `publish.folder_exclude_regex`          | ❌       | Debug logged, setting skipped   |
 | `publish.shortcut_exclude_regex`        | ❌       | Debug logged, setting skipped   |
@@ -328,6 +330,8 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `unpublish.skip`                        | ❌       | Defaults to `False`             |
 | `features`                              | ❌       | Warning logged, setting skipped |
 | `constants`                             | ❌       | Warning logged, setting skipped |
+
+If `publish.deployment_plan` has no value for the target environment, publishing proceeds without executing a deployment plan; publishing itself is not skipped.
 
 ### Selective Environment Configuration
 
