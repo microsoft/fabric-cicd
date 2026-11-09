@@ -56,7 +56,7 @@ def main():
         "Warehouse",
     ]
     token_credential = AzureCliCredential()
-    for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
+    for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure", "enable_warehouse_definition_publish"]:
         fabric_cicd.append_feature_flag(flag)
     target_workspace = fabric_cicd.FabricWorkspace(
         workspace_id=workspace_id,
