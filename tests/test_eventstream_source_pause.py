@@ -3,8 +3,6 @@
 
 """Eventstream source recovery, exercised through the real standard and bulk publishing paths."""
 
-import base64
-import json
 from pathlib import Path
 from threading import Barrier
 from types import MethodType, SimpleNamespace
@@ -52,7 +50,6 @@ class Deployment:
             getattr(ws, name).side_effect = MethodType(getattr(FabricWorkspace, name), ws)
         ws.endpoint.invoke.side_effect = self.invoke
         self.sources = {}
-        self.defined_sources = {}
         self.transitions = {}
         self.calls = []
         self.pause_errors = {}
@@ -60,9 +57,9 @@ class Deployment:
         self.accept_pause_on_error = set()
         self.after_pause = {}
         self.remove_on_publish = set()
-        self.hide_on_publish = set()
         self.publish_error = None
         self.on_pause = None
+        self.clock = SimpleNamespace(now=0)
 
     def add_item(self, name="stream", item_type="Eventstream", *, new=False, sources=None):
         item = Item(
@@ -76,7 +73,6 @@ class Deployment:
         self.workspace.repository_items.setdefault(item_type, {})[name] = item
         if item_type == "Eventstream" and not new:
             self.sources[item.guid] = sources if sources is not None else [self.source("source")]
-            self.defined_sources[item.guid] = {s["id"] for s in self.sources[item.guid]}
         return item
 
     @staticmethod
@@ -112,24 +108,11 @@ class Deployment:
             if error is not None:
                 raise error
             return {"body": {}}
-        if url.endswith("/getDefinition"):
-            guid = url.split("/")[-2]
-            payload = json.dumps({"sources": [{"id": s} for s in self.defined_sources[guid]]})
-            return {
-                "body": {
-                    "definition": {
-                        "parts": [{"path": "eventstream.json", "payload": base64.b64encode(payload.encode()).decode()}]
-                    }
-                }
-            }
         if "updateDefinition" in url or url.endswith("/bulkImportDefinitions"):
             if self.publish_error is not None:
                 raise self.publish_error
             for guid, sources in self.sources.items():
-                self.sources[guid] = [
-                    s for s in sources if s["id"] not in self.remove_on_publish | self.hide_on_publish
-                ]
-                self.defined_sources[guid] -= self.remove_on_publish
+                self.sources[guid] = [s for s in sources if s["id"] not in self.remove_on_publish]
             return {"body": {"importItemDefinitionsDetails": []}}
         if url.endswith("/items"):
             return {"body": {"id": "created-guid"}}
@@ -163,7 +146,8 @@ def deployment(monkeypatch, mocker):
             FeatureFlag.ENABLE_BULK_PUBLISH.value,
         },
     )
-    clock = SimpleNamespace(now=0)
+    d = Deployment()
+    clock = d.clock
 
     def sleep(delay):
         clock.now += delay
@@ -171,7 +155,7 @@ def deployment(monkeypatch, mocker):
     fake_time = SimpleNamespace(time=lambda: clock.now, sleep=sleep)
     mocker.patch("fabric_cicd._items._eventstream.time", fake_time)
     mocker.patch("fabric_cicd._common._fabric_endpoint.time", fake_time)
-    return Deployment()
+    return d
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -215,18 +199,24 @@ def test_no_source_calls_when_not_needed(deployment, mode, case, mocker):
         d.add_item(new=case == "new")
     if case == "flag-off":
         constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
-        if mode == "bulk":
-            mocker.patch.object(
-                EventstreamPublisher, "publish_context", side_effect=AssertionError("bulk seam invoked")
-            )
+        mocker.patch.object(
+            EventstreamPublisher, "publish_context", side_effect=AssertionError("source management invoked")
+        )
     d.run(mode)
     assert not any("/eventstreams/" in url for _, url, _ in d.calls)
+    if case == "new" and mode == "standard":
+        assert len(d.actions("/items")) == 1
+    else:
+        assert len(d.imports()) == (0 if case == "empty" else 1)
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
+@pytest.mark.parametrize("flag_enabled", [False, True])
 @pytest.mark.parametrize("filter_name", ["selection", "name", "folder-exclude", "folder-include"])
-def test_filters_precede_all_source_side_effects(deployment, mode, filter_name):
+def test_filters_precede_all_source_side_effects(deployment, mode, filter_name, flag_enabled):
     d = deployment
+    if not flag_enabled:
+        constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
     item = d.add_item()
     item.folder_path = "/excluded/child"
     if filter_name == "selection":
@@ -337,6 +327,21 @@ def test_attempt_all_recovery_and_preserve_primary_failure(deployment, mode, pub
     assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first", "second"]
     assert "resume rejected" in caplog.text
     assert "resume it manually" in caplog.text
+    assert len(d.imports()) == 1
+
+
+@pytest.mark.parametrize("mode", ["standard", "bulk"])
+def test_publish_failure_recovers_sources_without_retrying(deployment, mode):
+    d = deployment
+    item = d.add_item()
+    d.publish_error = RuntimeError("definition rejected")
+    with pytest.raises((PublishError, RuntimeError)) as caught:
+        d.run(mode)
+    primary = caught.value.errors[0][1] if mode == "standard" else caught.value
+    assert primary is d.publish_error
+    assert len(d.imports()) == 1
+    assert len(d.actions("/resume")) == 1
+    assert d.sources[item.guid][0]["status"] == "Running"
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -353,32 +358,30 @@ def test_source_types_are_not_filtered_by_the_library(deployment, mode, source_t
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
-@pytest.mark.parametrize("definition", ["unchanged", "removed", "replaced"])
-def test_missing_source_requires_deployed_definition_confirmation(deployment, mode, definition):
+@pytest.mark.parametrize("replaced", [False, True])
+def test_missing_source_reports_error_and_recovers_other_sources(deployment, mode, replaced):
     d = deployment
     item = d.add_item(sources=[d.source("source"), d.source("sibling")])
-    (d.hide_on_publish if definition == "unchanged" else d.remove_on_publish).add("source")
+    d.remove_on_publish.add("source")
     original_invoke = d.workspace.endpoint.invoke.side_effect
 
     def invoke(method, url, **kwargs):
         result = original_invoke(method, url, **kwargs)
-        if definition == "replaced" and ("updateDefinition" in url or url.endswith("/bulkImportDefinitions")):
+        if replaced and ("updateDefinition" in url or url.endswith("/bulkImportDefinitions")):
             d.sources[item.guid].append(d.source("replacement", "Paused"))
-            d.defined_sources[item.guid].add("replacement")
         return result
 
     d.workspace.endpoint.invoke.side_effect = invoke
-    if definition == "unchanged":
-        with pytest.raises(PublishError) as caught:
-            d.run(mode)
-        recovery_error = caught.value.errors[0][1] if mode == "standard" else caught.value
-        assert len(recovery_error.errors) == 1
-        assert "source 'source'" in recovery_error.errors[0][0]
-        assert "missing" in str(recovery_error.errors[0][1])
-    else:
+    with pytest.raises(PublishError) as caught:
         d.run(mode)
-    assert len(d.actions("/getDefinition")) == 1
+    recovery_error = caught.value.errors[0][1] if mode == "standard" else caught.value
+    assert len(recovery_error.errors) == 1
+    assert "source 'source'" in recovery_error.errors[0][0]
+    assert "missing" in str(recovery_error.errors[0][1])
+    assert not d.actions("/getDefinition")
     assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["sibling"]
+    if replaced:
+        assert next(s for s in d.sources[item.guid] if s["id"] == "replacement")["status"] == "Paused"
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -405,15 +408,8 @@ def test_recovery_read_failure_does_not_skip_other_sources(deployment, mode):
 def test_polling_timeout_is_bounded_and_prevents_definition_update(deployment, mode, monkeypatch, mocker):
     d = deployment
     d.add_item(sources=[d.source("source", "Updating")])
-    clock = SimpleNamespace(now=0)
-
-    def sleep(delay):
-        clock.now += delay
-
-    fake_time = SimpleNamespace(time=lambda: clock.now, sleep=sleep)
+    clock = d.clock
     monkeypatch.setattr(constants, "RETRY_MAX_DURATION_SECONDS", 3)
-    mocker.patch("fabric_cicd._items._eventstream.time", fake_time)
-    mocker.patch("fabric_cicd._common._fabric_endpoint.time", fake_time)
     retry = mocker.patch("fabric_cicd._items._eventstream.handle_retry", side_effect=handle_retry)
     with pytest.raises(Exception, match="Maximum execution duration|Failed to publish"):
         d.run(mode)
@@ -598,6 +594,54 @@ def test_flag_off_bulk_failure_keeps_existing_post_publish_behavior(deployment, 
         d.run("bulk")
     post.assert_not_called()
     assert not any("/eventstreams/" in url for _, url, _ in d.calls)
+
+
+def test_flag_off_standard_failure_keeps_existing_post_publish_behavior(deployment, mocker):
+    d = deployment
+    d.add_item()
+    constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    d.publish_error = RuntimeError("update failed")
+    context = mocker.patch.object(EventstreamPublisher, "publish_context")
+    post = mocker.patch.object(EventstreamPublisher, "post_publish_all")
+    with pytest.raises(PublishError) as caught:
+        d.run("standard")
+    assert caught.value.errors[0][1] is d.publish_error
+    context.assert_not_called()
+    post.assert_called_once_with()
+    assert len(d.imports()) == 1
+    assert not any("/eventstreams/" in url for _, url, _ in d.calls)
+
+
+@pytest.mark.parametrize("import_fails", [False, True])
+def test_flag_off_bulk_batches_bypass_source_management(deployment, mocker, import_fails):
+    d = deployment
+    d.add_item("first", sources=[d.source("first-source")])
+    d.add_item("second", sources=[d.source("second-source")])
+    constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value)
+    stage_dependencies(d, mocker, [("Eventstream.second", "Eventstream.first")])
+    context = mocker.patch.object(EventstreamPublisher, "publish_context")
+    recovery = mocker.patch.object(ItemPublisher, "_post_publish_completed_items")
+    post = mocker.patch.object(EventstreamPublisher, "post_publish_all")
+    original_invoke = d.workspace.endpoint.invoke.side_effect
+
+    def invoke(method, url, **kwargs):
+        if import_fails and len(d.imports()) == 1 and url.endswith("/bulkImportDefinitions"):
+            d.publish_error = RuntimeError("second import failed")
+        return original_invoke(method, url, **kwargs)
+
+    d.workspace.endpoint.invoke.side_effect = invoke
+    if import_fails:
+        with pytest.raises(RuntimeError, match="second import failed"):
+            d.run("bulk")
+        post.assert_not_called()
+    else:
+        d.run("bulk")
+        post.assert_called_once_with()
+    context.assert_not_called()
+    recovery.assert_not_called()
+    assert len(d.imports()) == 2
+    assert not any("/eventstreams/" in url for _, url, _ in d.calls)
+    d.workspace._refresh_deployed_items.assert_called_once()
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])

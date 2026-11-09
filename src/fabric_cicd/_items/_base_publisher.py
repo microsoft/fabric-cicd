@@ -335,6 +335,7 @@ class ItemPublisher(Publisher):
         publishers: list[ItemPublisher] = []
         items_with_context: list[tuple[str, Item, ItemPublisher]] = []
         skipped_items: list[str] = []
+        completed_items: set[tuple[str, str]] = set()
 
         # Phase 1: Pre-hooks + collect items with their publisher context
         for _order_num, item_type in ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
@@ -363,6 +364,11 @@ class ItemPublisher(Publisher):
             items_with_context.extend(publishable_items)
             publishers.append(publisher)
 
+        # Determine if source pause is enabled for eventstream items (requiring context-aware publishing)
+        source_pause_enabled = FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value in constants.FEATURE_FLAG and any(
+            publisher.item_type == ItemType.EVENTSTREAM.value for publisher in publishers
+        )
+
         # Phase 2: Batched bulk API calls (publisher context used inside for per-item transforms)
         if items_with_context:
             if skipped_items:
@@ -383,10 +389,6 @@ class ItemPublisher(Publisher):
 
             batches = compute_publish_batches(items_with_context, dependency_edges, logical_id_links)
 
-            source_pause_enabled = FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value in constants.FEATURE_FLAG and any(
-                item.type == ItemType.EVENTSTREAM.value for _, item, _ in items_with_context
-            )
-            completed_items: set[tuple[str, str]] = set()
             # Iterate over each batch and publish
             for batch_index, batch_items in enumerate(batches):
                 if len(batches) > 1:
@@ -442,13 +444,15 @@ class ItemPublisher(Publisher):
         completed_items: set[tuple[str, str]],
         skipped_items: Optional[list[str]] = None,
     ) -> None:
-        """Publish with source recovery when Eventstream source pause is enabled."""
+        """Publish a bulk batch within publisher contexts and finalize completed items on failure."""
+        # Each publisher context manages only its own items in this batch
         items_by_publisher: dict[ItemPublisher, list[Item]] = {}
         for _, item, publisher in batch_items:
             items_by_publisher.setdefault(publisher, []).append(item)
 
         has_publish_context = False
         try:
+            # Run cleanup for entered contexts even if later setup or publishing fails
             with ExitStack() as stack:
                 for publisher, items in items_by_publisher.items():
                     context = publisher.publish_context(items)
@@ -456,9 +460,10 @@ class ItemPublisher(Publisher):
                         has_publish_context = True
                         stack.enter_context(context)
                 fabric_workspace_obj._publish_items(batch_items, skipped_items=skipped_items)
-                # Record success before exiting contexts: recovery can still fail.
+                # Record success before exiting contexts: recovery can still fail
                 completed_items.update((item.type, name) for name, item, _ in batch_items)
         except Exception:
+            # Run post-publish hooks for completed items, then re-raise the original error
             if has_publish_context and completed_items:
                 ItemPublisher._post_publish_completed_items(fabric_workspace_obj, publishers, completed_items)
             raise
@@ -469,16 +474,17 @@ class ItemPublisher(Publisher):
         publishers: list["ItemPublisher"],
         completed_items: set[tuple[str, str]],
     ) -> None:
-        """Finalize imported items after a lifecycle failure without masking the primary error."""
+        """Run post-publish hooks only for completed items, logging hook errors to preserve the original failure."""
         completed_types = {item_type for item_type, _ in completed_items}
         temporarily_skipped: list[Item] = []
         try:
-            # Hooks inspect repository_items, which can include unimported future batches.
+            # Hooks inspect all repository items; temporarily skip items that were not published in this batch
             for item_type in completed_types:
                 for name, item in fabric_workspace_obj.repository_items[item_type].items():
                     if (item_type, name) not in completed_items and not item.skip_publish:
                         item.skip_publish = True
                         temporarily_skipped.append(item)
+            # Run hooks only for item types with at least one completed publish
             for publisher in publishers:
                 if publisher.item_type in completed_types:
                     try:
@@ -486,6 +492,7 @@ class ItemPublisher(Publisher):
                     except Exception:
                         logger.exception("Post-publish failed for %s after bulk lifecycle failure", publisher.item_type)
         finally:
+            # Restore only flags changed here, leaving previously skipped items unchanged
             for item in temporarily_skipped:
                 item.skip_publish = False
 
@@ -580,7 +587,7 @@ class ItemPublisher(Publisher):
         return None
 
     def publish_context(self, _items: list["Item"]) -> Optional[AbstractContextManager[None]]:
-        """Return an optional context around a filtered bulk batch; by default no lifecycle is needed.
+        """Return an optional context around a publish batch; by default no lifecycle is needed.
 
         A context must recover partial setup failures itself, preserve primary errors,
         and keep operation state local. Standard publishers can reuse it in publish_one().

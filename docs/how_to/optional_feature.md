@@ -17,12 +17,12 @@ append_feature_flag("<specific_flag>")
 <span class="md-h3-nonanchor">Publish behavior</span>
 
 | Flag Name                                 | Description                                                                                                                                                       | Experimental |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                    | ☑️           |
-| `enable_eventstream_source_pause`          | Pause running Eventstream sources before definition updates and restore them afterward, including bulk publishing                                                 |              |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --- |
+| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                    | ☑️           |     |
 | `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                               |              |
-| `enable_warehouse_definition_publish`     | Opt in to Warehouse SQL project deployment, including schema, shared queries, and pre/post-deployment scripts                                                     |
 | `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                  |              |
+| `enable_warehouse_definition_publish`     | Opt in to Warehouse SQL project deployment, including schema, shared queries, and pre/post-deployment scripts                                                     |
+| `enable_eventstream_source_pause`         | Pause an Eventstream's running sources before applying a definition update and resume them afterward; required when a source is backed by a private endpoint      |
 | `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward |              |
 | `enable_strict_semantic_model_binding`    | If a `semantic_model_binding` connection cannot be bound, fail the deployment instead of only logging the failure                                                 |              |
 | `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                           |              |
