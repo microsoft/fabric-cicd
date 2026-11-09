@@ -16,15 +16,16 @@ append_feature_flag("<specific_flag>")
 
 <span class="md-h3-nonanchor">Publish behavior</span>
 
-| Flag Name                                 | Description                                                                                                                                                                                            | Experimental |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
-| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                                                         | ☑️           |
-| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                                                                    |              |
-| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                                                       |              |
-| `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward                                     |              |
-| `enable_strict_semantic_model_binding`    | If a `semantic_model_binding` connection cannot be bound, fail the deployment instead of only logging the failure                                                                                      |              |
-| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                                                                |              |
-| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                                                                                                                              |              |
+| Flag Name                                 | Description                                                                                                                                                       | Experimental |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                    | ☑️           |
+| `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                               |              |
+| `enable_warehouse_definition_publish`     | Opt in to Warehouse SQL project deployment, including schema, shared queries, and pre/post-deployment scripts                                                     |
+| `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                  |              |
+| `enable_purge_data`                       | Allow existing data to be purged from all Semantic Models in a deployment batch when their updated definitions require it; the models must be refreshed afterward |              |
+| `enable_strict_semantic_model_binding`    | If a `semantic_model_binding` connection cannot be bound, fail the deployment instead of only logging the failure                                                 |              |
+| `disable_workspace_folder_publish`        | Disable deploying workspace sub folders                                                                                                                           |              |
+| `enable_environment_variable_replacement` | Enable the use of pipeline variables for parameterization                                                                                                         |              |
 
 <span class="md-h3-nonanchor">Unpublish behavior</span>
 
@@ -211,8 +212,10 @@ Dynamic replacement variables (`$workspace` and `$items`) are supported in bulk 
 
 Bulk publish will automatically fall back to standard publish mode when any of the following conditions are detected. A warning is logged when this occurs.
 
-- **Unsupported item types in scope**: `DataBuildToolJob` and `Warehouse` are not supported. If either is included in `item_type_in_scope`, the entire deployment uses standard publish.
-- **No `item_type_in_scope` specified**: Bulk publish requires an explicit `item_type_in_scope`. When omitted, all supported item types are included — which inevitably contains bulk unsupported types — so standard publish is used instead.
+- **Unsupported item types in scope**: Deployment falls back to standard publish if `item_type_in_scope` includes a type listed in `BULK_UNSUPPORTED_ITEM_TYPES`. Warehouse and DBT Job types are also treated as unsupported when any selected Warehouse requires shell-only publishing, because DBT jobs are tightly coupled to Warehouses. See [Warehouse](../reference/item_types.md#warehouse) for details. Additional types may be added to the unsupported list over time.
+
+    **Default scope:** Omitting `item_type_in_scope` includes all supported item types but does not, by itself, trigger fallback. Bulk eligibility still depends on the selected items and the fallback conditions described here.
+
 - **Unfiltered current-workspace `$items.*` replace values**: A current-workspace `$items.*` `replace_value` with no `item_type`, `item_name`, or `file_path` parameter filter forces fallback, since its dependency scope cannot be narrowed. Add a filter to each such entry to stay on the bulk path. All other dynamic replacement variables — `$workspace.*`, cross-workspace `$items.*`, and dynamic `find_value`s — are fully supported in bulk mode (see [Dynamic Replacement Variable Support](#dynamic-replacement-variable-support)).
 
 Check your deployment logs for the message `"Falling back to standard deployment..."` to confirm whether bulk publish was actually used.
