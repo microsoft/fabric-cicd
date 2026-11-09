@@ -232,13 +232,6 @@ def publish_all_items(
     # Validate workspace capacity before proceeding with the publish operation
     validate_workspace_capacity(fabric_workspace_obj)
 
-    # If deployment_plan is specified, ensure bulk publishing is enabled and validate the plan value
-    if deployment_plan is not None:
-        if not fabric_workspace_obj.bulk_publish_enabled:
-            msg = "Executing a deployment plan requires bulk publishing. Use bulk publishing or omit the 'deployment_plan' parameter."
-            raise InputError(msg, logger)
-        fabric_workspace_obj.deployment_plan = validate_deployment_plan(deployment_plan)
-
     # Apply selective deployment features (for folder-based filtering)
     if folders_publish_enabled:
         if folder_path_exclude_regex is not None and folder_path_to_include is not None:
@@ -289,6 +282,13 @@ def publish_all_items(
         else:
             fabric_workspace_obj.bulk_publish_enabled = True
             validate_bulk_item_logical_ids(fabric_workspace_obj)
+
+    # Validate plan selection after bulk eligibility is resolved, before any publishing
+    if deployment_plan is not None:
+        if not fabric_workspace_obj.bulk_publish_enabled:
+            msg = "Executing a deployment plan requires bulk publishing. Use bulk publishing or omit the 'deployment_plan' parameter."
+            raise InputError(msg, logger)
+        fabric_workspace_obj.deployment_plan = validate_deployment_plan(deployment_plan)
 
     # Execute chosen publish mode
     if fabric_workspace_obj.bulk_publish_enabled:

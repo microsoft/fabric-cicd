@@ -2186,12 +2186,14 @@ class TestBulkPublishDeploymentPlan:
             extra_flags(),
             patched_workspace(mock_endpoint, temp_workspace_dir) as ws,
             patch.object(ws, "_publish_item") as mock_publish,
+            patch.object(ws, "_publish_folders") as mock_publish_folders,
         ):
             constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_BULK_PUBLISH.value)
             with pytest.raises(InputError, match="requires bulk publishing"):
                 publish.publish_all_items(ws, deployment_plan="Plan")
 
         mock_publish.assert_not_called()
+        mock_publish_folders.assert_not_called()
         assert bodies == []
 
     @pytest.mark.parametrize("reason", ["unsupported_type", "unfiltered_variable"])
@@ -2210,6 +2212,7 @@ class TestBulkPublishDeploymentPlan:
                 mock_endpoint, temp_workspace_dir, item_type_in_scope=[item_type], environment="PPE"
             ) as ws,
             patch.object(ws, "_publish_item") as mock_publish,
+            patch.object(ws, "_publish_folders") as mock_publish_folders,
             pytest.raises(InputError, match="requires bulk publishing"),
         ):
             publish.publish_all_items(ws, deployment_plan="Plan")
@@ -2217,6 +2220,7 @@ class TestBulkPublishDeploymentPlan:
         assert ws.bulk_publish_enabled is False
         assert ws.deployment_plan is None
         mock_publish.assert_not_called()
+        mock_publish_folders.assert_not_called()
         assert bodies == []
 
     def test_rejects_multiple_batches_before_publishing(self, mock_endpoint, temp_workspace_dir):
@@ -2225,7 +2229,7 @@ class TestBulkPublishDeploymentPlan:
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DeploymentPlan"]) as ws,
             patch(
-                "fabric_cicd._items._bulk_publish_dependencies.compute_publish_batches",
+                "fabric_cicd._items._bulk_publish_utils.compute_publish_batches",
                 return_value=[[], []],
             ),
             pytest.raises(InputError, match="Cannot apply 'deployment_plan' across multiple bulk publish batches"),
