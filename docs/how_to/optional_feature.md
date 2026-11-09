@@ -19,6 +19,7 @@ append_feature_flag("<specific_flag>")
 | Flag Name                                 | Description                                                                                                                                                       | Experimental |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | `enable_bulk_publish`                     | Deploy all items in a single API call instead of one at a time (uses the bulk import beta API)                                                                    | ☑️           |
+| `enable_eventstream_source_pause`          | Pause supported running Eventstream sources before definition updates and restore them afterward, including bulk publishing                                       |              |
 | `enable_shortcut_publish`                 | Deploy shortcuts with the Lakehouse                                                                                                                               |              |
 | `enable_warehouse_definition_publish`     | Opt in to Warehouse SQL project deployment, including schema, shared queries, and pre/post-deployment scripts                                                     |
 | `continue_on_shortcut_failure`            | Allow deployment to continue even when shortcuts fail to publish                                                                                                  |              |
@@ -74,6 +75,28 @@ from fabric_cicd import get_supported_feature_flags
 get_supported_feature_flags()
 # ['continue_on_shortcut_failure', 'disable_workspace_folder_publish', 'enable_bulk_publish', ...]
 ```
+
+## Eventstream Source Pause
+
+Fabric requires private-endpoint-backed Eventstream sources to be paused before updating their definitions. Opt in with:
+
+```python
+from fabric_cicd import append_feature_flag
+
+append_feature_flag("enable_eventstream_source_pause")
+```
+
+This works with standard publishing and with `enable_bulk_publish` (which still requires `enable_experimental_features`). Selection, name, and folder filters are applied before any source operations. New Eventstreams are not paused.
+
+Only sources observed as running and listed as supporting pause/resume in the [Fabric support table](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/pause-resume-data-streams) are paused. Supported types include Event Hubs, IoT Hub, Service Bus, Azure Data Explorer, the documented CDC and Kafka connectors, Kinesis, Pub/Sub, HTTP, MQTT, weather, Solace, and Sample Data. Sources without documented support (including Custom endpoint, Event Grid, Fabric event sources, and unknown/new types) are left untouched with a warning; Fabric remains responsible for validating their updates. No unsupported-operation error is silently ignored.
+
+Source transitions are polled before updating, after each pause, and during recovery. Each wait is bounded by `FABRIC_CICD_RETRY_MAX_DURATION_SECONDS` (default: 300 seconds); API requests retain their separate retry timeout. Sample Data resumes with `Now`; other supported sources use `WhenLastStopped`. Sources already paused/stopped before the operation are not resumed.
+
+Recovery is attempted for every source whose pause was attempted, even after a lost response, partial setup failure, or failed definition update. Removed/replaced source IDs are skipped only when the deployed definition confirms their removal. A recovery failure after successful publishing fails the deployment, but required post-import actions for completed bulk items are still attempted; future batches are not finalized. If publishing/setup already failed, that error is preserved and recovery failures are logged separately.
+
+!!! warning "Operational limits"
+
+    Pausing interrupts ingestion, and resuming cannot guarantee against data loss outside the source's retention window. Avoid concurrent manual edits or source state changes during deployment. The process must remain running for recovery to execute; after interruption or a logged recovery failure, inspect the identified Eventstream/source IDs in Fabric and manually resume any sources left paused. This flag does not manage destinations.
 
 ## Debugging
 
