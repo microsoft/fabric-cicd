@@ -398,29 +398,13 @@ class ItemPublisher(Publisher):
                     )
 
                 if source_pause_enabled:
-                    items_by_publisher: dict[ItemPublisher, list[Item]] = {}
-                    for _, item, publisher in batch_items:
-                        items_by_publisher.setdefault(publisher, []).append(item)
-
-                    has_publish_context = False
-                    try:
-                        with ExitStack() as stack:
-                            for publisher, items in items_by_publisher.items():
-                                context = publisher.publish_context(items)
-                                if context is not None:
-                                    has_publish_context = True
-                                    stack.enter_context(context)
-                            fabric_workspace_obj._publish_items(
-                                batch_items, skipped_items=skipped_items if batch_index == 0 else None
-                            )
-                            # Record success before exiting contexts: recovery can still fail.
-                            completed_items.update((item.type, name) for name, item, _ in batch_items)
-                    except Exception:
-                        if has_publish_context and completed_items:
-                            ItemPublisher._post_publish_completed_items(
-                                fabric_workspace_obj, publishers, completed_items
-                            )
-                        raise
+                    ItemPublisher._publish_bulk_batch_with_context(
+                        fabric_workspace_obj,
+                        batch_items,
+                        publishers,
+                        completed_items,
+                        skipped_items=skipped_items if batch_index == 0 else None,
+                    )
                 else:
                     fabric_workspace_obj._publish_items(
                         batch_items, skipped_items=skipped_items if batch_index == 0 else None
@@ -449,6 +433,35 @@ class ItemPublisher(Publisher):
             publisher.post_publish_all()
 
         return [p for p in publishers if p.has_async_publish_check]
+
+    @staticmethod
+    def _publish_bulk_batch_with_context(
+        fabric_workspace_obj: "FabricWorkspace",
+        batch_items: list[tuple[str, Item, "ItemPublisher"]],
+        publishers: list["ItemPublisher"],
+        completed_items: set[tuple[str, str]],
+        skipped_items: Optional[list[str]] = None,
+    ) -> None:
+        """Publish with source recovery when Eventstream source pause is enabled."""
+        items_by_publisher: dict[ItemPublisher, list[Item]] = {}
+        for _, item, publisher in batch_items:
+            items_by_publisher.setdefault(publisher, []).append(item)
+
+        has_publish_context = False
+        try:
+            with ExitStack() as stack:
+                for publisher, items in items_by_publisher.items():
+                    context = publisher.publish_context(items)
+                    if context is not None:
+                        has_publish_context = True
+                        stack.enter_context(context)
+                fabric_workspace_obj._publish_items(batch_items, skipped_items=skipped_items)
+                # Record success before exiting contexts: recovery can still fail.
+                completed_items.update((item.type, name) for name, item, _ in batch_items)
+        except Exception:
+            if has_publish_context and completed_items:
+                ItemPublisher._post_publish_completed_items(fabric_workspace_obj, publishers, completed_items)
+            raise
 
     @staticmethod
     def _post_publish_completed_items(
