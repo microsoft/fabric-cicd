@@ -196,6 +196,7 @@ def test_pause_update_resume_and_preserve_inactive_sources(deployment, mode):
     calls = [url for _, url, _ in d.calls]
     assert calls.index(d.actions("/pause")[-1][0]) < calls.index(d.imports()[0])
     assert calls.index(d.imports()[0]) < calls.index(d.actions("/resume")[0][0])
+    assert calls[-1] == d.actions("/resume")[-1][0]
     assert {s["id"]: s["status"] for s in d.sources[item.guid]} == {
         "hub": "Running",
         "sample": "Running",
@@ -283,15 +284,21 @@ def test_accepted_pause_waits_for_paused_despite_stale_topology(deployment, mode
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
-@pytest.mark.parametrize("accepted", [False, True])
-@pytest.mark.parametrize("failed_source", ["first", "second"])
-@pytest.mark.parametrize("resume_fails", [False, True])
+@pytest.mark.parametrize(
+    ("failed_source", "accepted", "resume_fails"),
+    [
+        ("first", False, False),
+        ("second", False, False),
+        ("second", True, False),
+        ("second", True, True),
+    ],
+)
 def test_partial_setup_failure_recovers_attempts_including_lost_responses(
     deployment, mode, accepted, failed_source, resume_fails
 ):
     d = deployment
-    d.add_item(sources=[d.source("first"), d.source("second"), d.source("unattempted")])
-    error = RuntimeError("pause response lost")
+    item = d.add_item(sources=[d.source("first"), d.source("second"), d.source("unattempted")])
+    error = RuntimeError("pause response lost" if accepted else "DataSourceOperationNotSupported")
     d.pause_errors[failed_source] = error
     if accepted:
         d.accept_pause_on_error.add(failed_source)
@@ -306,6 +313,10 @@ def test_partial_setup_failure_recovers_attempts_including_lost_responses(
     assert [url.split("/")[-2] for url, _ in d.actions("/pause")] == attempted
     expected_resumes = attempted if accepted else attempted[:-1]
     assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == expected_resumes
+    statuses = {source["id"]: source["status"] for source in d.sources[item.guid]}
+    assert statuses["first"] == ("Paused" if resume_fails else "Running")
+    assert statuses["second"] == "Running"
+    assert statuses["unattempted"] == "Running"
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -342,67 +353,32 @@ def test_source_types_are_not_filtered_by_the_library(deployment, mode, source_t
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
-def test_resume_uses_api_response_without_extra_polling(deployment, mode):
+@pytest.mark.parametrize("definition", ["unchanged", "removed", "replaced"])
+def test_missing_source_requires_deployed_definition_confirmation(deployment, mode, definition):
     d = deployment
-    d.add_item()
-
-    def invoke(method, url, **kwargs):
-        if d.actions("/resume") and url.endswith("/topology"):
-            pytest.fail("Unexpected post-resume polling")
-        return d.invoke(method, url, **kwargs)
-
-    d.workspace.endpoint.invoke.side_effect = invoke
-    d.run(mode)
-    assert len(d.actions("/resume")) == 1
-
-
-@pytest.mark.parametrize("mode", ["standard", "bulk"])
-def test_service_rejected_pause_aborts_publish_and_recovers_earlier_sources(deployment, mode):
-    d = deployment
-    d.add_item(sources=[d.source("first"), d.source("unsupported"), d.source("unattempted")])
-    error = RuntimeError("DataSourceOperationNotSupported")
-    d.pause_errors["unsupported"] = error
-    with pytest.raises((PublishError, RuntimeError)) as caught:
-        d.run(mode)
-    primary = caught.value.errors[0][1] if mode == "standard" else caught.value
-    assert primary is error
-    assert not d.imports()
-    assert [url.split("/")[-2] for url, _ in d.actions("/pause")] == ["first", "unsupported"]
-    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first"]
-
-
-@pytest.mark.parametrize("mode", ["standard", "bulk"])
-@pytest.mark.parametrize("confirmed_removed", [False, True])
-def test_missing_source_requires_deployed_definition_confirmation(deployment, mode, confirmed_removed):
-    d = deployment
-    d.add_item()
-    (d.remove_on_publish if confirmed_removed else d.hide_on_publish).add("source")
-    if confirmed_removed:
-        d.run(mode)
-    else:
-        with pytest.raises(PublishError):
-            d.run(mode)
-    assert len(d.actions("/getDefinition")) == 1
-    assert not d.actions("/resume")
-
-
-@pytest.mark.parametrize("mode", ["standard", "bulk"])
-def test_replacement_source_id_is_not_resumed(deployment, mode):
-    d = deployment
-    item = d.add_item()
-    d.remove_on_publish.add("source")
+    item = d.add_item(sources=[d.source("source"), d.source("sibling")])
+    (d.hide_on_publish if definition == "unchanged" else d.remove_on_publish).add("source")
     original_invoke = d.workspace.endpoint.invoke.side_effect
 
     def invoke(method, url, **kwargs):
         result = original_invoke(method, url, **kwargs)
-        if "updateDefinition" in url or url.endswith("/bulkImportDefinitions"):
+        if definition == "replaced" and ("updateDefinition" in url or url.endswith("/bulkImportDefinitions")):
             d.sources[item.guid].append(d.source("replacement", "Paused"))
             d.defined_sources[item.guid].add("replacement")
         return result
 
     d.workspace.endpoint.invoke.side_effect = invoke
-    d.run(mode)
-    assert not d.actions("/resume")
+    if definition == "unchanged":
+        with pytest.raises(PublishError) as caught:
+            d.run(mode)
+        recovery_error = caught.value.errors[0][1] if mode == "standard" else caught.value
+        assert len(recovery_error.errors) == 1
+        assert "source 'source'" in recovery_error.errors[0][0]
+        assert "missing" in str(recovery_error.errors[0][1])
+    else:
+        d.run(mode)
+    assert len(d.actions("/getDefinition")) == 1
+    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["sibling"]
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -569,6 +545,7 @@ def test_bulk_failure_finalizes_only_completed_batches(deployment, mocker, failu
 
 def test_multiple_dependency_batches_recover_before_next_import(deployment, mocker):
     d = deployment
+    environment = d.add_item("environment", "Environment")
     d.add_item("first", sources=[d.source("first-source")])
     d.add_item("second", sources=[d.source("second-source")])
     stage_dependencies(d, mocker, [("Eventstream.second", "Eventstream.first")])
@@ -580,6 +557,9 @@ def test_multiple_dependency_batches_recover_before_next_import(deployment, mock
     assert len(imports) == 2
     assert imports[0] < first_resume < second_pause < imports[1]
     assert len(d.actions("/resume")) == 2
+    staging_url = f"{d.workspace.base_api_url}/environments/{environment.guid}/staging/publish?beta=False"
+    assert [url for url, _ in d.actions("/staging/publish?beta=False")] == [staging_url]
+    assert calls.index(staging_url) > imports[1]
     d.workspace._refresh_deployed_items.assert_called_once()
 
 

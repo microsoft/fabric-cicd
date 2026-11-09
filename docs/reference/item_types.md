@@ -87,11 +87,26 @@
 
 ## Eventstream
 
-- **Private-endpoint sources:** Opt in to [Eventstream source pause](../how_to/optional_feature.md#eventstream-source-pause) with `enable_eventstream_source_pause` to pause running sources around definition updates in both standard and bulk publishing. Fabric determines whether each source supports pausing; a rejected pause aborts publishing.
 - **Parameterization:**
     - Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
 - **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
+
+Fabric requires private-endpoint-backed sources to be paused before updating an Eventstream. Enable automatic source pause and resume with:
+
+```python
+from fabric_cicd import append_feature_flag
+
+append_feature_flag("enable_eventstream_source_pause")
+```
+
+This works with standard and bulk publishing, respects deployment filters, and leaves previously paused or stopped sources unchanged. New Eventstreams are not affected.
+
+Check that your sources [support pause and resume](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/pause-resume-data-streams) before enabling the flag; a rejected pause stops deployment. Sample Data restarts from the current time; other sources resume from where streaming stopped.
+
+!!! warning "Ingestion interruption"
+
+    Pausing interrupts ingestion; your source's retention limits still apply. If deployment is interrupted or a source fails to resume, check its state in Fabric and resume it manually if needed.
 
 ## Graph Model
 

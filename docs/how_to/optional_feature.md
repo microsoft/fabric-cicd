@@ -76,28 +76,6 @@ get_supported_feature_flags()
 # ['continue_on_shortcut_failure', 'disable_workspace_folder_publish', 'enable_bulk_publish', ...]
 ```
 
-## Eventstream Source Pause
-
-Fabric requires private-endpoint-backed Eventstream sources to be paused before updating their definitions. Opt in with:
-
-```python
-from fabric_cicd import append_feature_flag
-
-append_feature_flag("enable_eventstream_source_pause")
-```
-
-This works with standard publishing and with `enable_bulk_publish` (which still requires `enable_experimental_features`). Selection, name, and folder filters are applied before any source operations. New Eventstreams are not paused.
-
-All sources observed as running are sent to Fabric's pause API; the library does not maintain a list of supported source types. If Fabric rejects a pause (for example, because a source does not support pause/resume), publishing is aborted and recovery is attempted for sources whose pauses were already attempted. The API error is preserved rather than silently skipping the source. Before enabling the flag, check the [Fabric support table](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/pause-resume-data-streams) for the sources in your Eventstream.
-
-Source transitions are polled before updating, after each pause, and before resuming during recovery. Each wait is bounded by `FABRIC_CICD_RETRY_MAX_DURATION_SECONDS` (default: 300 seconds); API requests retain their separate retry timeout. Resume uses the API result without additional post-resume polling. Sample Data resumes with `Now`; other sources use `WhenLastStopped`. Sources already paused/stopped before the operation are not resumed.
-
-Recovery is attempted for every source whose pause was attempted, even after a lost response, partial setup failure, or failed definition update. Removed/replaced source IDs are skipped only when the deployed definition confirms their removal. A recovery failure after successful publishing fails the deployment, but required post-import actions for completed bulk items are still attempted; future batches are not finalized. If publishing/setup already failed, that error is preserved and recovery failures are logged separately.
-
-!!! warning "Operational limits"
-
-    Pausing interrupts ingestion, and resuming cannot guarantee against data loss outside the source's retention window. Avoid concurrent manual edits or source state changes during deployment. The process must remain running for recovery to execute; after interruption or a logged recovery failure, inspect the identified Eventstream/source IDs in Fabric and manually resume any sources left paused. This flag does not manage destinations.
-
 ## Debugging
 
 If an error arises, or you want full visibility into the API calls the library makes, enable debug logging:

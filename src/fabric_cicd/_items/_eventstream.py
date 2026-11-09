@@ -49,30 +49,69 @@ class EventstreamPublisher(ItemPublisher):
         attempted: list[tuple[str, dict]] = []
         operation_failed = True
         try:
-            for item in items:
-                sources = self._stable_sources(item.guid)
-                for source in sources:
-                    if source["status"].lower() != "running":
-                        continue
-                    # The service can accept a pause even if the client loses its response.
-                    attempted.append((item.guid, source))
-                    self._source_action(item.guid, source, "pause")
-                    self._wait_for_source_paused(item.guid, source["id"])
+            self.pause_sources(items, attempted)
             yield
             operation_failed = False
         finally:
-            errors: list[tuple[str, Exception]] = []
-            for guid, source in attempted:
-                try:
-                    self._recover_source(guid, source)
-                except Exception as error:
-                    label = f"Recover Eventstream '{guid}' source '{source['id']}'"
-                    errors.append((label, error))
-                    logger.error(
-                        "%s failed: %s. Check the source in Fabric and resume it manually if needed.", label, error
+            try:
+                self.resume_sources(attempted)
+            except PublishError:
+                if not operation_failed:
+                    raise
+
+    def pause_sources(self, items: list[Item], attempted: list[tuple[str, dict]]) -> None:
+        """Pause running sources, recording attempts in the caller's operation-local list.
+
+        The caller owns the list so partial setup can be recovered even when this
+        method raises. Record before sending each request to account for lost responses.
+        """
+        for item in items:
+            for source in self._stable_sources(item.guid):
+                if source["status"].lower() == "running":
+                    attempted.append((item.guid, source))
+                    self._source_action(item.guid, source, "pause")
+                    self._wait_for_source_paused(item.guid, source["id"])
+
+    def resume_sources(self, attempted: list[tuple[str, dict]]) -> None:
+        """Reconcile and resume every attempted pause, reporting failures after all attempts."""
+        errors: list[tuple[str, Exception]] = []
+        for guid, original_source in attempted:
+            source_id = original_source["id"]
+            try:
+                source = next((s for s in self._stable_sources(guid, source_id) if s["id"] == source_id), None)
+                if source is None:
+                    # Topology can lag an update. Only a deployed definition confirms removal.
+                    response = self.fabric_workspace_obj.endpoint.invoke(
+                        method="POST", url=f"{self.fabric_workspace_obj.base_api_url}/items/{guid}/getDefinition"
                     )
-            if errors and not operation_failed:
-                raise PublishError(errors, logger) from errors[0][1]
+                    part = next(
+                        (p for p in response["body"]["definition"]["parts"] if p["path"] == "eventstream.json"),
+                        None,
+                    )
+                    if part is None:
+                        msg = f"Eventstream '{guid}' deployed definition has no eventstream.json part"
+                        raise RuntimeError(msg)
+                    definition = json.loads(base64.b64decode(part["payload"], validate=True))
+                    if source_id not in {s["id"] for s in definition["sources"]}:
+                        logger.info(
+                            "Eventstream '%s' source '%s' was removed/replaced; no resume needed.", guid, source_id
+                        )
+                        continue
+                status = source["status"].lower() if source else "missing"
+                if status == "running":
+                    continue
+                if status != "paused":
+                    msg = f"Cannot recover Eventstream '{guid}' source '{source_id}' with topology status '{status}'"
+                    raise RuntimeError(msg)
+                self._source_action(guid, original_source, "resume")
+            except Exception as error:
+                label = f"Recover Eventstream '{guid}' source '{source_id}'"
+                errors.append((label, error))
+                logger.error(
+                    "%s failed: %s. Check the source in Fabric and resume it manually if needed.", label, error
+                )
+        if errors:
+            raise PublishError(errors, logger) from errors[0][1]
 
     def _stable_sources(self, guid: str, source_id: Optional[str] = None) -> list[dict]:
         """Wait for transitions without taking ownership of sources paused by someone else."""
@@ -133,27 +172,3 @@ class EventstreamPublisher(ItemPublisher):
             url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{guid}/sources/{source['id']}/{action}",
             **kwargs,
         )
-
-    def _recover_source(self, guid: str, original_source: dict) -> None:
-        source_id = original_source["id"]
-        source = next((s for s in self._stable_sources(guid, source_id) if s["id"] == source_id), None)
-        if source is None:
-            # Topology can lag an update. Only a deployed definition confirms removal.
-            response = self.fabric_workspace_obj.endpoint.invoke(
-                method="POST", url=f"{self.fabric_workspace_obj.base_api_url}/items/{guid}/getDefinition"
-            )
-            part = next((p for p in response["body"]["definition"]["parts"] if p["path"] == "eventstream.json"), None)
-            if part is None:
-                msg = f"Eventstream '{guid}' deployed definition has no eventstream.json part"
-                raise RuntimeError(msg)
-            definition = json.loads(base64.b64decode(part["payload"], validate=True))
-            if source_id not in {s["id"] for s in definition["sources"]}:
-                logger.info("Eventstream '%s' source '%s' was removed/replaced; no resume needed.", guid, source_id)
-                return
-        status = source["status"].lower() if source else "missing"
-        if status == "running":
-            return
-        if status != "paused":
-            msg = f"Cannot recover Eventstream '{guid}' source '{source_id}' with topology status '{status}'"
-            raise RuntimeError(msg)
-        self._source_action(guid, original_source, "resume")
