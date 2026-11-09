@@ -11,6 +11,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fixtures.credentials import DummyTokenCredential
 
+from fabric_cicd import constants
+from fabric_cicd._common._item import Item
+from fabric_cicd.constants import FeatureFlag
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 
@@ -115,6 +118,72 @@ def patched_fabric_workspace(mock_endpoint):
             )
 
     return _create_workspace
+
+
+@pytest.mark.parametrize("deployed", [False, True], ids=["create", "update"])
+@pytest.mark.parametrize(
+    ("folder_path", "folders_enabled", "expected_folder_id"),
+    [
+        pytest.param("/Target", True, "target-folder-id", id="target-folder"),
+        pytest.param("", True, "", id="workspace-root"),
+        pytest.param("/Target", False, "stale-folder-id", id="folder-publishing-disabled"),
+    ],
+)
+def test_publish_item_resolves_current_folder_id(
+    temp_workspace_dir,
+    patched_fabric_workspace,
+    valid_workspace_id,
+    mock_endpoint,
+    monkeypatch,
+    deployed,
+    folder_path,
+    folders_enabled,
+    expected_folder_id,
+):
+    """Create and move requests use folder IDs resolved after discovery, unless folder publishing is disabled."""
+    workspace = patched_fabric_workspace(valid_workspace_id, str(temp_workspace_dir), ["Notebook"])
+    item = Item(
+        "Notebook",
+        "TestNotebook",
+        "",
+        "deployed-id" if deployed else "",
+        folder_path=folder_path,
+        folder_id="stale-folder-id",
+    )
+    workspace.repository_items = {"Notebook": {item.name: item}}
+    workspace.repository_folders = {"/Target": "target-folder-id"}
+    workspace.deployed_items = (
+        {"Notebook": {item.name: Item("Notebook", item.name, "", item.guid, folder_id="previous-folder-id")}}
+        if deployed
+        else {}
+    )
+    flags = constants.FEATURE_FLAG - {FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value}
+    if not folders_enabled:
+        flags.add(FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value)
+    monkeypatch.setattr(constants, "FEATURE_FLAG", flags)
+    mock_endpoint.invoke.reset_mock()
+    mock_endpoint.invoke.return_value = {"body": {"id": "created-id"}, "header": {}}
+
+    workspace._publish_item(item.name, item.type)
+
+    assert item.folder_id == expected_folder_id
+    requests = [call.kwargs for call in mock_endpoint.invoke.call_args_list]
+    if not deployed:
+        assert len(requests) == 1
+        assert requests[0]["body"]["folderId"] == expected_folder_id
+    else:
+        moves = [request for request in requests if request["url"].endswith("/move")]
+        assert moves == (
+            [
+                {
+                    "method": "POST",
+                    "url": f"{workspace.base_api_url}/items/deployed-id/move",
+                    "body": {"targetFolderId": expected_folder_id},
+                }
+            ]
+            if folders_enabled
+            else []
+        )
 
 
 def test_refresh_repository_folders(repository_with_subfolders, patched_fabric_workspace, valid_workspace_id):

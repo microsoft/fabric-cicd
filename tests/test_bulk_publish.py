@@ -18,14 +18,17 @@ from fixtures.credentials import DummyTokenCredential
 import fabric_cicd.publish as publish
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
+from fabric_cicd._common._item import Item
 from fabric_cicd._items._base_publisher import ItemPublisher
-from fabric_cicd._items._bulk_publish_dependencies import (
+from fabric_cicd._items._bulk_publish_utils import (
     _get_referencing_item_keys,
     build_dynamic_variable_dependency_graph,
     build_logical_id_links,
     compute_publish_batches,
     get_async_attributes_to_wait_for,
+    get_bulk_publish_fallback_reasons,
     has_unfiltered_items_variable,
+    validate_bulk_item_logical_ids,
 )
 from fabric_cicd._items._deploymentplans import set_deployment_plan
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -73,6 +76,7 @@ def bulk_publish_flags():
     original_flags = constants.FEATURE_FLAG.copy()
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value)
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_BULK_PUBLISH.value)
+    constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
     yield
     constants.FEATURE_FLAG.clear()
     constants.FEATURE_FLAG.update(original_flags)
@@ -122,6 +126,26 @@ def create_parameter_file(base_path: Path, content: str) -> Path:
     param_file = base_path / "parameter.yml"
     param_file.write_text(content, encoding="utf-8")
     return param_file
+
+
+def create_warehouse_dir(
+    base_path: Path,
+    *,
+    name="TestWarehouse",
+    folder=None,
+    has_project=True,
+    creation_payload=None,
+    logical_id="wh-id-001",
+) -> Path:
+    """Create a Warehouse definition with explicit project and creation-payload settings."""
+    item_dir = create_test_item_dir(base_path, folder, name, "Warehouse", logical_id)
+    platform_file = item_dir / ".platform"
+    metadata = json.loads(platform_file.read_text(encoding="utf-8"))
+    metadata["metadata"]["creationPayload"] = creation_payload
+    platform_file.write_text(json.dumps(metadata), encoding="utf-8")
+    if has_project:
+        (item_dir / "Warehouse.sqlproj").write_text("<Project />", encoding="utf-8")
+    return item_dir
 
 
 @contextmanager
@@ -238,20 +262,250 @@ class TestBulkPublishFeatureFlags:
 # =============================================================================
 
 
+@pytest.mark.parametrize(
+    "logical_id",
+    [
+        pytest.param(None, id="empty-repository"),
+        pytest.param("valid-warehouse-id", id="valid-ids"),
+        pytest.param(constants.DEFAULT_GUID, id="placeholder-in-later-type"),
+    ],
+)
+def test_bulk_logical_id_validation_checks_later_item_types(logical_id):
+    """Validation scans every type and reports the item with a placeholder logical ID."""
+    workspace = SimpleNamespace(
+        repository_items=(
+            {
+                "Notebook": {"First": Item("Notebook", "First", "", "", logical_id="valid-notebook-id")},
+                "Warehouse": {"Second": Item("Warehouse", "Second", "", "", logical_id=logical_id)},
+            }
+            if logical_id is not None
+            else {}
+        )
+    )
+    if logical_id == constants.DEFAULT_GUID:
+        with pytest.raises(InputError, match=r"Second\.Warehouse.*default logicalId"):
+            validate_bulk_item_logical_ids(workspace)
+    else:
+        assert validate_bulk_item_logical_ids(workspace) is None
+
+
+@pytest.mark.parametrize(
+    ("unsupported_types", "contains_item_vars", "unfiltered", "expected_reasons"),
+    [
+        pytest.param([], False, False, [], id="no-restrictions"),
+        pytest.param([], True, False, [], id="filtered-variables"),
+        pytest.param(
+            [],
+            True,
+            True,
+            [
+                "parameter file contains $items.* replace_value entries without an item_type, "
+                "item_name, or file_path filter; add at least one filter to each to enable bulk publish."
+            ],
+            id="unfiltered-variables",
+        ),
+        pytest.param(
+            ["Notebook"],
+            True,
+            True,
+            ["unsupported item types: Notebook"],
+            id="unsupported-types-take-precedence",
+        ),
+    ],
+)
+def test_get_bulk_publish_fallback_reasons(
+    monkeypatch, unsupported_types, contains_item_vars, unfiltered, expected_reasons
+):
+    """The helper returns reasons without setting the mode and skips irrelevant variable checks."""
+    monkeypatch.setattr(constants, "BULK_UNSUPPORTED_ITEM_TYPES", unsupported_types)
+    workspace = SimpleNamespace(
+        item_type_in_scope=["Notebook"],
+        contains_param_item_vars=contains_item_vars,
+        bulk_publish_enabled=False,
+    )
+    with patch(
+        "fabric_cicd._items._bulk_publish_utils.has_unfiltered_items_variable", return_value=unfiltered
+    ) as check_variables:
+        assert get_bulk_publish_fallback_reasons(workspace) == expected_reasons
+
+    if contains_item_vars and not unsupported_types:
+        check_variables.assert_called_once_with(workspace)
+    else:
+        check_variables.assert_not_called()
+    assert workspace.bulk_publish_enabled is False
+
+
 @pytest.mark.usefixtures("bulk_publish_flags")
 class TestBulkPublishFallback:
     """Tests for conditions that cause fallback to standard publishing."""
 
-    def test_fallback_on_unsupported_item_type(self, mock_endpoint, temp_workspace_dir):
-        """Bulk publish falls back to standard mode when unsupported item types are in scope."""
-        create_test_item_dir(temp_workspace_dir, None, "TestWarehouse", "Warehouse", "wh-id-001")
+    @pytest.mark.parametrize(
+        ("unsupported_types", "expected_bulk"),
+        [
+            pytest.param([], True, id="dbt-supported"),
+            pytest.param(["DataBuildToolJob"], False, id="static-restriction"),
+            pytest.param(["Warehouse"], True, id="restriction-outside-scope"),
+        ],
+    )
+    def test_static_restrictions_apply_only_to_types_in_scope(
+        self, mock_endpoint, temp_workspace_dir, monkeypatch, unsupported_types, expected_bulk
+    ):
+        """DBT-only deployments use bulk unless a scoped type is explicitly restricted."""
+        monkeypatch.setattr(constants, "BULK_UNSUPPORTED_ITEM_TYPES", unsupported_types)
+        create_test_item_dir(temp_workspace_dir, None, "TestJob", "DataBuildToolJob", "job-id-001")
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DataBuildToolJob"]) as workspace:
+            publish.publish_all_items(workspace)
+            assert workspace.bulk_publish_enabled is expected_bulk
+            assert bool(bodies) is expected_bulk
+
+    @pytest.mark.parametrize(
+        ("definition_enabled", "has_project", "creation_payload", "expected_bulk"),
+        [
+            pytest.param(False, True, None, False, id="definition-disabled"),
+            pytest.param(True, False, None, False, id="no-project"),
+            pytest.param(True, True, {}, False, id="empty-creation-payload"),
+            pytest.param(
+                True, True, {"defaultCollation": "Latin1_General_100_BIN2_UTF8"}, False, id="creation-payload"
+            ),
+            pytest.param(True, True, None, True, id="full-definition"),
+        ],
+    )
+    def test_warehouse_fallback_uses_publish_settings(
+        self, mock_endpoint, temp_workspace_dir, definition_enabled, has_project, creation_payload, expected_bulk
+    ):
+        """Only full-definition Warehouses can use bulk; fallback preserves standard folder placement."""
+        if definition_enabled:
+            constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+        item_dir = create_warehouse_dir(
+            temp_workspace_dir, folder="Warehouses", has_project=has_project, creation_payload=creation_payload
+        )
+        (item_dir / ".gitignore").write_text("bin/\nobj/\n", encoding="utf-8")
+        sql_dir = item_dir / "dbo"
+        sql_dir.mkdir()
+        (sql_dir / ".gitignore").write_text("local.sql\n", encoding="utf-8")
+        (sql_dir / ".gitignore.sql").write_text("-- SQL asset", encoding="utf-8")
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse"]) as workspace:
+            publish.publish_all_items(workspace)
+
+            assert workspace.bulk_publish_enabled is expected_bulk
+            assert bool(bodies) is expected_bulk
+            if expected_bulk:
+                assert {part["path"] for part in bodies[0]["definitionParts"]} == {
+                    "/Warehouses/TestWarehouse.Warehouse/.platform",
+                    "/Warehouses/TestWarehouse.Warehouse/dummy.txt",
+                    "/Warehouses/TestWarehouse.Warehouse/Warehouse.sqlproj",
+                    "/Warehouses/TestWarehouse.Warehouse/dbo/.gitignore.sql",
+                }
+                assert not any(
+                    call.kwargs.get("method") == "POST" and call.kwargs["url"].endswith("/folders")
+                    for call in mock_endpoint.invoke.call_args_list
+                )
+            else:
+                item_calls = [
+                    call
+                    for call in mock_endpoint.invoke.call_args_list
+                    if call.kwargs.get("method") == "POST" and call.kwargs["url"].endswith("/items")
+                ]
+                assert len(item_calls) == 1
+                assert "definition" not in item_calls[0].kwargs["body"]
+                assert item_calls[0].kwargs["body"]["folderId"] == "mock-folder-id"
+
+    @pytest.mark.parametrize("selection", ["items", "name", "folder_exclude", "folder_include"])
+    def test_unselected_shell_only_warehouse_does_not_force_fallback(
+        self, mock_endpoint, temp_workspace_dir, selection
+    ):
+        """Unselected shell-only Warehouses do not block publishing the remaining items in bulk."""
+        create_test_item_dir(temp_workspace_dir, "Warehouses", "ShellWarehouse", "Warehouse", "wh-id-001")
+        create_test_item_dir(temp_workspace_dir, None, "TestNotebook", "Notebook", "nb-id-001")
+        options = {
+            "items": {"items_to_include": ["TestNotebook.Notebook"]},
+            "name": {"item_name_exclude_regex": "^ShellWarehouse$"},
+            "folder_exclude": {"folder_path_exclude_regex": "^/Warehouses$"},
+            "folder_include": {"folder_path_to_include": ["/OtherFolder"]},
+        }
+        bodies = capture_bulk_bodies(mock_endpoint)
 
         with (
-            patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse"]) as workspace,
-            patch("fabric_cicd._items._warehouse.WarehousePublisher", return_value=MagicMock()),
+            extra_flags(
+                FeatureFlag.ENABLE_ITEMS_TO_INCLUDE,
+                FeatureFlag.ENABLE_EXCLUDE_FOLDER,
+                FeatureFlag.ENABLE_INCLUDE_FOLDER,
+            ),
+            patched_workspace(
+                mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse", "Notebook"]
+            ) as workspace,
         ):
+            publish.publish_all_items(workspace, **options[selection])
+
+            assert workspace.bulk_publish_enabled is True
+            assert len(bodies) == 1
+            assert get_bulk_part_names(bodies[0]) == {"TestNotebook"}
+
+    def test_warehouse_restrictions_are_local_to_each_decision(self, mock_endpoint, temp_workspace_dir):
+        """A shell-only Warehouse blocks both coupled types without mutating static restrictions."""
+        create_warehouse_dir(temp_workspace_dir, name="FullWarehouse", logical_id="full-id")
+        create_warehouse_dir(temp_workspace_dir, name="ShellWarehouse", has_project=False, logical_id="shell-id")
+        original_restrictions = constants.BULK_UNSUPPORTED_ITEM_TYPES.copy()
+
+        with (
+            extra_flags(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH),
+            patched_workspace(
+                mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse", "DataBuildToolJob"]
+            ) as workspace,
+        ):
+            workspace._refresh_repository_items()
+            assert get_bulk_publish_fallback_reasons(workspace) == [
+                "unsupported item types: DataBuildToolJob, Warehouse"
+            ]
+
+            workspace.items_to_include = ["FullWarehouse.Warehouse"]
+            assert get_bulk_publish_fallback_reasons(workspace) == []
+            assert original_restrictions == constants.BULK_UNSUPPORTED_ITEM_TYPES
+
+    @pytest.mark.parametrize("definition_enabled", [False, True])
+    def test_warehouse_fallback_precedes_bulk_logical_id_validation(
+        self, mock_endpoint, temp_workspace_dir, definition_enabled
+    ):
+        """Placeholder IDs are rejected only if the final mode is bulk."""
+        if definition_enabled:
+            constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+        create_warehouse_dir(temp_workspace_dir, logical_id=constants.DEFAULT_GUID)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse"]) as workspace:
+            if definition_enabled:
+                with pytest.raises(InputError, match="default logicalId"):
+                    publish.publish_all_items(workspace)
+                assert not any(call.kwargs.get("method") == "POST" for call in mock_endpoint.invoke.call_args_list)
+            else:
+                publish.publish_all_items(workspace)
+                assert workspace.bulk_publish_enabled is False
+
+    @pytest.mark.parametrize("initial_definition_enabled", [False, True])
+    def test_bulk_mode_is_recomputed_when_warehouse_flag_changes(
+        self, mock_endpoint, temp_workspace_dir, initial_definition_enabled
+    ):
+        """Reusing a workspace must not retain a previous bulk decision."""
+        create_warehouse_dir(temp_workspace_dir)
+        if initial_definition_enabled:
+            constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Warehouse"]) as workspace:
             publish.publish_all_items(workspace)
-            assert workspace.bulk_publish_enabled is False
+            assert workspace.bulk_publish_enabled is initial_definition_enabled
+
+            if initial_definition_enabled:
+                constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+            else:
+                constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+            publish.publish_all_items(workspace)
+
+            assert workspace.bulk_publish_enabled is not initial_definition_enabled
+            assert len(bodies) == 1
 
     @pytest.mark.parametrize(
         "param_yaml",
@@ -1536,7 +1790,7 @@ class TestBulkPublishStagedExecution:
             patch.object(ItemPublisher, "create", return_value=publisher),
             patch.object(ItemPublisher, "_mark_skipped_items", return_value=[]),
             patch(
-                "fabric_cicd._items._bulk_publish_dependencies.compute_publish_batches",
+                "fabric_cicd._items._bulk_publish_utils.compute_publish_batches",
                 return_value=two_batches,
             ),
         ):
@@ -1558,7 +1812,7 @@ class TestBulkPublishStagedExecution:
             patch.object(ItemPublisher, "create", return_value=publisher),
             patch.object(ItemPublisher, "_mark_skipped_items", return_value=[]),
             patch(
-                "fabric_cicd._items._bulk_publish_dependencies.compute_publish_batches",
+                "fabric_cicd._items._bulk_publish_utils.compute_publish_batches",
                 return_value=single_batch,
             ),
         ):
@@ -1590,15 +1844,15 @@ class TestBulkPublishStagedExecution:
             patch.object(ItemPublisher, "create", return_value=publisher),
             patch.object(ItemPublisher, "_mark_skipped_items", return_value=[]),
             patch(
-                "fabric_cicd._items._bulk_publish_dependencies.build_dynamic_variable_dependency_graph",
+                "fabric_cicd._items._bulk_publish_utils.build_dynamic_variable_dependency_graph",
                 return_value=[],
             ),
             patch(
-                "fabric_cicd._items._bulk_publish_dependencies.get_async_attributes_to_wait_for",
+                "fabric_cicd._items._bulk_publish_utils.get_async_attributes_to_wait_for",
                 return_value={"Lakehouse.base": {"sqlendpoint"}},
             ),
             patch(
-                "fabric_cicd._items._bulk_publish_dependencies.compute_publish_batches",
+                "fabric_cicd._items._bulk_publish_utils.compute_publish_batches",
                 return_value=two_batches,
             ),
         ):

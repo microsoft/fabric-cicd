@@ -325,6 +325,9 @@ def test_publish_environments_passes_func_process_file(tmp_path):
         def _get_workspace_pools(self):
             return []
 
+        def _apply_publish_filters(self, _item, _item_name, _item_type):
+            return False
+
         def _publish_item(self, item_name, item_type, **kwargs):
             captured["called_with"] = kwargs
             self.repository_items[item_type][item_name].skip_publish = True
@@ -381,6 +384,9 @@ def test_end_to_end_environment_setting_only(tmp_path):
 
         def _get_workspace_pools(self):
             return []
+
+        def _apply_publish_filters(self, _item, _item_name, _item_type):
+            return False
 
         def _publish_item(self, item_name, item_type, **_kwargs):
             item = self.repository_items[item_type][item_name]
@@ -444,6 +450,9 @@ def test_end_to_end_environment_with_libraries(tmp_path):
 
         def _get_workspace_pools(self):
             return []
+
+        def _apply_publish_filters(self, _item, _item_name, _item_type):
+            return False
 
         def _publish_item(self, item_name, item_type, **_kwargs):
             item = self.repository_items[item_type][item_name]

@@ -6,7 +6,6 @@
 import logging
 from typing import Optional
 
-import dpath
 from azure.core.credentials import TokenCredential
 
 import fabric_cicd._items as items
@@ -19,7 +18,7 @@ from fabric_cicd._common._config_utils import (
     load_config_file,
 )
 from fabric_cicd._common._deployment_result import DeploymentResult, DeploymentStatus
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
+from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._logging import log_header
 from fabric_cicd._common._validate_input import (
     validate_deployment_plan,
@@ -29,8 +28,9 @@ from fabric_cicd._common._validate_input import (
     validate_folder_path_to_include,
     validate_items_to_include,
     validate_shortcut_exclude_regex,
+    validate_workspace_capacity,
 )
-from fabric_cicd._items._bulk_publish_dependencies import has_unfiltered_items_variable
+from fabric_cicd._items._bulk_publish_utils import get_bulk_publish_fallback_reasons, validate_bulk_item_logical_ids
 from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -210,63 +210,27 @@ def publish_all_items(
     """
     fabric_workspace_obj = validate_fabric_workspace_obj(fabric_workspace_obj)
 
-    # Publish selections are per-call options, not persistent workspace state.
-    # Clear them before applying the options supplied for this invocation.
+    # Reset per-call publish selections and flags
     fabric_workspace_obj.publish_item_name_exclude_regex = None
     fabric_workspace_obj.publish_folder_path_exclude_regex = None
     fabric_workspace_obj.publish_folder_path_to_include = None
     fabric_workspace_obj.items_to_include = None
     fabric_workspace_obj.shortcut_exclude_regex = None
     fabric_workspace_obj.deployment_plan = None
+    fabric_workspace_obj.bulk_publish_enabled = False
+
+    # Get the relevant feature flags for the current publish operation
+    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
+    bulk_publish_requested = FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG
+    experimental_features_enabled = FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value in constants.FEATURE_FLAG
+    folders_publish_enabled = FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG
 
     # Initialize response collection if feature flag is enabled
-    responses_enabled = FeatureFlag.ENABLE_RESPONSE_COLLECTION.value in constants.FEATURE_FLAG
     if responses_enabled:
         fabric_workspace_obj.responses = {}
 
-    # Check if workspace has assigned capacity, if not, exit
-    has_assigned_capacity = None
-    response_state = fabric_workspace_obj.endpoint.invoke(
-        method="GET", url=f"{constants.DEFAULT_API_ROOT_URL}/v1/workspaces/{fabric_workspace_obj.workspace_id}"
-    )
-    has_assigned_capacity = dpath.get(response_state, "body/capacityId", default=None)
-    if not has_assigned_capacity and not set(fabric_workspace_obj.item_type_in_scope).issubset(
-        set(constants.NO_ASSIGNED_CAPACITY_REQUIRED)
-    ):
-        msg = f"Workspace {fabric_workspace_obj.workspace_id} does not have an assigned capacity. Please assign a capacity before publishing items."
-        raise FailedPublishedItemStatusError(msg, logger)
-
-    # Reset bulk publish flag to False for each publish execution; it will be set to True if conditions are met for bulk publish
-    fabric_workspace_obj.bulk_publish_enabled = False
-    # Determine publishing mode path (standard vs. bulk) based on feature flags and input parameters
-    if FeatureFlag.ENABLE_BULK_PUBLISH.value in constants.FEATURE_FLAG:
-        if FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value not in constants.FEATURE_FLAG:
-            msg = "The 'enable_bulk_publish' feature flag requires 'enable_experimental_features' to be enabled."
-            raise InputError(msg, logger)
-
-        reasons = []
-        unsupported = set(fabric_workspace_obj.item_type_in_scope) - set(constants.BULK_ACCEPTED_ITEM_TYPES)
-        if unsupported:
-            reasons.append(f"unsupported item types: {', '.join(sorted(unsupported))}")
-
-        # Dynamic replacement variables are supported in bulk mode via staged publishing, EXCEPT
-        # when an $items.* replace_value has no file filter — dependency scope cannot be narrowed, so fall back to standard deployment in that case only
-        if (
-            not unsupported
-            and fabric_workspace_obj.contains_param_item_vars
-            and has_unfiltered_items_variable(fabric_workspace_obj)
-        ):
-            reasons.append(
-                "parameter file contains $items.* replace_value entries without an item_type, "
-                "item_name, or file_path filter; add at least one filter to each to enable bulk publish"
-            )
-
-        # Fall back to standard deployment if any blocking reason was found, otherwise enable bulk publish
-        if reasons:
-            logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}.")
-
-        else:
-            fabric_workspace_obj.bulk_publish_enabled = True
+    # Validate workspace capacity before proceeding with the publish operation
+    validate_workspace_capacity(fabric_workspace_obj)
 
     # If deployment_plan is specified, ensure bulk publishing is enabled and validate the plan value
     if deployment_plan is not None:
@@ -275,8 +239,8 @@ def publish_all_items(
             raise InputError(msg, logger)
         fabric_workspace_obj.deployment_plan = validate_deployment_plan(deployment_plan)
 
-    # Apply selective deployment features
-    if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
+    # Apply selective deployment features (for folder-based filtering)
+    if folders_publish_enabled:
         if folder_path_exclude_regex is not None and folder_path_to_include is not None:
             msg = "Cannot use both 'folder_path_exclude_regex' and 'folder_path_to_include' simultaneously. Choose one filtering strategy."
             raise InputError(msg, logger)
@@ -289,15 +253,7 @@ def publish_all_items(
             validate_folder_path_to_include(folder_path_to_include)
             fabric_workspace_obj.publish_folder_path_to_include = folder_path_to_include
 
-        fabric_workspace_obj._refresh_deployed_folders()
-        fabric_workspace_obj._refresh_repository_folders()
-
-        if not fabric_workspace_obj.bulk_publish_enabled:
-            fabric_workspace_obj._publish_folders()
-
-    fabric_workspace_obj._refresh_deployed_items()
-    fabric_workspace_obj._refresh_repository_items()
-
+    # Apply selective deployment features (for item-based filtering)
     if item_name_exclude_regex:
         logger.warning(
             "Using item_name_exclude_regex is risky as it can prevent needed dependencies from being deployed.  Use at your own risk."
@@ -312,12 +268,38 @@ def publish_all_items(
         validate_shortcut_exclude_regex(shortcut_exclude_regex)
         fabric_workspace_obj.shortcut_exclude_regex = shortcut_exclude_regex
 
+    # Refresh deployed and repository folders when folder-based publish is enabled
+    if folders_publish_enabled:
+        fabric_workspace_obj._refresh_deployed_folders()
+        fabric_workspace_obj._refresh_repository_folders()
+
+    # Refresh deployed and repository items
+    fabric_workspace_obj._refresh_deployed_items()
+    fabric_workspace_obj._refresh_repository_items()
+
+    # Check if bulk publish can be enabled based on certain criteria
+    if bulk_publish_requested:
+        if not experimental_features_enabled:
+            msg = "The 'enable_bulk_publish' feature flag requires 'enable_experimental_features' to be enabled."
+            raise InputError(msg, logger)
+
+        reasons = get_bulk_publish_fallback_reasons(fabric_workspace_obj)
+        if reasons:
+            logger.warning(f"Falling back to standard deployment. Reason: {'; '.join(reasons)}")
+        else:
+            fabric_workspace_obj.bulk_publish_enabled = True
+            validate_bulk_item_logical_ids(fabric_workspace_obj)
+
     # Execute chosen publish mode
     if fabric_workspace_obj.bulk_publish_enabled:
         # Publish all items in bulk (experimental)
         log_header(logger, "Publishing Items in Bulk")
         publishers_with_async_check = items.ItemPublisher.publish_all_bulk(fabric_workspace_obj)
     else:
+        # Publish workspace folders if folder-based publish is enabled
+        if folders_publish_enabled:
+            fabric_workspace_obj._publish_folders()
+
         # Publish items in the defined order synchronously (standard)
         total_item_types = len(constants.SERIAL_ITEM_PUBLISH_ORDER)
         publishers_with_async_check: list[items.ItemPublisher] = []
