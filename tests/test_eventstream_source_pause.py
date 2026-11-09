@@ -217,8 +217,6 @@ def test_no_source_calls_when_not_needed(deployment, mode, case, mocker):
             mocker.patch.object(
                 EventstreamPublisher, "publish_context", side_effect=AssertionError("bulk seam invoked")
             )
-        else:
-            mocker.patch.object(EventstreamPublisher, "_stable_sources", side_effect=AssertionError("source read"))
     d.run(mode)
     assert not any("/eventstreams/" in url for _, url, _ in d.calls)
 
