@@ -1,8 +1,0 @@
-kind: added
-body: Add opt-in Eventstream source pause and recovery for standard and bulk definition updates
-time: 2026-11-09T17:30:00+02:00
-custom:
-    Author: shirasassoon
-    AuthorLink: https://github.com/shirasassoon
-    Issue: "1152"
-    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1152

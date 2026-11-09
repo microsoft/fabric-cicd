@@ -331,6 +331,51 @@ def test_attempt_all_recovery_and_preserve_primary_failure(deployment, mode, pub
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
+def test_lost_pause_response_recovers_despite_delayed_transition(deployment, mode, caplog):
+    d = deployment
+    item = d.add_item(sources=[d.source("first"), d.source("delayed"), d.source("unattempted")])
+    error = RuntimeError("pause response lost")
+    d.pause_errors["delayed"] = error
+    d.accept_pause_on_error.add("delayed")
+
+    def delay_pause_visibility():
+        if d.actions("/pause")[-1][0].endswith("/delayed/pause"):
+            d.sources[item.guid][1]["status"] = "Running"
+            d.transitions[item.guid, "delayed"] = ["Running"] * 5 + ["Pausing", "Paused"]
+
+    d.on_pause = delay_pause_visibility
+    with pytest.raises((PublishError, RuntimeError)) as caught:
+        d.run(mode)
+    primary = caught.value.errors[0][1] if mode == "standard" else caught.value
+    assert primary is error
+    assert not d.imports()
+    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first", "delayed"]
+    assert all(source["status"] == "Running" for source in d.sources[item.guid])
+    assert d.clock.now > 0
+    assert "resume it manually" not in caplog.text
+
+
+@pytest.mark.parametrize("mode", ["standard", "bulk"])
+def test_uncertain_pause_remaining_running_reports_bounded_recovery_failure(deployment, mode, monkeypatch, caplog):
+    d = deployment
+    item = d.add_item(sources=[d.source("first"), d.source("uncertain")])
+    error = RuntimeError("pause response lost")
+    d.pause_errors["uncertain"] = error
+    monkeypatch.setattr(constants, "RETRY_MAX_DURATION_SECONDS", 3)
+    with pytest.raises((PublishError, RuntimeError)) as caught:
+        d.run(mode)
+    primary = caught.value.errors[0][1] if mode == "standard" else caught.value
+    assert primary is error
+    assert not d.imports()
+    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first"]
+    assert all(source["status"] == "Running" for source in d.sources[item.guid])
+    assert 3 <= d.clock.now < 23
+    assert "Maximum execution duration" in caplog.text
+    assert "source 'uncertain'" in caplog.text
+    assert "resume it manually" in caplog.text
+
+
+@pytest.mark.parametrize("mode", ["standard", "bulk"])
 def test_publish_failure_recovers_sources_without_retrying(deployment, mode):
     d = deployment
     item = d.add_item()
@@ -411,7 +456,7 @@ def test_polling_timeout_is_bounded_and_prevents_definition_update(deployment, m
     clock = d.clock
     monkeypatch.setattr(constants, "RETRY_MAX_DURATION_SECONDS", 3)
     retry = mocker.patch("fabric_cicd._items._eventstream.handle_retry", side_effect=handle_retry)
-    with pytest.raises(Exception, match="Maximum execution duration|Failed to publish"):
+    with pytest.raises(Exception, match=r"Maximum execution duration|Failed to publish"):
         d.run(mode)
     assert 3 <= clock.now < 23
     assert retry.call_args.kwargs["max_duration"] == 3
@@ -436,7 +481,7 @@ def test_stuck_pause_does_not_skip_other_recovery(deployment, mode, monkeypatch,
     d.add_item(sources=[d.source("first"), d.source("second")])
     monkeypatch.setattr(constants, "RETRY_MAX_DURATION_SECONDS", 3)
     d.after_pause["second"] = "Pausing"
-    with pytest.raises(Exception, match="Maximum execution duration|Failed to publish"):
+    with pytest.raises(Exception, match=r"Maximum execution duration|Failed to publish"):
         d.run(mode)
     assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first"]
     assert not d.imports()

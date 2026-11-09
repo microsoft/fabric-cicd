@@ -7,6 +7,7 @@ import logging
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import PublishError
@@ -16,6 +17,15 @@ from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _SourcePauseAttempt:
+    """Track a pause request and whether its API call returned successfully."""
+
+    guid: str
+    source: dict
+    acknowledged: bool = False
 
 
 def _get_topology_sources(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str) -> list[dict]:
@@ -115,7 +125,7 @@ class EventstreamPublisher(ItemPublisher):
     @contextmanager
     def publish_context(self, items: list[Item]) -> Generator[None, None, None]:
         """Pause running sources, publish once, and always attempt to resume paused sources."""
-        attempted: list[tuple[str, dict]] = []
+        attempted: list[_SourcePauseAttempt] = []
         pause_or_publish_failed = True
         try:
             self.pause_sources(items, attempted)
@@ -129,7 +139,7 @@ class EventstreamPublisher(ItemPublisher):
                 if not pause_or_publish_failed:
                     raise
 
-    def pause_sources(self, items: list[Item], attempted: list[tuple[str, dict]]) -> None:
+    def pause_sources(self, items: list[Item], attempted: list[_SourcePauseAttempt]) -> None:
         """Pause running sources and track which ones may need resuming.
 
         Add each source to the caller's list before requesting its pause, so the caller
@@ -142,18 +152,21 @@ class EventstreamPublisher(ItemPublisher):
             running_sources = _get_running_sources(self.fabric_workspace_obj, item.guid)
             for source in running_sources:
                 # Track before requesting a pause so recovery can handle lost responses
-                attempted.append((item.guid, source))
+                pause_attempt = _SourcePauseAttempt(item.guid, source)
+                attempted.append(pause_attempt)
                 _pause_source(self.fabric_workspace_obj, item.guid, source)
+                pause_attempt.acknowledged = True
             if running_sources:
                 # Wait for all asynchronous pauses to finish before publishing
                 _wait_for_sources_paused(
                     self.fabric_workspace_obj, item.guid, [source["id"] for source in running_sources]
                 )
 
-    def resume_sources(self, attempted: list[tuple[str, dict]]) -> None:
+    def resume_sources(self, attempted: list[_SourcePauseAttempt]) -> None:
         """Attempt to resume each source whose pause was attempted, then report any failures."""
         errors: list[tuple[str, Exception]] = []
-        for guid, original_source in attempted:
+        for pause_attempt in attempted:
+            guid, original_source = pause_attempt.guid, pause_attempt.source
             source_id = original_source["id"]
             try:
                 # Check the current state; an attempted pause may not have succeeded
@@ -161,10 +174,10 @@ class EventstreamPublisher(ItemPublisher):
                     (s for s in _get_topology_sources(self.fabric_workspace_obj, guid) if s["id"] == source_id), None
                 )
                 status = source.get("status", "").lower() if source else "missing"
-                if status == "running":
+                if status == "running" and pause_attempt.acknowledged:
                     continue
-                if status == "pausing":
-                    # A lost pause response can leave the source still transitioning
+                if status == "pausing" or (not pause_attempt.acknowledged and status in {"running", "missing"}):
+                    # A lost response can precede a visible transition; poll before declaring recovery complete
                     _wait_for_sources_paused(self.fabric_workspace_obj, guid, [source_id])
                 elif status != "paused":
                     msg = f"Cannot recover Eventstream '{guid}' source '{source_id}' with topology status '{status}'"
