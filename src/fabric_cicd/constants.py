@@ -164,7 +164,7 @@ class FeatureFlag(str, Enum):
     ENABLE_BULK_PUBLISH = "enable_bulk_publish"
     """Set to enable publishing of items using the bulk import API."""
     ENABLE_EVENTSTREAM_SOURCE_PAUSE = "enable_eventstream_source_pause"
-    """Set to pause supported running Eventstream sources around definition updates."""
+    """Set to pause running Eventstream sources around definition updates."""
     ENABLE_PURGE_DATA = "enable_purge_data"
     """Set to allow purging a Semantic Model's existing data when applying a definition update."""
     ENABLE_STRICT_SEMANTIC_MODEL_BINDING = "enable_strict_semantic_model_binding"

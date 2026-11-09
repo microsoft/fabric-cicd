@@ -58,9 +58,7 @@ class Deployment:
         self.pause_errors = {}
         self.resume_errors = {}
         self.accept_pause_on_error = set()
-        self.accept_resume_on_error = set()
         self.after_pause = {}
-        self.after_resume = {}
         self.remove_on_publish = set()
         self.hide_on_publish = set()
         self.publish_error = None
@@ -109,9 +107,8 @@ class Deployment:
                 # The test service rejects resumes sent before asynchronous pause completion.
                 assert source["status"] == "Paused"
                 error = self.resume_errors.get(source_id)
-                if error is None or source_id in self.accept_resume_on_error:
-                    source["status"] = "Resuming"
-                    self.transitions[guid, source_id] = [self.after_resume.get(source_id, "Running")]
+                if error is None:
+                    source["status"] = "Running"
             if error is not None:
                 raise error
             return {"body": {}}
@@ -186,7 +183,6 @@ def test_pause_update_resume_and_preserve_inactive_sources(deployment, mode):
             d.source("sample", source_type="SampleData"),
             d.source("paused", "Paused"),
             d.source("stopped", "Stopped"),
-            d.source("unsupported", source_type="CustomEndpoint"),
         ]
     )
     d.run(mode)
@@ -205,7 +201,6 @@ def test_pause_update_resume_and_preserve_inactive_sources(deployment, mode):
         "sample": "Running",
         "paused": "Paused",
         "stopped": "Stopped",
-        "unsupported": "Running",
     }
 
 
@@ -266,6 +261,28 @@ def test_preexisting_transitions_settle_before_publish(deployment, mode, initial
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
+@pytest.mark.parametrize("stale_status", ["Running", "missing"])
+def test_accepted_pause_waits_for_paused_despite_stale_topology(deployment, mode, stale_status):
+    d = deployment
+    item = d.add_item()
+    stale_returned = False
+
+    def invoke(method, url, **kwargs):
+        nonlocal stale_returned
+        if d.actions("/pause") and url.endswith("/topology") and not stale_returned:
+            stale_returned = True
+            sources = [] if stale_status == "missing" else [d.source("source", stale_status)]
+            return {"body": {"sources": sources}}
+        return d.invoke(method, url, **kwargs)
+
+    d.workspace.endpoint.invoke.side_effect = invoke
+    d.run(mode)
+    assert len(d.imports()) == 1
+    assert len(d.actions("/resume")) == 1
+    assert d.sources[item.guid][0]["status"] == "Running"
+
+
+@pytest.mark.parametrize("mode", ["standard", "bulk"])
 @pytest.mark.parametrize("accepted", [False, True])
 @pytest.mark.parametrize("failed_source", ["first", "second"])
 @pytest.mark.parametrize("resume_fails", [False, True])
@@ -312,26 +329,46 @@ def test_attempt_all_recovery_and_preserve_primary_failure(deployment, mode, pub
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
-def test_lost_resume_response_is_reconciled(deployment, mode):
+@pytest.mark.parametrize("source_type", ["NewSourceType", None])
+def test_source_types_are_not_filtered_by_the_library(deployment, mode, source_type):
+    d = deployment
+    source = d.source("source", source_type=source_type)
+    if source_type is None:
+        del source["type"]
+    d.add_item(sources=[source])
+    d.run(mode)
+    assert len(d.actions("/pause")) == 1
+    assert [kwargs["body"] for _, kwargs in d.actions("/resume")] == [{"startType": "WhenLastStopped"}]
+
+
+@pytest.mark.parametrize("mode", ["standard", "bulk"])
+def test_resume_uses_api_response_without_extra_polling(deployment, mode):
     d = deployment
     d.add_item()
-    d.resume_errors["source"] = RuntimeError("response lost after resume")
-    d.accept_resume_on_error.add("source")
+
+    def invoke(method, url, **kwargs):
+        if d.actions("/resume") and url.endswith("/topology"):
+            pytest.fail("Unexpected post-resume polling")
+        return d.invoke(method, url, **kwargs)
+
+    d.workspace.endpoint.invoke.side_effect = invoke
     d.run(mode)
     assert len(d.actions("/resume")) == 1
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
-@pytest.mark.parametrize(
-    "source_type", ["CustomEndpoint", "FabricJobEvents", "AzureEventGridNamespace", "NewSourceType"]
-)
-def test_unsupported_and_unknown_sources_are_left_alone_with_warning(deployment, mode, source_type, caplog):
+def test_service_rejected_pause_aborts_publish_and_recovers_earlier_sources(deployment, mode):
     d = deployment
-    d.add_item(sources=[d.source("unsupported", source_type=source_type), d.source("supported")])
-    d.run(mode)
-    assert [url.split("/")[-2] for url, _ in d.actions("/pause")] == ["supported"]
-    assert source_type in caplog.text
-    assert "pause/resume support is not documented" in caplog.text
+    d.add_item(sources=[d.source("first"), d.source("unsupported"), d.source("unattempted")])
+    error = RuntimeError("DataSourceOperationNotSupported")
+    d.pause_errors["unsupported"] = error
+    with pytest.raises((PublishError, RuntimeError)) as caught:
+        d.run(mode)
+    primary = caught.value.errors[0][1] if mode == "standard" else caught.value
+    assert primary is error
+    assert not d.imports()
+    assert [url.split("/")[-2] for url, _ in d.actions("/pause")] == ["first", "unsupported"]
+    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first"]
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -347,25 +384,6 @@ def test_missing_source_requires_deployed_definition_confirmation(deployment, mo
             d.run(mode)
     assert len(d.actions("/getDefinition")) == 1
     assert not d.actions("/resume")
-
-
-@pytest.mark.parametrize("mode", ["standard", "bulk"])
-def test_temporary_topology_gap_is_not_mistaken_for_removal(deployment, mode):
-    d = deployment
-    d.add_item()
-    gap_returned = False
-
-    def invoke(method, url, **kwargs):
-        nonlocal gap_returned
-        if d.imports() and url.endswith("/topology") and not gap_returned:
-            gap_returned = True
-            return {"body": {"sources": []}}
-        return d.invoke(method, url, **kwargs)
-
-    d.workspace.endpoint.invoke.side_effect = invoke
-    d.run(mode)
-    assert len(d.actions("/getDefinition")) == 1
-    assert len(d.actions("/resume")) == 1
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
@@ -437,25 +455,19 @@ def test_terminal_pause_failure_aborts_and_is_reported(deployment, mode, caplog)
     with pytest.raises((PublishError, RuntimeError)):
         d.run(mode)
     assert not d.imports()
-    assert "PauseFailed" in caplog.text
+    assert "pausefailed" in caplog.text
 
 
 @pytest.mark.parametrize("mode", ["standard", "bulk"])
-@pytest.mark.parametrize("phase", ["pause", "resume"])
-def test_stuck_transition_does_not_skip_other_recovery(deployment, mode, phase, monkeypatch, caplog):
+def test_stuck_pause_does_not_skip_other_recovery(deployment, mode, monkeypatch, caplog):
     d = deployment
     d.add_item(sources=[d.source("first"), d.source("second")])
     monkeypatch.setattr(constants, "RETRY_MAX_DURATION_SECONDS", 3)
-    if phase == "pause":
-        d.after_pause["second"] = "Pausing"
-    else:
-        d.after_resume["first"] = "Resuming"
+    d.after_pause["second"] = "Pausing"
     with pytest.raises(Exception, match="Maximum execution duration|Failed to publish"):
         d.run(mode)
-    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == (
-        ["first"] if phase == "pause" else ["first", "second"]
-    )
-    assert len(d.imports()) == (0 if phase == "pause" else 1)
+    assert [url.split("/")[-2] for url, _ in d.actions("/resume")] == ["first"]
+    assert not d.imports()
     assert "resume it manually" in caplog.text
 
 
@@ -463,14 +475,15 @@ def test_stuck_transition_does_not_skip_other_recovery(deployment, mode, phase, 
 def test_all_recovery_errors_are_reported(deployment, mode):
     d = deployment
     d.add_item(sources=[d.source("first"), d.source("second")])
-    d.after_resume = {"first": "ResumeFailed", "second": "ResumeFailed"}
+    d.resume_errors = {"first": RuntimeError("first resume failed"), "second": RuntimeError("second resume failed")}
     with pytest.raises(PublishError) as caught:
         d.run(mode)
     recovery_error = caught.value.errors[0][1] if mode == "standard" else caught.value
     assert len(recovery_error.errors) == 2
     assert "first" in recovery_error.additional_info
     assert "second" in recovery_error.additional_info
-    assert "ResumeFailed" in recovery_error.additional_info
+    assert "first resume failed" in recovery_error.additional_info
+    assert "second resume failed" in recovery_error.additional_info
 
 
 def test_parallel_standard_contexts_have_independent_attempt_tracking(deployment):

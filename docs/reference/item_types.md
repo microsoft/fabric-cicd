@@ -87,7 +87,7 @@
 
 ## Eventstream
 
-- **Private-endpoint sources:** Opt in to [Eventstream source pause](../how_to/optional_feature.md#eventstream-source-pause) with `enable_eventstream_source_pause` to pause supported running sources around definition updates in both standard and bulk publishing.
+- **Private-endpoint sources:** Opt in to [Eventstream source pause](../how_to/optional_feature.md#eventstream-source-pause) with `enable_eventstream_source_pause` to pause running sources around definition updates in both standard and bulk publishing. Fabric determines whether each source supports pausing; a rejected pause aborts publishing.
 - **Parameterization:**
     - Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.

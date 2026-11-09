@@ -20,33 +20,6 @@ from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
-# https://learn.microsoft.com/fabric/real-time-intelligence/event-streams/pause-resume-data-streams
-_PAUSABLE_SOURCE_TYPES = {
-    "AmazonKinesis",
-    "AmazonMSKKafka",
-    "ApacheKafka",
-    "AzureCosmosDBCDC",
-    "AzureDataExplorer",
-    "AzureEventHub",
-    "AzureEventHubExtended",
-    "AzureIoTHub",
-    "AzureIoTHubExtended",
-    "AzureServiceBus",
-    "AzureSQLDBCDC",
-    "AzureSQLMIDBCDC",
-    "ConfluentCloud",
-    "GooglePubSub",
-    "Http",
-    "MongoDBCDC",
-    "Mqtt",
-    "MySQLCDC",
-    "OracleDBCDC",
-    "PostgreSQLCDC",
-    "RealTimeWeather",
-    "SampleData",
-    "SolacePubSub",
-    "SQLServerOnVMDBCDC",
-}
 _TRANSITIONAL_STATUSES = {"updating", "pausing", "resuming"}
 
 
@@ -81,25 +54,10 @@ class EventstreamPublisher(ItemPublisher):
                 for source in sources:
                     if source["status"].lower() != "running":
                         continue
-                    if source["type"] not in _PAUSABLE_SOURCE_TYPES:
-                        logger.warning(
-                            "Not pausing Eventstream source '%s' (%s): pause/resume support is not documented. "
-                            "Fabric will validate the definition update.",
-                            source["id"],
-                            source["type"],
-                        )
-                        continue
                     # The service can accept a pause even if the client loses its response.
                     attempted.append((item.guid, source))
                     self._source_action(item.guid, source, "pause")
-                    paused = next(
-                        (s for s in self._stable_sources(item.guid, source["id"]) if s["id"] == source["id"]),
-                        None,
-                    )
-                    if paused is None or paused["status"].lower() != "paused":
-                        status = paused["status"] if paused else "missing"
-                        msg = f"Eventstream '{item.guid}' source '{source['id']}' did not pause (status: {status})"
-                        raise RuntimeError(msg)
+                    self._wait_for_source_paused(item.guid, source["id"])
             yield
             operation_failed = False
         finally:
@@ -116,19 +74,13 @@ class EventstreamPublisher(ItemPublisher):
             if errors and not operation_failed:
                 raise PublishError(errors, logger) from errors[0][1]
 
-    def _stable_sources(
-        self, guid: str, source_id: Optional[str] = None, *, wait_for_presence: bool = False
-    ) -> list[dict]:
+    def _stable_sources(self, guid: str, source_id: Optional[str] = None) -> list[dict]:
         """Wait for transitions without taking ownership of sources paused by someone else."""
         start_time = time.time()
         attempt = 0
         while True:
-            response = self.fabric_workspace_obj.endpoint.invoke(
-                method="GET", url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{guid}/topology"
-            )
-            sources = response["body"]["sources"]
-            source_present = any(source["id"] == source_id for source in sources)
-            if (not wait_for_presence or source_present) and not any(
+            sources = self._get_sources(guid)
+            if not any(
                 source["status"].lower() in _TRANSITIONAL_STATUSES
                 for source in sources
                 if source_id is None or source["id"] == source_id
@@ -144,11 +96,38 @@ class EventstreamPublisher(ItemPublisher):
             )
             attempt += 1
 
+    def _get_sources(self, guid: str) -> list[dict]:
+        response = self.fabric_workspace_obj.endpoint.invoke(
+            method="GET", url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{guid}/topology"
+        )
+        return response["body"]["sources"]
+
+    def _wait_for_source_paused(self, guid: str, source_id: str) -> None:
+        """Wait for Paused, tolerating stale Running or missing topology after an accepted pause."""
+        start_time = time.time()
+        attempt = 0
+        while True:
+            status = next((s["status"].lower() for s in self._get_sources(guid) if s["id"] == source_id), "missing")
+            if status == "paused":
+                return
+            if status == "pausefailed":
+                msg = f"Failed to pause Eventstream '{guid}' source '{source_id}'"
+                raise RuntimeError(msg)
+            handle_retry(
+                attempt=attempt,
+                base_delay=2,
+                response_retry_after=20,
+                prepend_message=f"Waiting for Eventstream '{guid}' source '{source_id}' to pause.",
+                max_duration=constants.RETRY_MAX_DURATION_SECONDS,
+                start_time=start_time,
+            )
+            attempt += 1
+
     def _source_action(self, guid: str, source: dict, action: str) -> None:
         logger.info("%sEventstream '%s': %s source '%s'", constants.INDENT, guid, action, source["id"])
         kwargs = {}
         if action == "resume":
-            kwargs["body"] = {"startType": "Now" if source["type"] == "SampleData" else "WhenLastStopped"}
+            kwargs["body"] = {"startType": "Now" if source.get("type") == "SampleData" else "WhenLastStopped"}
         self.fabric_workspace_obj.endpoint.invoke(
             method="POST",
             url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{guid}/sources/{source['id']}/{action}",
@@ -171,27 +150,10 @@ class EventstreamPublisher(ItemPublisher):
             if source_id not in {s["id"] for s in definition["sources"]}:
                 logger.info("Eventstream '%s' source '%s' was removed/replaced; no resume needed.", guid, source_id)
                 return
-            source = next(
-                s for s in self._stable_sources(guid, source_id, wait_for_presence=True) if s["id"] == source_id
-            )
-        if source["status"].lower() == "running":
+        status = source["status"].lower() if source else "missing"
+        if status == "running":
             return
-        if source["status"].lower() == "paused":
-            if source["type"] not in _PAUSABLE_SOURCE_TYPES:
-                msg = f"Eventstream '{guid}' source '{source_id}' changed to unsupported type '{source['type']}'"
-                raise RuntimeError(msg)
-            resume_error = None
-            try:
-                self._source_action(guid, source, "resume")
-            except Exception as error:
-                # A lost resume response is harmless only if topology confirms recovery.
-                resume_error = error
-            resumed = next((s for s in self._stable_sources(guid, source_id) if s["id"] == source_id), None)
-            if resumed is not None and resumed["status"].lower() == "running":
-                return
-            if resume_error is not None:
-                raise resume_error
-            source = resumed
-        status = source["status"] if source else "missing"
-        msg = f"Eventstream '{guid}' source '{source_id}' could not be restored to Running (status: {status})"
-        raise RuntimeError(msg)
+        if status != "paused":
+            msg = f"Cannot recover Eventstream '{guid}' source '{source_id}' with topology status '{status}'"
+            raise RuntimeError(msg)
+        self._source_action(guid, original_source, "resume")
