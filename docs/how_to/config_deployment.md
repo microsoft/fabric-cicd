@@ -208,7 +208,7 @@ To apply a deployment plan during publishing, set `publish.deployment_plan` to t
     - The selected plan must exist in the repository directory, even if it already exists in the target workspace. Target-only plans are not supported.
     - Executing a deployment plan requires a single bulk publish batch. Plans cannot be executed when parameter dependencies split the deployment into multiple batches.
     - If the plan references a repository Variable Library, all Variable Libraries included by scope and publish filters are published first and their value sets activated. Explicit `ActiveValueSetName` plan selections take precedence; other libraries use the target environment or default value set. These libraries remain in the final bulk batch that executes the plan.
-    - Environment Spark settings and libraries might not be ready for deployment plan actions: fabric-cicd submits Environment publishing and checks its completion only after the bulk import operation finishes. Ensure required Environment settings and libraries are published before dependent actions run, or run dependent jobs separately after deployment completes successfully.
+    - Deployment plan execution may be incompatible with items that require post-deployment actions, such as Environment publishing or Semantic Model connection binding. Dependent items in the same deployment batch may fail when executed by the plan—for example, a Notebook attached to an Environment whose required libraries have not yet been published. These scenarios may require a manual workaround.
 
 ### Unpublish Settings
 
