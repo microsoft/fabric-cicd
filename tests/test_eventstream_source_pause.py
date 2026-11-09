@@ -194,6 +194,8 @@ def test_pause_update_resume_and_preserve_inactive_sources(deployment, mode):
     ]
     assert len(d.imports()) == 1
     calls = [url for _, url, _ in d.calls]
+    pause_positions = [i for i, url in enumerate(calls) if url.endswith("/pause")]
+    assert pause_positions[1] == pause_positions[0] + 1
     assert calls.index(d.actions("/pause")[-1][0]) < calls.index(d.imports()[0])
     assert calls.index(d.imports()[0]) < calls.index(d.actions("/resume")[0][0])
     assert calls[-1] == d.actions("/resume")[-1][0]

@@ -9,9 +9,8 @@ import logging
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Optional
 
-from fabric_cicd import constants
+from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._exceptions import PublishError
 from fabric_cicd._common._fabric_endpoint import handle_retry
 from fabric_cicd._common._item import Item
@@ -20,7 +19,82 @@ from fabric_cicd.constants import FeatureFlag, ItemType
 
 logger = logging.getLogger(__name__)
 
-_TRANSITIONAL_STATUSES = {"updating", "pausing", "resuming"}
+
+def _get_topology_sources(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str) -> list[dict]:
+    """Return every source in the eventstream's topology."""
+    response = fabric_workspace_obj.endpoint.invoke(
+        method="GET",
+        url=f"{fabric_workspace_obj.base_api_url}/eventstreams/{eventstream_guid}/topology",
+    )
+    return response["body"].get("sources", [])
+
+
+def _get_running_sources(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str) -> list[dict]:
+    """Wait for source transitions to finish, then return the currently running sources."""
+    start_time = time.time()
+    attempt = 0
+    while True:
+        sources = _get_topology_sources(fabric_workspace_obj, eventstream_guid)
+        if not any(source.get("status", "").lower() in {"updating", "pausing", "resuming"} for source in sources):
+            return [source for source in sources if source.get("status", "").lower() == "running"]
+        handle_retry(
+            attempt=attempt,
+            base_delay=2,
+            response_retry_after=20,
+            prepend_message=f"{constants.INDENT}Waiting for Eventstream source transition(s) to finish.",
+            max_duration=constants.RETRY_MAX_DURATION_SECONDS,
+            start_time=start_time,
+        )
+        attempt += 1
+
+
+def _wait_for_sources_paused(
+    fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, source_ids: list[str]
+) -> None:
+    """Wait for asynchronous pauses to finish before publishing or resuming."""
+    pending = set(source_ids)
+    start_time = time.time()
+    attempt = 0
+    while pending:
+        statuses = {
+            source["id"]: source.get("status", "").lower()
+            for source in _get_topology_sources(fabric_workspace_obj, eventstream_guid)
+        }
+        failed = {source_id for source_id in pending if statuses.get(source_id) == "pausefailed"}
+        if failed:
+            msg = f"Failed to pause Eventstream source(s): {sorted(failed)}"
+            raise RuntimeError(msg)
+        pending = {source_id for source_id in pending if statuses.get(source_id) != "paused"}
+        if not pending:
+            return
+        handle_retry(
+            attempt=attempt,
+            base_delay=2,
+            response_retry_after=20,
+            prepend_message=f"{constants.INDENT}Waiting for Eventstream source(s) to pause.",
+            max_duration=constants.RETRY_MAX_DURATION_SECONDS,
+            start_time=start_time,
+        )
+        attempt += 1
+
+
+def _pause_source(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, source: dict) -> None:
+    """Pause a single eventstream source."""
+    logger.info("%sPausing Eventstream source '%s'", constants.INDENT, source.get("name", source["id"]))
+    fabric_workspace_obj.endpoint.invoke(
+        method="POST",
+        url=f"{fabric_workspace_obj.base_api_url}/eventstreams/{eventstream_guid}/sources/{source['id']}/pause",
+    )
+
+
+def _resume_source(fabric_workspace_obj: FabricWorkspace, eventstream_guid: str, source: dict) -> None:
+    """Resume Sample Data from now and other sources from where they last stopped."""
+    logger.info("%sResuming Eventstream source '%s'", constants.INDENT, source.get("name", source["id"]))
+    fabric_workspace_obj.endpoint.invoke(
+        method="POST",
+        url=f"{fabric_workspace_obj.base_api_url}/eventstreams/{eventstream_guid}/sources/{source['id']}/resume",
+        body={"startType": "Now" if source.get("type") == "SampleData" else "WhenLastStopped"},
+    )
 
 
 class EventstreamPublisher(ItemPublisher):
@@ -30,10 +104,6 @@ class EventstreamPublisher(ItemPublisher):
 
     def publish_one(self, item_name: str, item: Item) -> None:
         """Use the same recovery context for standard updates and bulk batches."""
-        if FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value in constants.FEATURE_FLAG and (
-            item.skip_publish or self.fabric_workspace_obj._apply_publish_filters(item, item_name, self.item_type)
-        ):
-            return
         with self.publish_context([item]):
             super().publish_one(item_name, item)
 
@@ -43,14 +113,10 @@ class EventstreamPublisher(ItemPublisher):
         if FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value not in constants.FEATURE_FLAG:
             yield
             return
-        deployed_items = [item for item in items if item.guid and not item.skip_publish]
-        if not deployed_items:
-            yield
-            return
         attempted: list[tuple[str, dict]] = []
         operation_failed = True
         try:
-            self.pause_sources(deployed_items, attempted)
+            self.pause_sources(items, attempted)
             yield
             operation_failed = False
         finally:
@@ -67,41 +133,16 @@ class EventstreamPublisher(ItemPublisher):
         method raises. Record before sending each request to account for lost responses.
         """
         for item in items:
-            for source in self._wait_for_source_transitions(item.guid):
-                if source["status"].lower() != "running":
-                    continue
+            if not item.guid:
+                continue
+            running_sources = _get_running_sources(self.fabric_workspace_obj, item.guid)
+            for source in running_sources:
                 attempted.append((item.guid, source))
-                logger.info("%sEventstream '%s': pause source '%s'", constants.INDENT, item.guid, source["id"])
-                self.fabric_workspace_obj.endpoint.invoke(
-                    method="POST",
-                    url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{item.guid}/sources/{source['id']}/pause",
+                _pause_source(self.fabric_workspace_obj, item.guid, source)
+            if running_sources:
+                _wait_for_sources_paused(
+                    self.fabric_workspace_obj, item.guid, [source["id"] for source in running_sources]
                 )
-                start_time = time.time()
-                attempt = 0
-                while True:
-                    response = self.fabric_workspace_obj.endpoint.invoke(
-                        method="GET",
-                        url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{item.guid}/topology",
-                    )
-                    status = next(
-                        (s["status"].lower() for s in response["body"]["sources"] if s["id"] == source["id"]),
-                        "missing",
-                    )
-                    if status == "paused":
-                        break
-                    if status == "pausefailed":
-                        msg = f"Failed to pause Eventstream '{item.guid}' source '{source['id']}'"
-                        raise RuntimeError(msg)
-                    # Accepted pauses can still appear Running or missing in stale topology.
-                    handle_retry(
-                        attempt=attempt,
-                        base_delay=2,
-                        response_retry_after=20,
-                        prepend_message=f"Waiting for Eventstream '{item.guid}' source '{source['id']}' to pause.",
-                        max_duration=constants.RETRY_MAX_DURATION_SECONDS,
-                        start_time=start_time,
-                    )
-                    attempt += 1
 
     def resume_sources(self, attempted: list[tuple[str, dict]]) -> None:
         """Reconcile and resume every attempted pause, reporting failures after all attempts."""
@@ -110,7 +151,7 @@ class EventstreamPublisher(ItemPublisher):
             source_id = original_source["id"]
             try:
                 source = next(
-                    (s for s in self._wait_for_source_transitions(guid, source_id) if s["id"] == source_id), None
+                    (s for s in _get_topology_sources(self.fabric_workspace_obj, guid) if s["id"] == source_id), None
                 )
                 if source is None:
                     # Topology can lag an update. Only a deployed definition confirms removal.
@@ -130,18 +171,15 @@ class EventstreamPublisher(ItemPublisher):
                             "Eventstream '%s' source '%s' was removed/replaced; no resume needed.", guid, source_id
                         )
                         continue
-                status = source["status"].lower() if source else "missing"
+                status = source.get("status", "").lower() if source else "missing"
                 if status == "running":
                     continue
-                if status != "paused":
+                if status == "pausing":
+                    _wait_for_sources_paused(self.fabric_workspace_obj, guid, [source_id])
+                elif status != "paused":
                     msg = f"Cannot recover Eventstream '{guid}' source '{source_id}' with topology status '{status}'"
                     raise RuntimeError(msg)
-                logger.info("%sEventstream '%s': resume source '%s'", constants.INDENT, guid, source_id)
-                self.fabric_workspace_obj.endpoint.invoke(
-                    method="POST",
-                    url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{guid}/sources/{source_id}/resume",
-                    body={"startType": "Now" if original_source.get("type") == "SampleData" else "WhenLastStopped"},
-                )
+                _resume_source(self.fabric_workspace_obj, guid, original_source)
             except Exception as error:
                 label = f"Recover Eventstream '{guid}' source '{source_id}'"
                 errors.append((label, error))
@@ -150,28 +188,3 @@ class EventstreamPublisher(ItemPublisher):
                 )
         if errors:
             raise PublishError(errors, logger) from errors[0][1]
-
-    def _wait_for_source_transitions(self, guid: str, source_id: Optional[str] = None) -> list[dict]:
-        """Wait for transitions without taking ownership of sources paused by someone else."""
-        start_time = time.time()
-        attempt = 0
-        while True:
-            response = self.fabric_workspace_obj.endpoint.invoke(
-                method="GET", url=f"{self.fabric_workspace_obj.base_api_url}/eventstreams/{guid}/topology"
-            )
-            sources = response["body"]["sources"]
-            if not any(
-                source["status"].lower() in _TRANSITIONAL_STATUSES
-                for source in sources
-                if source_id is None or source["id"] == source_id
-            ):
-                return sources
-            handle_retry(
-                attempt=attempt,
-                base_delay=2,
-                response_retry_after=20,
-                prepend_message=f"Waiting for Eventstream '{guid}' source transitions.",
-                max_duration=constants.RETRY_MAX_DURATION_SECONDS,
-                start_time=start_time,
-            )
-            attempt += 1
