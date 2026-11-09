@@ -116,23 +116,32 @@ def test_bulk_variable_library_activation_only_overrides_with_explicit_selection
     )
 
 
-def test_bulk_plan_reimports_variable_libraries_after_activation(mocker):
+@pytest.mark.parametrize("has_plan_references", [True, False])
+@pytest.mark.parametrize("has_publishable_libraries", [True, False])
+def test_bulk_plan_reimports_variable_libraries_after_activation(
+    mocker, has_plan_references, has_publishable_libraries
+):
     library = Item(ItemType.VARIABLE_LIBRARY.value, "Vars", "", "library-id")
+    unreferenced_library = Item(ItemType.VARIABLE_LIBRARY.value, "OtherVars", "", "other-library-id")
+    excluded_library = Item(ItemType.VARIABLE_LIBRARY.value, "ExcludedVars", "", "excluded-library-id")
+    libraries = {item.name: item for item in (library, unreferenced_library, excluded_library)}
     notebook = Item(ItemType.NOTEBOOK.value, "Notebook", "", "notebook-id")
     plan = make_plan()
     workspace = make_workspace(
         "Plan",
         {
             ItemType.DEPLOYMENT_PLAN.value: {plan.name: plan},
-            ItemType.VARIABLE_LIBRARY.value: {library.name: library},
+            ItemType.VARIABLE_LIBRARY.value: libraries,
         },
     )
-    workspace._apply_publish_filters.return_value = False
+    workspace._apply_publish_filters.side_effect = lambda item, _name, item_type: (
+        item_type == ItemType.VARIABLE_LIBRARY.value and (not has_publishable_libraries or item is excluded_library)
+    )
     workspace.items_to_include = None
     workspace.contains_param_item_vars = False
     workspace._dynamic_var_cache = {"$workspace.id": "workspace-id", "$items.VariableLibrary.Vars.id": "stale-id"}
     library_publisher = VariableLibraryPublisher(workspace)
-    mocker.patch.object(library_publisher, "get_items_to_publish", return_value={library.name: library})
+    mocker.patch.object(library_publisher, "get_items_to_publish", return_value=libraries)
     activation = mocker.patch.object(library_publisher, "post_publish_all")
     notebook_publisher = MagicMock()
     notebook_publisher.item_type = ItemType.NOTEBOOK.value
@@ -145,7 +154,7 @@ def test_bulk_plan_reimports_variable_libraries_after_activation(mocker):
     )
     mocker.patch.object(ItemPublisher, "create", side_effect=[library_publisher, notebook_publisher])
     plan_options = {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}}
-    selections = {library.name: "PROD"}
+    selections = {library.name: "PROD"} if has_plan_references else {}
     mocker.patch("fabric_cicd._items._deploymentplans.set_deployment_plan", return_value=(plan_options, selections))
     events = MagicMock()
     events.attach_mock(workspace._publish_items, "publish")
@@ -154,15 +163,33 @@ def test_bulk_plan_reimports_variable_libraries_after_activation(mocker):
 
     ItemPublisher.publish_all_bulk(workspace)
 
-    library_context = (library.name, library, library_publisher)
-    assert workspace._publish_items.call_count == 2
-    assert workspace._publish_items.call_args_list[0].args[0] == [library_context]
-    assert "deployment_plan_options" not in workspace._publish_items.call_args_list[0].kwargs
-    assert library_context in workspace._publish_items.call_args_list[1].args[0]
-    assert workspace._publish_items.call_args_list[1].kwargs["deployment_plan_options"] == plan_options
-    activation.assert_called_once_with(selections)
-    assert [event[0] for event in events.mock_calls] == ["publish", "activate", "publish"]
-    assert workspace._dynamic_var_cache == {"$workspace.id": "workspace-id"}
+    library_contexts = (
+        [(item.name, item, library_publisher) for item in (library, unreferenced_library)]
+        if has_publishable_libraries
+        else []
+    )
+    preliminary_publish = has_plan_references and has_publishable_libraries
+    assert workspace._publish_items.call_count == (2 if preliminary_publish else 1)
+    if preliminary_publish:
+        assert workspace._publish_items.call_args_list[0].args[0] == library_contexts
+        assert "deployment_plan_options" not in workspace._publish_items.call_args_list[0].kwargs
+        activation.assert_called_once_with(selections)
+        assert [event[0] for event in events.mock_calls] == ["publish", "activate", "publish"]
+        assert workspace._dynamic_var_cache == {"$workspace.id": "workspace-id"}
+    else:
+        if has_publishable_libraries:
+            activation.assert_called_once_with()
+            assert [event[0] for event in events.mock_calls] == ["publish", "activate"]
+        else:
+            activation.assert_not_called()
+            assert [event[0] for event in events.mock_calls] == ["publish"]
+        assert workspace._dynamic_var_cache == {
+            "$workspace.id": "workspace-id",
+            "$items.VariableLibrary.Vars.id": "stale-id",
+        }
+    final_publish = workspace._publish_items.call_args_list[-1]
+    assert final_publish.args[0] == [*library_contexts, (notebook.name, notebook, notebook_publisher)]
+    assert final_publish.kwargs["deployment_plan_options"] == plan_options
     notebook_publisher.post_publish_all.assert_called_once_with()
 
 

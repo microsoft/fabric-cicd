@@ -76,9 +76,11 @@
 - **Note:** Standard publishing may leave Deployment Plan references unresolved, showing "Removed from workspace" warnings even when the referenced items exist in the target workspace. Reassign these references manually in the Fabric UI, or use bulk publishing to resolve them automatically.
 - **Execution:**
     - A deployment plan controls the order in which items are deployed and runs the intermediate actions defined in the plan.
+    - Only **one** deployment plan can be selected for execution per deployment, even if multiple Deployment Plan items are published.
     - Publishing a deployment plan item does not automatically execute it. To execute the plan as part of a deployment, specify its exact display name in the `publish.deployment_plan` configuration field or the optional `deployment_plan` argument to [`publish_all_items()`](code_reference.md#fabric_cicd.publish_all_items).
     - Executing a plan requires **bulk publish mode**. The selected plan must exist in the repository with a non-empty logical ID. It must also be included in the publish batch or already exist in the target workspace.
     - See [Deployment Plan Option](../how_to/config_deployment.md#deployment-plan-option) for more configuration details and limitations.
+    - For more information, see the [Microsoft Fabric deployment plan overview](https://learn.microsoft.com/en-us/fabric/cicd/deployment-plan/deployment-plan-overview).
 
 ## Environment
 
