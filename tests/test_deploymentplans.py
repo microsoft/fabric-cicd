@@ -58,64 +58,6 @@ def make_plan(name="Plan", logical_id="00000000-0000-0000-0000-000000000000"):
     return plan
 
 
-@pytest.mark.parametrize(
-    ("environment", "expected_set"),
-    [("PROD", "PROD"), ("PPE", "PPE"), ("Unknown", "Default value set")],
-)
-def test_standard_variable_library_activation_uses_workspace_environment(environment, expected_set):
-    library = Item(ItemType.VARIABLE_LIBRARY.value, "Vars", "", "library-id")
-    settings = MagicMock()
-    settings.name = "settings.json"
-    settings.contents = '{"valueSetsOrder": ["PPE", "PROD"]}'
-    library.item_files = [settings]
-    workspace = make_workspace("Plan", {ItemType.VARIABLE_LIBRARY.value: {library.name: library}})
-    workspace.environment = environment
-    workspace.bulk_publish_enabled = False
-    publisher = VariableLibraryPublisher(workspace)
-
-    publisher.publish_one(library.name, library)
-    publisher.post_publish_all({library.name: "PROD"})
-
-    workspace._publish_item.assert_called_once_with(item_name=library.name, item_type=library.type)
-    workspace.endpoint.invoke.assert_called_once_with(
-        method="PATCH",
-        url=f"{workspace.base_api_url}/VariableLibraries/{library.guid}",
-        body={"properties": {"activeValueSetName": expected_set}},
-    )
-
-
-def test_standard_variable_library_missing_settings_does_not_raise():
-    library = Item(ItemType.VARIABLE_LIBRARY.value, "Vars", "", "library-id")
-    workspace = make_workspace()
-    workspace.bulk_publish_enabled = False
-    publisher = VariableLibraryPublisher(workspace)
-
-    publisher.publish_one(library.name, library)
-
-    workspace._publish_item.assert_called_once_with(item_name=library.name, item_type=library.type)
-    workspace.endpoint.invoke.assert_not_called()
-
-
-@pytest.mark.parametrize(("selections", "expected_set"), [(None, "PPE"), ({"Vars": "PROD"}, "PROD")])
-def test_bulk_variable_library_activation_only_overrides_with_explicit_selection(selections, expected_set):
-    library = Item(ItemType.VARIABLE_LIBRARY.value, "Vars", "", "library-id")
-    settings = MagicMock()
-    settings.name = "settings.json"
-    settings.contents = '{"valueSetsOrder": ["PPE", "PROD"]}'
-    library.item_files = [settings]
-    workspace = make_workspace(repository_items={ItemType.VARIABLE_LIBRARY.value: {library.name: library}})
-    workspace.environment = "PPE"
-    workspace.bulk_publish_enabled = True
-
-    VariableLibraryPublisher(workspace).post_publish_all(selections)
-
-    workspace.endpoint.invoke.assert_called_once_with(
-        method="PATCH",
-        url=f"{workspace.base_api_url}/VariableLibraries/{library.guid}",
-        body={"properties": {"activeValueSetName": expected_set}},
-    )
-
-
 @pytest.mark.parametrize("has_plan_references", [True, False])
 @pytest.mark.parametrize("has_publishable_libraries", [True, False])
 def test_bulk_plan_reimports_variable_libraries_after_activation(
@@ -274,19 +216,6 @@ def test_get_plan_variable_libraries_rejects_invalid_yaml():
         _get_plan_variable_libraries(workspace, plan)
 
 
-def test_set_deployment_plan_returns_bulk_options_for_undeployed_plan():
-    plan = make_plan()
-
-    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {plan.name: plan}}
-    workspace = make_workspace("Plan", repository_items)
-    assert set_deployment_plan(workspace) == (
-        {
-            "deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"},
-        },
-        {},
-    )
-
-
 def test_set_deployment_plan_returns_no_options_without_selection():
     assert set_deployment_plan(make_workspace()) == ({}, {})
 
@@ -300,12 +229,27 @@ def test_set_deployment_plan_rejects_same_name_of_another_type():
 
 
 @pytest.mark.parametrize(
-    "deployed_id",
-    ["", "deployed-id"],
+    ("deployed_type", "deployed_id"),
+    [
+        (None, None),
+        (ItemType.DEPLOYMENT_PLAN.value, ""),
+        (ItemType.DEPLOYMENT_PLAN.value, "deployed-id"),
+        (ItemType.NOTEBOOK.value, "notebook-id"),
+    ],
+    ids=[
+        "repository-only",
+        "target-plan-without-logical-id",
+        "target-plan-with-logical-id",
+        "same-name-target-notebook",
+    ],
 )
-def test_set_deployment_plan_resolves_existing_target_plan(deployed_id):
+def test_set_deployment_plan_uses_repository_id_regardless_of_target(deployed_type, deployed_id):
     repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": make_plan(logical_id="repository-id")}}
-    deployed_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": make_plan(logical_id=deployed_id)}}
+    deployed_items = (
+        {deployed_type: {"Plan": Item(deployed_type, "Plan", "", "", logical_id=deployed_id)}}
+        if deployed_type is not None
+        else {}
+    )
     workspace = make_workspace("Plan", repository_items, deployed_items)
 
     assert set_deployment_plan(workspace) == (
@@ -324,29 +268,7 @@ def test_set_deployment_plan_requires_repository_plan_before_other_lookups():
         set_deployment_plan(workspace)
 
     deployed_items.get.assert_not_called()
-
-
-def test_set_deployment_plan_accepts_repository_only_plan():
-    plan = make_plan()
-    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}}
-    workspace = make_workspace("Plan", repository_items)
-
-    assert set_deployment_plan(workspace) == (
-        {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}},
-        {},
-    )
-
-
-def test_set_deployment_plan_ignores_same_name_target_item_of_another_type():
-    plan = make_plan()
-    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}}
-    deployed_items = {ItemType.NOTEBOOK.value: {"Plan": Item(ItemType.NOTEBOOK.value, "Plan", "", "notebook-id")}}
-    workspace = make_workspace("Plan", repository_items, deployed_items)
-
-    assert set_deployment_plan(workspace) == (
-        {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}},
-        {},
-    )
+    workspace.endpoint.invoke.assert_not_called()
 
 
 def test_set_deployment_plan_does_not_require_target_lookup():
@@ -434,16 +356,6 @@ def test_bulk_publish_preserves_per_item_options_with_plan():
         "itemOptionsByLogicalId": [{"logicalId": "model-id", "options": {"allowPurgeData": True}}],
     }
     assert plan_options == {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}}
-
-
-def test_set_deployment_plan_rejects_missing_plan_before_request():
-    workspace = make_workspace()
-    workspace.deployment_plan = "Plan"
-
-    with pytest.raises(InputError, match="must exist in the repository"):
-        set_deployment_plan(workspace)
-
-    workspace.endpoint.invoke.assert_not_called()
 
 
 def test_bulk_publish_validates_plan_with_no_publishable_items(mocker):

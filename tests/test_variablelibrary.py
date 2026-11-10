@@ -11,7 +11,7 @@ import pytest
 from fabric_cicd import FabricWorkspace, ItemType
 from fabric_cicd._common._exceptions import InvokeError
 from fabric_cicd._common._item import Item
-from fabric_cicd._items._variablelibrary import activate_value_set
+from fabric_cicd._items._variablelibrary import VariableLibraryPublisher, activate_value_set
 
 
 @pytest.fixture
@@ -26,6 +26,56 @@ def activation_context():
     workspace.base_api_url = "https://example.test/workspaces/workspace"
     workspace.environment = "PPE"
     return workspace, library
+
+
+@pytest.mark.parametrize(
+    ("environment", "expected_set"),
+    [("PROD", "PROD"), ("PPE", "PPE"), ("Unknown", "Default value set")],
+)
+def test_standard_activation_uses_workspace_environment(activation_context, environment, expected_set):
+    workspace, library = activation_context
+    workspace.environment = environment
+    workspace.bulk_publish_enabled = False
+    publisher = VariableLibraryPublisher(workspace)
+
+    publisher.publish_one(library.name, library)
+    publisher.post_publish_all({library.name: "PROD"})
+
+    workspace._publish_item.assert_called_once_with(item_name=library.name, item_type=library.type)
+    workspace.endpoint.invoke.assert_called_once_with(
+        method="PATCH",
+        url=f"{workspace.base_api_url}/VariableLibraries/{library.guid}",
+        body={"properties": {"activeValueSetName": expected_set}},
+    )
+
+
+def test_standard_publish_without_settings_still_publishes_item(activation_context):
+    workspace, library = activation_context
+    library.item_files = []
+    workspace.bulk_publish_enabled = False
+
+    VariableLibraryPublisher(workspace).publish_one(library.name, library)
+
+    workspace._publish_item.assert_called_once_with(item_name=library.name, item_type=library.type)
+    workspace.endpoint.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("selections", "expected_set"),
+    [(None, "PPE"), ({}, "PPE"), ({"Other": "PROD"}, "PPE"), ({"Vars": None}, "PPE"), ({"Vars": "PROD"}, "PROD")],
+)
+def test_bulk_activation_only_overrides_with_explicit_selection(activation_context, selections, expected_set):
+    workspace, library = activation_context
+    workspace.repository_items = {ItemType.VARIABLE_LIBRARY.value: {library.name: library}}
+    workspace.bulk_publish_enabled = True
+
+    VariableLibraryPublisher(workspace).post_publish_all(selections)
+
+    workspace.endpoint.invoke.assert_called_once_with(
+        method="PATCH",
+        url=f"{workspace.base_api_url}/VariableLibraries/{library.guid}",
+        body={"properties": {"activeValueSetName": expected_set}},
+    )
 
 
 @pytest.mark.parametrize("selection", ["PROD", "Default value set", "DEV"])
