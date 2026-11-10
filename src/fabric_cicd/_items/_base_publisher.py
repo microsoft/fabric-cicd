@@ -371,7 +371,7 @@ class ItemPublisher(Publisher):
             publishers.append(publisher)
 
         # Set the deployment plan, if specified
-        deployment_plan_options, plan_variable_libraries = set_deployment_plan(fabric_workspace_obj, items_with_context)
+        deployment_plan_options, plan_variable_libraries = set_deployment_plan(fabric_workspace_obj)
 
         # Phase 2: Batched bulk API calls (publisher context used inside for per-item transforms)
         if items_with_context:
@@ -400,6 +400,11 @@ class ItemPublisher(Publisher):
 
             # Stage B: Publish variable libraries first if any are specified in the plan and activate the selected value sets
             if plan_variable_libraries and variable_libraries:
+                logger.debug(
+                    "Publishing Variable Libraries and activating value sets before executing Deployment Plan '%s': %s",
+                    fabric_workspace_obj.deployment_plan,
+                    [name for name, _item, _publisher in variable_libraries],
+                )
                 fabric_workspace_obj._publish_items(variable_libraries)
                 for publisher in publishers:
                     if isinstance(publisher, VariableLibraryPublisher):

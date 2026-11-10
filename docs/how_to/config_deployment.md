@@ -197,19 +197,6 @@ publish:
         <env..>: <bool_value>
 ```
 
-#### Deployment Plan Option
-
-To apply a deployment plan during publishing, set `publish.deployment_plan` to the exact display name of a deployment plan item in the repository. Specify a non-empty string or an environment-specific mapping, as shown above.
-
-!!! note
-
-    - This option requires **bulk publish mode**, with both the `enable_bulk_publish` and `enable_experimental_features` flags enabled. If `deployment_plan` is specified but bulk publishing is disabled or falls back to standard publishing, the deployment stops with an error before any items are published.
-    - Only **one** deployment plan can be selected for execution per deployment, even if multiple Deployment Plan items are published.
-    - The selected plan must exist in the repository directory, even if it already exists in the target workspace. Target-only plans are not supported.
-    - Executing a deployment plan requires a single bulk publish batch. Plans cannot be executed when parameter dependencies split the deployment into multiple batches.
-    - If the plan references a repository Variable Library, all Variable Libraries included by scope and publish filters are published first and their value sets activated. Explicit `ActiveValueSetName` plan selections take precedence; other libraries use the target environment or default value set. These libraries remain in the final bulk batch that executes the plan.
-    - Deployment plan execution may be incompatible with items that require post-deployment actions, such as Environment publishing or Semantic Model connection binding. Dependent items in the same deployment batch may fail when executed by the plan—for example, a Notebook attached to an Environment whose required libraries have not yet been published. These scenarios may require a manual workaround.
-
 ### Unpublish Settings
 
 The `unpublish` section is optional and controls item unpublishing behavior. If this section is omitted entirely, unpublishing will run with **default behavior — all orphan items unpublished, no exclusions.** It includes various optional settings to enable/disable unpublishing or selectively unpublish items.

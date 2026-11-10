@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def activate_value_set(
-    fabric_workspace_obj: FabricWorkspace, item_obj: Item, active_value_set: Optional[str] = None
+    fabric_workspace_obj: FabricWorkspace, item_obj: Item, value_set_override: Optional[str] = None
 ) -> None:
     """
     Activates the value set for the given Variable Library item.
@@ -27,13 +27,14 @@ def activate_value_set(
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
         item_obj: The item object.
-        active_value_set: Explicit plan selection validated by Fabric, or None to use the workspace environment.
+        value_set_override: Explicit value set name that overrides environment-based selection, or None to use it.
     """
     settings_file_obj = next((file for file in item_obj.item_files if file.name == "settings.json"), None)
 
     if settings_file_obj:
         settings_dict = json.loads(settings_file_obj.contents)
-        if active_value_set is not None:
+        if value_set_override is not None:
+            active_value_set = value_set_override
             if active_value_set != fabric_workspace_obj.environment:
                 logger.warning(
                     f"Variable Library '{item_obj.name}' uses plan value set '{active_value_set}', "
@@ -77,7 +78,4 @@ class VariableLibraryPublisher(ItemPublisher):
             for item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 if not item.skip_publish:
                     selection = value_set_selections.get(item.name) if value_set_selections else None
-                    if selection is None:
-                        activate_value_set(self.fabric_workspace_obj, item)
-                    else:
-                        activate_value_set(self.fabric_workspace_obj, item, selection)
+                    activate_value_set(self.fabric_workspace_obj, item, selection)

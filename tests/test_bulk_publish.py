@@ -2057,7 +2057,7 @@ class TestBulkPublishDeploymentPlan:
         ):
             publish.publish_all_items(ws, deployment_plan="Missing")
 
-        mock_set_plan.assert_called_once_with(ws, [])
+        mock_set_plan.assert_called_once_with(ws)
         assert bodies == []
 
     def test_empty_collection_without_plan_remains_noop(self, mock_endpoint, temp_workspace_dir):
@@ -2070,7 +2070,7 @@ class TestBulkPublishDeploymentPlan:
         ):
             publish.publish_all_items(ws)
 
-        mock_set_plan.assert_called_once_with(ws, [])
+        mock_set_plan.assert_called_once_with(ws)
         assert bodies == []
 
     @pytest.mark.parametrize("selection", ["out_of_scope", "filtered", "target_only"])
@@ -2149,20 +2149,33 @@ class TestBulkPublishDeploymentPlan:
         }
         assert bodies[1]["options"] == {"allowPairingByName": True}
 
-    @pytest.mark.parametrize(
-        ("name", "message"), [("Missing", "must exist in the repository"), ("Plan", "must be included")]
-    )
-    def test_rejects_missing_or_filtered_plan(self, mock_endpoint, temp_workspace_dir, name, message):
+    def test_rejects_missing_repository_plan(self, mock_endpoint, temp_workspace_dir):
         create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
         bodies = capture_bulk_bodies(mock_endpoint)
 
         with (
             patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["DeploymentPlan"]) as ws,
-            pytest.raises(InputError, match=message),
+            pytest.raises(InputError, match="must exist in the repository"),
         ):
-            publish.publish_all_items(ws, deployment_plan=name, item_name_exclude_regex="^Plan$")
+            publish.publish_all_items(ws, deployment_plan="Missing", item_name_exclude_regex="^Plan$")
 
         assert bodies == []
+
+    @pytest.mark.parametrize("selection", ["out_of_scope", "filtered"])
+    def test_sends_repository_only_plan_to_api(self, mock_endpoint, temp_workspace_dir, selection):
+        create_test_item_dir(temp_workspace_dir, None, "Plan", "DeploymentPlan", "plan-id")
+        create_test_item_dir(temp_workspace_dir, None, "Notebook", "Notebook", "notebook-id")
+        bodies = capture_bulk_bodies(mock_endpoint)
+        item_types = ["Notebook", "DeploymentPlan"] if selection == "filtered" else ["Notebook"]
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=item_types) as ws:
+            publish.publish_all_items(
+                ws, deployment_plan="Plan", item_name_exclude_regex="^Plan$" if selection == "filtered" else None
+            )
+
+        assert len(bodies) == 1
+        assert get_bulk_part_names(bodies[0]) == {"Notebook"}
+        assert bodies[0]["options"]["deploymentPlan"] == {"logicalId": "plan-id", "referenceType": "ByLogicalId"}
 
     @pytest.mark.parametrize(
         ("name", "message"),

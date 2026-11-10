@@ -235,7 +235,7 @@ groups:
     workspace.deployment_plan = "Other"
     assert _get_plan_variable_libraries(workspace, plan) == {"Explicit": "PROD", "Fallback": None}
     workspace.deployment_plan = plan.name
-    options, selections = set_deployment_plan(workspace, [(plan.name, plan, object())])
+    options, selections = set_deployment_plan(workspace)
     assert options == {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}}
     assert selections == {"Explicit": "PROD", "Fallback": None}
     workspace.endpoint.invoke.assert_not_called()
@@ -279,7 +279,7 @@ def test_set_deployment_plan_returns_bulk_options_for_undeployed_plan():
 
     repository_items = {ItemType.DEPLOYMENT_PLAN.value: {plan.name: plan}}
     workspace = make_workspace("Plan", repository_items)
-    assert set_deployment_plan(workspace, [(plan.name, plan, object())]) == (
+    assert set_deployment_plan(workspace) == (
         {
             "deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"},
         },
@@ -288,7 +288,7 @@ def test_set_deployment_plan_returns_bulk_options_for_undeployed_plan():
 
 
 def test_set_deployment_plan_returns_no_options_without_selection():
-    assert set_deployment_plan(make_workspace(), []) == ({}, {})
+    assert set_deployment_plan(make_workspace()) == ({}, {})
 
 
 def test_set_deployment_plan_rejects_same_name_of_another_type():
@@ -296,7 +296,7 @@ def test_set_deployment_plan_rejects_same_name_of_another_type():
     workspace = make_workspace("Plan", {ItemType.NOTEBOOK.value: {"Plan": notebook}})
 
     with pytest.raises(InputError, match="must exist in the repository"):
-        set_deployment_plan(workspace, [(notebook.name, notebook, object())])
+        set_deployment_plan(workspace)
 
 
 @pytest.mark.parametrize(
@@ -308,7 +308,7 @@ def test_set_deployment_plan_resolves_existing_target_plan(deployed_id):
     deployed_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": make_plan(logical_id=deployed_id)}}
     workspace = make_workspace("Plan", repository_items, deployed_items)
 
-    assert set_deployment_plan(workspace, []) == (
+    assert set_deployment_plan(workspace) == (
         {
             "deploymentPlan": {"logicalId": "repository-id", "referenceType": "ByLogicalId"},
         },
@@ -316,43 +316,46 @@ def test_set_deployment_plan_resolves_existing_target_plan(deployed_id):
     )
 
 
-@pytest.mark.parametrize("in_batch", [False, True])
-def test_set_deployment_plan_requires_repository_plan_before_other_lookups(in_batch):
-    plan = make_plan(logical_id="target-id")
-    batch = [(plan.name, plan, object())] if in_batch else []
+def test_set_deployment_plan_requires_repository_plan_before_other_lookups():
     deployed_items = MagicMock()
     workspace = make_workspace("Plan", deployed_items=deployed_items)
 
     with pytest.raises(InputError, match="must exist in the repository"):
-        set_deployment_plan(workspace, batch)
+        set_deployment_plan(workspace)
 
     deployed_items.get.assert_not_called()
 
 
-def test_set_deployment_plan_rejects_repository_only_plan_outside_batch():
-    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": make_plan()}}
+def test_set_deployment_plan_accepts_repository_only_plan():
+    plan = make_plan()
+    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}}
     workspace = make_workspace("Plan", repository_items)
 
-    with pytest.raises(InputError, match="already exist in the target workspace"):
-        set_deployment_plan(workspace, [])
+    assert set_deployment_plan(workspace) == (
+        {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}},
+        {},
+    )
 
 
-def test_set_deployment_plan_rejects_same_name_target_item_of_another_type():
-    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": make_plan()}}
+def test_set_deployment_plan_ignores_same_name_target_item_of_another_type():
+    plan = make_plan()
+    repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}}
     deployed_items = {ItemType.NOTEBOOK.value: {"Plan": Item(ItemType.NOTEBOOK.value, "Plan", "", "notebook-id")}}
     workspace = make_workspace("Plan", repository_items, deployed_items)
 
-    with pytest.raises(InputError, match="already exist in the target workspace"):
-        set_deployment_plan(workspace, [])
+    assert set_deployment_plan(workspace) == (
+        {"deploymentPlan": {"logicalId": plan.logical_id, "referenceType": "ByLogicalId"}},
+        {},
+    )
 
 
-def test_set_deployment_plan_in_batch_does_not_require_target_lookup():
+def test_set_deployment_plan_does_not_require_target_lookup():
     plan = make_plan(logical_id="batch-id")
     repository_items = {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}}
     deployed_items = MagicMock()
     workspace = make_workspace("Plan", repository_items, deployed_items)
 
-    assert set_deployment_plan(workspace, [(plan.name, plan, object())]) == (
+    assert set_deployment_plan(workspace) == (
         {
             "deploymentPlan": {"logicalId": "batch-id", "referenceType": "ByLogicalId"},
         },
@@ -372,7 +375,7 @@ def test_bulk_publish_uses_top_level_plan_logical_id():
     FabricWorkspace._publish_items(
         workspace,
         batch,
-        deployment_plan_options=set_deployment_plan(workspace, batch)[0],
+        deployment_plan_options=set_deployment_plan(workspace)[0],
     )
 
     assert workspace.endpoint.invoke.call_args.kwargs["body"]["options"] == {
@@ -388,6 +391,30 @@ def test_bulk_publish_without_plan_preserves_pairing_by_name():
     assert workspace.endpoint.invoke.call_args.kwargs["body"]["options"] == {"allowPairingByName": True}
 
 
+def test_bulk_publish_propagates_api_error_for_repository_only_plan():
+    plan = make_plan()
+    workspace = make_workspace("Plan", {ItemType.DEPLOYMENT_PLAN.value: {"Plan": plan}})
+    api_error = RuntimeError(f"Deployment plan artifact with LogicalId {plan.logical_id} was not found in Git")
+    workspace.endpoint.invoke.side_effect = api_error
+    notebook = Item(ItemType.NOTEBOOK.value, "Notebook", "", "", logical_id="notebook-id")
+    publisher = MagicMock()
+    publisher.get_definition_options.return_value = {}
+
+    with pytest.raises(RuntimeError, match="was not found in Git") as exc:
+        FabricWorkspace._publish_items(
+            workspace,
+            [(notebook.name, notebook, publisher)],
+            deployment_plan_options=set_deployment_plan(workspace)[0],
+        )
+
+    assert exc.value is api_error
+    workspace.endpoint.invoke.assert_called_once()
+    assert workspace.endpoint.invoke.call_args.kwargs["body"]["options"]["deploymentPlan"] == {
+        "logicalId": plan.logical_id,
+        "referenceType": "ByLogicalId",
+    }
+
+
 def test_bulk_publish_preserves_per_item_options_with_plan():
     workspace = make_workspace()
     plan = make_plan()
@@ -398,7 +425,7 @@ def test_bulk_publish_preserves_per_item_options_with_plan():
 
     batch = [(plan.name, plan, DeploymentPlanPublisher(workspace)), (model.name, model, model_publisher)]
     workspace.repository_items = {ItemType.DEPLOYMENT_PLAN.value: {plan.name: plan}}
-    plan_options, _selections = set_deployment_plan(workspace, batch)
+    plan_options, _selections = set_deployment_plan(workspace)
     FabricWorkspace._publish_items(workspace, batch, deployment_plan_options=plan_options)
 
     assert workspace.endpoint.invoke.call_args.kwargs["body"]["options"] == {
@@ -414,7 +441,7 @@ def test_set_deployment_plan_rejects_missing_plan_before_request():
     workspace.deployment_plan = "Plan"
 
     with pytest.raises(InputError, match="must exist in the repository"):
-        set_deployment_plan(workspace, [])
+        set_deployment_plan(workspace)
 
     workspace.endpoint.invoke.assert_not_called()
 
@@ -449,7 +476,7 @@ def test_bulk_publish_selects_named_plan_among_multiple_plans():
     FabricWorkspace._publish_items(
         workspace,
         batch,
-        deployment_plan_options=set_deployment_plan(workspace, batch)[0],
+        deployment_plan_options=set_deployment_plan(workspace)[0],
     )
 
     assert workspace.endpoint.invoke.call_args.kwargs["body"]["options"]["deploymentPlan"] == {

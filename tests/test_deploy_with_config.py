@@ -146,7 +146,9 @@ class TestDeploymentPlanConfig:
             load_config_file(self._write_config(tmp_path, value), "dev")
 
     def test_rejects_unpublish_setting(self, tmp_path):
-        with pytest.raises(ConfigValidationError, match="only supported in the 'publish' section"):
+        with pytest.raises(
+            ConfigValidationError, match="'deployment_plan' field is not supported in 'unpublish' section"
+        ):
             load_config_file(self._write_config(tmp_path, "Plan", section="unpublish"), "dev")
 
     def test_missing_environment_omits_selection(self, tmp_path):

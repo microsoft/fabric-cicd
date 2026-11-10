@@ -32,7 +32,7 @@ def activation_context():
 def test_explicit_value_set_is_submitted_to_fabric(activation_context, selection):
     workspace, library = activation_context
 
-    activate_value_set(workspace, library, selection)
+    activate_value_set(workspace, library, value_set_override=selection)
 
     workspace.endpoint.invoke.assert_called_once_with(
         method="PATCH",

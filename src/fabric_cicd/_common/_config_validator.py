@@ -864,7 +864,11 @@ class ConfigValidator:
 
         if "deployment_plan" in section:
             if section_name != "publish":
-                self.errors.append("'deployment_plan' is only supported in the 'publish' section.")
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unsupported_field"].format(
+                        "deployment_plan", section_name
+                    )
+                )
             plan = section["deployment_plan"]
             context = f"{section_name}.deployment_plan"
             if isinstance(plan, dict):
