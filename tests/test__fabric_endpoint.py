@@ -393,6 +393,20 @@ def test_invoke_rejects_invalid_extra_headers(setup_mocks, monkeypatch, extra_he
     mock_requests.assert_not_called()
 
 
+def test_invoke_rejects_leading_whitespace_header_without_exposing_value(setup_mocks, monkeypatch, caplog):
+    """Test a leading-whitespace header value fails before any request and the value never reaches errors or logs."""
+    _, mock_requests = setup_mocks
+    monkeypatch.setattr(constants, "EXTRA_HEADERS", {"x-api-key": " secret-value"})
+
+    with pytest.raises(InputError) as exc_info:
+        _mock_endpoint(mock_requests).invoke("GET", "http://example.com")
+
+    mock_requests.assert_not_called()
+    assert "x-api-key" in str(exc_info.value)
+    assert "secret-value" not in str(exc_info.value)
+    assert "secret-value" not in caplog.text
+
+
 def test_get_token(setup_mocks):
     """Test getting token returns token from credential and caches it."""
     _dl, _mock_requests = setup_mocks

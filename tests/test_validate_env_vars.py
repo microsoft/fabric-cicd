@@ -4,6 +4,7 @@
 import os
 
 import pytest
+import requests
 
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._validate_env_vars import (
@@ -228,6 +229,8 @@ class TestValidateExtraHeaders:
             ({"Content-Type": "v"}, "reserved header"),
             ({"x-a": 1}, "must be a string"),
             ({"x-a": "v\nx-b: injected"}, "must be a string without control characters"),
+            ({"x-a": " secret-value"}, "must not start with whitespace"),
+            ({"x-a": "\tsecret-value"}, "must not start with whitespace"),
         ],
         ids=[
             "not_mapping",
@@ -239,8 +242,38 @@ class TestValidateExtraHeaders:
             "content_type",
             "non_string_value",
             "newline_in_value",
+            "leading_space_value",
+            "leading_tab_value",
         ],
     )
     def test_rejects_invalid_headers(self, headers, error):
         with pytest.raises(InputError, match=error):
             validate_extra_headers(headers, "EXTRA_HEADERS")
+
+    def test_leading_whitespace_error_names_header_without_value(self):
+        with pytest.raises(InputError) as exc_info:
+            validate_extra_headers({"x-api-key": " secret-value"}, "EXTRA_HEADERS")
+
+        assert "x-api-key" in str(exc_info.value)
+        assert "secret-value" not in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "value",
+        ["secret-value", "", "a b", "trailing ", " secret-value", "\tsecret-value", "\u00a0secret-value"],
+        ids=["plain", "empty", "inner_space", "trailing_space", "leading_space", "leading_tab", "leading_nbsp"],
+    )
+    def test_accepts_only_values_requests_can_prepare(self, value):
+        """Test validation accepts a value exactly when real Requests request preparation does (no request is sent)."""
+        try:
+            requests.Request("GET", "https://api.fabric.microsoft.com", headers={"x-api-key": value}).prepare()
+            requests_accepts = True
+        except requests.exceptions.InvalidHeader:
+            requests_accepts = False
+
+        try:
+            validate_extra_headers({"x-api-key": value}, "EXTRA_HEADERS")
+            validator_accepts = True
+        except InputError:
+            validator_accepts = False
+
+        assert validator_accepts == requests_accepts

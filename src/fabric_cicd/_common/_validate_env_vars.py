@@ -144,5 +144,9 @@ def validate_extra_headers(headers: object, label: str) -> dict[str, str]:
         if not isinstance(value, str) or any(ch in value for ch in ("\r", "\n", "\0")):
             msg = f"'{label}' header '{name}' must be a string without control characters."
             raise InputError(msg, logger)
+        if value[:1].isspace():
+            # Requests rejects such values with an error that echoes the value, so fail early without exposing it
+            msg = f"'{label}' header '{name}' value must not start with whitespace."
+            raise InputError(msg, logger)
 
     return headers
