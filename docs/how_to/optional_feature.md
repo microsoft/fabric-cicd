@@ -132,8 +132,8 @@ constants:
 
 **Notes:**
 
-- Header names must be valid HTTP header names, and values must be strings without line breaks.
-- Headers managed by fabric-cicd (`Authorization`, `Content-Type`, `Content-Length`, `Host` and `User-Agent`) cannot be set and raise an error.
+- Header names must be valid HTTP header names, and values must be strings without line breaks that do not start with whitespace.
+- There are reserved headers managed by fabric-cicd which cannot be set and will raise an error.
 - Header values are redacted from HTTP trace output, and only header names are logged when set through a configuration file.
 
 ## Bulk Publish
