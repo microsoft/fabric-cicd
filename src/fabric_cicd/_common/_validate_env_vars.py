@@ -31,9 +31,22 @@ VALID_GUID_REGEX = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4
 # Constants that hold API URLs and require URL validation
 _URL_CONSTANTS = {"DEFAULT_API_ROOT_URL", "FABRIC_API_ROOT_URL"}
 
-# Headers managed by fabric-cicd that cannot be set through EXTRA_HEADERS (compared case-insensitively).
-# Kept outside the constants module so they cannot be overridden through config.
-_RESERVED_REQUEST_HEADERS = frozenset({"authorization", "content-type", "content-length", "host", "user-agent"})
+# Headers managed by fabric-cicd or its HTTP client that cannot be set through EXTRA_HEADERS (compared
+# case-insensitively). Kept outside the constants module so they cannot be overridden through config.
+_RESERVED_REQUEST_HEADERS = frozenset({
+    "authorization",
+    "connection",
+    "content-length",
+    "content-type",
+    "host",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "user-agent",
+})
+
+# Control characters not allowed in HTTP header values (RFC 9110 permits only horizontal tab)
+_HEADER_VALUE_CONTROL_REGEX = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
 
 # RFC 9110 token characters for HTTP header field names
 _HEADER_NAME_REGEX = re.compile(r"\A[!#$%&'*+\-.^_`|~0-9A-Za-z]+\Z")
@@ -121,7 +134,8 @@ def validate_extra_headers(headers: object, label: str) -> dict[str, str]:
     """
     Validates user-supplied extra HTTP request headers.
     Validates the value is a mapping of header names to string values, that each name is a
-    valid HTTP token, that values contain no control characters, and that no name is reserved.
+    valid HTTP token, that no name is reserved or repeated (case-insensitively), and that values
+    contain no control characters.
 
     Args:
         headers: The value to validate.
@@ -134,6 +148,7 @@ def validate_extra_headers(headers: object, label: str) -> dict[str, str]:
         msg = f"'{label}' must be a mapping of header names to string values, got {type(headers).__name__}."
         raise InputError(msg, logger)
 
+    seen_names = set()
     for name, value in headers.items():
         if not isinstance(name, str) or not _HEADER_NAME_REGEX.match(name):
             msg = f"'{label}' contains an invalid header name: {name!r}."
@@ -141,7 +156,12 @@ def validate_extra_headers(headers: object, label: str) -> dict[str, str]:
         if name.lower() in _RESERVED_REQUEST_HEADERS:
             msg = f"'{label}' cannot set the reserved header '{name}'."
             raise InputError(msg, logger)
-        if not isinstance(value, str) or any(ch in value for ch in ("\r", "\n", "\0")):
+        if name.lower() in seen_names:
+            # Header names are case-insensitive, so only one of the values would be sent
+            msg = f"'{label}' sets the header '{name}' more than once (header names are case-insensitive)."
+            raise InputError(msg, logger)
+        seen_names.add(name.lower())
+        if not isinstance(value, str) or _HEADER_VALUE_CONTROL_REGEX.search(value):
             msg = f"'{label}' header '{name}' must be a string without control characters."
             raise InputError(msg, logger)
         if value[:1].isspace():

@@ -214,7 +214,7 @@ class TestValidateExtraHeaders:
     """Tests for validate_extra_headers."""
 
     def test_accepts_valid_headers(self):
-        headers = {"x-correlation-id": "abc-123", "X-Custom_Header.1": ""}
+        headers = {"x-correlation-id": "abc-123", "X-Custom_Header.1": "", "x-tab": "a\tb"}
         assert validate_extra_headers(headers, "EXTRA_HEADERS") == headers
 
     @pytest.mark.parametrize(
@@ -227,8 +227,13 @@ class TestValidateExtraHeaders:
             ({"AUTHORIZATION": "v"}, "reserved header"),
             ({"user-agent": "v"}, "reserved header"),
             ({"Content-Type": "v"}, "reserved header"),
+            ({"Transfer-Encoding": "chunked"}, "reserved header"),
+            ({"x-a": "1", "X-A": "2"}, "more than once"),
             ({"x-a": 1}, "must be a string"),
             ({"x-a": "v\nx-b: injected"}, "must be a string without control characters"),
+            ({"x-a": "v\x0bv"}, "must be a string without control characters"),
+            ({"x-a": "v\x1b[0m"}, "must be a string without control characters"),
+            ({"x-a": "v\x7f"}, "must be a string without control characters"),
             ({"x-a": " secret-value"}, "must not start with whitespace"),
             ({"x-a": "\tsecret-value"}, "must not start with whitespace"),
         ],
@@ -240,8 +245,13 @@ class TestValidateExtraHeaders:
             "authorization_any_case",
             "user_agent",
             "content_type",
+            "transfer_encoding",
+            "case_insensitive_duplicate",
             "non_string_value",
             "newline_in_value",
+            "vertical_tab_in_value",
+            "escape_in_value",
+            "delete_in_value",
             "leading_space_value",
             "leading_tab_value",
         ],
