@@ -459,13 +459,6 @@ class FabricWorkspace:
                         raise FailedPublishedItemStatusError(msg, logger)
                     visited_logical_ids.add(item_logical_id)
 
-                elif self.bulk_publish_enabled:
-                    msg = (
-                        f"Item '{item_name}.{item_type}' has the default logicalId '{constants.DEFAULT_GUID}' "
-                        f"in the .platform file. The bulk import API only accepts a unique logicalId. "
-                    )
-                    raise InputError(msg, logger)
-
                 item_path = directory
                 relative_path = f"/{directory.relative_to(self.repository_directory).as_posix()}"
                 # Special handling for KQLDatabase items:
@@ -794,6 +787,9 @@ class FabricWorkspace:
         # Note: items_to_include filtering is applied upstream in publish_all() via get_items_to_publish().
         if self._apply_publish_filters(item, item_name, item_type):
             return
+
+        if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
+            item.folder_id = self.repository_folders.get(item.folder_path, "")
 
         item_guid = item.guid
         item_description = item.description

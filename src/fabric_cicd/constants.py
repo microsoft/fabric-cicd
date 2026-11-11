@@ -127,6 +127,8 @@ class FeatureFlag(str, Enum):
     """Set to enable the deletion of Lakehouses."""
     ENABLE_WAREHOUSE_UNPUBLISH = "enable_warehouse_unpublish"
     """Set to enable the deletion of Warehouses."""
+    ENABLE_WAREHOUSE_DEFINITION_PUBLISH = "enable_warehouse_definition_publish"
+    """Set to enable deployment of native Warehouse SQL project definitions."""
     ENABLE_SQLDATABASE_UNPUBLISH = "enable_sqldatabase_unpublish"
     """Set to enable the deletion of SQL Databases."""
     ENABLE_EVENTHOUSE_UNPUBLISH = "enable_eventhouse_unpublish"
@@ -189,13 +191,7 @@ UNPUBLISH_FLAG_MAPPING = {
 
 # Item Type
 ACCEPTED_ITEM_TYPES = tuple(item_type.value for item_type in ItemType)
-BULK_UNSUPPORTED_ITEM_TYPES = [
-    ItemType.DATA_BUILD_TOOL_JOB.value,
-    ItemType.WAREHOUSE.value,
-]
-BULK_ACCEPTED_ITEM_TYPES = tuple(
-    item_type.value for item_type in ItemType if item_type.value not in BULK_UNSUPPORTED_ITEM_TYPES
-)
+BULK_UNSUPPORTED_ITEM_TYPES: list[str] = []
 
 # API URLs
 DEFAULT_API_ROOT_URL = validate_env_var_api_url(EnvVar.DEFAULT_API_ROOT_URL.value, "https://api.powerbi.com")
@@ -239,7 +235,7 @@ NON_MOVABLE_ITEM_TYPES = [
 ]
 
 SHELL_ONLY_PUBLISH = [
-    ItemType.WAREHOUSE.value,
+    ItemType.LAKEHOUSE.value,
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,
 ]
@@ -257,10 +253,12 @@ EXCLUDE_PATH_REGEX_MAPPING = {
     ItemType.SEMANTIC_MODEL.value: r".*\.pbi[/\\].*",
     ItemType.EVENTHOUSE.value: r".*\.children[/\\].*",
     ItemType.ORG_APP.value: r".*\.children[/\\].*",
+    ItemType.WAREHOUSE.value: r"(?:.*[/\\])?\.gitignore$",
 }
 
 # API Format Mapping for item types that require specific API formats
 API_FORMAT_MAPPING = {
+    ItemType.WAREHOUSE.value: "sqlproj",
     ItemType.SPARK_JOB_DEFINITION.value: "SparkJobDefinitionV2",
     ItemType.NOTEBOOK.value: "ipynb",
 }

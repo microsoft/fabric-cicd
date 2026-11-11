@@ -1,0 +1,8 @@
+kind: added
+body: Add opt-in Warehouse SQL project deployment while preserving shell-only publishing by default
+time: 2026-11-02T11:16:38.7679801+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "961"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/961

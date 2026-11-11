@@ -243,6 +243,7 @@
 
 - **Parameterization:**
     - The `find_replace` section in the `parameter.yml` file is not applied.
-- **Warehouse content is not deployed.** Only the item shell is deployed. Warehouse DDL must be deployed separately using a DACPAC or other tools such as dbt.
-- **Case insensitive collation is supported** custom collation must be manually edited in the `.platform` file creation payload. See [How to: Create a warehouse with case-insensitive (CI) collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation) for more details.
+- **Deployment:**
+    - **Publishing:** Shell-only publishing deploys metadata only and is the default. Enable `enable_warehouse_definition_publish` to deploy the schema, shared queries, and any pre/post-deployment scripts from Git-exported **SQL projects**. Warehouses with a non-null **creation payload** or no `.sqlproj` file remain shell-only.
+    - **Collation:** New Warehouses use the target workspace's default collation unless overridden by `metadata.creationPayload.defaultCollation` in `.platform`. Collation cannot be changed after creation. See [Data Warehouse collation](https://learn.microsoft.com/en-us/fabric/data-warehouse/collation).
 - **Unpublish** is disabled by default, enable with feature flag `enable_warehouse_unpublish`.

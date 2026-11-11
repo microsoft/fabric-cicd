@@ -133,7 +133,7 @@ def test_publish_all_items_integration(mock_fabric_api_server):  # noqa: ARG001
 
     token_credential = DummyTokenCredential()
 
-    for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure"]:
+    for flag in ["enable_shortcut_publish", "continue_on_shortcut_failure", "enable_warehouse_definition_publish"]:
         fabric_cicd.append_feature_flag(flag)
 
     target_workspace = fabric_cicd.FabricWorkspace(
