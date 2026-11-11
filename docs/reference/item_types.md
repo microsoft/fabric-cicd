@@ -116,14 +116,13 @@
 
 ## Lakehouse
 
-- **Full definition deployment:** Lakehouses are deployed with their item definition (`lakehouse.metadata.json`, `alm.settings.json`, `data-access-roles.json`, `.platform`). New lakehouses are created with the definition and existing lakehouses are updated via the update definition API.
-    - **Schemas:** schema-enabled lakehouses are created when `lakehouse.metadata.json` contains a `defaultSchema`. If `lakehouse.metadata.json` is missing, an empty definition (`{}`) is used.
-    - **Data access roles:** `data-access-roles.json` is only applied when the `DataAccessRoles` object type is set to `Enabled` in `alm.settings.json` (disabled by default). Roles can be added, modified, and removed through the definition. `microsoftEntraMembers` are not supported by the Lakehouse definition API and are ignored.
-    - **Schemas and tables are not deployed** unless the schema has a shortcut present. Lakehouse data is not deployed.
 - **Parameterization:**
-    - The `find_replace` section in the `parameter.yml` file is applied to the definition files (excluding `.platform`) and to `shortcuts.metadata.json`.
+    - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Publishing:**
+    - **Standard:** Shell-only by default, including schema-enabled creation when `lakehouse.metadata.json` contains `defaultSchema`. Set `enable_lakehouse_definition_publish` to deploy Lakehouse metadata and ALM settings, including enabled data access roles, as described in the [Lakehouse definition](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/lakehouse-definition) documentation. This does not deploy schema or table definitions or stored data.
+    - **Bulk:** Always deploys the repository definition, regardless of the definition flag. If bulk falls back to standard publishing, the flag applies.
+    - **Data access roles:** `data-access-roles.json` is only applied when `DataAccessRoles` is `Enabled` in `alm.settings.json` (disabled by default). Roles can be added, modified, and removed. `microsoftEntraMembers` are unsupported by the Lakehouse definition API and ignored.
 - **Shortcut** publish remains separate from the definition and is disabled by default (for now), enable with feature flag `enable_shortcut_publish`.
-    - `shortcuts.metadata.json` is never sent as part of the lakehouse definition. To prevent the definition API from creating, modifying, or deleting shortcuts, the `Shortcuts` object type (and its sub-object types) in the deployed `alm.settings.json` is always set to `Disabled`; a default `alm.settings.json` is added if not present in the repository.
 - **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`.
 
 ## Map

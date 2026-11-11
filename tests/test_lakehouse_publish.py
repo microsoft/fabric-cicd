@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Tests for full definition Lakehouse publishing."""
+"""Tests for shell-only and opt-in full definition Lakehouse publishing."""
 
 import base64
 import json
@@ -12,11 +12,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fixtures.credentials import DummyTokenCredential
 
-from fabric_cicd import constants
+from fabric_cicd import append_feature_flag, constants, get_supported_feature_flags
 from fabric_cicd._common._exceptions import ParsingError
 from fabric_cicd._common._item import Item
 from fabric_cicd._items._lakehouse import LakehousePublisher, is_data_access_roles_enabled
-from fabric_cicd.constants import ItemType
+from fabric_cicd.constants import FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 VALID_WORKSPACE_ID = "12345678-1234-5678-abcd-1234567890ab"
@@ -102,8 +102,9 @@ def mock_endpoint():
 
 
 @pytest.fixture
-def workspace(mock_endpoint, tmp_path):
+def workspace(mock_endpoint, tmp_path, monkeypatch):
     """Create a FabricWorkspace with mocked endpoint and no deployed items."""
+    monkeypatch.setattr(constants, "FEATURE_FLAG", set())
     with (
         patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
         patch.object(FabricWorkspace, "_refresh_deployed_items", new=lambda self: setattr(self, "deployed_items", {})),
@@ -120,6 +121,13 @@ def workspace(mock_endpoint, tmp_path):
         ws.deployed_items = {}
         ws.deployed_folders = {}
         yield ws
+
+
+@pytest.fixture
+def definition_workspace(workspace):
+    """Opt in to full definitions through the public feature flag API."""
+    append_feature_flag(FeatureFlag.ENABLE_LAKEHOUSE_DEFINITION_PUBLISH.value)
+    return workspace
 
 
 def _add_lakehouse(ws: FabricWorkspace, tmp_path: Path, files: dict, guid: str = "") -> Item:
@@ -161,15 +169,49 @@ def _parts(body: dict) -> dict:
     return {part["path"]: base64.b64decode(part["payload"]).decode("utf-8") for part in body["definition"]["parts"]}
 
 
-def test_lakehouse_not_shell_only():
-    """Lakehouse is published with its full definition, not as a shell."""
-    assert ItemType.LAKEHOUSE.value not in constants.SHELL_ONLY_PUBLISH
+def test_lakehouse_definition_publish_flag_is_supported():
+    """Expose the standard publishing opt-in through the public supported-feature list."""
+    assert FeatureFlag.ENABLE_LAKEHOUSE_DEFINITION_PUBLISH.value in get_supported_feature_flags()
 
 
-def test_create_sends_full_definition_without_creation_payload(workspace, mock_endpoint, tmp_path):
+@pytest.mark.parametrize("deployed", [False, True], ids=["create", "update"])
+@pytest.mark.parametrize("metadata", [None, {}, {"defaultSchema": "dbo"}], ids=["missing", "empty", "schemas"])
+def test_default_publishing_is_shell_only(workspace, mock_endpoint, tmp_path, metadata, deployed):
+    """Without the flag, definitions are ignored and schema-enabled creation is preserved."""
+    files = {
+        ".platform": PLATFORM,
+        "alm.settings.json": "{not json",
+        "data-access-roles.json": DATA_ACCESS_ROLES,
+        "shortcuts.metadata.json": SHORTCUTS,
+    }
+    if metadata is not None:
+        files["lakehouse.metadata.json"] = metadata
+    item = _add_lakehouse(workspace, tmp_path, files, guid="existing-guid" if deployed else "")
+
+    _publish(workspace)
+
+    writes = [c for c in mock_endpoint.calls if c["method"] in {"POST", "PATCH"}]
+    assert len(writes) == 1
+    call = writes[0]
+    expected_body = {"displayName": LAKEHOUSE_NAME, "description": ""}
+    if deployed:
+        assert call["method"] == "PATCH"
+        assert call["url"].endswith("/items/existing-guid")
+    else:
+        assert call["method"] == "POST"
+        assert call["url"].endswith("/items")
+        expected_body.update({"type": ItemType.LAKEHOUSE.value, "folderId": ""})
+        if metadata and "defaultSchema" in metadata:
+            expected_body["creationPayload"] = {"enableSchemas": True}
+        assert item.guid == "new-lakehouse-guid"
+    assert call["body"] == expected_body
+    assert any(c["method"] == "GET" and "/lakehouses/" in c["url"] for c in mock_endpoint.calls)
+
+
+def test_create_sends_full_definition_without_creation_payload(definition_workspace, mock_endpoint, tmp_path):
     """New lakehouses are created with a definition; schemas are driven by lakehouse.metadata.json."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {
             ".platform": PLATFORM,
@@ -180,7 +222,7 @@ def test_create_sends_full_definition_without_creation_payload(workspace, mock_e
         },
     )
 
-    _publish(workspace)
+    _publish(definition_workspace)
 
     call = _definition_call(mock_endpoint)
     assert call["url"].endswith("/items")
@@ -189,19 +231,19 @@ def test_create_sends_full_definition_without_creation_payload(workspace, mock_e
     assert set(parts) == {".platform", "lakehouse.metadata.json", "alm.settings.json", "data-access-roles.json"}
     assert json.loads(parts["lakehouse.metadata.json"]) == {"defaultSchema": "dbo"}
     assert json.loads(parts["data-access-roles.json"]) == DATA_ACCESS_ROLES
-    assert workspace.repository_items[ItemType.LAKEHOUSE.value][LAKEHOUSE_NAME].guid == "new-lakehouse-guid"
+    assert definition_workspace.repository_items[ItemType.LAKEHOUSE.value][LAKEHOUSE_NAME].guid == "new-lakehouse-guid"
 
 
-def test_update_uses_update_definition(workspace, mock_endpoint, tmp_path):
+def test_update_uses_update_definition(definition_workspace, mock_endpoint, tmp_path):
     """Deployed lakehouses are updated via updateDefinition instead of a metadata-only PATCH."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {".platform": PLATFORM, "lakehouse.metadata.json": {}, "shortcuts.metadata.json": SHORTCUTS},
         guid="existing-guid",
     )
 
-    _publish(workspace)
+    _publish(definition_workspace)
 
     call = _definition_call(mock_endpoint)
     assert call["url"].endswith("/items/existing-guid/updateDefinition?updateMetadata=True")
@@ -209,16 +251,16 @@ def test_update_uses_update_definition(workspace, mock_endpoint, tmp_path):
     assert "shortcuts.metadata.json" not in _parts(call["body"])
 
 
-def test_alm_settings_shortcuts_disabled_and_other_settings_preserved(workspace, mock_endpoint, tmp_path):
+def test_alm_settings_shortcuts_disabled_and_other_settings_preserved(definition_workspace, mock_endpoint, tmp_path):
     """Shortcuts (and sub-types) are disabled in alm.settings.json; DataAccessRoles setting is preserved."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {".platform": PLATFORM, "lakehouse.metadata.json": {}, "alm.settings.json": ALM_SETTINGS},
         guid="existing-guid",
     )
 
-    _publish(workspace)
+    _publish(definition_workspace)
 
     alm = json.loads(_parts(_definition_call(mock_endpoint)["body"])["alm.settings.json"])
     assert alm["version"] == "1.0.1"
@@ -228,10 +270,10 @@ def test_alm_settings_shortcuts_disabled_and_other_settings_preserved(workspace,
     assert object_types["DataAccessRoles"]["state"] == "Enabled"
 
 
-def test_alm_settings_without_shortcuts_entry_gets_one(workspace, mock_endpoint, tmp_path):
+def test_alm_settings_without_shortcuts_entry_gets_one(definition_workspace, mock_endpoint, tmp_path):
     """A Disabled Shortcuts entry is added when alm.settings.json does not define one."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {
             ".platform": PLATFORM,
@@ -243,7 +285,7 @@ def test_alm_settings_without_shortcuts_entry_gets_one(workspace, mock_endpoint,
         },
     )
 
-    _publish(workspace)
+    _publish(definition_workspace)
 
     alm = json.loads(_parts(_definition_call(mock_endpoint)["body"])["alm.settings.json"])
     object_types = {obj["name"]: obj for obj in alm["objectTypes"]}
@@ -251,11 +293,11 @@ def test_alm_settings_without_shortcuts_entry_gets_one(workspace, mock_endpoint,
     assert object_types["DataAccessRoles"]["state"] == "Disabled"
 
 
-def test_missing_alm_settings_and_metadata_are_synthesized(workspace, mock_endpoint, tmp_path):
+def test_missing_alm_settings_and_metadata_are_synthesized(definition_workspace, mock_endpoint, tmp_path):
     """Missing lakehouse.metadata.json and alm.settings.json are added with safe defaults."""
-    _add_lakehouse(workspace, tmp_path, {".platform": PLATFORM, "shortcuts.metadata.json": SHORTCUTS})
+    _add_lakehouse(definition_workspace, tmp_path, {".platform": PLATFORM, "shortcuts.metadata.json": SHORTCUTS})
 
-    _publish(workspace)
+    _publish(definition_workspace)
 
     parts = _parts(_definition_call(mock_endpoint)["body"])
     assert set(parts) == {".platform", "lakehouse.metadata.json", "alm.settings.json"}
@@ -266,36 +308,36 @@ def test_missing_alm_settings_and_metadata_are_synthesized(workspace, mock_endpo
     }
 
 
-def test_invalid_alm_settings_raises(workspace, tmp_path):
+def test_invalid_alm_settings_raises(definition_workspace, tmp_path):
     """Malformed alm.settings.json raises a parsing error rather than risking shortcut deletion."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {".platform": PLATFORM, "lakehouse.metadata.json": {}, "alm.settings.json": "{not json"},
     )
 
     with pytest.raises(ParsingError):
-        _publish(workspace)
+        _publish(definition_workspace)
 
 
-def test_data_access_roles_not_enabled_logs_debug(workspace, tmp_path, caplog):
+def test_data_access_roles_not_enabled_logs_debug(definition_workspace, tmp_path, caplog):
     """A debug message is logged when data-access-roles.json exists but DataAccessRoles is not enabled."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {".platform": PLATFORM, "lakehouse.metadata.json": {}, "data-access-roles.json": DATA_ACCESS_ROLES},
     )
 
     with caplog.at_level(logging.DEBUG, logger="fabric_cicd._items._lakehouse"):
-        _publish(workspace)
+        _publish(definition_workspace)
 
     assert any("DataAccessRoles is not enabled" in record.message for record in caplog.records)
 
 
-def test_data_access_roles_enabled_no_debug(workspace, tmp_path, caplog):
+def test_data_access_roles_enabled_no_debug(definition_workspace, tmp_path, caplog):
     """No data access role warning is logged when DataAccessRoles is enabled."""
     _add_lakehouse(
-        workspace,
+        definition_workspace,
         tmp_path,
         {
             ".platform": PLATFORM,
@@ -306,7 +348,7 @@ def test_data_access_roles_enabled_no_debug(workspace, tmp_path, caplog):
     )
 
     with caplog.at_level(logging.DEBUG, logger="fabric_cicd._items._lakehouse"):
-        _publish(workspace)
+        _publish(definition_workspace)
 
     assert not any("DataAccessRoles is not enabled" in record.message for record in caplog.records)
 
@@ -327,8 +369,11 @@ def test_is_data_access_roles_enabled(contents, expected):
     assert is_data_access_roles_enabled(contents) is expected
 
 
-def test_skipped_lakehouse_does_not_check_sql_endpoint(workspace, mock_endpoint, tmp_path):
-    """SQL endpoint provisioning check is still performed after publish, and skipped items are untouched."""
+@pytest.mark.parametrize("definition_enabled", [False, True], ids=["shell", "definition"])
+def test_skipped_lakehouse_does_not_check_sql_endpoint(workspace, mock_endpoint, tmp_path, definition_enabled):
+    """Both publish modes check provisioning after publishing but leave filtered items untouched."""
+    if definition_enabled:
+        append_feature_flag(FeatureFlag.ENABLE_LAKEHOUSE_DEFINITION_PUBLISH.value)
     item = _add_lakehouse(workspace, tmp_path, {".platform": PLATFORM, "lakehouse.metadata.json": {}})
 
     _publish(workspace)
@@ -338,4 +383,4 @@ def test_skipped_lakehouse_does_not_check_sql_endpoint(workspace, mock_endpoint,
     item.skip_publish = True
     with patch.object(FabricWorkspace, "_apply_publish_filters", return_value=True):
         _publish(workspace)
-    assert not any("/lakehouses/" in c["url"] for c in mock_endpoint.calls)
+    assert mock_endpoint.calls == []
