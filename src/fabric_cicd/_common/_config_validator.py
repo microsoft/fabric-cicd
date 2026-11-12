@@ -12,7 +12,7 @@ import yaml
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import InputError
-from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url
+from fabric_cicd._common._validate_env_vars import _URL_CONSTANTS, validate_api_url, validate_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +214,11 @@ class ConfigValidator:
         if section == "constants":
             action = "added" if "constants" not in self.config else "updated"
             self.config["constants"] = value
-            logger.warning(constants.CONFIG_VALIDATION_MSGS["log"]["override_section"].format(action, section, value))
+            logger.warning(
+                constants.CONFIG_VALIDATION_MSGS["log"]["override_section"].format(
+                    action, section, _redact_constants_for_log(value)
+                )
+            )
             return
 
         # Add section if it doesn't already exist (publish, unpublish only)
@@ -1039,6 +1043,13 @@ class ConfigValidator:
 
     def _validate_single_constant(self, key: str, value: any, context: str) -> None:
         """Validate a single constant value."""
+        if key == "EXTRA_HEADERS":
+            try:
+                validate_extra_headers(value, context)
+            except InputError as e:
+                self.errors.append(str(e))
+            return
+
         if key in _URL_CONSTANTS:
             if not isinstance(value, str):
                 self.errors.append(f"'{context}' must be a string URL, got {type(value).__name__}")
@@ -1047,6 +1058,20 @@ class ConfigValidator:
                 validate_api_url(value, context)
             except InputError as e:
                 self.errors.append(str(e))
+
+
+def _redact_header_values(value: object) -> object:
+    """Return a copy of an EXTRA_HEADERS value with every header value redacted, keeping environment and header names."""
+    if isinstance(value, dict):
+        return {k: _redact_header_values(v) for k, v in value.items()}
+    return "<redacted>"
+
+
+def _redact_constants_for_log(value: Union[dict, list]) -> Union[dict, list]:
+    """Return a copy of a constants section that is safe to log, without modifying the original."""
+    if not isinstance(value, dict) or "EXTRA_HEADERS" not in value:
+        return value
+    return {k: (_redact_header_values(v) if k == "EXTRA_HEADERS" else v) for k, v in value.items()}
 
 
 def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
