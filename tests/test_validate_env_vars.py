@@ -4,12 +4,14 @@
 import os
 
 import pytest
+import requests
 
 from fabric_cicd._common._exceptions import InputError
 from fabric_cicd._common._validate_env_vars import (
     _VALID_HOSTNAME_REGEX,
     validate_api_url,
     validate_env_var_api_url,
+    validate_extra_headers,
 )
 
 
@@ -206,3 +208,82 @@ class TestValidateApiUrlHostname:
         monkeypatch.setenv("TEST_HOSTNAME_VAR", "https:///")
         with pytest.raises(InputError, match="invalid hostname"):
             validate_env_var_api_url("TEST_HOSTNAME_VAR", "https://api.fabric.microsoft.com")
+
+
+class TestValidateExtraHeaders:
+    """Tests for validate_extra_headers."""
+
+    def test_accepts_valid_headers(self):
+        headers = {"x-correlation-id": "abc-123", "X-Custom_Header.1": "", "x-tab": "a\tb"}
+        assert validate_extra_headers(headers, "EXTRA_HEADERS") == headers
+
+    @pytest.mark.parametrize(
+        ("headers", "error"),
+        [
+            (["x-a"], "must be a mapping"),
+            ({"bad header": "v"}, "invalid header name"),
+            ({"": "v"}, "invalid header name"),
+            ({1: "v"}, "invalid header name"),
+            ({"AUTHORIZATION": "v"}, "reserved header"),
+            ({"user-agent": "v"}, "reserved header"),
+            ({"Content-Type": "v"}, "reserved header"),
+            ({"Transfer-Encoding": "chunked"}, "reserved header"),
+            ({"x-a": "1", "X-A": "2"}, "more than once"),
+            ({"x-a": 1}, "must be a string"),
+            ({"x-a": "v\nx-b: injected"}, "must be a string without control characters"),
+            ({"x-a": "v\x0bv"}, "must be a string without control characters"),
+            ({"x-a": "v\x1b[0m"}, "must be a string without control characters"),
+            ({"x-a": "v\x7f"}, "must be a string without control characters"),
+            ({"x-a": " secret-value"}, "must not start with whitespace"),
+            ({"x-a": "\tsecret-value"}, "must not start with whitespace"),
+        ],
+        ids=[
+            "not_mapping",
+            "space_in_name",
+            "empty_name",
+            "non_string_name",
+            "authorization_any_case",
+            "user_agent",
+            "content_type",
+            "transfer_encoding",
+            "case_insensitive_duplicate",
+            "non_string_value",
+            "newline_in_value",
+            "vertical_tab_in_value",
+            "escape_in_value",
+            "delete_in_value",
+            "leading_space_value",
+            "leading_tab_value",
+        ],
+    )
+    def test_rejects_invalid_headers(self, headers, error):
+        with pytest.raises(InputError, match=error):
+            validate_extra_headers(headers, "EXTRA_HEADERS")
+
+    def test_leading_whitespace_error_names_header_without_value(self):
+        with pytest.raises(InputError) as exc_info:
+            validate_extra_headers({"x-api-key": " secret-value"}, "EXTRA_HEADERS")
+
+        assert "x-api-key" in str(exc_info.value)
+        assert "secret-value" not in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "value",
+        ["secret-value", "", "a b", "trailing ", " secret-value", "\tsecret-value", "\u00a0secret-value"],
+        ids=["plain", "empty", "inner_space", "trailing_space", "leading_space", "leading_tab", "leading_nbsp"],
+    )
+    def test_accepts_only_values_requests_can_prepare(self, value):
+        """Test validation accepts a value exactly when real Requests request preparation does (no request is sent)."""
+        try:
+            requests.Request("GET", "https://api.fabric.microsoft.com", headers={"x-api-key": value}).prepare()
+            requests_accepts = True
+        except requests.exceptions.InvalidHeader:
+            requests_accepts = False
+
+        try:
+            validate_extra_headers({"x-api-key": value}, "EXTRA_HEADERS")
+            validator_accepts = True
+        except InputError:
+            validator_accepts = False
+
+        assert validator_accepts == requests_accepts
