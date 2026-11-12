@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
@@ -27,6 +28,7 @@ from fabric_cicd._common._exceptions import (
     ParsingError,
 )
 from fabric_cicd._common._fabric_endpoint import FabricEndpoint, handle_retry
+from fabric_cicd._common._file import File
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._logging import log_header
 from fabric_cicd.constants import FeatureFlag, ItemType
@@ -763,6 +765,7 @@ class FabricWorkspace:
         exclude_path: str = r"^(?!.*)",
         func_process_file: Optional[callable] = None,
         options: Optional[dict] = None,
+        func_finalize_file: Optional[Callable[["FabricWorkspace", Item, File], str]] = None,
         **kwargs,
     ) -> None:
         """
@@ -774,6 +777,7 @@ class FabricWorkspace:
             exclude_path: Regex string of paths to exclude. Defaults to r"^(?!.*)".
             func_process_file: Custom function to process file contents. Defaults to None.
             options: Dictionary of additional options for the update definition operation (e.g., {"allowPurgeData": True}). Defaults to None.
+            func_finalize_file: Custom function to finalize text file contents after all replacements and before encoding. Defaults to None.
             **kwargs: Additional keyword arguments (e.g., additional_parts: list of base64 definition part dicts
                 to append to the definition payload).
         """
@@ -819,6 +823,9 @@ class FabricWorkspace:
                             file.contents = self._replace_logical_ids(file.contents)
                             file.contents = self._replace_parameters(file, item)
                             file.contents = self._replace_workspace_ids(file.contents, item)
+
+                        if func_finalize_file:
+                            file.contents = func_finalize_file(self, item, file)
 
                     item_payload.append(file.base64_payload)
             # Append any synthesized definition parts not present in the repository (e.g., required default parts)

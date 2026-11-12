@@ -124,13 +124,13 @@ def is_data_access_roles_enabled(alm_settings_contents: Optional[str]) -> bool:
     )
 
 
-def func_process_file(_workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
+def func_finalize_file(_workspace_obj: FabricWorkspace, item_obj: Item, file_obj: File) -> str:
     """
-    Custom file processing for Lakehouse definition files.
+    Finalize Lakehouse definition files after all replacements.
 
     Shortcuts are published separately (see ShortcutPublisher), so the Shortcuts object type in
-    alm.settings.json is always set to Disabled to ensure the definition API never creates, updates,
-    or deletes shortcuts. All other ALM settings (e.g., DataAccessRoles) are preserved.
+    alm.settings.json is set to Disabled after parameter replacement to ensure the definition API
+    never creates, updates, or deletes shortcuts. Other parameterized ALM settings are preserved.
 
     Args:
         _workspace_obj: The FabricWorkspace object
@@ -221,7 +221,7 @@ class LakehousePublisher(ItemPublisher):
         ):
             logger.debug(
                 f"{DATA_ACCESS_ROLES_FILE} found for Lakehouse '{item_name}' but DataAccessRoles is not enabled in "
-                f"{ALM_SETTINGS_FILE}; data access roles will be ignored by the Fabric API"
+                f"the source {ALM_SETTINGS_FILE}; roles require it to be enabled in the final parameterized settings"
             )
 
         self.fabric_workspace_obj._publish_item(
@@ -229,7 +229,7 @@ class LakehousePublisher(ItemPublisher):
             item_type=self.item_type,
             shell_only_publish=False,
             exclude_path=SHORTCUTS_EXCLUDE_PATH_REGEX,
-            func_process_file=func_process_file,
+            func_finalize_file=func_finalize_file,
             additional_parts=additional_parts,
             skip_publish_logging=True,
         )

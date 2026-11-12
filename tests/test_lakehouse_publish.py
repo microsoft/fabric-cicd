@@ -270,6 +270,40 @@ def test_alm_settings_shortcuts_disabled_and_other_settings_preserved(definition
     assert object_types["DataAccessRoles"]["state"] == "Enabled"
 
 
+@pytest.mark.parametrize("deployed", [False, True], ids=["create", "update"])
+def test_alm_shortcuts_remain_disabled_after_parameter_replacement(
+    definition_workspace, mock_endpoint, tmp_path, deployed
+):
+    """Enabling roles through parameterization must not re-enable shortcut handling."""
+    definition_workspace.environment = "TEST"
+    definition_workspace.environment_parameter = {
+        "find_replace": [{"find_value": "Disabled", "replace_value": {"TEST": "Enabled"}}]
+    }
+    _add_lakehouse(
+        definition_workspace,
+        tmp_path,
+        {
+            ".platform": PLATFORM,
+            "lakehouse.metadata.json": {},
+            "alm.settings.json": json.dumps(ALM_SETTINGS).replace("Enabled", "Disabled"),
+            "shortcuts.metadata.json": SHORTCUTS,
+            "data-access-roles.json": DATA_ACCESS_ROLES,
+        },
+        guid="existing-guid" if deployed else "",
+    )
+
+    _publish(definition_workspace)
+
+    parts = _parts(_definition_call(mock_endpoint)["body"])
+    alm = json.loads(parts["alm.settings.json"])
+    object_types = {obj["name"]: obj for obj in alm["objectTypes"]}
+    assert object_types["DataAccessRoles"]["state"] == "Enabled"
+    assert object_types["Shortcuts"]["state"] == "Disabled"
+    assert all(sub["state"] == "Disabled" for sub in object_types["Shortcuts"]["subObjectTypes"])
+    assert "shortcuts.metadata.json" not in parts
+    assert FeatureFlag.ENABLE_SHORTCUT_PUBLISH.value not in constants.FEATURE_FLAG
+
+
 def test_alm_settings_without_shortcuts_entry_gets_one(definition_workspace, mock_endpoint, tmp_path):
     """A Disabled Shortcuts entry is added when alm.settings.json does not define one."""
     _add_lakehouse(
