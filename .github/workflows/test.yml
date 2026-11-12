@@ -11,7 +11,7 @@ on:
 jobs:
     unit_test:
         name: Unit Test (Python ${{ matrix.python-version }})
-        runs-on: ubuntu-latest
+        runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-24.04' || 'ubuntu-latest' }}
         strategy:
             fail-fast: false
             matrix:
