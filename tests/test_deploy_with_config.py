@@ -3,6 +3,7 @@
 
 """Tests for the config-based deployment functionality."""
 
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -420,6 +421,18 @@ class TestConfigOverrides:
 
         assert original_url == constants.DEFAULT_API_ROOT_URL
 
+    def test_extra_headers_override_logs_names_only(self, caplog):
+        """Test EXTRA_HEADERS override is applied per environment and logs header names without values."""
+        original_headers = constants.EXTRA_HEADERS
+        config = {"constants": {"EXTRA_HEADERS": {"dev": {"x-correlation-id": "secret-value"}}}}
+
+        with config_overrides_scope(config, "dev"):
+            assert constants.EXTRA_HEADERS == {"x-correlation-id": "secret-value"}
+
+        assert "x-correlation-id" in caplog.text
+        assert "secret-value" not in caplog.text
+        assert constants.EXTRA_HEADERS is original_headers
+
     def test_user_constants_preserved_across_scope(self):
         """Test that constants set by user before scope are preserved after scope exits."""
         original_url = constants.DEFAULT_API_ROOT_URL
@@ -608,6 +621,53 @@ class TestConfigOverridesIntegration:
 
         # Verify feature flag was restored after scope exit
         assert "enable_response_collection" not in constants.FEATURE_FLAG
+
+    @patch("fabric_cicd.publish.FabricWorkspace")
+    @patch("fabric_cicd.publish.publish_all_items")
+    @patch("fabric_cicd.publish.unpublish_all_orphan_items")
+    def test_extra_headers_config_override_does_not_log_values(
+        self, mock_unpublish, mock_publish, mock_workspace, tmp_path, caplog
+    ):
+        """Test EXTRA_HEADERS passed through config_override are applied but their values never appear in logs."""
+        _ = mock_unpublish
+        caplog.set_level(logging.DEBUG)
+
+        test_repo_dir = tmp_path / "test" / "path"
+        test_repo_dir.mkdir(parents=True)
+
+        config_data = {
+            "core": {
+                "workspace_id": {"dev": "77777777-7777-7777-7777-777777777777"},
+                "repository_directory": "test/path",
+            },
+        }
+        config_file = tmp_path / "config.yml"
+        with Path.open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        mock_workspace_instance = MagicMock()
+        mock_workspace_instance.responses = None
+        mock_workspace_instance.unpublish_responses = None
+        mock_workspace.return_value = mock_workspace_instance
+
+        headers_during_publish = {}
+        mock_publish.side_effect = lambda *_args, **_kwargs: headers_during_publish.update(constants.EXTRA_HEADERS)
+
+        original_headers = constants.EXTRA_HEADERS
+        config_override = {"constants": {"EXTRA_HEADERS": {"dev": {"x-api-key": "secret-value"}}}}
+
+        deploy_with_config(
+            config_file_path=str(config_file),
+            token_credential=MagicMock(),
+            environment="dev",
+            config_override=config_override,
+        )
+
+        assert headers_during_publish == {"x-api-key": "secret-value"}
+        assert config_override == {"constants": {"EXTRA_HEADERS": {"dev": {"x-api-key": "secret-value"}}}}
+        assert "x-api-key" in caplog.text
+        assert "secret-value" not in caplog.text
+        assert constants.EXTRA_HEADERS is original_headers
 
 
 class TestDeployWithConfig:
