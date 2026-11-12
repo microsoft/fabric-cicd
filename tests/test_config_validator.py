@@ -582,6 +582,32 @@ class TestConfigValidator:
         assert len(self.validator.errors) == 1
         assert "Unknown constant 'HOST_APP_ALLOWLIST_REGEX'" in self.validator.errors[0]
 
+    def test_validate_constants_extra_headers_per_environment(self):
+        """Test EXTRA_HEADERS accepts a per-environment mapping of headers."""
+        constants_dict = {"EXTRA_HEADERS": {"dev": {"x-correlation-id": "dev-id"}, "prod": {}}}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert self.validator.errors == []
+
+    def test_validate_constants_extra_headers_flat_mapping_rejected(self):
+        """Test a flat EXTRA_HEADERS mapping is rejected since constant mappings are keyed by environment."""
+        constants_dict = {"EXTRA_HEADERS": {"x-correlation-id": "abc-123"}}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "'constants.EXTRA_HEADERS.x-correlation-id' must be a mapping" in self.validator.errors[0]
+
+    def test_validate_constants_extra_headers_reserved_header_rejected(self):
+        """Test EXTRA_HEADERS rejects reserved headers."""
+        constants_dict = {"EXTRA_HEADERS": {"dev": {"Authorization": "Bearer other"}}}
+
+        self.validator._validate_constants_section(constants_dict)
+
+        assert len(self.validator.errors) == 1
+        assert "reserved header 'Authorization'" in self.validator.errors[0]
+
     def test_validate_constants_dict_valid_various_types(self):
         """Test _validate_constants_section with valid constants of various types."""
         constants_dict = {

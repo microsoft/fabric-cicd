@@ -184,7 +184,11 @@ def config_overrides_scope(config: dict, environment: str) -> Generator[None, No
                 if value is not None and hasattr(constants, key):
                     overridden_keys[key] = getattr(constants, key)
                     setattr(constants, key, value)
-                    logger.warning(f"Override constant {key} = {value}")
+                    if key == "EXTRA_HEADERS":
+                        # Log header names only, values may be sensitive
+                        logger.warning(f"Override constant {key} with headers: {', '.join(value)}")
+                    else:
+                        logger.warning(f"Override constant {key} = {value}")
         yield
 
     finally:

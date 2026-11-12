@@ -281,6 +281,18 @@ constants:
         <env..>: <constant_value..>
 ```
 
+<span class="md-h4-nonanchor">Dictionary-valued constants:</span>
+
+A dictionary value in the `constants` section is always read as an environment mapping. Constants whose value is itself a dictionary, such as `EXTRA_HEADERS`, must therefore use the environment mapping format. See [Custom HTTP Headers](optional_feature.md#custom-http-headers).
+
+```yaml
+constants:
+    EXTRA_HEADERS:
+        <env_1>:
+            <header_name>: <header_value>
+        <env..>: {}
+```
+
 ## Environment-Specific Values
 
 All configuration fields support environment-specific values using a mapping format:

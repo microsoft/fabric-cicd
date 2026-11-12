@@ -102,6 +102,40 @@ This writes all API calls to the terminal. To additionally capture logs and full
 
 For comprehensive debugging information, including how to use the error log file and debug scripts, see the [Troubleshooting Guide](troubleshooting.md).
 
+## Custom HTTP Headers
+
+Some environments require additional HTTP headers on Fabric API requests, for example a routing or correlation header. Set the `EXTRA_HEADERS` constant to a dictionary of header names and values, and fabric-cicd adds them to every Fabric API request it sends.
+
+```python
+from fabric_cicd import FabricWorkspace, constants, publish_all_items
+
+constants.EXTRA_HEADERS = {"x-correlation-id": "release-2026-01"}
+
+target_workspace = FabricWorkspace(
+    workspace_id="your-workspace-id",
+    repository_directory="/path/to/repo",
+    item_type_in_scope=["Notebook", "DataPipeline"],
+)
+publish_all_items(target_workspace)
+```
+
+When deploying with a configuration file, set the headers per environment in the `constants` section. See [Constants Setting](config_deployment.md#constants-setting).
+
+```yaml
+constants:
+    EXTRA_HEADERS:
+        dev:
+            x-correlation-id: "dev-release"
+        prod:
+            x-correlation-id: "prod-release"
+```
+
+**Notes:**
+
+- Header names must be valid HTTP header names and unique regardless of case, and values must be strings without control characters that do not start with whitespace.
+- There are reserved headers managed by fabric-cicd which cannot be set and will raise an error.
+- Header values are redacted from HTTP trace output, and only header names are logged when set through a configuration file.
+
 ## Bulk Publish
 
 !!! warning "Experimental"
