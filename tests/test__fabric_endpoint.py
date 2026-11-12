@@ -9,7 +9,7 @@ import requests
 from azure.core.exceptions import ClientAuthenticationError
 
 from fabric_cicd import constants
-from fabric_cicd._common._exceptions import InvokeError, TokenError
+from fabric_cicd._common._exceptions import InputError, InvokeError, TokenError
 from fabric_cicd._common._fabric_endpoint import (
     _USER_AGENT,
     FabricEndpoint,
@@ -341,6 +341,70 @@ def test_invoke_calls_http_tracer(setup_mocks):
     mock_tracer.capture_request.assert_called_once()
     mock_tracer.capture_response.assert_called_once()
     mock_tracer.save.assert_called_once()
+
+
+def _mock_endpoint(mock_requests, http_tracer=None):
+    mock_requests.return_value = Mock(
+        status_code=200, headers={"Content-Type": "application/json"}, json=Mock(return_value={})
+    )
+    mock_token_credential = Mock()
+    mock_token_credential.get_token.return_value = Mock(token=generate_mock_token(), expires_on=9999999999)
+    return FabricEndpoint(token_credential=mock_token_credential, http_tracer=http_tracer)
+
+
+def test_invoke_sends_extra_headers(setup_mocks, monkeypatch):
+    """Test invoke adds EXTRA_HEADERS to the request and redacts their values from the trace."""
+    _, mock_requests = setup_mocks
+    monkeypatch.setattr(constants, "EXTRA_HEADERS", {"x-correlation-id": "abc-123"})
+    mock_tracer = Mock()
+
+    _mock_endpoint(mock_requests, mock_tracer).invoke("GET", "http://example.com")
+
+    sent_headers = mock_requests.call_args.kwargs["headers"]
+    assert sent_headers["x-correlation-id"] == "abc-123"
+    assert sent_headers["User-Agent"] == _USER_AGENT
+    assert sent_headers["Authorization"] == f"Bearer {generate_mock_token()}"
+    traced_headers = mock_tracer.capture_request.call_args.args[2]
+    assert traced_headers["x-correlation-id"] == "<redacted>"
+
+
+def test_invoke_without_extra_headers_sends_only_default_headers(setup_mocks):
+    """Test invoke sends only the built-in headers when EXTRA_HEADERS is empty."""
+    _, mock_requests = setup_mocks
+
+    _mock_endpoint(mock_requests).invoke("GET", "http://example.com")
+
+    assert set(mock_requests.call_args.kwargs["headers"]) == {"Authorization", "User-Agent", "Content-Type"}
+
+
+@pytest.mark.parametrize(
+    "extra_headers",
+    [{"Authorization": "Bearer other"}, {"x-bad": "value\r\nInjected: 1"}, "not-a-dict"],
+    ids=["reserved_header", "crlf_value", "not_a_mapping"],
+)
+def test_invoke_rejects_invalid_extra_headers(setup_mocks, monkeypatch, extra_headers):
+    """Test invoke raises InputError and sends no request when EXTRA_HEADERS is invalid."""
+    _, mock_requests = setup_mocks
+    monkeypatch.setattr(constants, "EXTRA_HEADERS", extra_headers)
+
+    with pytest.raises(InputError):
+        _mock_endpoint(mock_requests).invoke("GET", "http://example.com")
+
+    mock_requests.assert_not_called()
+
+
+def test_invoke_rejects_leading_whitespace_header_without_exposing_value(setup_mocks, monkeypatch, caplog):
+    """Test a leading-whitespace header value fails before any request and the value never reaches errors or logs."""
+    _, mock_requests = setup_mocks
+    monkeypatch.setattr(constants, "EXTRA_HEADERS", {"x-api-key": " secret-value"})
+
+    with pytest.raises(InputError) as exc_info:
+        _mock_endpoint(mock_requests).invoke("GET", "http://example.com")
+
+    mock_requests.assert_not_called()
+    assert "x-api-key" in str(exc_info.value)
+    assert "secret-value" not in str(exc_info.value)
+    assert "secret-value" not in caplog.text
 
 
 def test_get_token(setup_mocks):

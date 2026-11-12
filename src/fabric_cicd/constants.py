@@ -215,6 +215,10 @@ PARALLEL_MAX_WORKERS: int = (
 )
 
 # HTTP Headers
+# Extra headers added to every Fabric API request (e.g., routing or correlation headers).
+# Reserved headers (Authorization, Content-Type, User-Agent, etc.) cannot be set.
+EXTRA_HEADERS: dict[str, str] = {}
+
 # Headers filtered from HTTP trace output as a defense-in-depth measure
 SENSITIVE_REQUEST_HEADERS = frozenset({
     "authorization",
