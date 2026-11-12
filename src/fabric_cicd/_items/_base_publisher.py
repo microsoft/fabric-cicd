@@ -6,13 +6,14 @@
 import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import AbstractContextManager, ExitStack
 from dataclasses import dataclass
 from typing import Callable, Optional
 
 from fabric_cicd import constants
 from fabric_cicd._common._exceptions import PublishError
 from fabric_cicd._common._item import Item
-from fabric_cicd.constants import PARALLEL_MAX_WORKERS, ItemType
+from fabric_cicd.constants import PARALLEL_MAX_WORKERS, FeatureFlag, ItemType
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
 logger = logging.getLogger(__name__)
@@ -334,6 +335,7 @@ class ItemPublisher(Publisher):
         publishers: list[ItemPublisher] = []
         items_with_context: list[tuple[str, Item, ItemPublisher]] = []
         skipped_items: list[str] = []
+        completed_items: set[tuple[str, str]] = set()
 
         # Phase 1: Pre-hooks + collect items with their publisher context
         for _order_num, item_type in ItemPublisher.get_item_types_to_publish(fabric_workspace_obj):
@@ -361,6 +363,11 @@ class ItemPublisher(Publisher):
             publisher.pre_publish_all()
             items_with_context.extend(publishable_items)
             publishers.append(publisher)
+
+        # Determine if source pause is enabled for eventstream items (requiring context-aware publishing)
+        source_pause_enabled = FeatureFlag.ENABLE_EVENTSTREAM_SOURCE_PAUSE.value in constants.FEATURE_FLAG and any(
+            publisher.item_type == ItemType.EVENTSTREAM.value for publisher in publishers
+        )
 
         # Phase 2: Batched bulk API calls (publisher context used inside for per-item transforms)
         if items_with_context:
@@ -392,9 +399,18 @@ class ItemPublisher(Publisher):
                         [f"{item.type}: {item_name}" for item_name, item, _publisher in batch_items],
                     )
 
-                fabric_workspace_obj._publish_items(
-                    batch_items, skipped_items=skipped_items if batch_index == 0 else None
-                )
+                if source_pause_enabled:
+                    ItemPublisher._publish_bulk_batch_with_context(
+                        fabric_workspace_obj,
+                        batch_items,
+                        publishers,
+                        completed_items,
+                        skipped_items=skipped_items if batch_index == 0 else None,
+                    )
+                else:
+                    fabric_workspace_obj._publish_items(
+                        batch_items, skipped_items=skipped_items if batch_index == 0 else None
+                    )
 
                 # Refresh deployed items and invalidate cached $items.* values between batches
                 if batch_index < len(batches) - 1:
@@ -419,6 +435,66 @@ class ItemPublisher(Publisher):
             publisher.post_publish_all()
 
         return [p for p in publishers if p.has_async_publish_check]
+
+    @staticmethod
+    def _publish_bulk_batch_with_context(
+        fabric_workspace_obj: "FabricWorkspace",
+        batch_items: list[tuple[str, Item, "ItemPublisher"]],
+        publishers: list["ItemPublisher"],
+        completed_items: set[tuple[str, str]],
+        skipped_items: Optional[list[str]] = None,
+    ) -> None:
+        """Publish a bulk batch within publisher contexts and finalize completed items on failure."""
+        # Each publisher context manages only its own items in this batch
+        items_by_publisher: dict[ItemPublisher, list[Item]] = {}
+        for _, item, publisher in batch_items:
+            items_by_publisher.setdefault(publisher, []).append(item)
+
+        has_publish_context = False
+        try:
+            # Run cleanup for entered contexts even if later setup or publishing fails
+            with ExitStack() as stack:
+                for publisher, items in items_by_publisher.items():
+                    context = publisher.publish_context(items)
+                    if context is not None:
+                        has_publish_context = True
+                        stack.enter_context(context)
+                fabric_workspace_obj._publish_items(batch_items, skipped_items=skipped_items)
+                # Record success before exiting contexts: recovery can still fail
+                completed_items.update((item.type, name) for name, item, _ in batch_items)
+        except Exception:
+            # Run post-publish hooks for completed items, then re-raise the original error
+            if has_publish_context and completed_items:
+                ItemPublisher._post_publish_completed_items(fabric_workspace_obj, publishers, completed_items)
+            raise
+
+    @staticmethod
+    def _post_publish_completed_items(
+        fabric_workspace_obj: "FabricWorkspace",
+        publishers: list["ItemPublisher"],
+        completed_items: set[tuple[str, str]],
+    ) -> None:
+        """Run post-publish hooks only for completed items, logging hook errors to preserve the original failure."""
+        completed_types = {item_type for item_type, _ in completed_items}
+        temporarily_skipped: list[Item] = []
+        try:
+            # Hooks inspect all repository items; temporarily skip items that were not published in this batch
+            for item_type in completed_types:
+                for name, item in fabric_workspace_obj.repository_items[item_type].items():
+                    if (item_type, name) not in completed_items and not item.skip_publish:
+                        item.skip_publish = True
+                        temporarily_skipped.append(item)
+            # Run hooks only for item types with at least one completed publish
+            for publisher in publishers:
+                if publisher.item_type in completed_types:
+                    try:
+                        publisher.post_publish_all()
+                    except Exception:
+                        logger.exception("Post-publish failed for %s after bulk lifecycle failure", publisher.item_type)
+        finally:
+            # Restore only flags changed here, leaving previously skipped items unchanged
+            for item in temporarily_skipped:
+                item.skip_publish = False
 
     # endregion
 
@@ -507,6 +583,14 @@ class ItemPublisher(Publisher):
             A dictionary of options to merge into the request body, or None.
             Default implementation returns None. Subclasses can override to
             provide item-type-specific options (e.g. Semantic Model allowPurgeData).
+        """
+        return None
+
+    def publish_context(self, _items: list["Item"]) -> Optional[AbstractContextManager[None]]:
+        """Return an optional context around a publish batch; by default no lifecycle is needed.
+
+        A context must recover partial setup failures itself, preserve primary errors,
+        and keep operation state local. Standard publishers can reuse it in publish_one().
         """
         return None
 
