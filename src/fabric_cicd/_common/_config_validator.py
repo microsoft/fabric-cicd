@@ -866,6 +866,24 @@ class ConfigValidator:
                     )
                 )
 
+        if "deployment_plan" in section:
+            if section_name != "publish":
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["operation"]["unsupported_field"].format(
+                        "deployment_plan", section_name
+                    )
+                )
+            plan = section["deployment_plan"]
+            context = f"{section_name}.deployment_plan"
+            if isinstance(plan, dict):
+                self._validate_environment_mapping(plan, context, str)
+            elif not isinstance(plan, str):
+                self.errors.append(
+                    constants.CONFIG_VALIDATION_MSGS["field"]["string_or_dict"].format(context, type(plan).__name__)
+                )
+            elif not plan.strip():
+                self.errors.append(constants.CONFIG_VALIDATION_MSGS["operation"]["empty_string"].format(context))
+
         # Validate skip if present
         if "skip" in section:
             skip_value = section["skip"]
@@ -1095,6 +1113,7 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
         (config.get("publish", {}), "folder_exclude_regex", "publish.folder_exclude_regex", False, False),
         (config.get("publish", {}), "folder_path_to_include", "publish.folder_path_to_include", False, False),
         (config.get("publish", {}), "shortcut_exclude_regex", "publish.shortcut_exclude_regex", False, False),
+        (config.get("publish", {}), "deployment_plan", "publish.deployment_plan", False, False),
         (config.get("publish", {}), "items_to_include", "publish.items_to_include", False, False),
         (config.get("publish", {}), "skip", "publish.skip", False, False),
         # Unpublish section fields - optional (debug if missing)

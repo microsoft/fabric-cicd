@@ -69,6 +69,17 @@
 - If you are using connections and expect them to change between different environments, then those need to be parameterized in the `parameter.yml` file.
 - The **executing identity** of the deployment must have access to the connections, or the deployment will fail.
 
+## Deployment Plan
+
+- **Parameterization:**
+    - The `find_replace` section in the `parameter.yml` file is not applied.
+- **Note:** Standard publishing may leave Deployment Plan references unresolved, showing "Removed from workspace" warnings even when the referenced items exist in the target workspace. Reassign these references manually in the Fabric UI, or use bulk publishing to resolve them automatically.
+- **Execution:**
+    - A [deployment plan](https://learn.microsoft.com/en-us/fabric/cicd/deployment-plan/deployment-plan-overview) controls deployment order and runs the intermediate actions defined in the plan.
+    - Publishing a plan does **not** automatically execute it. Select **one** plan to run by specifying its exact display name in [`publish.deployment_plan`](../how_to/config_deployment.md#publish-settings) or the `deployment_plan` argument to [`publish_all_items()`](code_reference.md#fabric_cicd.publish_all_items).
+    - Execution requires **bulk publish mode and a single publish batch**. The selected plan must exist in the repository and must either be included in the publish batch or already exist in the target workspace.
+    - See [Deployment Plan Option](../how_to/optional_feature.md#deployment-plan-option) for setup details and limitations.
+
 ## Environment
 
 - **Parameterization:**
@@ -230,6 +241,7 @@
 
 - **Parameterization:**
     - The active value set of the variable library is defined by the `environment` field passed into the `FabricWorkspace` object. If no `environment` is specified, the active Value Set will not be changed.
+    - When executing a deployment plan, an explicit `ActiveValueSetName` selection in the plan takes precedence over `environment` and cannot be overridden during deployment. To use a different value set, edit the deployment plan.
 - **Changing Value Sets:**
     - Variable Libraries do not support programmatically changing the name of value set which is active
     - After the initial deployment, if an active set is renamed, or removed, the deployment will fail

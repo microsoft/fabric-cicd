@@ -206,7 +206,23 @@ When authenticating with a service principal or managed identity, all item types
 
 ### Dynamic Replacement Variable Support
 
-Dynamic replacement variables (`$workspace` and `$items`) are supported in bulk publish. Because these variables are resolved at runtime, bulk publish orders items into dependency **batches**: when an `$items.*` variable references another item in the same workspace, the referenced item is published in an earlier batch so its resolved value is available to its dependents. Each batch is published in its own bulk call, and deployed items are refreshed between batches so later batches resolve against real item IDs.
+Dynamic replacement variables (`$workspace` and `$items`) are supported in bulk publish. Because these variables are resolved at runtime, bulk publish orders items into dependency **batches**: when an `$items.*` variable references another item in the same workspace, the referenced item is published in an earlier batch so its resolved value is available to its dependents. Each batch is published in its own bulk API call, and deployed items are refreshed between batches so later batches resolve against real item IDs.
+
+**Note:** Batches are managed automatically and cannot be configured directly. If a `$items.*` replacement value refers to another item being deployed to the same workspace, that item is published in an earlier batch only if it does not already exist in the target workspace. If all referenced items already exist, everything is published in a single batch.
+
+#### Deployment Plan Option
+
+To execute a deployment plan during publishing, specify the exact display name of a deployment plan item in the repository using either:
+
+- The `publish.deployment_plan` field in `config.yml`, as a non-empty string or an environment-specific mapping.
+- The optional `deployment_plan` argument to `publish_all_items()`, as a non-empty string.
+
+!!! note
+
+    - **Publishing requirements:** Executing a deployment plan requires bulk publish mode and a single bulk publish batch. If bulk publishing is disabled, falls back to standard publishing, or requires multiple [dependency batches](#dynamic-replacement-variable-support), the deployment stops before publishing items.
+    - **Plan selection:** Multiple deployment plan items can be published, but only one can be selected to run. The selected plan must exist in the repository directory, even if it already exists in the target workspace; target-only plans are not supported.
+    - **Variable Libraries:** If the plan references a repository Variable Library, all Variable Libraries included by scope and publish filters are published first and their value sets activated. Explicit `ActiveValueSetName` plan selections take precedence; other libraries use the target environment or default value set. These libraries remain in the final bulk batch that executes the plan.
+    - Deployment plan execution may be incompatible with items that require post-deployment actions, such as Environment publishing or Semantic Model connection binding. Dependent items in the same deployment batch may fail when executed by the plan—for example, a Notebook attached to an Environment whose required libraries have not yet been published. These scenarios may require a manual workaround.
 
 ### Automatic Fallback to Standard Publish
 
