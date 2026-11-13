@@ -77,6 +77,15 @@ def test_full_unfiltered_unpublish_preserves_existing_empty_folder_behavior():
     assert [url.removeprefix(ws.base_api_url) for url in ws.endpoint.calls] == ["/folders/independent"]
 
 
+def test_empty_exclusion_regex_keeps_full_workspace_folder_cleanup():
+    ws = make_workspace(
+        {"/Active": "active", "/IndependentlyManaged": "independent"},
+        {"Keep": SimpleNamespace(folder_id="active", guid="keep-id")},
+        repository={"Keep": object()},
+    )
+    assert run_unpublish(ws, exclude="") == ["/folders/independent"]
+
+
 def test_filtered_item_deletion_prunes_only_selected_folder_ancestry():
     ws = make_workspace(
         {
