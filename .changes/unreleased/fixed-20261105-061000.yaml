@@ -1,0 +1,8 @@
+kind: fixed
+body: Limit selective orphan cleanup to folders affected by the selected item deletions
+time: 2026-11-05T06:10:00+01:00
+custom:
+    Author: mhatipog
+    AuthorLink: https://github.com/mhatipog
+    Issue: "1188"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1188
