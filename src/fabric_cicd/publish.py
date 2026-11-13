@@ -424,7 +424,7 @@ def unpublish_all_orphan_items(
     fabric_workspace_obj._refresh_deployed_items()
     fabric_workspace_obj._refresh_deployed_folders()
     if FeatureFlag.DISABLE_WORKSPACE_FOLDER_PUBLISH.value not in constants.FEATURE_FLAG:
-        if item_name_exclude_regex in (None, "^$") and items_to_include is None:
+        if item_name_exclude_regex in (None, "", "^$") and items_to_include is None:
             # The default exclusion selects all orphan items: retain existing cleanup.
             fabric_workspace_obj._unpublish_folders()
         elif selected_folder_ids:
