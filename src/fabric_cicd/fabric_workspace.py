@@ -543,6 +543,7 @@ class FabricWorkspace:
                 if item_type in [
                     ItemType.LAKEHOUSE.value,
                     ItemType.MIRRORED_DATABASE.value,
+                    ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value,
                     ItemType.WAREHOUSE.value,
                     ItemType.SQL_DATABASE.value,
                 ]:

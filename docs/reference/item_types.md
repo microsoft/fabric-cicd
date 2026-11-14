@@ -128,6 +128,36 @@
     - Referenced items (e.g., Lakehouse, KQL Database, Ontology) that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Referenced items within the same workspace are automatically re-pointed to the new item in the target workspace.
 
+## Mirrored Azure Databricks Catalog
+
+- **Parameterization:**
+    - Connections will always point to the original data source unless parameterized using `find_replace` or `key_value_replace` in the `parameter.yml` file.
+    - Parameterize `databricksWorkspaceConnectionId` and `storageConnectionId` in `definition.json` when the connections differ between environments.
+    - `catalogName` and mirroring settings can also be parameterized when they differ between environments. See [Parameterization](../how_to/parameterization.md) for configuration guidance.
+- **Connections** are not source controlled. The Databricks workspace and ADLS Gen2 storage connections must be created before deployment.
+- The **executing identity** of the deployment must have access to the connections, or the deployment will fail.
+
+An example parameters file is:
+
+```yaml
+key_value_replace:
+    - find_key: $.databricksWorkspaceConnectionId
+      replace_value:
+          TEST: "22222222-2222-2222-2222-222222222222"
+      item_type: MirroredAzureDatabricksCatalog
+      item_name: mir_databricks
+    - find_key: $.storageConnectionId
+      replace_value:
+          TEST: "33333333-3333-3333-3333-333333333333"
+      item_type: MirroredAzureDatabricksCatalog
+      item_name: mir_databricks
+    - find_key: $.catalogName
+      replace_value:
+          TEST: "unity_catalog_test"
+      item_type: MirroredAzureDatabricksCatalog
+      item_name: mir_databricks
+```
+
 ## Mirrored Database
 
 - **Parameterization:**
