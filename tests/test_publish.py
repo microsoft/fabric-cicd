@@ -41,10 +41,21 @@ def mock_endpoint():
     mock = MagicMock()
 
     def mock_invoke(method, url, **_kwargs):
-        if method == "GET" and "workspaces" in url and not url.endswith("/items"):
-            return {"body": {"value": [], "capacityId": "test-capacity"}}
         if method == "GET" and url.endswith("/items"):
             return {"body": {"value": []}}
+        if method == "GET" and "/mirroredazuredatabrickscatalogs/" in url:
+            return {
+                "body": {
+                    "properties": {
+                        "sqlEndpointProperties": {
+                            "id": "sql-endpoint-id",
+                            "connectionString": "test.datawarehouse.fabric.microsoft.com",
+                        }
+                    }
+                }
+            }
+        if method == "GET" and "workspaces" in url and not url.endswith("/items"):
+            return {"body": {"value": [], "capacityId": "test-capacity"}}
         if method == "POST" and url.endswith("/folders"):
             return {"body": {"id": "mock-folder-id"}}
         if method == "POST" and url.endswith("/items"):
@@ -277,6 +288,82 @@ def test_mirrored_azure_databricks_catalog_publishes_definition(mirrored_databri
     assert all(part["payloadType"] == "InlineBase64" for part in definition["parts"])
 
 
+@pytest.mark.parametrize("contains_param_item_vars", [False, True])
+def test_mirrored_azure_databricks_catalog_waits_for_sql_endpoint(
+    mirrored_databricks_workspace, mock_endpoint, contains_param_item_vars, monkeypatch, caplog
+):
+    """Publishing waits for the endpoint even without a dynamic SQL attribute reference."""
+    workspace = mirrored_databricks_workspace
+    workspace.contains_param_item_vars = contains_param_item_vars
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    original_invoke = mock_endpoint.invoke.side_effect
+    endpoint_properties = [
+        {},
+        {"sqlEndpointProperties": {"id": "sql-endpoint-id"}},
+        {"sqlEndpointProperties": {"id": "sql-endpoint-id", "connectionString": ""}},
+        {
+            "sqlEndpointProperties": {
+                "id": "sql-endpoint-id",
+                "connectionString": "test.datawarehouse.fabric.microsoft.com",
+            }
+        },
+    ]
+    responses = iter(endpoint_properties)
+    observed_properties = []
+    retry = MagicMock()
+    monkeypatch.setattr("fabric_cicd.fabric_workspace.handle_retry", retry)
+
+    def invoke_with_provisioning_endpoint(method, url, **kwargs):
+        if method == "GET" and url == f"{workspace.base_api_url}/{item_type.lower()}s/mock-item-id":
+            assert f"Published {item_type} 'TestCatalog'" not in caplog.text
+            properties = next(responses)
+            observed_properties.append(properties)
+            return {"body": {"properties": properties}}
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_provisioning_endpoint
+    with caplog.at_level(logging.INFO):
+        publish.publish_all_items(workspace)
+
+    assert observed_properties == endpoint_properties
+    assert retry.call_count == 2
+    assert f"Published {item_type} 'TestCatalog'" in caplog.text
+
+
+def test_mirrored_azure_databricks_catalog_skips_sql_endpoint_wait(mirrored_databricks_workspace, mock_endpoint):
+    """Excluded catalogs do not wait for an endpoint or report a successful publish."""
+    workspace = mirrored_databricks_workspace
+
+    with patch.object(workspace, "_wait_for_item_attribute_provisioning") as wait:
+        publish.publish_all_items(workspace, item_name_exclude_regex="TestCatalog")
+
+    wait.assert_not_called()
+    assert workspace.repository_items[ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value]["TestCatalog"].skip_publish
+    assert not any(call.kwargs.get("method") == "POST" for call in mock_endpoint.invoke.call_args_list)
+
+
+def test_mirrored_azure_databricks_catalog_propagates_sql_endpoint_failure(
+    mirrored_databricks_workspace, mock_endpoint, caplog
+):
+    """A failed endpoint lookup fails the catalog publish without reporting success."""
+    workspace = mirrored_databricks_workspace
+    original_invoke = mock_endpoint.invoke.side_effect
+
+    def invoke_with_endpoint_failure(method, url, **kwargs):
+        if method == "GET" and "/mirroredazuredatabrickscatalogs/" in url:
+            message = "SQL endpoint lookup failed"
+            raise RuntimeError(message)
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_endpoint_failure
+    with caplog.at_level(logging.INFO), pytest.raises(PublishError, match="TestCatalog") as exc_info:
+        publish.publish_all_items(workspace)
+
+    assert len(exc_info.value.errors) == 1
+    assert str(exc_info.value.errors[0][1]) == "SQL endpoint lookup failed"
+    assert "Published MirroredAzureDatabricksCatalog 'TestCatalog'" not in caplog.text
+
+
 @pytest.mark.parametrize("parameter_type", ["find_replace", "key_value_replace"])
 @pytest.mark.parametrize("environment", ["DEV", "PROD"])
 def test_mirrored_azure_databricks_catalog_parameterization(
@@ -455,14 +542,14 @@ def test_mirrored_azure_databricks_catalog_sql_endpoint_attributes(mirrored_data
         ("bulk", "id"),
         ("bulk", "sqlendpoint"),
         ("bulk", "sqlendpointid"),
-        ("serial-unprovisioned", "sqlendpoint"),
-        ("serial-unprovisioned", "sqlendpointid"),
+        ("serial-delayed", "sqlendpoint"),
+        ("serial-delayed", "sqlendpointid"),
     ],
 )
 def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
     mirrored_databricks_workspace, mock_endpoint, monkeypatch, parameter_type, attribute, publish_mode
 ):
-    """Resolve catalog attributes downstream, checking both bulk waits and serial missing-endpoint errors."""
+    """Resolve catalog attributes downstream only after serial or bulk endpoint waits complete."""
     workspace = mirrored_databricks_workspace
     catalog_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
     catalog_id = "44444444-4444-4444-4444-444444444444"
@@ -471,8 +558,7 @@ def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
     endpoint_connection = "test.example"
     expected = {"id": catalog_id, "sqlendpoint": endpoint_connection, "sqlendpointid": endpoint_id}[attribute]
     bulk_enabled = publish_mode == "bulk"
-    delayed_endpoint = bulk_enabled and attribute != "id"
-    unavailable_serial_endpoint = publish_mode == "serial-unprovisioned"
+    delayed_endpoint = (bulk_enabled or publish_mode == "serial-delayed") and attribute != "id"
     monkeypatch.setattr(
         constants,
         "FEATURE_FLAG",
@@ -524,8 +610,6 @@ def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
             return {"body": {"value": deployed}}
         if method == "GET" and url == f"{workspace.base_api_url}/{catalog_type.lower()}s/{catalog_id}":
             endpoint_reads += 1
-            if unavailable_serial_endpoint:
-                return {"body": {"properties": {}}}
             if delayed_endpoint and endpoint_reads == 1:
                 events.append("endpoint-missing")
                 return {"body": {"properties": {}}}
@@ -568,10 +652,12 @@ def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
                 }
             }
         if method == "POST" and url == f"{workspace.base_api_url}/items":
+            events.append(f"publish-{kwargs['body']['displayName']}")
             if kwargs["body"]["type"] == catalog_type:
                 catalog_created = True
                 return {"body": {"id": catalog_id}}
             assert catalog_created
+            assert not delayed_endpoint or endpoint_reads >= 2
             return {"body": {"id": consumer_id}}
         return original_invoke(method, url, **kwargs)
 
@@ -594,29 +680,9 @@ def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
             workspace, "_wait_for_item_attribute_provisioning", wraps=workspace._wait_for_item_attribute_provisioning
         ) as wait,
     ):
-        if unavailable_serial_endpoint:
-            with pytest.raises(PublishError, match="Consumer") as exc_info:
-                publish.publish_all_items(workspace)
-        else:
-            publish.publish_all_items(workspace)
+        publish.publish_all_items(workspace)
 
     assert workspace.bulk_publish_enabled == bulk_enabled
-    if unavailable_serial_endpoint:
-        assert len(exc_info.value.errors) == 1
-        assert exc_info.value.errors[0][0] == "Consumer"
-        assert f"Value does not exist for attribute '{attribute}'" in str(exc_info.value.errors[0][1])
-        creates = [
-            call.kwargs["body"]
-            for call in mock_endpoint.invoke.call_args_list
-            if call.kwargs.get("method") == "POST" and call.kwargs["url"] == f"{workspace.base_api_url}/items"
-        ]
-        assert [body["displayName"] for body in creates] == ["TestCatalog"]
-        assert workspace.repository_items[catalog_type]["TestCatalog"].guid == catalog_id
-        assert workspace.repository_items[ItemType.NOTEBOOK.value]["Consumer"].guid == ""
-        wait.assert_not_called()
-        retry.assert_not_called()
-        assert json.loads(content_path.read_text(encoding="utf-8")) == original_content
-        return
     if bulk_enabled:
         batches = [
             call.kwargs["body"]["definitionParts"]
@@ -635,6 +701,10 @@ def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
         ]
         assert batch_names == [["TestCatalog"], ["Consumer"]]
         consumer_payload = [{**part, "path": Path(part["path"]).name} for part in batches[1]]
+        if delayed_endpoint:
+            wait.assert_called_once_with(catalog_type, catalog_id, "TestCatalog", attribute)
+        else:
+            wait.assert_not_called()
     else:
         creates = [
             call.kwargs["body"]
@@ -643,16 +713,18 @@ def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
         ]
         assert [body["displayName"] for body in creates] == ["TestCatalog", "Consumer"]
         consumer_payload = creates[1]["definition"]["parts"]
+        assert [call.args for call in wait.call_args_list] == [
+            (catalog_type, catalog_id, "TestCatalog", "sqlendpointid"),
+            (catalog_type, catalog_id, "TestCatalog", "sqlendpoint"),
+        ]
     consumer_parts = {part["path"]: json.loads(base64.b64decode(part["payload"])) for part in consumer_payload}
     assert consumer_parts["source.json"] == {"source": expected}
     assert workspace.repository_items[catalog_type]["TestCatalog"].guid == catalog_id
     assert workspace.repository_items[ItemType.NOTEBOOK.value]["Consumer"].guid == consumer_id
     if delayed_endpoint:
-        wait.assert_called_once_with(catalog_type, catalog_id, "TestCatalog", attribute)
         retry.assert_called_once()
         assert events == ["publish-TestCatalog", "endpoint-missing", "retry", "endpoint-ready", "publish-Consumer"]
     else:
-        wait.assert_not_called()
         retry.assert_not_called()
     assert json.loads(content_path.read_text(encoding="utf-8")) == original_content
 

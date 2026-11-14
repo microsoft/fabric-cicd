@@ -1,12 +1,16 @@
 """Functions to process and deploy Mirrored Azure Databricks Catalog items."""
 
+import logging
 from typing import TYPE_CHECKING
 
+from fabric_cicd import constants
 from fabric_cicd._items._base_publisher import ItemPublisher
 from fabric_cicd.constants import ItemType
 
 if TYPE_CHECKING:
     from fabric_cicd._common._item import Item
+
+logger = logging.getLogger(__name__)
 
 
 class MirroredAzureDatabricksCatalogPublisher(ItemPublisher):
@@ -15,17 +19,13 @@ class MirroredAzureDatabricksCatalogPublisher(ItemPublisher):
     item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
 
     def publish_one(self, item_name: str, _item: "Item") -> None:
-        """Publish the catalog and wait for referenced asynchronous attributes."""
-        from fabric_cicd._items._bulk_publish_utils import get_async_attributes_to_wait_for
-
-        super().publish_one(item_name, _item)
+        """Publish the catalog and wait for its SQL endpoint to be provisioned."""
         workspace = self.fabric_workspace_obj
-        if _item.skip_publish or not workspace.contains_param_item_vars:
+        workspace._publish_item(item_name=item_name, item_type=self.item_type, skip_publish_logging=True)
+        if _item.skip_publish:
             return
 
-        item_key = f"{self.item_type}.{item_name}"
-        attributes = get_async_attributes_to_wait_for(workspace, {item_key})
-        for attribute_name in sorted(attributes.get(item_key, ())):
-            workspace._wait_for_item_attribute_provisioning(
-                self.item_type, _item.guid, item_name, attribute_name
-            )
+        for attribute_name in ("sqlendpointid", "sqlendpoint"):
+            workspace._wait_for_item_attribute_provisioning(self.item_type, _item.guid, item_name, attribute_name)
+
+        logger.info(f"{constants.INDENT}Published {self.item_type} '{item_name}'")
