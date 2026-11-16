@@ -38,7 +38,8 @@ def get_config_value(config_section: dict, key: str, environment: str) -> Option
         environment: Target environment
 
     Returns:
-        The extracted value, or None if key doesn't exist or environment not found in dict
+        The extracted value. None if the key is absent, or if the value is an environment mapping that
+        leaves out the environment or sets it to null.
     """
     if key not in config_section:
         return None
@@ -97,7 +98,8 @@ def extract_workspace_settings(config: dict, environment: str) -> dict:
     if "repository_directory" in core:
         settings["repository_directory"] = get_config_value(core, "repository_directory", environment)
 
-    # Optional settings - validation logs warning if value not found for target environment
+    # Optional settings - a missing target environment or null resolves to None here
+    # (for a missing environment, validation logs a warning, or fails with enable_strict_environment_mapping)
     update_setting(settings, core, "item_types_in_scope", environment)
     update_setting(settings, core, "parameter", environment, output_key="parameter_file_path")
 
@@ -111,7 +113,8 @@ def extract_publish_settings(config: dict, environment: str) -> dict:
     if "publish" in config:
         publish_config = config["publish"]
 
-        # Optional settings - validation logs debug if value not found for target environment
+        # Optional settings - a missing target environment or null resolves to None here
+        # (for a missing environment, validation logs debug, or fails with enable_strict_environment_mapping)
         settings_to_update = [
             "exclude_regex",
             "folder_exclude_regex",
@@ -135,7 +138,8 @@ def extract_unpublish_settings(config: dict, environment: str) -> dict:
     if "unpublish" in config:
         unpublish_config = config["unpublish"]
 
-        # Optional settings - validation logs debug if value not found for target environment
+        # Optional settings - a missing target environment or null resolves to None here
+        # (for a missing environment, validation logs debug, or fails with enable_strict_environment_mapping)
         settings_to_update = [
             "exclude_regex",
             "items_to_include",
@@ -170,7 +174,8 @@ def config_overrides_scope(config: dict, environment: str) -> Generator[None, No
         # Set feature flags
         if "features" in config:
             features = config["features"]
-            features_list = features.get(environment, []) if isinstance(features, dict) else features
+            # A missing environment and an environment set to null both apply no feature flags
+            features_list = (features.get(environment) or []) if isinstance(features, dict) else features
             for feature in features_list:
                 constants.FEATURE_FLAG.add(feature)
                 logger.info(f"Enabled feature flag: {feature}")

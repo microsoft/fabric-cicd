@@ -1,0 +1,8 @@
+kind: added
+body: Add the `enable_strict_environment_mapping` feature flag to fail config validation when an optional field's environment mapping leaves out the target environment, and accept `null` in optional environment mappings
+time: 2026-11-12T18:47:13+01:00
+custom:
+    Author: arhx91
+    AuthorLink: https://github.com/arhx91
+    Issue: "1183"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1183

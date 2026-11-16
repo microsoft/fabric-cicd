@@ -321,6 +321,8 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `features`                              | ❌       | Warning logged, setting skipped |
 | `constants`                             | ❌       | Warning logged, setting skipped |
 
+With the `enable_strict_environment_mapping` feature flag set, a missing environment in an optional field is a validation error. See [Strict Environment Mapping](#strict-environment-mapping).
+
 ### Selective Environment Configuration
 
 Optional fields allow you to apply settings to specific environments without affecting others. This is useful when you want different behavior per environment:
@@ -370,6 +372,38 @@ To enable debug logging:
 from fabric_cicd import change_log_level
 change_log_level()
 ```
+
+With the `enable_strict_environment_mapping` feature flag set, nothing is logged for these fields. The missing environment is a validation error instead. See [Strict Environment Mapping](#strict-environment-mapping).
+
+### Strict Environment Mapping
+
+A missing environment in an optional field can widen a deployment. For example, a missing environment in `core.item_types_in_scope` deploys every item type, and a missing environment in `unpublish.skip` runs the unpublish step.
+
+To make a missing environment a validation error, set the `enable_strict_environment_mapping` [feature flag](optional_feature.md#feature-flags). You can set it with `append_feature_flag()` or in the `features` section of the configuration file. With the flag set, validation reports every optional field that leaves out the target environment, and the deployment stops before anything is published:
+
+```
+'core.item_types_in_scope' is not set for environment 'prod'. Available environments: ['dev']. Without strict mapping, fabric-cicd ignores the setting for that environment. Add 'prod' to the mapping, or set it to null to keep the default.
+```
+
+The check covers every optional field in the [Required vs Optional Fields](#required-vs-optional-fields) table, including `features` and each key under `constants`. It checks the target environment only.
+
+To leave an optional field deliberately not set for an environment, set that environment to `null`. At deployment time, `null` has the same effect as a missing key: fabric-cicd uses the default. Unlike a missing key, `null` passes validation with the flag set:
+
+```yaml
+unpublish:
+    exclude_regex:
+        dev: "^DEBUG.*"
+        test: null
+        prod: null
+```
+
+Before you set `null`, look at what the default does. For some fields, the default is the widest action:
+
+- `core.item_types_in_scope`: every item type is deployed.
+- `unpublish.skip`: the unpublish step runs.
+- `unpublish.exclude_regex` and `unpublish.items_to_include`: every orphan item in scope can be unpublished.
+
+`null` is not valid for the required fields `core.workspace_id`, `core.workspace` and `core.repository_directory`.
 
 ## Sample `config.yml` File
 

@@ -167,6 +167,8 @@ class FeatureFlag(str, Enum):
     """Set to allow purging a Semantic Model's existing data when applying a definition update."""
     ENABLE_STRICT_SEMANTIC_MODEL_BINDING = "enable_strict_semantic_model_binding"
     """Set to fail the deployment when a Semantic Model cannot be bound to its connection."""
+    ENABLE_STRICT_ENVIRONMENT_MAPPING = "enable_strict_environment_mapping"
+    """Set to fail config validation when an optional field's environment mapping leaves out the target environment."""
 
 
 class OperationType(str, Enum):
@@ -512,6 +514,7 @@ CONFIG_VALIDATION_MSGS = {
         "empty_mapping": "'{}' environment mapping cannot be empty",
         "invalid_env_key": "Environment key in '{}' must be a non-empty string, got: {}",
         "empty_env_value": "'{}' value for environment '{}' cannot be empty",
+        "strict_env_not_set": "'{}' is not set for environment '{}'. Available environments: {}. Without strict mapping, fabric-cicd ignores the setting for that environment. Add '{}' to the mapping, or set it to null to keep the default.",
     },
     # Field validation
     "field": {

@@ -49,6 +49,12 @@ append_feature_flag("<specific_flag>")
 | `enable_include_folder`   | Enable folder-based inclusion during publish operations    | ☑️           |
 | `enable_shortcut_exclude` | Enable selective publishing of shortcuts in a Lakehouse    | ☑️           |
 
+<span class="md-h3-nonanchor">Configuration deployment</span>
+
+| Flag Name                           | Description                                                                                                                                                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enable_strict_environment_mapping` | If an optional field's environment mapping in `config.yml` leaves out the target environment, fail validation instead of skipping the setting. See [Strict Environment Mapping](config_deployment.md#strict-environment-mapping) |
+
 <span class="md-h3-nonanchor">Diagnostics</span>
 
 | Flag Name                    | Description                                                                |

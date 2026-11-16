@@ -342,7 +342,11 @@ class ConfigValidator:
             self._validate_constants_section(self.config["constants"])
 
     def _validate_environment_exists(self) -> None:
-        """Validate that target environment exists in all environment mappings."""
+        """Check every environment mapping for the target environment.
+
+        A missing target environment is a validation error for required fields, and for optional fields
+        when enable_strict_environment_mapping is set. Otherwise it is logged and the setting is skipped.
+        """
         if self.environment == "N/A":
             # Handle no target environment case
             if any(
@@ -352,6 +356,8 @@ class ConfigValidator:
             ):
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["no_env_with_mappings"])
             return
+
+        strict = self._strict_mapping_enabled()
 
         # Check each field for target environment presence
         for section, field_name, display_name, is_required, log_warning in _get_config_fields(self.config):
@@ -363,6 +369,9 @@ class ConfigValidator:
                         for const_key, const_val in field_value.items():
                             if isinstance(const_val, dict) and self.environment not in const_val:
                                 available_envs = list(const_val.keys())
+                                if strict:
+                                    self._add_strict_mapping_error(f"constants.{const_key}", available_envs)
+                                    continue
                                 logger.warning(
                                     f"Environment '{self.environment}' not found in 'constants.{const_key}'. "
                                     f"Available environments: {available_envs}. This constant will be skipped."
@@ -383,13 +392,43 @@ class ConfigValidator:
                                 self.environment, display_name, available_envs
                             )
                         )
+                    elif strict:
+                        self._add_strict_mapping_error(display_name, available_envs)
                     elif log_warning:
                         logger.warning(msg)
                     else:
                         logger.debug(msg)
 
-    def _validate_environment_mapping(self, field_value: dict, field_name: str, accepted_type: type) -> bool:
-        """Validate field with environment mapping."""
+    def _strict_mapping_enabled(self) -> bool:
+        """Return True if enable_strict_environment_mapping is set for the target environment.
+
+        The features section of the config file is applied only after validation, so the flag is
+        read from both the active feature flags and the features section for the target environment.
+        """
+        flag = constants.FeatureFlag.ENABLE_STRICT_ENVIRONMENT_MAPPING.value
+        if flag in constants.FEATURE_FLAG:
+            return True
+
+        features = self.config.get("features")
+        if isinstance(features, dict):
+            features = features.get(self.environment)
+        return isinstance(features, list) and flag in features
+
+    def _add_strict_mapping_error(self, display_name: str, available_envs: list) -> None:
+        """Report an optional setting that leaves out the target environment as a validation error."""
+        self.errors.append(
+            constants.CONFIG_VALIDATION_MSGS["environment"]["strict_env_not_set"].format(
+                display_name, self.environment, available_envs, self.environment
+            )
+        )
+
+    def _validate_environment_mapping(
+        self, field_value: dict, field_name: str, accepted_type: type, allow_null: bool = False
+    ) -> bool:
+        """Validate field with environment mapping.
+
+        If allow_null is True, an environment set to null is valid and means the setting is not set for that environment.
+        """
         if not field_value:
             self.errors.append(constants.CONFIG_VALIDATION_MSGS["environment"]["empty_mapping"].format(field_name))
             return False
@@ -404,6 +443,9 @@ class ConfigValidator:
                     )
                 )
                 valid = False
+                continue
+
+            if value is None and allow_null:
                 continue
 
             # Validate environment value type
@@ -516,11 +558,11 @@ class ConfigValidator:
 
         if isinstance(item_types, dict):
             # Validate environment mapping
-            if not self._validate_environment_mapping(item_types, "item_types_in_scope", list):
+            if not self._validate_environment_mapping(item_types, "item_types_in_scope", list, allow_null=True):
                 return
 
             # Validate each environment's item types
-            for env, item_type_list in item_types.items():
+            for env, item_type_list in _set_values(item_types):
                 self._validate_item_types(item_type_list, env_context=env)
             return
 
@@ -572,7 +614,7 @@ class ConfigValidator:
                 self.errors.append(constants.CONFIG_VALIDATION_MSGS["field"]["empty_value"].format("parameter"))
                 return
         elif isinstance(parameter_value, dict):
-            if not self._validate_environment_mapping(parameter_value, "parameter", str):
+            if not self._validate_environment_mapping(parameter_value, "parameter", str, allow_null=True):
                 return
         else:
             self.errors.append(
@@ -595,15 +637,18 @@ class ConfigValidator:
 
         # If environment mapping is used and target environment is provided, only process that environment path
         if self.environment and self.environment != "N/A" and isinstance(field_value, dict):
-            if self.environment not in paths_to_resolve:
-                # Skip if environment not in mapping (for parameter field, which is optional)
+            if paths_to_resolve.get(self.environment) is None:
+                # Skip if environment not in mapping or set to null (for parameter field, which is optional)
                 logger.debug(
-                    f"Skipping path resolution for '{field_name}' - environment '{self.environment}' not in mapping"
+                    f"Skipping path resolution for '{field_name}' - environment '{self.environment}' not in mapping or set to null"
                 )
                 return
             paths_to_resolve = {self.environment: paths_to_resolve[self.environment]}
 
         for env_key, path_str in paths_to_resolve.items():
+            if path_str is None:
+                # null means the field is not set for this environment, so there is no path to resolve
+                continue
             try:
                 env_desc = f" for environment '{env_key}'" if env_key != "_default" else ""
                 path = Path(path_str)
@@ -712,11 +757,13 @@ class ConfigValidator:
 
             elif isinstance(exclude_regex, dict):
                 # Validate environment mapping
-                if not self._validate_environment_mapping(exclude_regex, f"{section_name}.exclude_regex", str):
+                if not self._validate_environment_mapping(
+                    exclude_regex, f"{section_name}.exclude_regex", str, allow_null=True
+                ):
                     return
 
                 # Validate each environment's regex pattern
-                for env, regex_pattern in exclude_regex.items():
+                for env, regex_pattern in _set_values(exclude_regex):
                     self._validate_regex(regex_pattern, f"{section_name}.exclude_regex.{env}")
 
             else:
@@ -742,11 +789,13 @@ class ConfigValidator:
 
             elif isinstance(items, dict):
                 # Validate environment mapping
-                if not self._validate_environment_mapping(items, f"{section_name}.items_to_include", list):
+                if not self._validate_environment_mapping(
+                    items, f"{section_name}.items_to_include", list, allow_null=True
+                ):
                     return
 
                 # Validate each environment's items list
-                for env, items_list in items.items():
+                for env, items_list in _set_values(items):
                     self._validate_items_list(items_list, f"{section_name}.items_to_include.{env}")
 
             else:
@@ -779,12 +828,12 @@ class ConfigValidator:
             elif isinstance(folder_exclude_regex, dict):
                 # Validate environment mapping
                 if not self._validate_environment_mapping(
-                    folder_exclude_regex, f"{section_name}.folder_exclude_regex", str
+                    folder_exclude_regex, f"{section_name}.folder_exclude_regex", str, allow_null=True
                 ):
                     return
 
                 # Validate each environment's regex pattern
-                for env, regex_pattern in folder_exclude_regex.items():
+                for env, regex_pattern in _set_values(folder_exclude_regex):
                     self._validate_regex(regex_pattern, f"{section_name}.folder_exclude_regex.{env}")
 
             else:
@@ -816,11 +865,13 @@ class ConfigValidator:
 
             elif isinstance(folders, dict):
                 # Validate environment mapping
-                if not self._validate_environment_mapping(folders, f"{section_name}.folder_path_to_include", list):
+                if not self._validate_environment_mapping(
+                    folders, f"{section_name}.folder_path_to_include", list, allow_null=True
+                ):
                     return
 
                 # Validate each environment's folders list
-                for env, folders_list in folders.items():
+                for env, folders_list in _set_values(folders):
                     self._validate_folders_list(folders_list, f"{section_name}.folder_path_to_include.{env}")
 
             else:
@@ -851,12 +902,12 @@ class ConfigValidator:
             elif isinstance(shortcut_exclude_regex, dict):
                 # Validate environment mapping
                 if not self._validate_environment_mapping(
-                    shortcut_exclude_regex, f"{section_name}.shortcut_exclude_regex", str
+                    shortcut_exclude_regex, f"{section_name}.shortcut_exclude_regex", str, allow_null=True
                 ):
                     return
 
                 # Validate each environment's regex pattern
-                for env, regex_pattern in shortcut_exclude_regex.items():
+                for env, regex_pattern in _set_values(shortcut_exclude_regex):
                     self._validate_regex(regex_pattern, f"{section_name}.shortcut_exclude_regex.{env}")
 
             else:
@@ -876,7 +927,7 @@ class ConfigValidator:
 
             if isinstance(skip_value, dict):
                 # Use the reusable environment mapping validation
-                if not self._validate_environment_mapping(skip_value, f"{section_name}.skip", bool):
+                if not self._validate_environment_mapping(skip_value, f"{section_name}.skip", bool, allow_null=True):
                     return
 
             else:
@@ -945,9 +996,9 @@ class ConfigValidator:
             )
             return
 
-        # Determine which environments each field contains (if they are environment mappings)
-        value1_envs = set(value1.keys()) if isinstance(value1, dict) else set()
-        value2_envs = set(value2.keys()) if isinstance(value2, dict) else set()
+        # Determine which environments each field sets (if they are environment mappings); null counts as not set
+        value1_envs = {env for env, _ in _set_values(value1)} if isinstance(value1, dict) else set()
+        value2_envs = {env for env, _ in _set_values(value2)} if isinstance(value2, dict) else set()
 
         # Determine if it is a direct value
         value1_is_direct = not isinstance(value1, dict)
@@ -978,11 +1029,11 @@ class ConfigValidator:
 
         if isinstance(features, dict):
             # Validate environment mapping
-            if not self._validate_environment_mapping(features, "features", list):
+            if not self._validate_environment_mapping(features, "features", list, allow_null=True):
                 return
 
             # Validate each environment's features list
-            for env, features_list in features.items():
+            for env, features_list in _set_values(features):
                 self._validate_features_list(features_list, f"features.{env}")
             return
 
@@ -1036,6 +1087,9 @@ class ConfigValidator:
                             )
                         )
                         continue
+                    if env_value is None:
+                        # null means the constant is not overridden for this environment
+                        continue
                     self._validate_single_constant(key, env_value, f"constants.{key}.{env}")
             else:
                 # Flat value: { KEY: val }
@@ -1079,8 +1133,10 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
 
     Returns:
         List of tuples: (section_dict, field_name, display_name, is_required, log_warning)
-        - is_required: If True, missing environment causes error.
-        - log_warning: logging type (e.g., warning (True), debug (False)).
+        - is_required: If True, a missing environment is always a validation error. For an optional
+          field, a missing environment is an error only when enable_strict_environment_mapping is set.
+        - log_warning: log level for a missing environment in an optional field when the flag is not
+          set (e.g., warning (True), debug (False)).
     """
     return [
         # Core section fields - required
@@ -1105,6 +1161,11 @@ def _get_config_fields(config: dict) -> list[tuple[dict, str, str, bool, bool]]:
         (config, "features", "features", False, True),
         (config, "constants", "constants", False, True),
     ]
+
+
+def _set_values(mapping: dict) -> list[tuple[Any, Any]]:
+    """Return the (environment, value) pairs of an environment mapping, leaving out environments set to null."""
+    return [(env, value) for env, value in mapping.items() if value is not None]
 
 
 def _find_git_root(path: Path) -> Optional[Path]:
