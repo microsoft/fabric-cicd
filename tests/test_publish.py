@@ -13,11 +13,12 @@ from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 from fixtures.credentials import DummyTokenCredential
 
 import fabric_cicd.publish as publish
 from fabric_cicd import append_feature_flag, constants, get_supported_feature_flags
-from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError
+from fabric_cicd._common._exceptions import FailedPublishedItemStatusError, InputError, PublishError
 from fabric_cicd._common._item import Item
 from fabric_cicd._common._validate_input import validate_workspace_capacity
 from fabric_cicd._items._base_publisher import ItemPublisher
@@ -40,10 +41,21 @@ def mock_endpoint():
     mock = MagicMock()
 
     def mock_invoke(method, url, **_kwargs):
-        if method == "GET" and "workspaces" in url and not url.endswith("/items"):
-            return {"body": {"value": [], "capacityId": "test-capacity"}}
         if method == "GET" and url.endswith("/items"):
             return {"body": {"value": []}}
+        if method == "GET" and "/mirroredazuredatabrickscatalogs/" in url:
+            return {
+                "body": {
+                    "properties": {
+                        "sqlEndpointProperties": {
+                            "id": "sql-endpoint-id",
+                            "connectionString": "test.datawarehouse.fabric.microsoft.com",
+                        }
+                    }
+                }
+            }
+        if method == "GET" and "workspaces" in url and not url.endswith("/items"):
+            return {"body": {"value": [], "capacityId": "test-capacity"}}
         if method == "POST" and url.endswith("/folders"):
             return {"body": {"id": "mock-folder-id"}}
         if method == "POST" and url.endswith("/items"):
@@ -172,6 +184,569 @@ def test_validate_workspace_capacity_propagates_api_errors(capacity_workspace):
 # =============================================================================
 # Basic Publishing Tests
 # =============================================================================
+
+
+@pytest.fixture
+def mirrored_databricks_workspace(mock_endpoint, temp_workspace_dir):
+    """Load a deterministic Git-style catalog definition with mocked Fabric APIs."""
+    temp_workspace_dir = temp_workspace_dir.resolve()
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    item_dir = create_test_item(
+        temp_workspace_dir, None, "TestCatalog", item_type, "11111111-1111-1111-1111-111111111111"
+    )
+    (item_dir / "dummy.txt").unlink()
+    platform_path = item_dir / ".platform"
+    platform = json.loads(platform_path.read_text(encoding="utf-8"))
+    platform["$schema"] = (
+        "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json"
+    )
+    platform["config"]["version"] = "2.0"
+    platform_path.write_text(json.dumps(platform), encoding="utf-8")
+    definition = {
+        "$schema": (
+            "https://developer.microsoft.com/json-schemas/fabric/item/mirroredAzureDatabricksCatalog/"
+            "definition/mirroredAzureDatabricksCatalogDefinition/1.0.0/schema.json"
+        ),
+        "autoSync": "Enabled",
+        "catalogName": "test_catalog",
+        "databricksWorkspaceConnectionId": "22222222-2222-2222-2222-222222222222",
+        "storageConnectionId": "33333333-3333-3333-3333-333333333333",
+        "mirroringMode": "Partial",
+        "mirrorConfiguration": {
+            "schemas": [{"mirroringMode": "Full", "name": name} for name in ["schema_1", "schema_2", "schema_3"]]
+        },
+    }
+    (item_dir / "definition.json").write_text(json.dumps(definition), encoding="utf-8")
+    with (
+        patch("fabric_cicd.fabric_workspace.FabricEndpoint", return_value=mock_endpoint),
+        patch.object(
+            FabricWorkspace, "_refresh_deployed_folders", new=lambda self: setattr(self, "deployed_folders", {})
+        ),
+    ):
+        workspace = FabricWorkspace(
+            workspace_id="12345678-1234-5678-abcd-1234567890ab",
+            repository_directory=str(temp_workspace_dir),
+            item_type_in_scope=[item_type],
+            token_credential=DummyTokenCredential(),
+        )
+        workspace._refresh_repository_items()
+        mock_endpoint.invoke.reset_mock()
+        yield workspace
+
+
+@pytest.mark.parametrize("deployed", [False, True], ids=["create", "update-definition"])
+def test_mirrored_azure_databricks_catalog_publishes_definition(mirrored_databricks_workspace, mock_endpoint, deployed):
+    """The standard publisher creates and updates the complete catalog definition."""
+    workspace = mirrored_databricks_workspace
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    item = workspace.repository_items[item_type]["TestCatalog"]
+    original_definition = json.loads((item.path / "definition.json").read_text(encoding="utf-8"))
+    original_platform = json.loads((item.path / ".platform").read_text(encoding="utf-8"))
+    if deployed:
+        original_invoke = mock_endpoint.invoke.side_effect
+
+        def invoke_with_existing_catalog(method, url, **kwargs):
+            if method == "GET" and url == f"{workspace.base_api_url}/items":
+                return {
+                    "body": {
+                        "value": [
+                            {
+                                "id": "44444444-4444-4444-4444-444444444444",
+                                "type": item_type,
+                                "displayName": item.name,
+                                "description": item.description,
+                            }
+                        ]
+                    }
+                }
+            return original_invoke(method, url, **kwargs)
+
+        mock_endpoint.invoke.side_effect = invoke_with_existing_catalog
+
+    publish.publish_all_items(workspace)
+    item = workspace.repository_items[item_type]["TestCatalog"]
+
+    api_calls = [call for call in mock_endpoint.invoke.call_args_list if call.kwargs.get("method") in {"POST", "PATCH"}]
+    assert len(api_calls) == 1
+    request = api_calls[0].kwargs
+    assert request["method"] == "POST"
+    if deployed:
+        assert request["url"] == f"{workspace.base_api_url}/items/{item.guid}/updateDefinition?updateMetadata=True"
+        assert set(request["body"]) == {"definition"}
+        assert item.guid == "44444444-4444-4444-4444-444444444444"
+    else:
+        assert request["url"] == f"{workspace.base_api_url}/items"
+        assert request["body"]["type"] == item_type
+        assert request["body"]["displayName"] == item.name
+        assert request["body"]["description"] == item.description
+        assert item.guid == "mock-item-id"
+    assert "creationPayload" not in request["body"]
+    definition = request["body"]["definition"]
+    assert "format" not in definition
+    parts = {part["path"]: json.loads(base64.b64decode(part["payload"])) for part in definition["parts"]}
+    assert parts == {".platform": original_platform, "definition.json": original_definition}
+    assert all(part["payloadType"] == "InlineBase64" for part in definition["parts"])
+
+
+@pytest.mark.parametrize("contains_param_item_vars", [False, True])
+def test_mirrored_azure_databricks_catalog_waits_for_sql_endpoint(
+    mirrored_databricks_workspace, mock_endpoint, contains_param_item_vars, monkeypatch, caplog
+):
+    """Publishing waits for the endpoint even without a dynamic SQL attribute reference."""
+    workspace = mirrored_databricks_workspace
+    workspace.contains_param_item_vars = contains_param_item_vars
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    original_invoke = mock_endpoint.invoke.side_effect
+    endpoint_properties = [
+        {},
+        {"sqlEndpointProperties": {"id": "sql-endpoint-id"}},
+        {"sqlEndpointProperties": {"id": "sql-endpoint-id", "connectionString": ""}},
+        {
+            "sqlEndpointProperties": {
+                "id": "sql-endpoint-id",
+                "connectionString": "test.datawarehouse.fabric.microsoft.com",
+            }
+        },
+    ]
+    responses = iter(endpoint_properties)
+    observed_properties = []
+    retry = MagicMock()
+    monkeypatch.setattr("fabric_cicd.fabric_workspace.handle_retry", retry)
+
+    def invoke_with_provisioning_endpoint(method, url, **kwargs):
+        if method == "GET" and url == f"{workspace.base_api_url}/{item_type.lower()}s/mock-item-id":
+            assert f"Published {item_type} 'TestCatalog'" not in caplog.text
+            properties = next(responses)
+            observed_properties.append(properties)
+            return {"body": {"properties": properties}}
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_provisioning_endpoint
+    with caplog.at_level(logging.INFO):
+        publish.publish_all_items(workspace)
+
+    assert observed_properties == endpoint_properties
+    assert retry.call_count == 2
+    assert f"Published {item_type} 'TestCatalog'" in caplog.text
+
+
+def test_mirrored_azure_databricks_catalog_skips_sql_endpoint_wait(mirrored_databricks_workspace, mock_endpoint):
+    """Excluded catalogs do not wait for an endpoint or report a successful publish."""
+    workspace = mirrored_databricks_workspace
+
+    with patch.object(workspace, "_wait_for_item_attribute_provisioning") as wait:
+        publish.publish_all_items(workspace, item_name_exclude_regex="TestCatalog")
+
+    wait.assert_not_called()
+    assert workspace.repository_items[ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value]["TestCatalog"].skip_publish
+    assert not any(call.kwargs.get("method") == "POST" for call in mock_endpoint.invoke.call_args_list)
+
+
+def test_mirrored_azure_databricks_catalog_propagates_sql_endpoint_failure(
+    mirrored_databricks_workspace, mock_endpoint, caplog
+):
+    """A failed endpoint lookup fails the catalog publish without reporting success."""
+    workspace = mirrored_databricks_workspace
+    original_invoke = mock_endpoint.invoke.side_effect
+
+    def invoke_with_endpoint_failure(method, url, **kwargs):
+        if method == "GET" and "/mirroredazuredatabrickscatalogs/" in url:
+            message = "SQL endpoint lookup failed"
+            raise RuntimeError(message)
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_endpoint_failure
+    with caplog.at_level(logging.INFO), pytest.raises(PublishError, match="TestCatalog") as exc_info:
+        publish.publish_all_items(workspace)
+
+    assert len(exc_info.value.errors) == 1
+    assert str(exc_info.value.errors[0][1]) == "SQL endpoint lookup failed"
+    assert "Published MirroredAzureDatabricksCatalog 'TestCatalog'" not in caplog.text
+
+
+@pytest.mark.parametrize("parameter_type", ["find_replace", "key_value_replace"])
+@pytest.mark.parametrize("environment", ["DEV", "PROD"])
+def test_mirrored_azure_databricks_catalog_parameterization(
+    mirrored_databricks_workspace, mock_endpoint, parameter_type, environment
+):
+    """Real YAML parameterization replaces connection IDs and applies item/file filters."""
+    workspace = mirrored_databricks_workspace
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    item = workspace.repository_items[item_type]["TestCatalog"]
+    original_definition = json.loads((item.path / "definition.json").read_text(encoding="utf-8"))
+    other_dir = create_test_item(
+        workspace.repository_directory, None, "OtherCatalog", item_type, "99999999-9999-9999-9999-999999999999"
+    )
+    (other_dir / "dummy.txt").unlink()
+    (other_dir / "definition.json").write_text(json.dumps(original_definition), encoding="utf-8")
+    target_values = {
+        "catalogName": {"DEV": "dev_catalog", "PROD": "prod_catalog"},
+        "databricksWorkspaceConnectionId": {
+            "DEV": "55555555-5555-5555-5555-555555555555",
+            "PROD": "77777777-7777-7777-7777-777777777777",
+        },
+        "storageConnectionId": {
+            "DEV": "66666666-6666-6666-6666-666666666666",
+            "PROD": "88888888-8888-8888-8888-888888888888",
+        },
+    }
+    parameters = []
+    for field, replacements in target_values.items():
+        find_entry = (
+            {"find_key": f"$.{field}"}
+            if parameter_type == "key_value_replace"
+            else {"find_value": original_definition[field]}
+        )
+        parameters.append({
+            **find_entry,
+            "replace_value": replacements,
+            "item_type": item_type,
+            "item_name": "TestCatalog",
+            "file_path": f"{item.path.name}/definition.json",
+        })
+    (workspace.repository_directory / "parameter.yml").write_text(
+        yaml.safe_dump({parameter_type: parameters}), encoding="utf-8"
+    )
+    workspace = FabricWorkspace(
+        workspace_id=workspace.workspace_id,
+        repository_directory=str(workspace.repository_directory),
+        environment=environment,
+        item_type_in_scope=[item_type],
+        token_credential=DummyTokenCredential(),
+    )
+    mock_endpoint.invoke.reset_mock()
+
+    publish.publish_all_items(workspace)
+
+    requests = {
+        call.kwargs["body"]["displayName"]: call.kwargs["body"]
+        for call in mock_endpoint.invoke.call_args_list
+        if call.kwargs.get("method") == "POST" and call.kwargs["url"].endswith("/items")
+    }
+    assert set(requests) == {"TestCatalog", "OtherCatalog"}
+    for name, body in requests.items():
+        parts = {part["path"]: json.loads(base64.b64decode(part["payload"])) for part in body["definition"]["parts"]}
+        expected = original_definition.copy()
+        if name == "TestCatalog":
+            expected.update({field: replacements[environment] for field, replacements in target_values.items()})
+        assert parts["definition.json"] == expected
+        assert parts[".platform"]["metadata"]["displayName"] == name
+    assert json.loads((item.path / "definition.json").read_text(encoding="utf-8")) == original_definition
+
+
+def test_mirrored_azure_databricks_catalog_publish_and_unpublish_order(monkeypatch):
+    """Catalogs publish beside mirrored databases and unpublish after dependent items."""
+    catalog_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG
+    expected = [ItemType.MIRRORED_DATABASE, catalog_type, ItemType.NOTEBOOK]
+    workspace = SimpleNamespace(
+        item_type_in_scope=[item_type.value for item_type in reversed(expected)],
+        repository_items={item_type.value: {"TestItem": object()} for item_type in expected},
+        deployed_items={item_type.value: {"TestItem": object()} for item_type in expected},
+    )
+    monkeypatch.setattr(constants, "FEATURE_FLAG", set())
+
+    assert [item_type for _, item_type in ItemPublisher.get_item_types_to_publish(workspace)] == expected
+    assert ItemPublisher.get_item_types_to_unpublish(workspace) == [item_type.value for item_type in reversed(expected)]
+    order = list(constants.SERIAL_ITEM_PUBLISH_ORDER.values())
+    assert order.index(catalog_type) == order.index(ItemType.MIRRORED_DATABASE) + 1
+    assert order.index(catalog_type) < order.index(ItemType.LAKEHOUSE)
+    assert len(order) == len(set(order)) == len(ItemType)
+    assert set(order) == set(ItemType)
+    assert catalog_type.value not in constants.UNPUBLISH_FLAG_MAPPING
+    assert ItemType.MIRRORED_DATABASE.value not in constants.UNPUBLISH_FLAG_MAPPING
+
+
+def test_mirrored_azure_databricks_catalog_unpublishes_only_orphans(
+    mirrored_databricks_workspace, mock_endpoint, monkeypatch
+):
+    """Like mirrored databases, in-scope orphaned catalogs can be deleted without a flag."""
+    workspace = mirrored_databricks_workspace
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    monkeypatch.setattr(constants, "FEATURE_FLAG", set())
+    original_invoke = mock_endpoint.invoke.side_effect
+
+    def invoke_with_catalogs(method, url, **kwargs):
+        if method == "GET" and url == f"{workspace.base_api_url}/items":
+            return {
+                "body": {
+                    "value": [
+                        {
+                            "id": "44444444-4444-4444-4444-444444444444",
+                            "type": item_type,
+                            "displayName": "TestCatalog",
+                            "description": "Retained catalog",
+                        },
+                        {
+                            "id": "55555555-5555-5555-5555-555555555555",
+                            "type": item_type,
+                            "displayName": "OrphanCatalog",
+                            "description": "Orphaned catalog",
+                        },
+                        {
+                            "id": "66666666-6666-6666-6666-666666666666",
+                            "type": ItemType.NOTEBOOK.value,
+                            "displayName": "OutOfScope",
+                            "description": "Out-of-scope notebook",
+                        },
+                    ]
+                }
+            }
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_catalogs
+    with patch.object(workspace, "_unpublish_folders"):
+        publish.unpublish_all_orphan_items(workspace)
+
+    deletes = [call.kwargs for call in mock_endpoint.invoke.call_args_list if call.kwargs.get("method") == "DELETE"]
+    assert len(deletes) == 1
+    assert deletes[0]["url"] == f"{workspace.base_api_url}/items/55555555-5555-5555-5555-555555555555"
+
+
+def test_mirrored_azure_databricks_catalog_sql_endpoint_attributes(mirrored_databricks_workspace, mock_endpoint):
+    """Catalog SQL endpoint values are available to downstream dynamic parameterization."""
+    workspace = mirrored_databricks_workspace
+    item_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    catalog_id = "44444444-4444-4444-4444-444444444444"
+    endpoint_id = "55555555-5555-5555-5555-555555555555"
+    workspace.contains_param_item_vars = True
+
+    def invoke_with_sql_endpoint(method, url, **_kwargs):
+        assert method == "GET"
+        if url == f"{workspace.base_api_url}/items":
+            return {
+                "body": {
+                    "value": [{"id": catalog_id, "type": item_type, "displayName": "TestCatalog", "description": ""}]
+                }
+            }
+        assert url == f"{workspace.base_api_url}/{item_type.lower()}s/{catalog_id}"
+        return {
+            "body": {"properties": {"sqlEndpointProperties": {"id": endpoint_id, "connectionString": "test.example"}}}
+        }
+
+    mock_endpoint.invoke.side_effect = invoke_with_sql_endpoint
+    workspace._refresh_deployed_items()
+
+    attributes = workspace.workspace_items[item_type]["TestCatalog"]
+    assert attributes["id"] == catalog_id
+    assert attributes["sqlendpointid"] == endpoint_id
+    assert attributes["sqlendpoint"] == "test.example"
+
+
+@pytest.mark.parametrize("parameter_type", ["find_replace", "key_value_replace"])
+@pytest.mark.parametrize(
+    ("publish_mode", "attribute"),
+    [
+        ("serial", "id"),
+        ("serial", "sqlendpoint"),
+        ("serial", "sqlendpointid"),
+        ("bulk", "id"),
+        ("bulk", "sqlendpoint"),
+        ("bulk", "sqlendpointid"),
+        ("serial-delayed", "sqlendpoint"),
+        ("serial-delayed", "sqlendpointid"),
+    ],
+)
+def test_mirrored_azure_databricks_catalog_downstream_dynamic_replacement(
+    mirrored_databricks_workspace, mock_endpoint, monkeypatch, parameter_type, attribute, publish_mode
+):
+    """Resolve catalog attributes downstream only after serial or bulk endpoint waits complete."""
+    workspace = mirrored_databricks_workspace
+    catalog_type = ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value
+    catalog_id = "44444444-4444-4444-4444-444444444444"
+    endpoint_id = "55555555-5555-5555-5555-555555555555"
+    consumer_id = "77777777-7777-7777-7777-777777777777"
+    endpoint_connection = "test.example"
+    expected = {"id": catalog_id, "sqlendpoint": endpoint_connection, "sqlendpointid": endpoint_id}[attribute]
+    bulk_enabled = publish_mode == "bulk"
+    delayed_endpoint = (bulk_enabled or publish_mode == "serial-delayed") and attribute != "id"
+    monkeypatch.setattr(
+        constants,
+        "FEATURE_FLAG",
+        {FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value, FeatureFlag.ENABLE_BULK_PUBLISH.value}
+        if bulk_enabled
+        else set(),
+    )
+    consumer_dir = create_test_item(
+        workspace.repository_directory,
+        None,
+        "Consumer",
+        ItemType.NOTEBOOK.value,
+        "66666666-6666-6666-6666-666666666666",
+    )
+    (consumer_dir / "dummy.txt").unlink()
+    content_path = consumer_dir / "source.json"
+    original_content = {"source": "source-placeholder"}
+    content_path.write_text(json.dumps(original_content), encoding="utf-8")
+    find_entry = (
+        {"find_key": "$.source"} if parameter_type == "key_value_replace" else {"find_value": "source-placeholder"}
+    )
+    (workspace.repository_directory / "parameter.yml").write_text(
+        yaml.safe_dump({
+            parameter_type: [
+                {
+                    **find_entry,
+                    "replace_value": {"TEST": f"$items.{catalog_type}.TestCatalog.{attribute}"},
+                    "item_type": ItemType.NOTEBOOK.value,
+                    "item_name": "Consumer",
+                    "file_path": f"{consumer_dir.name}/source.json",
+                }
+            ]
+        }),
+        encoding="utf-8",
+    )
+    catalog_created = False
+    endpoint_reads = 0
+    events = []
+    original_invoke = mock_endpoint.invoke.side_effect
+
+    def invoke_with_catalog(method, url, **kwargs):
+        nonlocal catalog_created, endpoint_reads
+        if method == "GET" and url == f"{workspace.base_api_url}/items":
+            deployed = (
+                [{"id": catalog_id, "type": catalog_type, "displayName": "TestCatalog", "description": ""}]
+                if catalog_created
+                else []
+            )
+            return {"body": {"value": deployed}}
+        if method == "GET" and url == f"{workspace.base_api_url}/{catalog_type.lower()}s/{catalog_id}":
+            endpoint_reads += 1
+            if delayed_endpoint and endpoint_reads == 1:
+                events.append("endpoint-missing")
+                return {"body": {"properties": {}}}
+            if delayed_endpoint and endpoint_reads == 2:
+                events.append("endpoint-ready")
+            return {
+                "body": {
+                    "properties": {
+                        "sqlEndpointProperties": {"id": endpoint_id, "connectionString": endpoint_connection}
+                    }
+                }
+            }
+        if method == "POST" and url == f"{workspace.base_api_url}/items/bulkImportDefinitions":
+            platforms = [
+                json.loads(base64.b64decode(part["payload"]))
+                for part in kwargs["body"]["definitionParts"]
+                if part["path"].endswith("/.platform")
+            ]
+            assert len(platforms) == 1
+            metadata = platforms[0]["metadata"]
+            if metadata["type"] == catalog_type:
+                assert not catalog_created
+                catalog_created = True
+                deployed_id = catalog_id
+            else:
+                assert catalog_created
+                assert not delayed_endpoint or endpoint_reads >= 2
+                deployed_id = consumer_id
+            events.append(f"publish-{metadata['displayName']}")
+            return {
+                "body": {
+                    "importItemDefinitionsDetails": [
+                        {
+                            "itemType": metadata["type"],
+                            "itemDisplayName": metadata["displayName"],
+                            "itemId": deployed_id,
+                            "operationType": "Create",
+                        }
+                    ]
+                }
+            }
+        if method == "POST" and url == f"{workspace.base_api_url}/items":
+            events.append(f"publish-{kwargs['body']['displayName']}")
+            if kwargs["body"]["type"] == catalog_type:
+                catalog_created = True
+                return {"body": {"id": catalog_id}}
+            assert catalog_created
+            assert not delayed_endpoint or endpoint_reads >= 2
+            return {"body": {"id": consumer_id}}
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_catalog
+    workspace = FabricWorkspace(
+        workspace_id=workspace.workspace_id,
+        repository_directory=str(workspace.repository_directory),
+        environment="TEST",
+        item_type_in_scope=[ItemType.NOTEBOOK.value, catalog_type],
+        token_credential=DummyTokenCredential(),
+    )
+    assert workspace.contains_param_item_vars
+    mock_endpoint.invoke.reset_mock()
+
+    with (
+        patch(
+            "fabric_cicd.fabric_workspace.handle_retry", side_effect=lambda **_kwargs: events.append("retry")
+        ) as retry,
+        patch.object(
+            workspace, "_wait_for_item_attribute_provisioning", wraps=workspace._wait_for_item_attribute_provisioning
+        ) as wait,
+    ):
+        publish.publish_all_items(workspace)
+
+    assert workspace.bulk_publish_enabled == bulk_enabled
+    if bulk_enabled:
+        batches = [
+            call.kwargs["body"]["definitionParts"]
+            for call in mock_endpoint.invoke.call_args_list
+            if call.kwargs.get("method") == "POST"
+            and call.kwargs["url"] == f"{workspace.base_api_url}/items/bulkImportDefinitions"
+        ]
+        assert len(batches) == 2
+        batch_names = [
+            [
+                json.loads(base64.b64decode(part["payload"]))["metadata"]["displayName"]
+                for part in batch
+                if part["path"].endswith("/.platform")
+            ]
+            for batch in batches
+        ]
+        assert batch_names == [["TestCatalog"], ["Consumer"]]
+        consumer_payload = [{**part, "path": Path(part["path"]).name} for part in batches[1]]
+        if delayed_endpoint:
+            wait.assert_called_once_with(catalog_type, catalog_id, "TestCatalog", attribute)
+        else:
+            wait.assert_not_called()
+    else:
+        creates = [
+            call.kwargs["body"]
+            for call in mock_endpoint.invoke.call_args_list
+            if call.kwargs.get("method") == "POST" and call.kwargs["url"] == f"{workspace.base_api_url}/items"
+        ]
+        assert [body["displayName"] for body in creates] == ["TestCatalog", "Consumer"]
+        consumer_payload = creates[1]["definition"]["parts"]
+        assert [call.args for call in wait.call_args_list] == [
+            (catalog_type, catalog_id, "TestCatalog", "sqlendpointid"),
+            (catalog_type, catalog_id, "TestCatalog", "sqlendpoint"),
+        ]
+    consumer_parts = {part["path"]: json.loads(base64.b64decode(part["payload"])) for part in consumer_payload}
+    assert consumer_parts["source.json"] == {"source": expected}
+    assert workspace.repository_items[catalog_type]["TestCatalog"].guid == catalog_id
+    assert workspace.repository_items[ItemType.NOTEBOOK.value]["Consumer"].guid == consumer_id
+    if delayed_endpoint:
+        retry.assert_called_once()
+        assert events == ["publish-TestCatalog", "endpoint-missing", "retry", "endpoint-ready", "publish-Consumer"]
+    else:
+        retry.assert_not_called()
+    assert json.loads(content_path.read_text(encoding="utf-8")) == original_content
+
+
+def test_mirrored_azure_databricks_catalog_propagates_api_failure(mirrored_databricks_workspace, mock_endpoint):
+    """A failed catalog create fails deployment without recording a successful item ID."""
+    workspace = mirrored_databricks_workspace
+    original_invoke = mock_endpoint.invoke.side_effect
+
+    def invoke_with_failure(method, url, **kwargs):
+        if method == "POST" and url == f"{workspace.base_api_url}/items":
+            message = "Catalog creation failed"
+            raise RuntimeError(message)
+        return original_invoke(method, url, **kwargs)
+
+    mock_endpoint.invoke.side_effect = invoke_with_failure
+    with pytest.raises(PublishError, match="TestCatalog") as exc_info:
+        publish.publish_all_items(workspace)
+    assert len(exc_info.value.errors) == 1
+    assert exc_info.value.errors[0][0] == "TestCatalog"
+    assert str(exc_info.value.errors[0][1]) == "Catalog creation failed"
+    assert workspace.repository_items[ItemType.MIRRORED_AZURE_DATABRICKS_CATALOG.value]["TestCatalog"].guid == ""
 
 
 @pytest.fixture
