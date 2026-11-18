@@ -10,7 +10,8 @@ import pytest
 
 from fabric_cicd import constants
 from fabric_cicd._common._item import Item
-from fabric_cicd._items._lakehouse import LakehousePublisher, ShortcutPublisher
+from fabric_cicd._items._lakehouse import LakehousePublisher
+from fabric_cicd._items._shortcuts import ShortcutPublisher
 from fabric_cicd.constants import FeatureFlag
 from fabric_cicd.fabric_workspace import FabricWorkspace
 
@@ -419,7 +420,7 @@ def test_publish_all_marks_excluded_items_skip_publish():
     with (
         patch.object(LakehousePublisher, "pre_publish_all", return_value=None),
         patch.object(LakehousePublisher, "publish_one", return_value=None),
-        patch("fabric_cicd._items._lakehouse.ShortcutPublisher.publish_all", fake_shortcut_publish_all),
+        patch("fabric_cicd._items._shortcuts.ShortcutPublisher.publish_all", fake_shortcut_publish_all),
     ):
         publisher.publish_all()
 

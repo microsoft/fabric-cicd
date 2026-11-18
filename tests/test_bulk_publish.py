@@ -76,6 +76,7 @@ def bulk_publish_flags():
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_EXPERIMENTAL_FEATURES.value)
     constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_BULK_PUBLISH.value)
     constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_WAREHOUSE_DEFINITION_PUBLISH.value)
+    constants.FEATURE_FLAG.discard(FeatureFlag.ENABLE_LAKEHOUSE_DEFINITION_PUBLISH.value)
     yield
     constants.FEATURE_FLAG.clear()
     constants.FEATURE_FLAG.update(original_flags)
@@ -625,6 +626,56 @@ class TestBulkPublishItemCountLimit:
 @pytest.mark.usefixtures("bulk_publish_flags")
 class TestBulkPublishEndToEnd:
     """Integration-style tests for the bulk publish flow with mocked API."""
+
+    @pytest.mark.parametrize("definition_enabled", [False, True], ids=["flag-off", "flag-on"])
+    def test_lakehouse_full_definition_ignores_standard_publish_flag(
+        self, mock_endpoint, temp_workspace_dir, definition_enabled
+    ):
+        """Bulk always sends all repository definition files without standard-only transformations."""
+        if definition_enabled:
+            constants.FEATURE_FLAG.add(FeatureFlag.ENABLE_LAKEHOUSE_DEFINITION_PUBLISH.value)
+        item_dir = create_test_item_dir(temp_workspace_dir, None, "TestLH", "Lakehouse", "lh-id-001")
+        definitions = {
+            "lakehouse.metadata.json": {"defaultSchema": "dbo"},
+            "alm.settings.json": {
+                "version": "1.0.1",
+                "objectTypes": [
+                    {"name": "Shortcuts", "state": "Enabled"},
+                    {"name": "DataAccessRoles", "state": "Enabled"},
+                ],
+            },
+            "data-access-roles.json": [{"name": "Reader"}],
+            "shortcuts.metadata.json": [{"name": "Shortcut", "path": "/Tables"}],
+        }
+        for name, contents in definitions.items():
+            (item_dir / name).write_text(json.dumps(contents), encoding="utf-8")
+        set_bulk_response(
+            mock_endpoint,
+            [
+                {
+                    "itemType": "Lakehouse",
+                    "itemDisplayName": "TestLH",
+                    "itemId": "lh-guid-001",
+                    "operationType": "Create",
+                },
+            ],
+        )
+        bodies = capture_bulk_bodies(mock_endpoint)
+
+        with patched_workspace(mock_endpoint, temp_workspace_dir, item_type_in_scope=["Lakehouse"]) as workspace:
+            with patch.object(workspace, "_publish_item") as standard_publish:
+                publish.publish_all_items(workspace)
+
+            assert workspace.bulk_publish_enabled is True
+            standard_publish.assert_not_called()
+            assert workspace.repository_items["Lakehouse"]["TestLH"].guid == "lh-guid-001"
+
+        assert len(bodies) == 1
+        assert {part["path"] for part in bodies[0]["definitionParts"]} == {
+            f"/TestLH.Lakehouse/{name}" for name in {".platform", "dummy.txt", *definitions}
+        }
+        for name, contents in definitions.items():
+            assert json.loads(get_bulk_part_content(bodies[0], f"/{name}")) == contents
 
     def test_bulk_publish_assigns_guids_from_response(self, mock_endpoint, temp_workspace_dir):
         """Bulk publish assigns item GUIDs from the API response."""

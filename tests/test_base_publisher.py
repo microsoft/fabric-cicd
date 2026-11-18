@@ -222,7 +222,7 @@ def test_lakehouse_publish_error_names_failed_shortcut(shortcut_publish_enabled)
 
     with (
         patch.object(LakehousePublisher, "publish_one", side_effect=fake_publish_one),
-        patch("fabric_cicd._items._lakehouse.ShortcutPublisher.publish_all", fake_shortcut_publish_all),
+        patch("fabric_cicd._items._shortcuts.ShortcutPublisher.publish_all", fake_shortcut_publish_all),
         pytest.raises(PublishError) as exc_info,
     ):
         publisher.publish_all()

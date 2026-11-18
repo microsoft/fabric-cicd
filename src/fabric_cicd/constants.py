@@ -125,6 +125,8 @@ class FeatureFlag(str, Enum):
 
     ENABLE_LAKEHOUSE_UNPUBLISH = "enable_lakehouse_unpublish"
     """Set to enable the deletion of Lakehouses."""
+    ENABLE_LAKEHOUSE_DEFINITION_PUBLISH = "enable_lakehouse_definition_publish"
+    """Set to enable full Lakehouse definitions in standard publishing; bulk publishing is unaffected."""
     ENABLE_WAREHOUSE_UNPUBLISH = "enable_warehouse_unpublish"
     """Set to enable the deletion of Warehouses."""
     ENABLE_WAREHOUSE_DEFINITION_PUBLISH = "enable_warehouse_definition_publish"
@@ -239,7 +241,6 @@ NON_MOVABLE_ITEM_TYPES = [
 ]
 
 SHELL_ONLY_PUBLISH = [
-    ItemType.LAKEHOUSE.value,
     ItemType.SQL_DATABASE.value,
     ItemType.ML_EXPERIMENT.value,
 ]

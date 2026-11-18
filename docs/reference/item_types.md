@@ -118,8 +118,11 @@
 
 - **Parameterization:**
     - The `find_replace` section in the `parameter.yml` file is not applied.
-- **Shortcut** publish is disabled by default (for now), enable with feature flag `enable_shortcut_publish`.
-- **Schemas are not deployed** unless the schema has a shortcut present.
+- **Publishing:**
+    - **Standard:** Shell-only by default, including schema-enabled creation when `lakehouse.metadata.json` contains `defaultSchema`. Set `enable_lakehouse_definition_publish` to deploy Lakehouse metadata and ALM settings, including enabled data access roles, as described in the [Lakehouse definition](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/lakehouse-definition) documentation. This does not deploy schema or table definitions or stored data.
+    - **Bulk:** Always deploys the repository definition, regardless of the definition flag. If bulk falls back to standard publishing, the flag applies.
+    - **Data access roles:** `data-access-roles.json` is only applied when `DataAccessRoles` is `Enabled` in `alm.settings.json` (disabled by default). Roles can be added, modified, and removed. `microsoftEntraMembers` are unsupported by the Lakehouse definition API and ignored.
+- **Shortcut** publish remains separate from the definition and is disabled by default (for now), enable with feature flag `enable_shortcut_publish`.
 - **Unpublish** is disabled by default, enable with feature flag `enable_lakehouse_unpublish`.
 
 ## Map
