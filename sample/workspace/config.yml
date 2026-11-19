@@ -25,6 +25,8 @@ core: # Core configurations
   parameter: "parameter.yml" # Path to parameter file (relative to config.yml location) (optional)
 
 publish: # Publish configuration (optional)
+  # deployment_plan: "DeploymentPlan_PPE"  # Name of the deployment plan to use (optional)
+  
   exclude_regex: "^DONT_DEPLOY.*"  # Regex pattern to exclude items from publishing
 
   # folder_exclude_regex: "^/DONT_DEPLOY_FOLDER"  # Regex pattern to exclude folder paths with items from publishing (requires feature flags)

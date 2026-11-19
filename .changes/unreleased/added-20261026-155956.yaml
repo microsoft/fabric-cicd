@@ -1,0 +1,8 @@
+kind: added
+body: Add support for executing a deployment plan during bulk publishing
+time: 2026-10-26T15:59:56.8000281+02:00
+custom:
+    Author: shirasassoon
+    AuthorLink: https://github.com/shirasassoon
+    Issue: "1177"
+    IssueLink: https://github.com/microsoft/fabric-cicd/issues/1138

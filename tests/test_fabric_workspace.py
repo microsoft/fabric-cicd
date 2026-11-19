@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+import base64
 import json
 import re
 import tempfile
@@ -2355,6 +2356,73 @@ def test_publish_non_variable_library_calls_all_replacements(
         mock_logical.assert_called_once()
         mock_params.assert_called_once()
         mock_ws.assert_called_once_with(mock_file.contents, mock_item)
+
+
+@pytest.mark.parametrize("plan_guid", ["", "deployed-plan-id"])
+@pytest.mark.parametrize("references_deployed", [False, True])
+def test_publish_deployment_plan_preserves_logical_references(
+    temp_workspace_dir, patched_fabric_workspace, valid_workspace_id, plan_guid, references_deployed
+):
+    workspace = patched_fabric_workspace(valid_workspace_id, str(temp_workspace_dir))
+    notebook_id = "99b570c5-0c79-9dc4-4c9b-fa16c621384c"
+    pipeline_id = "70a8992d-af56-801f-4046-ad0813bac453"
+    plan_content = {
+        "version": "1.0.0",
+        "groups": [
+            {
+                "name": "Original group",
+                "logicalId": notebook_id,
+                "postActions": [{"name": "Run pipeline", "job": {"type": "Execute", "logicalId": pipeline_id}}],
+            }
+        ],
+    }
+    plan_dir = temp_workspace_dir / "Plan.DeploymentPlan"
+    plan_dir.mkdir()
+    (plan_dir / "plan.yml").write_text(yaml.safe_dump(plan_content), encoding="utf-8")
+    plan = Item(
+        constants.ItemType.DEPLOYMENT_PLAN.value, "Plan", "", plan_guid, logical_id="plan-logical-id", path=plan_dir
+    )
+    plan.collect_item_files()
+    workspace.repository_items = {
+        constants.ItemType.DEPLOYMENT_PLAN.value: {plan.name: plan},
+        constants.ItemType.NOTEBOOK.value: {
+            "Notebook": Item(
+                constants.ItemType.NOTEBOOK.value,
+                "Notebook",
+                "",
+                "deployed-notebook-id" if references_deployed else "",
+                logical_id=notebook_id,
+            )
+        },
+        constants.ItemType.DATA_PIPELINE.value: {
+            "Pipeline": Item(
+                constants.ItemType.DATA_PIPELINE.value,
+                "Pipeline",
+                "",
+                "deployed-pipeline-id" if references_deployed else "",
+                logical_id=pipeline_id,
+            )
+        },
+    }
+    workspace.environment = "TEST"
+    workspace.environment_parameter = {
+        "find_replace": [{"find_value": "Original group", "replace_value": {"TEST": "Renamed group"}}]
+    }
+
+    workspace._publish_item(item_name=plan.name, item_type=plan.type)
+
+    request = workspace.endpoint.invoke.call_args.kwargs
+    expected_url = (
+        f"{workspace.base_api_url}/items/{plan_guid}/updateDefinition?updateMetadata=True"
+        if plan_guid
+        else f"{workspace.base_api_url}/items"
+    )
+    assert request["method"] == "POST"
+    assert request["url"] == expected_url
+    part = next(part for part in request["body"]["definition"]["parts"] if part["path"] == "plan.yml")
+    published_plan = yaml.safe_load(base64.b64decode(part["payload"]))
+    plan_content["groups"][0]["name"] = "Renamed group"
+    assert published_plan == plan_content
 
 
 def test_publish_reflex_enables_reflex_workspace_id_replacement(

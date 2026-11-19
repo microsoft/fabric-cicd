@@ -123,6 +123,9 @@ The `publish` section is optional and controls item publishing behavior. If this
 
 ```yaml
 publish:
+    # Optional - name of the DeploymentPlan to apply (bulk publish mode only)
+    deployment_plan: <plan_name>
+
     # Optional - pattern to exclude items from publishing (no feature flag required)
     exclude_regex: <regex_pattern_string>
 
@@ -151,6 +154,11 @@ publish:
 
 ```yaml
 publish:
+    # Optional - select a different deployment plan for each environment
+    deployment_plan:
+        <env_1>: <plan_name_1>
+        <env..>: <plan_name..>
+
     # Optional - pattern to exclude items from publishing
     exclude_regex:
         <env_1>: <regex_pattern_string_1>
@@ -309,6 +317,7 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `core.repository_directory`             | ✅       | Validation error                |
 | `core.item_types_in_scope`              | ❌       | Warning logged, setting skipped |
 | `core.parameter`                        | ❌       | Warning logged, setting skipped |
+| `publish.deployment_plan`               | ❌       | Debug logged, setting skipped   |
 | `publish.exclude_regex`                 | ❌       | Debug logged, setting skipped   |
 | `publish.folder_exclude_regex`          | ❌       | Debug logged, setting skipped   |
 | `publish.shortcut_exclude_regex`        | ❌       | Debug logged, setting skipped   |
@@ -320,6 +329,8 @@ Fields are categorized as **required** or **optional**, which affects how missin
 | `unpublish.skip`                        | ❌       | Defaults to `False`             |
 | `features`                              | ❌       | Warning logged, setting skipped |
 | `constants`                             | ❌       | Warning logged, setting skipped |
+
+If `publish.deployment_plan` has no value for the target environment, publishing proceeds without executing a deployment plan; publishing itself is not skipped.
 
 ### Selective Environment Configuration
 

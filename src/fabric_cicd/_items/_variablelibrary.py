@@ -5,6 +5,7 @@
 
 import json
 import logging
+from typing import Optional
 
 from fabric_cicd import FabricWorkspace, constants
 from fabric_cicd._common._item import Item
@@ -15,19 +16,31 @@ from fabric_cicd.constants import ItemType
 logger = logging.getLogger(__name__)
 
 
-def activate_value_set(fabric_workspace_obj: FabricWorkspace, item_obj: Item) -> None:
+def activate_value_set(
+    fabric_workspace_obj: FabricWorkspace, item_obj: Item, value_set_override: Optional[str] = None
+) -> None:
     """
     Activates the value set for the given Variable Library item.
+
+    Logs a warning and skips activation if settings.json is missing.
 
     Args:
         fabric_workspace_obj: The FabricWorkspace object.
         item_obj: The item object.
+        value_set_override: Explicit value set name that overrides environment-based selection, or None to use it.
     """
     settings_file_obj = next((file for file in item_obj.item_files if file.name == "settings.json"), None)
 
     if settings_file_obj:
         settings_dict = json.loads(settings_file_obj.contents)
-        if fabric_workspace_obj.environment in settings_dict["valueSetsOrder"]:
+        if value_set_override is not None:
+            active_value_set = value_set_override
+            if active_value_set != fabric_workspace_obj.environment:
+                logger.warning(
+                    f"Variable Library '{item_obj.name}' uses plan value set '{active_value_set}', "
+                    f"which differs from target environment '{fabric_workspace_obj.environment}'."
+                )
+        elif fabric_workspace_obj.environment in settings_dict["valueSetsOrder"]:
             active_value_set = fabric_workspace_obj.environment
         else:
             active_value_set = "Default value set"
@@ -58,10 +71,11 @@ class VariableLibraryPublisher(ItemPublisher):
         if not item.skip_publish:
             activate_value_set(self.fabric_workspace_obj, item)
 
-    def post_publish_all(self) -> None:
+    def post_publish_all(self, value_set_selections: Optional[dict[str, Optional[str]]] = None) -> None:
         """Activate value sets after bulk upload."""
         if self.fabric_workspace_obj.bulk_publish_enabled:
             log_header(logger, "Activating Variable Library Value Sets")
             for item in self.fabric_workspace_obj.repository_items.get(self.item_type, {}).values():
                 if not item.skip_publish:
-                    activate_value_set(self.fabric_workspace_obj, item)
+                    selection = value_set_selections.get(item.name) if value_set_selections else None
+                    activate_value_set(self.fabric_workspace_obj, item, selection)
