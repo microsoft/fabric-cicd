@@ -91,6 +91,14 @@
     - Destinations connected to items that exist in a different workspace will always point to the original item unless parameterized in the `find_replace` section of the `parameter.yml` file.
     - Destinations connected to items within the same workspace are re-pointed to the new item in the target workspace.
 - **Initial deployment** requires waiting for the table to populate in the destination lakehouse if a lakehouse destination is present in the eventstream.
+- **Private endpoint sources:** Enable the
+  [`enable_eventstream_source_pause`](../how_to/optional_feature.md#feature-flags) feature flag when deploying Eventstreams that contain private endpoint sources.
+  When enabled, it attempts to pause all running sources in each selected, existing Eventstream—not just private endpoint sources—before updating the definition.
+  It attempts to resume sources whose pause was attempted, even if pausing or updating fails. Sources already paused or stopped are left unchanged.
+  Excluded Eventstreams are not queried, paused, or resumed. New Eventstreams skip source management.
+  If a source remains paused after a recovery failure, manual recovery may be required.
+- **Source compatibility:** Not all source types support pause and resume. This feature attempts to pause every running source, so unsupported sources can cause deployment failures.
+  Before enabling the flag, check the [Fabric pause/resume support table](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/pause-resume-data-streams).
 
 ## Graph Model
 
